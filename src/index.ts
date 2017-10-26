@@ -4,7 +4,6 @@ import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import * as Q from 'q';
 import * as zipFolder from 'zip-folder';
-import * as rimraf from 'rimraf';
 import * as glob from 'glob';
 
 /**
@@ -35,7 +34,7 @@ export async function createPackage(options: RokuDeployOptions) {
     stagingFolderPath = path.resolve(stagingFolderPath);
 
     //clean the staging directory
-    await Q.nfcall(rimraf, stagingFolderPath);
+    await fsExtra.remove(stagingFolderPath);
 
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
@@ -45,52 +44,20 @@ export async function createPackage(options: RokuDeployOptions) {
 
     //move all of the files up to the root of the staging folder
     let manifestPath = (await Q.nfcall(glob, path.join(stagingFolderPath, '**/manifest')))[0];
-    let upCount = getUpDirCount(stagingFolderPath, manifestPath);
-    if (upCount > 0) {
-        //copy the files from the manifest's path to the root of the staging directory
-        await Q.nfcall(copyfiles, [path.join(stagingFolderPath, '**/*'), stagingFolderPath], upCount);
-    }
+
+    //use the folder where the manifest is located as the "project" folder
+    let projectPath = path.dirname(manifestPath);
+
     let outFolderPath = path.resolve(options.outDir);
     //make sure the output folder exists
     await fsExtra.ensureDir(outFolderPath);
     let outFilePath = path.join(outFolderPath, options.outFile);
 
     //create a zip of the staging folder
-    await Q.nfcall(zipFolder, stagingFolderPath, outFilePath);
+    await Q.nfcall(zipFolder, projectPath, outFilePath);
 
     //remove the staging folder path
-    await Q.nfcall(rimraf, stagingFolderPath);
-}
-
-/**
- * Given a root path and a full path, determine the number of directory traversals
- * upward it would take to reach the root path
- * @param rootPath
- * @param fullPath 
- */
-export function getUpDirCount(rootPath: string, fullPath: string) {
-    //normalize the paths
-    rootPath = path.normalize(rootPath);
-    fullPath = path.normalize(fullPath);
-    let count = -1;
-    let iterations = 0;
-    let lastPath: string;
-
-    let currentPath = fullPath;
-    //the last item in the path is the file
-    for (let i = 0; i < 5000; i++) {
-        lastPath = currentPath;
-        currentPath = path.dirname(currentPath);
-        count++;
-        if (currentPath === rootPath) {
-            return count;
-        }
-        if (lastPath === currentPath) {
-            throw new Error(`Unable to determine upDirCount for rootPath '${rootPath}' and fullPath '${fullPath}'`);
-        }
-    }
-    //fell out of that very long loop. If we haven't solved the path issue by now, we never will
-    throw new Error(`Prevented infinite while looking for upDirCount for rootPath: ${rootPath}`);
+    await fsExtra.remove(stagingFolderPath);
 }
 
 export async function publish(options: RokuDeployOptions) {
