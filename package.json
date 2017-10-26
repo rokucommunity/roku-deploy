@@ -4,24 +4,29 @@
   "description": "Package a Roku application's source code and then deploy it to a Roku.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "rimraf out && tsc",
+    "prepublishOnly": "npm run compile",
+    "test": "npm run compile && mocha dist/index.spec.js"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/fs-extra": "^4.0.3",
+    "@types/mocha": "^2.2.43",
+    "@types/node": "^8.0.47",
+    "adm-zip": "^0.4.7",
     "mocha": "^4.0.1",
-    "rimraf": "^2.6.2",
     "tslint": "^5.7.0",
     "typescript": "^2.5.2"
   },
   "dependencies": {
-    "@types/mocha": "^2.2.43",
-    "@types/node": "^8.0.47",
     "copy": "^0.3.1",
+    "copyfiles": "^1.2.0",
     "fs-extra": "^4.0.2",
+    "glob": "^7.1.2",
     "path": "^0.12.7",
     "q": "^1.5.1",
+    "rimraf": "^2.6.2",
     "zip-folder": "^1.0.0"
   }
 }
