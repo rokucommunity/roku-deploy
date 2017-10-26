@@ -1,0 +1,27 @@
+{
+  "name": "roku-deploy",
+  "version": "0.1.0",
+  "description": "Package a Roku application's source code and then deploy it to a Roku.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/fs-extra": "^4.0.3",
+    "mocha": "^4.0.1",
+    "rimraf": "^2.6.2",
+    "tslint": "^5.7.0",
+    "typescript": "^2.5.2"
+  },
+  "dependencies": {
+    "@types/mocha": "^2.2.43",
+    "@types/node": "^8.0.47",
+    "copy": "^0.3.1",
+    "fs-extra": "^4.0.2",
+    "path": "^0.12.7",
+    "q": "^1.5.1",
+    "zip-folder": "^1.0.0"
+  }
+}
