@@ -3,21 +3,25 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as Q from 'q';
 import * as AdmZip from 'adm-zip';
+import * as nrc from 'node-run-cmd';
 
-import { createPackage, getOptions, RokuDeployOptions } from './index';
+import { createPackage, deploy, getOptions, RokuDeployOptions } from './index';
+
+let outputFilePath: string;
+let options: RokuDeployOptions;
+
+beforeEach(() => {
+    options = getOptions();
+    options.rootDir = './testProject';
+    outputFilePath = path.join(<string>options.outDir, <string>options.outFile);
+});
+afterEach(async () => {
+    //delete the output file and other interum files
+    await Q.nfcall(fsExtra.remove, path.dirname(outputFilePath));
+    await Q.nfcall(fsExtra.remove, '.tmp');
+});
+
 describe('createPackage', function () {
-    let outputFilePath: string;
-    let options: RokuDeployOptions;
-    beforeEach(() => {
-        options = getOptions();
-        options.rootDir = './testProject';
-        outputFilePath = path.join(<string>options.outDir, <string>options.outFile);
-    });
-    afterEach(async () => {
-        //delete the output file and other interum files
-        await Q.nfcall(fsExtra.remove, path.dirname(outputFilePath));
-        await Q.nfcall(fsExtra.remove, '.tmp');
-    });
 
     it('should create package in proper directory', async function () {
         await createPackage(options);
@@ -27,17 +31,13 @@ describe('createPackage', function () {
 
     it('should only include the specified files', async () => {
         try {
-            console.log('starting test');
             options.files = ['manifest'];
             await createPackage(options);
-            console.log(outputFilePath);
             var zip = new AdmZip(outputFilePath);
             await fsExtra.ensureDir('.tmp');
             zip.extractAllTo('.tmp/output', true);
             assert.equal(fsExtra.existsSync('./.tmp/output/manifest'), true);
-            console.log('finishing test');
         } catch (e) {
-            console.log(e);
             throw e;
         }
     });
@@ -50,5 +50,30 @@ describe('createPackage', function () {
         assert.equal(fsExtra.existsSync('./.tmp/output/components'), true);
         assert.equal(fsExtra.existsSync('./.tmp/output/images'), true);
         assert.equal(fsExtra.existsSync('./.tmp/output/source'), true);
+    });
+});
+
+describe('deploy', () => {
+    it('works', async function () {
+        this.timeout(20000);
+        options.password = 'password';
+        options.host = '192.168.1.17';
+        let response = await deploy(options);
+        assert.equal(response.message, 'Successful deploy');
+    });
+});
+
+it.only('runs via the command line using the brsconfig.json file', function (done) {
+    this.timeout(20000);
+    nrc.run('node dist/index.js', {
+        onData: function (data) {
+            console.log(data);
+        }
+    }).then(() => {
+        assert.ok('deploy succeeded');
+        done();
+    }, () => {
+        assert.fail('deploy failed');
+        done();
     });
 });

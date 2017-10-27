@@ -5,6 +5,8 @@ import * as fsExtra from 'fs-extra';
 import * as Q from 'q';
 import * as zipFolder from 'zip-folder';
 import * as glob from 'glob';
+import * as request from 'request';
+import * as fs from 'fs';
 
 /**
  * Create a zip folder containing all of the specified roku project files.
@@ -26,8 +28,6 @@ export async function createPackage(options: RokuDeployOptions) {
 
     options.outDir = <string>options.outDir;
     options.outFile = <string>options.outFile;
-
-    console.log(JSON.stringify(options.files));
 
     //create the staging folder if it doesn't already exist
     let stagingFolderPath = path.join(".", ".roku-deploy-staging");
@@ -63,26 +63,69 @@ export async function createPackage(options: RokuDeployOptions) {
     await fsExtra.remove(stagingFolderPath);
 }
 
-export async function publish(options: RokuDeployOptions) {
+export async function publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
     options = getOptions(options);
-    let outFolderPath = path.resolve(options.outDir);
-    let outFilePath = path.join(outFolderPath, <string>options.outFile);
+    if (!options.host) {
+        throw new Error('must specify the host for the Roku device');
+    }
+    let packageFolderPath = path.resolve(options.outDir);
+    let packagePath = path.join(packageFolderPath, <string>options.outFile);
+    let hostUrl = `http://${options.host}`;
+    let homeClickUrl = `${hostUrl}:8060/keypress/Home`;
+    let packageUploadUrl = `${hostUrl}/plugin_install`;
 
-    // await rokuDeploy({
-    //     ipaddress: options.host,
-    //     password: options.password,
-    //     packagePath: outFilePath
-    // });
+    return Promise.all([]).then(function () {
+        // press the home button to return to the main screen
+        return new Promise(function (resolve, reject) {
+            request.post(homeClickUrl, function (err, response) {
+                if (err) {
+                    return reject(err)
+                }
+                return resolve(response)
+            })
+        }).then(function (response) {
+            // upload the package to the Roku  
+            return new Promise<any>(function (resolve, reject) {
+                request.post({
+                    url: packageUploadUrl,
+                    formData: {
+                        mysubmit: 'Replace',
+                        archive: fs.createReadStream(packagePath)
+                    }
+                }, function (err, response, body) {
+                    if (err) {
+                        return reject(err)
+                    }
+                    return resolve({ response: response, body: body })
+                }).auth(options.username, options.password, false)
+            })
+        }).then(function (results) {
+            if (results && results.response && results.response.statusCode === 200) {
+                if (results.body.indexOf('Identical to previous version -- not replacing.') != -1) {
+                    return { message: 'Identical to previous version -- not replacing', results: results }
+                }
+                return { message: 'Successful deploy', results: results }
+            } else if (results && results.response) {
+                return Q.reject({ message: 'Error, statusCode other than 200: ' + results.response.statusCode, results: results });
+            } else {
+                return Q.reject({ message: 'Invalid response', results: results });
+            }
+        })
+    })
 }
 
 /**
  * Create a zip of the project, and then publish to the target Roku device
  * @param options 
  */
-export default async function deploy(options: RokuDeployOptions) {
+export async function deploy(options: RokuDeployOptions) {
     options = getOptions(options);
+    console.log('Creating package');
     await createPackage(options);
-    await publish(options);
+    console.log('Deploying package');
+    let result = await publish(options);
+    console.log('Deployment complete');
+    return result;
 }
 
 /**
@@ -100,7 +143,8 @@ export function getOptions(options: RokuDeployOptions = {}) {
             "components/**/*.*",
             "images/**/*.*",
             "manifest"
-        ]
+        ],
+        username: 'rokudev'
     };
     for (let key in options) {
         defaultOptions[key] = options[key];
@@ -137,7 +181,27 @@ export interface RokuDeployOptions {
      */
     host?: string;
     /**
+     * The username for the roku box. This will almost always be 'rokudev', but allow to be passed in
+     * just in case roku adds support for custom usernames in the future
+     */
+    username?: string;
+    /**
      * The password for logging in to the developer portal on the target Roku device
      */
     password?: string;
+}
+
+//if run from the cmd line, start processing now
+if (require.main === module) {
+    let options: RokuDeployOptions;
+    //load a brsdeploy.json file if it exists
+    if (fsExtra.existsSync('brsdeploy.json')) {
+        let configFileText = fsExtra.readFileSync('brsdeploy.json').toString();
+        let optionsFromFile = JSON.parse(configFileText);
+        options = getOptions(optionsFromFile);
+    } else {
+        options = getOptions();
+    }
+
+    deploy(options);
 }
