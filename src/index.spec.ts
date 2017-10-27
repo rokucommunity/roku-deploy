@@ -63,7 +63,7 @@ describe('deploy', () => {
     });
 });
 
-it.only('runs via the command line using the brsconfig.json file', function (done) {
+it('runs via the command line using the brsconfig.json file', function (done) {
     this.timeout(20000);
     nrc.run('node dist/index.js', {
         onData: function (data) {
