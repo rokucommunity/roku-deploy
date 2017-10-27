@@ -38,12 +38,15 @@ export async function createPackage(options: RokuDeployOptions) {
 
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
-
+    let files = options.files.slice();
+    files.push(stagingFolderPath);
     //copy all of the files to the staging folder
-    await Q.nfcall(copy, options.files, stagingFolderPath);
+    await Q.nfcall(copyfiles, files);
 
     //move all of the files up to the root of the staging folder
-    let manifestPath = (await Q.nfcall(glob, path.join(stagingFolderPath, '**/manifest')))[0];
+    let manifestGlob = path.join(stagingFolderPath, '**/manifest');
+    let globResults = await Q.nfcall(glob, manifestGlob);
+    let manifestPath = globResults[0];
 
     //use the folder where the manifest is located as the "project" folder
     let projectPath = path.dirname(manifestPath);
