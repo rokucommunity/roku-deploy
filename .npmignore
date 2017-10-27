@@ -6,3 +6,4 @@ testProject
 rokudeploy.json
 tsconfig.json
 dist/*.map
+dist/*.spec.*

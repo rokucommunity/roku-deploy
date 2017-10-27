@@ -2,7 +2,7 @@
   "name": "roku-deploy",
   "version": "0.1.1",
   "description": "Package and publish a Roku application using Node.js",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "compile": "rimraf out && tsc",
     "prepublishOnly": "npm run compile",
