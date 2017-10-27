@@ -17,8 +17,8 @@ beforeEach(() => {
 });
 afterEach(async () => {
     //delete the output file and other interum files
-    await Q.nfcall(fsExtra.remove, path.dirname(outputFilePath));
-    await Q.nfcall(fsExtra.remove, '.tmp');
+    try { await Q.nfcall(fsExtra.remove, path.dirname(outputFilePath)); } catch (e) { }
+    try { await Q.nfcall(fsExtra.remove, '.tmp'); } catch (e) { }
 });
 
 describe('createPackage', function () {
@@ -50,6 +50,18 @@ describe('createPackage', function () {
         assert.equal(fsExtra.existsSync('./.tmp/output/components'), true);
         assert.equal(fsExtra.existsSync('./.tmp/output/images'), true);
         assert.equal(fsExtra.existsSync('./.tmp/output/source'), true);
+    });
+
+    it('fails with good error message when unable to find manifest', async () => {
+        //wipe out the files array
+        options.files = [];
+        try {
+            await createPackage(options);
+            assert.fail('Should have thrown exception');
+        } catch (e) {
+            assert.equal(e.message, 'Unable to find manifest file');
+            assert.ok('Threw exception as expected');
+        }
     });
 });
 

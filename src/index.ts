@@ -46,6 +46,9 @@ export async function createPackage(options: RokuDeployOptions) {
     let manifestGlob = path.join(stagingFolderPath, '**/manifest');
     let globResults = await Q.nfcall(glob, manifestGlob);
     let manifestPath = globResults[0];
+    if (!manifestPath) {
+        throw new Error('Unable to find manifest file');
+    }
 
     //use the folder where the manifest is located as the "project" folder
     let projectPath = path.dirname(manifestPath);
@@ -117,7 +120,7 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
  * Create a zip of the project, and then publish to the target Roku device
  * @param options 
  */
-export async function deploy(options: RokuDeployOptions) {
+export async function deploy(options?: RokuDeployOptions) {
     options = getOptions(options);
     console.log('Creating package');
     await createPackage(options);
@@ -132,6 +135,13 @@ export async function deploy(options: RokuDeployOptions) {
  * @param options 
  */
 export function getOptions(options: RokuDeployOptions = {}) {
+    let fileOptions: RokuDeployOptions = {};
+    //load a rokudeploy.json file if it exists
+    if (fsExtra.existsSync('rokudeploy.json')) {
+        let configFileText = fsExtra.readFileSync('rokudeploy.json').toString();
+        fileOptions = JSON.parse(configFileText);
+    }
+
     let defaultOptions = <RokuDeployOptions>{
         outDir: './out',
         outFile: 'roku-deploy.zip',
@@ -145,10 +155,11 @@ export function getOptions(options: RokuDeployOptions = {}) {
         ],
         username: 'rokudev'
     };
-    for (let key in options) {
-        defaultOptions[key] = options[key];
-    }
-    return defaultOptions;
+
+    //override the defaults with any found or provided options
+    let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
+    
+    return finalOptions;
 }
 
 export interface RokuDeployOptions {
