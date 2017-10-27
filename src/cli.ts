@@ -4,8 +4,8 @@ import * as fsExtra from 'fs-extra';
 
 let options: RokuDeployOptions;
 //load a brsdeploy.json file if it exists
-if (fsExtra.existsSync('brsdeploy.json')) {
-    let configFileText = fsExtra.readFileSync('brsdeploy.json').toString();
+if (fsExtra.existsSync('rokudeploy.json')) {
+    let configFileText = fsExtra.readFileSync('rokudeploy.json').toString();
     let optionsFromFile = JSON.parse(configFileText);
     options = getOptions(optionsFromFile);
 } else {

@@ -3,10 +3,10 @@
     "noImplicitAny": false,
     "target": "es5",
     "module": "commonjs",
-    "sourceMap": false,
+    "sourceMap": true,
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": false,
+    "declaration": true,
     "strict": true,
     "lib": [
       "es2015"
