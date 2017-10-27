@@ -165,43 +165,40 @@ export interface RokuDeployOptions {
     outFile?: string;
     /**
      * The root path to the folder holding your project. This folder should include the manifest file.
+     * @default './'
      */
     rootDir?: string;
     /**
      * An array of file paths or globs
+     * @default [
+            "source/**\/*.*",
+            "components/**\/*.*",
+            "images/**\/*.*",
+            "manifest"
+        ],
      */
     files?: string[];
     /**
      * Set this to true prevent the staging folder from being deleted after creating the package
+     * @default false
      */
     retainStagingFolder?: boolean;
     /**
-     * The IP address or hostname of the target Roku device
+     * The IP address or hostname of the target Roku device. 
+     * @required
      * @example "192.168.1.21" 
+     * 
      */
     host?: string;
     /**
      * The username for the roku box. This will almost always be 'rokudev', but allow to be passed in
      * just in case roku adds support for custom usernames in the future
+     * @default "rokudev"
      */
     username?: string;
     /**
      * The password for logging in to the developer portal on the target Roku device
+     * @required
      */
     password?: string;
-}
-
-//if run from the cmd line, start processing now
-if (require.main === module) {
-    let options: RokuDeployOptions;
-    //load a brsdeploy.json file if it exists
-    if (fsExtra.existsSync('brsdeploy.json')) {
-        let configFileText = fsExtra.readFileSync('brsdeploy.json').toString();
-        let optionsFromFile = JSON.parse(configFileText);
-        options = getOptions(optionsFromFile);
-    } else {
-        options = getOptions();
-    }
-
-    deploy(options);
 }
