@@ -1,4 +1,3 @@
-import * as copy from 'copy';
 import * as copyfiles from 'copyfiles';
 import * as path from 'path';
 import * as fsExtra from 'fs-extra';
