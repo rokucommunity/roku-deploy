@@ -23,6 +23,16 @@ afterEach(async () => {
 
 describe('createPackage', function () {
 
+    it('should throw error when no files were found to copy', async () => {
+        try {
+            options.files = [];
+            await createPackage(options);
+            assert.fail('Exception should have been thrown');
+        } catch (e) {
+            assert.ok('Exception was thrown as expected');
+        }
+    });
+
     it('should create package in proper directory', async function () {
         await createPackage(options);
         let exists = fsExtra.existsSync(outputFilePath);

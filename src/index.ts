@@ -1,4 +1,3 @@
-import * as copyfiles from 'copyfiles';
 import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import * as Q from 'q';
@@ -37,21 +36,7 @@ export async function createPackage(options: RokuDeployOptions) {
 
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
-    let files = options.files.slice();
-    files.push(stagingFolderPath);
-    //copy all of the files to the staging folder
-    await Q.nfcall(copyfiles, files);
-
-    //move all of the files up to the root of the staging folder
-    let manifestGlob = path.join(stagingFolderPath, '**/manifest');
-    let globResults = await Q.nfcall(glob, manifestGlob);
-    let manifestPath = globResults[0];
-    if (!manifestPath) {
-        throw new Error('Unable to find manifest file');
-    }
-
-    //use the folder where the manifest is located as the "project" folder
-    let projectPath = path.dirname(manifestPath);
+    await copyToStaging(options.files, stagingFolderPath);
 
     let outFolderPath = path.resolve(options.outDir);
     //make sure the output folder exists
@@ -59,10 +44,71 @@ export async function createPackage(options: RokuDeployOptions) {
     let outFilePath = path.join(outFolderPath, options.outFile);
 
     //create a zip of the staging folder
-    await Q.nfcall(zipFolder, projectPath, outFilePath);
+    await Q.nfcall(zipFolder, stagingFolderPath, outFilePath);
 
     //remove the staging folder path
     await fsExtra.remove(stagingFolderPath);
+}
+
+/**
+ * Copy all of the files to the staging directory
+ * @param fileGlobs 
+ * @param stagingPath 
+ */
+async function copyToStaging(fileGlobs: string[], stagingPath: string) {
+    stagingPath = path.normalize(stagingPath);
+    let filePaths: string[] = [];
+
+    //run glob lookups for every glob string provided
+    let globPromises: Promise<string[]>[] = [];
+    for (let fileGlob of fileGlobs) {
+        globPromises.push(
+            Q.nfcall(glob, fileGlob)
+        );
+    }
+
+    //wait for all globs to finish
+    let filePathArrays = await Promise.all(globPromises);
+
+    //create a single array of all paths
+    for (let filePathArray of filePathArrays) {
+        filePaths = filePaths.concat(filePathArray);
+    }
+
+    //make all file paths absolute
+    filePaths = filePaths.map((filePath) => {
+        return path.resolve(filePath);
+    });
+
+    //remove duplicate entries
+    filePaths = filePaths.filter(function (item, index, inputArray) {
+        return inputArray.indexOf(item) == index;
+    });
+
+    //find path for the manifest file
+    let manifestPath: string | undefined;
+    for (let filePath of filePaths) {
+        if (path.basename(filePath) === 'manifest') {
+            manifestPath = filePath;
+        }
+    }
+    if (!manifestPath) {
+        throw new Error('Unable to find manifest file');
+    }
+
+    //get the full path to the folder containing manifest
+    let manifestParentPath = path.dirname(manifestPath);
+
+    //copy each file, retaining their folder structure starting at the manifest location
+    let copyPromises = filePaths.map((sourcePath: string) => {
+        let relativeSourcePath = sourcePath.replace(manifestParentPath, '');
+        let destinationPath = path.join(stagingPath, relativeSourcePath);
+        let destinationFolderPath = path.dirname(destinationPath);
+        return fsExtra.ensureDir(destinationFolderPath).then(() => {
+            return Q.nfcall(fsExtra.copy, sourcePath, destinationPath);
+        });
+    });
+    await Promise.all(copyPromises);
 }
 
 export async function publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
@@ -158,7 +204,7 @@ export function getOptions(options: RokuDeployOptions = {}) {
 
     //override the defaults with any found or provided options
     let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
-    
+
     return finalOptions;
 }
 
