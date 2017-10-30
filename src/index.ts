@@ -154,7 +154,14 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
                 }
                 return { message: 'Successful deploy', results: results }
             } else if (results && results.response) {
-                return Q.reject({ message: 'Error, statusCode other than 200: ' + results.response.statusCode, results: results });
+                let error: any;
+                if (results.response.statusCode === 401) {
+                    error = new Error('Unauthorized. Please verify username and password for target Roku.');
+                } else {
+                    error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
+                }
+                error.response = results.response;
+                return Q.reject(error);
             } else {
                 return Q.reject({ message: 'Invalid response', results: results });
             }
@@ -168,11 +175,8 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
  */
 export async function deploy(options?: RokuDeployOptions) {
     options = getOptions(options);
-    console.log('Creating package');
     await createPackage(options);
-    console.log('Deploying package');
     let result = await publish(options);
-    console.log('Deployment complete');
     return result;
 }
 
