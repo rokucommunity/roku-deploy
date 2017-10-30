@@ -134,6 +134,24 @@ async function copyToStaging(fileGlobs: string[], stagingPath: string) {
     await Promise.all(copyPromises);
 }
 
+/**
+ * Simulate pressing the home button on the remote for this roku. 
+ * This makes the roku return to the home screen
+ * @param host
+ */
+export async function pressHomeButton(host) {
+    let homeClickUrl = `http://${host}:8060/keypress/Home`;
+    // press the home button to return to the main screen
+    return new Promise(function (resolve, reject) {
+        request.post(homeClickUrl, function (err, response) {
+            if (err) {
+                return reject(err)
+            }
+            return resolve(response)
+        })
+    })
+}
+
 export async function publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
     options = getOptions(options);
     if (!options.host) {
@@ -142,53 +160,45 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
     let packageFolderPath = path.resolve(options.outDir);
     let packagePath = path.join(packageFolderPath, <string>options.outFile);
     let hostUrl = `http://${options.host}`;
-    let homeClickUrl = `${hostUrl}:8060/keypress/Home`;
     let packageUploadUrl = `${hostUrl}/plugin_install`;
 
     return Promise.all([]).then(function () {
-        // press the home button to return to the main screen
-        return new Promise(function (resolve, reject) {
-            request.post(homeClickUrl, function (err, response) {
-                if (err) {
-                    return reject(err)
-                }
-                return resolve(response)
-            })
-        }).then(function (response) {
-            // upload the package to the Roku  
-            return new Promise<any>(function (resolve, reject) {
-                request.post({
-                    url: packageUploadUrl,
-                    formData: {
-                        mysubmit: 'Replace',
-                        archive: fs.createReadStream(packagePath)
+        return pressHomeButton(options.host)
+            .then(function (response) {
+                // upload the package to the Roku  
+                return new Promise<any>(function (resolve, reject) {
+                    request.post({
+                        url: packageUploadUrl,
+                        formData: {
+                            mysubmit: 'Replace',
+                            archive: fs.createReadStream(packagePath)
+                        }
+                    }, function (err, response, body) {
+                        if (err) {
+                            return reject(err)
+                        }
+                        return resolve({ response: response, body: body })
+                    }).auth(options.username, options.password, false)
+                })
+            }).then(function (results) {
+                if (results && results.response && results.response.statusCode === 200) {
+                    if (results.body.indexOf('Identical to previous version -- not replacing.') != -1) {
+                        return { message: 'Identical to previous version -- not replacing', results: results }
                     }
-                }, function (err, response, body) {
-                    if (err) {
-                        return reject(err)
+                    return { message: 'Successful deploy', results: results }
+                } else if (results && results.response) {
+                    let error: any;
+                    if (results.response.statusCode === 401) {
+                        error = new Error('Unauthorized. Please verify username and password for target Roku.');
+                    } else {
+                        error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
                     }
-                    return resolve({ response: response, body: body })
-                }).auth(options.username, options.password, false)
-            })
-        }).then(function (results) {
-            if (results && results.response && results.response.statusCode === 200) {
-                if (results.body.indexOf('Identical to previous version -- not replacing.') != -1) {
-                    return { message: 'Identical to previous version -- not replacing', results: results }
-                }
-                return { message: 'Successful deploy', results: results }
-            } else if (results && results.response) {
-                let error: any;
-                if (results.response.statusCode === 401) {
-                    error = new Error('Unauthorized. Please verify username and password for target Roku.');
+                    error.response = results.response;
+                    return Q.reject(error);
                 } else {
-                    error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
+                    return Q.reject({ message: 'Invalid response', results: results });
                 }
-                error.response = results.response;
-                return Q.reject(error);
-            } else {
-                return Q.reject({ message: 'Invalid response', results: results });
-            }
-        })
+            })
     })
 }
 
