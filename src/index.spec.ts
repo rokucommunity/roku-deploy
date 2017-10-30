@@ -85,15 +85,13 @@ describe('deploy', () => {
     });
 
     it('Presents nice message for 401 unauthorized status code', async function () {
-        this.timeout(120000);
+        this.timeout(20000);
         options.password = 'NOT_THE_PASSWORD';
         options.host = '192.168.1.17';
         try {
             let response = await deploy(options);
-            console.log(response);
             assert.fail('Should have rejected');
         } catch (e) {
-            console.log(e);
             assert.equal(e.message, 'Unauthorized. Please verify username and password for target Roku.');
         }
     });

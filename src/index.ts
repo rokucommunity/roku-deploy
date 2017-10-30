@@ -7,13 +7,10 @@ import * as request from 'request';
 import * as fs from 'fs';
 
 /**
- * Create a zip folder containing all of the specified roku project files.
- * Will scan for a manifest file, and if found, will remove parent folders above manifest for zipped folder.
- * For example, if this is the files glob: ["AppCode/RokuProject/**\/*"], and manifest exists at AppCode/RokuProject/manifest, then
- * the output zip would omit the AppCode/RokuProject folder structure from the zip. 
+ * Copies all of the referenced files to the staging folder
  * @param options 
  */
-export async function createPackage(options: RokuDeployOptions) {
+export async function prepublishToStaging(options: RokuDeployOptions) {
     options = getOptions(options);
 
     //cast some of the options as not null so we don't have to cast them below
@@ -25,7 +22,6 @@ export async function createPackage(options: RokuDeployOptions) {
     }
 
     options.outDir = <string>options.outDir;
-    options.outFile = <string>options.outFile;
 
     //create the staging folder if it doesn't already exist
     let stagingFolderPath = path.join(".", ".roku-deploy-staging");
@@ -37,17 +33,41 @@ export async function createPackage(options: RokuDeployOptions) {
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
     await copyToStaging(options.files, stagingFolderPath);
+}
+
+/**
+ * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
+ * @param options 
+ */
+export async function zipPackage(options: RokuDeployOptions) {
+    options = getOptions(options);
+    
+    //create the staging folder if it doesn't already exist
+    let stagingFolderPath = path.join(".", ".roku-deploy-staging");
+    stagingFolderPath = path.resolve(stagingFolderPath);
 
     let outFolderPath = path.resolve(options.outDir);
     //make sure the output folder exists
     await fsExtra.ensureDir(outFolderPath);
-    let outFilePath = path.join(outFolderPath, options.outFile);
+    let outFilePath = path.join(outFolderPath, <string>options.outFile);
 
     //create a zip of the staging folder
     await Q.nfcall(zipFolder, stagingFolderPath, outFilePath);
 
     //remove the staging folder path
     await fsExtra.remove(stagingFolderPath);
+}
+
+/**
+ * Create a zip folder containing all of the specified roku project files.
+ * Will scan for a manifest file, and if found, will remove parent folders above manifest for zipped folder.
+ * For example, if this is the files glob: ["AppCode/RokuProject/**\/*"], and manifest exists at AppCode/RokuProject/manifest, then
+ * the output zip would omit the AppCode/RokuProject folder structure from the zip. 
+ * @param options 
+ */
+export async function createPackage(options: RokuDeployOptions) {
+    await prepublishToStaging(options);
+    await zipPackage(options);
 }
 
 /**
