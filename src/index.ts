@@ -33,6 +33,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
     await copyToStaging(options.files, stagingFolderPath);
+    return stagingFolderPath;
 }
 
 /**
