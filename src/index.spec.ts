@@ -5,7 +5,7 @@ import * as Q from 'q';
 import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 
-import { createPackage, deploy, getOptions, RokuDeployOptions } from './index';
+import { createPackage, deploy, getOptions, prepublishToStaging, zipPackage, RokuDeployOptions } from './index';
 
 let outputFilePath: string;
 let options: RokuDeployOptions;
@@ -72,6 +72,14 @@ describe('createPackage', function () {
             assert.equal(e.message, 'Unable to find manifest file');
             assert.ok('Threw exception as expected');
         }
+    });
+
+    it('should retain the staging directory when told to', async () => {
+        let stagingFolderPath = await prepublishToStaging(options);
+        assert.equal(fsExtra.existsSync(stagingFolderPath), true);
+        options.retainStagingFolder = true;
+        await zipPackage(options);
+        assert.equal(fsExtra.existsSync(stagingFolderPath), true);
     });
 });
 

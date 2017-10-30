@@ -42,7 +42,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
  */
 export async function zipPackage(options: RokuDeployOptions) {
     options = getOptions(options);
-    
+
     //create the staging folder if it doesn't already exist
     let stagingFolderPath = path.join(".", ".roku-deploy-staging");
     stagingFolderPath = path.resolve(stagingFolderPath);
@@ -55,8 +55,10 @@ export async function zipPackage(options: RokuDeployOptions) {
     //create a zip of the staging folder
     await Q.nfcall(zipFolder, stagingFolderPath, outFilePath);
 
-    //remove the staging folder path
-    await fsExtra.remove(stagingFolderPath);
+    //delete the staging folder unless told to retain it.
+    if (options.retainStagingFolder !== true) {
+        await fsExtra.remove(stagingFolderPath);
+    }
 }
 
 /**
