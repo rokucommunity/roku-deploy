@@ -182,10 +182,12 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
                 })
             }).then(function (results) {
                 let error: any;
-                if (results && results.body && results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                    error = new Error('Compile error');
-                    error.results = results;
-                    return Q.reject(error);
+                if (options.failOnCompileError) {
+                    if (results && results.body && results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                        error = new Error('Compile error');
+                        error.results = results;
+                        return Q.reject(error);
+                    }
                 }
                 if (results && results.response && results.response.statusCode === 200) {
                     if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
@@ -236,6 +238,7 @@ export function getOptions(options: RokuDeployOptions = {}) {
         outDir: './out',
         outFile: 'roku-deploy.zip',
         retainStagingFolder: false,
+        failOnCompileError: true,
         rootDir: './',
         files: [
             "source/**/*.*",
@@ -301,4 +304,8 @@ export interface RokuDeployOptions {
      * @required
      */
     password?: string;
+    /**
+     * If true, the publish will fail on compile error
+     */
+    failOnCompileError?: boolean;
 }
