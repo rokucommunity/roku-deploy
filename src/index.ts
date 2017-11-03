@@ -181,22 +181,29 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
                     }).auth(options.username, options.password, false)
                 })
             }).then(function (results) {
+                let error: any;
+                if (results && results.body && results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                    error = new Error('Compile error');
+                    error.results = results;
+                    return Q.reject(error);
+                }
                 if (results && results.response && results.response.statusCode === 200) {
-                    if (results.body.indexOf('Identical to previous version -- not replacing.') != -1) {
+                    if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
                         return { message: 'Identical to previous version -- not replacing', results: results }
                     }
                     return { message: 'Successful deploy', results: results }
                 } else if (results && results.response) {
-                    let error: any;
                     if (results.response.statusCode === 401) {
                         error = new Error('Unauthorized. Please verify username and password for target Roku.');
                     } else {
                         error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
                     }
-                    error.response = results.response;
+                    error.results = results;
                     return Q.reject(error);
                 } else {
-                    return Q.reject({ message: 'Invalid response', results: results });
+                    error = new Error('Invalid response');
+                    error.results = results;
+                    return Q.reject(error);
                 }
             })
     })
