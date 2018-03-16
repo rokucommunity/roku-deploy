@@ -6,6 +6,9 @@ import * as glob from 'glob';
 import * as request from 'request';
 import * as fs from 'fs';
 
+// tslint:disable-next-line
+export var __request: any = request;
+
 /**
  * Copies all of the referenced files to the staging folder
  * @param options 
@@ -24,7 +27,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
     options.outDir = <string>options.outDir;
 
     //create the staging folder if it doesn't already exist
-    let stagingFolderPath = path.join(".", ".roku-deploy-staging");
+    let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
     stagingFolderPath = path.resolve(stagingFolderPath);
 
     //clean the staging directory
@@ -44,7 +47,7 @@ export async function zipPackage(options: RokuDeployOptions) {
     options = getOptions(options);
 
     //create the staging folder if it doesn't already exist
-    let stagingFolderPath = path.join(".", ".roku-deploy-staging");
+    let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
     stagingFolderPath = path.resolve(stagingFolderPath);
 
     let outFolderPath = path.resolve(options.outDir);
@@ -105,7 +108,7 @@ async function copyToStaging(fileGlobs: string[], stagingPath: string) {
 
     //remove duplicate entries
     filePaths = filePaths.filter(function (item, index, inputArray) {
-        return inputArray.indexOf(item) == index;
+        return inputArray.indexOf(item) === index;
     });
 
     //find path for the manifest file
@@ -145,11 +148,11 @@ export async function pressHomeButton(host) {
     return new Promise(function (resolve, reject) {
         request.post(homeClickUrl, function (err, response) {
             if (err) {
-                return reject(err)
+                return reject(err);
             }
-            return resolve(response)
-        })
-    })
+            return resolve(response);
+        });
+    });
 }
 
 export async function publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
@@ -163,52 +166,51 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
     let packageUploadUrl = `${hostUrl}/plugin_install`;
 
     return Promise.all([]).then(function () {
-        return pressHomeButton(options.host)
-            .then(function (response) {
-                // upload the package to the Roku  
-                return new Promise<any>(function (resolve, reject) {
-                    request.post({
-                        url: packageUploadUrl,
-                        formData: {
-                            mysubmit: 'Replace',
-                            archive: fs.createReadStream(packagePath)
-                        }
-                    }, function (err, response, body) {
-                        if (err) {
-                            return reject(err)
-                        }
-                        return resolve({ response: response, body: body })
-                    }).auth(options.username, options.password, false)
-                })
-            }).then(function (results) {
-                let error: any;
-                if (options.failOnCompileError) {
-                    if (results && results.body && results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                        error = new Error('Compile error');
-                        error.results = results;
-                        return Q.reject(error);
+        return pressHomeButton(options.host).then(function (response) {
+            // upload the package to the Roku  
+            return new Promise<any>(function (resolve, reject) {
+                request.post({
+                    url: packageUploadUrl,
+                    formData: {
+                        mysubmit: 'Replace',
+                        archive: fs.createReadStream(packagePath)
                     }
-                }
-                if (results && results.response && results.response.statusCode === 200) {
-                    if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-                        return { message: 'Identical to previous version -- not replacing', results: results }
+                }, function (err, resp, body) {
+                    if (err) {
+                        return reject(err);
                     }
-                    return { message: 'Successful deploy', results: results }
-                } else if (results && results.response) {
-                    if (results.response.statusCode === 401) {
-                        error = new Error('Unauthorized. Please verify username and password for target Roku.');
-                    } else {
-                        error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
-                    }
+                    return resolve({ response: resp, body: body });
+                }).auth(options.username, options.password, false);
+            });
+        }).then(function (results) {
+            let error: any;
+            if (options.failOnCompileError) {
+                if (results && results.body && results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                    error = new Error('Compile error');
                     error.results = results;
                     return Q.reject(error);
+                }
+            }
+            if (results && results.response && results.response.statusCode === 200) {
+                if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                    return { message: 'Identical to previous version -- not replacing', results: results };
+                }
+                return { message: 'Successful deploy', results: results };
+            } else if (results && results.response) {
+                if (results.response.statusCode === 401) {
+                    error = new Error('Unauthorized. Please verify username and password for target Roku.');
                 } else {
-                    error = new Error('Invalid response');
-                    error.results = results;
-                    return Q.reject(error);
+                    error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
                 }
-            })
-    })
+                error.results = results;
+                return Q.reject(error);
+            } else {
+                error = new Error('Invalid response');
+                error.results = results;
+                return Q.reject(error);
+            }
+        });
+    });
 }
 
 /**
@@ -241,10 +243,10 @@ export function getOptions(options: RokuDeployOptions = {}) {
         failOnCompileError: true,
         rootDir: './',
         files: [
-            "source/**/*.*",
-            "components/**/*.*",
-            "images/**/*.*",
-            "manifest"
+            'source/**/*.*',
+            'components/**/*.*',
+            'images/**/*.*',
+            'manifest'
         ],
         username: 'rokudev'
     };
@@ -271,6 +273,7 @@ export interface RokuDeployOptions {
      * @default './'
      */
     rootDir?: string;
+    // tslint:disable:jsdoc-format
     /**
      * An array of file paths or globs
      * @default [
@@ -280,6 +283,7 @@ export interface RokuDeployOptions {
             "manifest"
         ],
      */
+    // tslint:enable:jsdoc-format
     files?: string[];
     /**
      * Set this to true prevent the staging folder from being deleted after creating the package

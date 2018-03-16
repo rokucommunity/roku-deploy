@@ -4,9 +4,11 @@
   "description": "Package and publish a Roku application using Node.js",
   "main": "dist/index.js",
   "scripts": {
-    "compile": "rimraf out && tsc",
+    "compile": "npm run tslint && rimraf out && tsc",
     "prepublishOnly": "npm run compile",
-    "test": "npm run compile && mocha dist/index.spec.js"
+    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
+    "test": "nyc mocha src/**/*.spec.ts --full-trace --bail",
+    "coverage": "nyc report --reporter=text-lcov | coveralls"
   },
   "typings": "dist/index.d.ts",
   "bin": {
@@ -14,23 +16,54 @@
   },
   "author": "",
   "license": "ISC",
+  "nyc": {
+    "include": [
+      "src/index.ts"
+    ],
+    "extension": [
+      ".ts"
+    ],
+    "require": [
+      "ts-node/register",
+      "source-map-support/register"
+    ],
+    "reporter": [
+      "text-summary",
+      "html"
+    ],
+    "sourceMap": true,
+    "instrument": true,
+    "check-coverage": true,
+    "lines": 100,
+    "statements": 100,
+    "functions": 100,
+    "branches": 100
+  },
   "devDependencies": {
-    "@types/fs-extra": "^4.0.3",
-    "@types/mocha": "^2.2.43",
-    "@types/node": "^8.0.47",
+    "@types/chai": "^4.1.2",
+    "@types/fs-extra": "^5.0.1",
+    "@types/mocha": "^2.2.48",
+    "@types/node": "^9.4.7",
+    "@types/request": "^2.47.0",
     "adm-zip": "^0.4.7",
-    "mocha": "^4.0.1",
+    "chai": "^4.1.2",
+    "coveralls": "^3.0.0",
+    "mocha": "^5.0.4",
     "node-run-cmd": "^1.0.1",
+    "nyc": "^11.6.0",
     "rimraf": "^2.6.2",
-    "tslint": "^5.7.0",
-    "typescript": "^2.5.2"
+    "source-map-support": "^0.5.3",
+    "testdouble": "^3.5.2",
+    "ts-node": "^5.0.1",
+    "tslint": "^5.9.1",
+    "typescript": "^2.7.2"
   },
   "dependencies": {
-    "fs-extra": "^4.0.2",
+    "fs-extra": "^5.0.0",
     "glob": "^7.1.2",
     "path": "^0.12.7",
     "q": "^1.5.1",
-    "request": "^2.83.0",
+    "request": "^2.85.0",
     "zip-folder": "^1.0.0"
   }
 }

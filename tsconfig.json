@@ -3,11 +3,12 @@
     "noImplicitAny": false,
     "target": "es5",
     "module": "commonjs",
-    "sourceMap": false,
+    "sourceMap": true,
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
     "strict": true,
+    "strictNullChecks": false,
     "lib": [
       "es2015"
     ]

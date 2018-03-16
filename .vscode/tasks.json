@@ -2,24 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "type": "typescript",
-            "promptOnClose": false,
-            "presentation": {
-                "echo": true,
-                "reveal": "silent",
-                "focus": false,
-                "panel": "shared"
-            },
-            "tsconfig": "tsconfig.json",
-            "problemMatcher": [
-                "$tsc"
-            ]
-        },
-        {
             "type": "npm",
             "group": {
                 "kind": "test",
@@ -27,6 +9,18 @@
             },
             "script": "test",
             "problemMatcher": []
+        },
+        {
+            "type": "npm",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "script": "compile",
+            "problemMatcher": [
+                "$tslint5",
+                "$tsc"
+            ]
         }
     ]
 }
