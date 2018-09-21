@@ -77,9 +77,25 @@ export interface RokuDeployOptions {
      * 
      * This can also include {src;dest} objects which allows you to move files into different destination paths in the
      * deployment package. This would be useful for copying environment-specific configs into a common config location 
-     * (i.e. copy from "ProjectRoot\configs\dev.config.json" to "roku-deploy.zip\config.json"). 
+     * (i.e. copy from "ProjectRoot\configs\dev.config.json" to "roku-deploy.zip\config.json"). Here's a sample:
+     * 
+     * files: [
+     *  "manifest",
+     *  "source/**/*.*",
+     *  {
+     *      "src": "configs/app.dev.config",
+     *      "dest": "app.config"
+     *  },
+     *  {
+     *      "src": "images/english/**/*.*",
+     *      //you must add a trailing slash for directories
+     *      "dest": "images/"
+     *  }
+     * ]
      * 
      * If you specify "files", you need to provide ALL config values, as your array will completely overwrite the default.
+     * 
+     *
      * @default [
             "source/**/*.*",
             "components/**/*.*",
