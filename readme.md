@@ -55,77 +55,54 @@ From an npm script in package.json. (Requires rokudeploy.json to exist at the ro
     }
 
 ## Options
-```TypeScript
-export interface RokuDeployOptions {
-    /**
-     * A full path to the folder where the zip package should be placed
-     * @default "./out"
-     */
-    outDir?: string;
-    /**
-     * The name the zip file should be given. 
-     * @default "roku-deploy.zip"
-     */
-    outFile?: string;
-    /**
-     * The root path to the folder holding your project. This folder should include the manifest file.
-     * @default './'
-     */
-    rootDir?: string;
-    /**
-     * An array of file paths, file globs, or {src:string;dest:string} objects that will be copied into the deployment package.
-     * 
-     * This can also include {src;dest} objects which allows you to move files into different destination paths in the
-     * deployment package. This would be useful for copying environment-specific configs into a common config location 
-     * (i.e. copy from "ProjectRoot\configs\dev.config.json" to "roku-deploy.zip\config.json"). Here's a sample:
-     * 
-     * files: [
-     *  "manifest",
-     *  "source/**/*.*",
-     *  {
-     *      "src": "configs/app.dev.config",
-     *      "dest": "app.config"
-     *  },
-     *  {
-     *      "src": "images/english/**/*.*",
-     *      //you must add a trailing slash for directories
-     *      "dest": "images/"
-     *  }
-     * ]
-     * 
-     * If you specify "files", you need to provide ALL config values, as your array will completely overwrite the default.
-     * 
-     *
-     * @default [
-            "source/**/*.*",
-            "components/**/*.*",
-            "images/**/*.*",
-            "manifest"
-        ]
-     */
-    files?: string[] | { src: string; dest: string; };
-    /**
-     * Set this to true prevent the staging folder from being deleted after creating the package
-     * @default false
-     */
-    retainStagingFolder?: boolean;
-    /**
-     * The IP address or hostname of the target Roku device. 
-     * @required
-     * @example "192.168.1.21" 
-     * 
-     */
-    host?: string;
-    /**
-     * The username for the roku box. This will always be 'rokudev', but allow to be passed in
-     * just in case roku adds support for custom usernames in the future
-     * @default "rokudev"
-     */
-    username?: string;
-    /**
-     * The password for logging in to the developer portal on the target Roku device
-     * @required
-     */
-    password?: string;
-}
-```
+Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
+
+- **host:** string (*required*)  
+    The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`
+
+- **password:** string (*required*)  
+    The password for logging in to the developer portal on the target Roku device
+
+- **outDir?:** string = `"./out"`  
+    A full path to the folder where the zip package should be placed  
+
+- **outFile?:** string = `"roku-deploy.zip"`  
+    The name the zip file should be given.  
+
+- **rootDir?:** string = `'./'`  
+    The root path to the folder holding your project. The manifest file should be directly underneath this folder.
+
+- **files?:** ( string | { src: string; dest: string; } ) [] =  
+    ```
+    [
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "manifest"
+    ]
+    ```
+    An array of file paths, file globs, or {src:string;dest:string} objects that will     be copied into the deployment package.
+        
+    Using the {src;dest} objects will allow you to move files into different     destination paths in the
+    deployment package. This would be useful for copying environment-specific configs     into a common config location 
+    (i.e. copy from "ProjectRoot\configs\dev.config.json" to     "roku-deploy.zip\config.json"). Here's a sample:  
+    ```
+    {
+         "src": "configs/dev.config.json",
+         "dest": "app.config"
+    }
+    ```
+    This will result in the `[sourceFolder]/configs/dev.config.json` file being copied     to the zip file and named `"app.config"`
+    
+    *NOTE:* If you override this "files" property, you need to provide ALL config     values, as your array will completely overwrite the default.
+    
+- **retainStagingFolder?:** boolean = `false`  
+    Set this to true prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
+
+- **username?:** string = `"rokudev"`  
+    The username for the roku box. This will always be 'rokudev', but allow to be passed in
+    just in case roku adds support for custom usernames in the future
+   
+
+Click [here](https://github.com/TwitchBronBron/roku-deploy/blob/2648069de1f3e889c58b8119b5f852f126e60042/src/index.ts#L288) to see the typescript interface for these options
+
