@@ -12,6 +12,7 @@
         },
         {
             "type": "npm",
+            "label": "build",
             "group": {
                 "kind": "build",
                 "isDefault": true

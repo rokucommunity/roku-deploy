@@ -118,7 +118,7 @@ describe('createPackage', function () {
     });
 });
 
-it('runs via the command line using the brsconfig.json file', function (done) {
+it('runs via the command line using the rokudeploy.json file', function (done) {
     this.timeout(20000);
     nrc.run('node dist/index.js', {
         onData: function (data) {
@@ -317,6 +317,91 @@ describe('prepublishToStaging', () => {
     it('should use outDir for staging folder', async () => {
         await prepublishToStaging(options);
         expect(fsExtra.existsSync('out/.roku-deploy-staging')).to.be.true;
+    });
+
+    it('handles old glob-style', async () => {
+        options.files = [
+            'manifest',
+            'source/main.brs'
+        ];
+        await prepublishToStaging(options);
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/main.brs'));
+    });
+
+    it('throws when src matches multiple files, but dest does not end in a slash', async () => {
+        options.files = [
+            {
+                src: 'manifest',
+                dest: ''
+            },
+            {
+                src: 'source/**/*',
+                dest: 'source'
+            }
+        ];
+        try {
+            await prepublishToStaging(options);
+            expect('Should not have run this line').to.be.false;
+        } catch (e) {
+            let expectedMessage = 'Files entry matched multiple files';
+            let actualMessage = e.message.substring(0, expectedMessage.length);
+
+            if (expectedMessage !== actualMessage) {
+                expect(e.message).to.equal(expectedMessage);
+            }
+        }
+    });
+
+    it('handles new src;dest style', async () => {
+        options.files = [
+            {
+                src: 'manifest',
+                dest: ''
+            },
+            {
+                src: 'source/**/*',
+                dest: 'source/'
+            },
+            {
+                src: 'source/main.brs',
+                dest: 'source/main.brs'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/main.brs'));
+    });
+
+    it('handles renaming files', async () => {
+        options.files = [
+            {
+                src: 'manifest',
+                dest: ''
+            },
+            {
+                src: 'source/main.brs',
+                dest: 'source/renamed.brs'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/renamed.brs'));
+    });
+
+    it('handles absolute src paths',  async () => {
+        let absoluteManifestPath = path.resolve('./testProject/manifest');
+        options.files = [
+            {
+                src: absoluteManifestPath,
+                dest: ''
+            },
+            {
+                src: 'source/main.brs',
+                dest: 'source/renamed.brs'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
     });
 });
 

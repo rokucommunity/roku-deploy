@@ -18,13 +18,26 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
 
     //cast some of the options as not null so we don't have to cast them below
     options.rootDir = <string>options.rootDir;
-    options.files = <string[]>options.files;
-    //append the rootDir to every glob
-    for (let i = 0; i < options.files.length; i++) {
-        options.files[i] = path.join(options.rootDir, options.files[i]);
+    options.outDir = <string>options.outDir;
+    let files = [] as { src: string; dest: string }[];
+    //standardize the files object
+    for (let fileEntry of options.files) {
+        let entry: any = fileEntry;
+        if (typeof fileEntry === 'string') {
+            entry = <any>{ src: fileEntry };
+        }
+        if (!entry.dest) {
+            entry.dest = '';
+        }
+        files.push(entry);
     }
 
-    options.outDir = <string>options.outDir;
+    //append the rootDir to every relative glob and string file entry
+    for (let fileEntry of files as { src: string; dest: string }[]) {
+        if (path.isAbsolute(fileEntry.src) === false) {
+            fileEntry.src = path.join(options.rootDir, fileEntry.src);
+        }
+    }
 
     //create the staging folder if it doesn't already exist
     let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
@@ -35,7 +48,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
 
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
-    await copyToStaging(options.files, stagingFolderPath);
+    await copyToStaging(files, stagingFolderPath);
     return stagingFolderPath;
 }
 
@@ -81,41 +94,48 @@ export async function createPackage(options: RokuDeployOptions) {
  * @param fileGlobs 
  * @param stagingPath 
  */
-async function copyToStaging(fileGlobs: string[], stagingPath: string) {
+async function copyToStaging(files: { src: string; dest: string }[], stagingPath: string) {
     stagingPath = path.normalize(stagingPath);
-    let filePaths: string[] = [];
 
     //run glob lookups for every glob string provided
-    let globPromises: Promise<string[]>[] = [];
-    for (let fileGlob of fileGlobs) {
-        globPromises.push(
-            Q.nfcall(glob, fileGlob)
-        );
-    }
+    let globPromises = <{ src: string; dest: string }[][]>[];
+    files.forEach((file) => {
+        let promise = Q.nfcall(glob, file.src).then((filePathArray) => {
+            let result = <{ src: string; dest: string }[]>[];
+            //if found more than one file, then the dest must be empty string or end in a slash
+            if (filePathArray.length > 1 && !(file.dest === '' || file.dest.endsWith('/') || file.dest.endsWith('\\'))) {
+                throw new Error(`Files entry matched multiple files, so dest must end in a slash to indicate that it is a folder ${JSON.stringify(file)}`);
+            }
+            for (let filePath of filePathArray) {
+                result.push({
+                    src: filePath,
+                    dest: file.dest
+                });
+            }
+            return result;
+        });
+        globPromises.push(promise);
+    });
 
     //wait for all globs to finish
-    let filePathArrays = await Promise.all(globPromises);
+    let filePathObjects = await Promise.all(globPromises);
 
+    let fileObjects = <{ src: string; dest: string }[]>[];
     //create a single array of all paths
-    for (let filePathArray of filePathArrays) {
-        filePaths = filePaths.concat(filePathArray);
+    for (let filePathObject of filePathObjects) {
+        fileObjects = fileObjects.concat(filePathObject);
     }
 
     //make all file paths absolute
-    filePaths = filePaths.map((filePath) => {
-        return path.resolve(filePath);
-    });
-
-    //remove duplicate entries
-    filePaths = filePaths.filter(function (item, index, inputArray) {
-        return inputArray.indexOf(item) === index;
-    });
+    for (let fileObject of fileObjects) {
+        fileObject.src = path.resolve(fileObject.src);
+    }
 
     //find path for the manifest file
     let manifestPath: string | undefined;
-    for (let filePath of filePaths) {
-        if (path.basename(filePath) === 'manifest') {
-            manifestPath = filePath;
+    for (let fileObject of fileObjects) {
+        if (path.basename(fileObject.src) === 'manifest') {
+            manifestPath = fileObject.src;
         }
     }
     if (!manifestPath) {
@@ -126,12 +146,20 @@ async function copyToStaging(fileGlobs: string[], stagingPath: string) {
     let manifestParentPath = path.dirname(manifestPath);
 
     //copy each file, retaining their folder structure starting at the manifest location
-    let copyPromises = filePaths.map((sourcePath: string) => {
-        let relativeSourcePath = sourcePath.replace(manifestParentPath, '');
-        let destinationPath = path.join(stagingPath, relativeSourcePath);
+    let copyPromises = fileObjects.map((fileObject: { src: string; dest: string }) => {
+        let relativeSourcePath = fileObject.src.replace(manifestParentPath, '');
+        let destinationPath: string;
+        //if the dest ends in a slash (or is empty string), it's a folder and should use the relative source path
+        if (fileObject.dest.endsWith('\\') || fileObject.dest.endsWith('/') || !fileObject.dest) {
+            destinationPath = path.join(stagingPath, fileObject.dest, relativeSourcePath);
+        } else {
+            //dest is a relative path to a destination filename
+            destinationPath = path.join(stagingPath, fileObject.dest);
+        }
+
         let destinationFolderPath = path.dirname(destinationPath);
         return fsExtra.ensureDir(destinationFolderPath).then(() => {
-            return Q.nfcall(fsExtra.copy, sourcePath, destinationPath);
+            return Q.nfcall(fsExtra.copy, fileObject.src, destinationPath);
         });
     });
     await Promise.all(copyPromises);
@@ -259,7 +287,7 @@ export function getOptions(options: RokuDeployOptions = {}) {
 
 export interface RokuDeployOptions {
     /**
-     * A full path to the folder where the zip package sould be placed
+     * A full path to the folder where the zip package should be placed
      * @default "./out"
      */
     outDir?: string;
@@ -275,7 +303,9 @@ export interface RokuDeployOptions {
     rootDir?: string;
     // tslint:disable:jsdoc-format
     /**
-     * An array of file paths or globs
+     * An array of source file paths, source file globs, or {src,dest} objects indicating
+     * where the source files are and where they should be placed 
+     * in the output directory
      * @default [
             "source/**\/*.*",
             "components/**\/*.*",
@@ -284,7 +314,7 @@ export interface RokuDeployOptions {
         ],
      */
     // tslint:enable:jsdoc-format
-    files?: string[];
+    files?: (string | { src: string; dest: string; })[];
     /**
      * Set this to true prevent the staging folder from being deleted after creating the package
      * @default false
@@ -298,7 +328,7 @@ export interface RokuDeployOptions {
      */
     host?: string;
     /**
-     * The username for the roku box. This will almost always be 'rokudev', but allow to be passed in
+     * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
      * @default "rokudev"
      */

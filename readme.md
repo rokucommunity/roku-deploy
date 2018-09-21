@@ -58,7 +58,7 @@ From an npm script in package.json. (Requires rokudeploy.json to exist at the ro
 ```TypeScript
 export interface RokuDeployOptions {
     /**
-     * A full path to the folder where the zip package sould be placed
+     * A full path to the folder where the zip package should be placed
      * @default "./out"
      */
     outDir?: string;
@@ -73,7 +73,13 @@ export interface RokuDeployOptions {
      */
     rootDir?: string;
     /**
-     * An array of file paths or globs
+     * An array of file paths, file globs, or {src:string;dest:string} objects that will be copied into the deployment package.
+     * 
+     * This can also include {src;dest} objects which allows you to move files into different destination paths in the
+     * deployment package. This would be useful for copying environment-specific configs into a common config location 
+     * (i.e. copy from "ProjectRoot\configs\dev.config.json" to "roku-deploy.zip\config.json"). 
+     * 
+     * If you specify "files", you need to provide ALL config values, as your array will completely overwrite the default.
      * @default [
             "source/**/*.*",
             "components/**/*.*",
@@ -81,7 +87,7 @@ export interface RokuDeployOptions {
             "manifest"
         ]
      */
-    files?: string[];
+    files?: string[] | { src: string; dest: string; };
     /**
      * Set this to true prevent the staging folder from being deleted after creating the package
      * @default false
@@ -95,7 +101,7 @@ export interface RokuDeployOptions {
      */
     host?: string;
     /**
-     * The username for the roku box. This will almost always be 'rokudev', but allow to be passed in
+     * The username for the roku box. This will always be 'rokudev', but allow to be passed in
      * just in case roku adds support for custom usernames in the future
      * @default "rokudev"
      */
