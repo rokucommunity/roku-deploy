@@ -12,12 +12,14 @@ Publish Roku projects to a Roku device by using Node.js.
 
 ## Requirements
 
- 1. Your project must be structured the way that Roku expects. This means the following folder structure:  
+ 1. Your project must be structured the way that Roku expects. The source files can be in a subdirectory (using the `rootDir` config option), but whever your roku files exist, they must align with the following folder structure:  
      
      components/  
      images/  
      source/  
      manifest
+
+    
 
 2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible.
 
@@ -70,7 +72,7 @@ Here are the available options. The defaults are shown to the right of the optio
     The name the zip file should be given.  
 
 - **rootDir?:** string = `'./'`  
-    The root path to the folder holding your project. The manifest file should be directly underneath this folder.
+    The root path to the folder holding your project. The manifest file should be directly underneath this folder. Use this option when your roku project is in a subdirectory of where roku-deploy is installed.
 
 - **files?:** ( string | { src: string; dest: string; } ) [] =  
     ```
