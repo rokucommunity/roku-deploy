@@ -1,11 +1,10 @@
 import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import * as Q from 'q';
-import * as zipFolder from 'zip-folder';
 import * as glob from 'glob';
 import * as request from 'request';
 import * as fs from 'fs';
-
+import * as archiver from 'archiver';
 // tslint:disable-next-line
 export var __request: any = request;
 
@@ -69,7 +68,7 @@ export async function zipPackage(options: RokuDeployOptions) {
     let outFilePath = path.join(outFolderPath, <string>options.outFile);
 
     //create a zip of the staging folder
-    await Q.nfcall(zipFolder, stagingFolderPath, outFilePath);
+    await zipFolder(stagingFolderPath, outFilePath);
 
     //delete the staging folder unless told to retain it.
     if (options.retainStagingFolder !== true) {
@@ -283,6 +282,48 @@ export function getOptions(options: RokuDeployOptions = {}) {
     let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
 
     return finalOptions;
+}
+
+/**
+ * Given a path to a folder, zip up that folder and all of its contents
+ * @param srcFolder 
+ * @param zipFilePath 
+ */
+export function zipFolder(srcFolder: string, zipFilePath: string) {
+    return new Promise((resolve, reject) => {
+        let output = fs.createWriteStream(zipFilePath);
+        let archive = archiver('zip');
+
+        output.on('close', () => {
+            resolve();
+        });
+
+        output.on('error', (err) => {
+            reject(err);
+        });
+
+        /* istanbul ignore next */
+        archive.on('warning', function (err) {
+            if (err.code === 'ENOENT') {
+                console.warn(err);
+            } else {
+                reject(err);
+            }
+        });
+        
+        /* istanbul ignore next */
+        archive.on('error', (err) => {
+            reject(err);
+        });
+
+        archive.pipe(output);
+
+        //add every file in the source folder
+        archive.directory(srcFolder, false);
+
+        //finalize the archive
+        archive.finalize();
+    });
 }
 
 export interface RokuDeployOptions {

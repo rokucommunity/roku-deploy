@@ -388,7 +388,7 @@ describe('prepublishToStaging', () => {
         expect(fsExtra.existsSync('out/.roku-deploy-staging/source/renamed.brs'));
     });
 
-    it('handles absolute src paths',  async () => {
+    it('handles absolute src paths', async () => {
         let absoluteManifestPath = path.resolve('./testProject/manifest');
         options.files = [
             {
@@ -423,3 +423,24 @@ describe('deploy', () => {
         expect(result).not.to.be.undefined;
     });
 });
+
+describe('zipFolder', () => {
+    //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D 
+    it('rejects the promise when an error occurrs', async () => {
+        //zip path doesn't exist
+        await assertThrowsAsync(async () => {
+            await rokuDeploy.zipFolder('source', 'some/zip/path/that/does/not/exist');
+        });
+    });
+});
+
+async function assertThrowsAsync(fn) {
+    let f = () => { };
+    try {
+        await fn();
+    } catch (e) {
+        f = () => { throw e; };
+    } finally {
+        assert.throws(f);
+    }
+}
