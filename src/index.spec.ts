@@ -1,5 +1,6 @@
 import * as  assert from 'assert';
-import { expect } from 'chai';
+import * as chai from 'chai';
+import * as chaiFiles from 'chai-files';
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as Q from 'q';
@@ -9,6 +10,11 @@ import * as td from 'testdouble';
 
 import { createPackage, deploy, getOptions, publish, prepublishToStaging, zipPackage, RokuDeployOptions, __request, pressHomeButton } from './index';
 import * as rokuDeploy from './index';
+
+chai.use(chaiFiles);
+const expect = chai.expect;
+const file = chaiFiles.file;
+const dir = chaiFiles.dir;
 
 function getOutputFilePath() {
     return path.join(<string>options.outDir, <string>options.outFile);
@@ -70,8 +76,7 @@ describe('createPackage', function () {
 
     it('should create package in proper directory', async function () {
         await createPackage(options);
-        let exists = fsExtra.existsSync(getOutputFilePath());
-        assert.equal(exists, true);
+        expect(file(getOutputFilePath())).to.exist;
     });
 
     it('should only include the specified files', async () => {
@@ -81,7 +86,7 @@ describe('createPackage', function () {
             let zip = new AdmZip(getOutputFilePath());
             await fsExtra.ensureDir('.tmp');
             zip.extractAllTo('.tmp/output', true);
-            assert.equal(fsExtra.existsSync('./.tmp/output/manifest'), true);
+            expect(file('./.tmp/output/manifest')).to.exist;
         } catch (e) {
             throw e;
         }
@@ -92,9 +97,9 @@ describe('createPackage', function () {
         let zip = new AdmZip(getOutputFilePath());
         await fsExtra.ensureDir('.tmp');
         zip.extractAllTo('.tmp/output', true);
-        assert.equal(fsExtra.existsSync('./.tmp/output/components'), true);
-        assert.equal(fsExtra.existsSync('./.tmp/output/images'), true);
-        assert.equal(fsExtra.existsSync('./.tmp/output/source'), true);
+        expect(dir('./.tmp/output/components')).to.exist;
+        expect(dir('./.tmp/output/images')).to.exist;
+        expect(dir('./.tmp/output/source')).to.exist;
     });
 
     it('fails with good error message when unable to find manifest', async () => {
@@ -111,10 +116,10 @@ describe('createPackage', function () {
 
     it('should retain the staging directory when told to', async () => {
         let stagingFolderPath = await prepublishToStaging(options);
-        assert.equal(fsExtra.existsSync(stagingFolderPath), true);
+        expect(dir(stagingFolderPath)).to.exist;
         options.retainStagingFolder = true;
         await zipPackage(options);
-        assert.equal(fsExtra.existsSync(stagingFolderPath), true);
+        expect(dir(stagingFolderPath)).to.exist;
     });
 });
 
@@ -164,7 +169,7 @@ describe('publish', () => {
         try { fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json'); } catch (e) { }
     });
     it('fails when no host is provided', () => {
-        expect(fsExtra.existsSync('rokudeploy.json')).to.be.false;
+        expect(file('rokudeploy.json')).not.to.exist;
         return publish({ host: undefined }).then(() => {
             assert.fail('Should not have succeeded');
         }, () => {
@@ -316,7 +321,7 @@ describe('publish', () => {
 describe('prepublishToStaging', () => {
     it('should use outDir for staging folder', async () => {
         await prepublishToStaging(options);
-        expect(fsExtra.existsSync('out/.roku-deploy-staging')).to.be.true;
+        expect(dir('out/.roku-deploy-staging')).to.exist;
     });
 
     it('handles old glob-style', async () => {
@@ -325,8 +330,8 @@ describe('prepublishToStaging', () => {
             'source/main.brs'
         ];
         await prepublishToStaging(options);
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/main.brs'));
+        expect(file('out/.roku-deploy-staging/manifest')).to.exist;
+        expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
     });
 
     it('throws when src matches multiple files, but dest does not end in a slash', async () => {
@@ -369,8 +374,8 @@ describe('prepublishToStaging', () => {
             }
         ];
         await prepublishToStaging(options);
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/main.brs'));
+        expect(file('out/.roku-deploy-staging/manifest')).to.exist;
+        expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
     });
 
     it('handles renaming files', async () => {
@@ -385,7 +390,7 @@ describe('prepublishToStaging', () => {
             }
         ];
         await prepublishToStaging(options);
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/source/renamed.brs'));
+        expect(file('out/.roku-deploy-staging/source/renamed.brs')).to.exist;
     });
 
     it('handles absolute src paths', async () => {
@@ -401,7 +406,7 @@ describe('prepublishToStaging', () => {
             }
         ];
         await prepublishToStaging(options);
-        expect(fsExtra.existsSync('out/.roku-deploy-staging/manifest'));
+        expect(file('out/.roku-deploy-staging/manifest')).to.exist;
     });
 });
 
