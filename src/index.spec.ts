@@ -8,7 +8,7 @@ import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 import * as td from 'testdouble';
 
-import { createPackage, deploy, getOptions, publish, prepublishToStaging, zipPackage, RokuDeployOptions, __request, pressHomeButton } from './index';
+import { createPackage, deploy, getOptions, publish, prepublishToStaging, zipPackage, RokuDeployOptions, __request, pressHomeButton, normalizeFilesOption } from './index';
 import * as rokuDeploy from './index';
 
 chai.use(chaiFiles);
@@ -168,6 +168,7 @@ describe('publish', () => {
         //rename the rokudeploy.json file so publish doesn't pick it up
         try { fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json'); } catch (e) { }
     });
+
     it('fails when no host is provided', () => {
         expect(file('rokudeploy.json')).not.to.exist;
         return publish({ host: undefined }).then(() => {
@@ -407,6 +408,108 @@ describe('prepublishToStaging', () => {
         ];
         await prepublishToStaging(options);
         expect(file('out/.roku-deploy-staging/manifest')).to.exist;
+    });
+
+    it('handles excluded folders in glob pattern', async () => {
+        options.files = [
+            'manifest',
+            'components/!(scenes)/**/*'
+        ];
+        options.retainStagingFolder = true;
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
+        expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
+    });
+
+    it('handles multi-globs', async () => {
+        options.files = [
+            'manifest',
+            'components/**/*',
+            '!components/scenes/**/*'
+        ];
+        options.retainStagingFolder = true;
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
+        expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
+    });
+
+    it('throws on invalid entries', async () => {
+        options.files = [
+            'manifest',
+            <any>{}
+        ];
+        options.retainStagingFolder = true;
+        try {
+            await prepublishToStaging(options);
+            expect(true).to.be.false;
+        } catch (e) {
+            expect(true).to.be.true;
+        }
+    });
+});
+
+describe('makeFilesAbsolute', () => {
+    it('handles negated entries', () => {
+        expect(
+            rokuDeploy.makeFilesAbsolute([{
+                dest: '',
+                src: [
+                    'components/**/*',
+                    '!components/scenes/**/*'
+                ]
+            }], 'C:/somepath/')
+        ).to.eql([{
+            dest: '',
+            src: [
+                path.normalize('C:/somepath/components/**/*'),
+                `!${path.normalize('C:/somepath/components/scenes/**/*')}`
+            ]
+        }]);
+    });
+});
+describe('normalizeFilesOption', () => {
+    it('properly handles negated globs', () => {
+        expect(
+            rokuDeploy.normalizeFilesOption([
+                'manifest',
+                'components/**/*',
+                '!components/scenes/**/*'
+            ])
+        ).to.eql([{
+            dest: '',
+            src: [
+                'manifest',
+                'components/**/*',
+                '!components/scenes/**/*'
+            ],
+        }]);
+    });
+
+    it('properly handles negated globs', () => {
+        expect(
+            rokuDeploy.normalizeFilesOption([
+                'manifest',
+                {
+                    src: [
+                        'components/**/*',
+                        '!components/scenes/**/*'
+                    ]
+                },
+                'someOtherFile.brs'
+            ])
+        ).to.eql([{
+            src: [
+                'manifest',
+                'someOtherFile.brs'
+            ],
+            dest: '',
+        }, {
+            src: [
+                'components/**/*',
+                '!components/scenes/**/*'
+            ],
+            dest: '',
+        }]);
     });
 });
 

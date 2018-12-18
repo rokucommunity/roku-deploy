@@ -37,7 +37,7 @@ From a node script
 ```javascript
 var rokuDeploy = require('roku-deploy');
 
-rokuDeploy({
+rokuDeploy.deploy({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal'
     //other options if necessary
@@ -83,20 +83,28 @@ Here are the available options. The defaults are shown to the right of the optio
         "manifest"
     ]
     ```
-    An array of file paths, file globs, or {src:string;dest:string} objects that will     be copied into the deployment package.
+    An array of file paths, globs, or {src:string;dest:string} objects that will be copied into the deployment package.
         
-    Using the {src;dest} objects will allow you to move files into different     destination paths in the
-    deployment package. This would be useful for copying environment-specific configs     into a common config location 
-    (i.e. copy from "ProjectRoot\configs\dev.config.json" to     "roku-deploy.zip\config.json"). Here's a sample:  
+    Using the {src;dest} objects will allow you to move files into different destination paths in the
+    deployment package. This would be useful for copying environment-specific configs into a common config location 
+    (i.e. copy from `"ProjectRoot\configs\dev.config.json"` to `"roku-deploy.zip\config.json"`). Here's a sample:  
     ```
     {
          "src": "configs/dev.config.json",
-         "dest": "app.config"
+         "dest": "config.json"
     }
     ```
-    This will result in the `[sourceFolder]/configs/dev.config.json` file being copied     to the zip file and named `"app.config"`
-    
-    *NOTE:* If you override this "files" property, you need to provide ALL config     values, as your array will completely overwrite the default.
+    This will result in the `[sourceFolder]/configs/dev.config.json` file being copied to the zip file and named `"config.json"`.
+
+    You can also provide negated globs (thanks to [glob-all](https://www.npmjs.com/package/glob-all)). So something like this would include all component files EXCEPT for specs.
+    ```
+    files: [
+        'components/**/*.*',
+        '!components/**/*.spec.*'
+    ]
+    ```
+
+    *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
     
 - **retainStagingFolder?:** boolean = `false`  
     Set this to true prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
