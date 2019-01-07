@@ -335,6 +335,18 @@ describe('prepublishToStaging', () => {
         expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
     });
 
+    it('handles copying a simple directory by name using src;dest;', async () => {
+        options.files = [
+            'manifest',
+            {
+                src: 'source',
+                dest: 'source'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
+    });
+
     it('throws when src matches multiple files, but dest does not end in a slash', async () => {
         options.files = [
             {
@@ -424,6 +436,7 @@ describe('prepublishToStaging', () => {
     it('handles multi-globs', async () => {
         options.files = [
             'manifest',
+            { src: 'source', dest: 'dest' },
             'components/**/*',
             '!components/scenes/**/*'
         ];
@@ -468,14 +481,48 @@ describe('makeFilesAbsolute', () => {
     });
 });
 describe('normalizeFilesOption', () => {
+    it('glob-ifies top-level folder name', () => {
+        expect(rokuDeploy.normalizeFilesOption([
+            'manifest',
+            'components'
+        ], options.rootDir)).to.eql([{
+            dest: '',
+            src: [
+                'manifest'
+            ]
+        }, {
+            dest: 'components' + path.sep,
+            src: [
+                'components/**/*'
+            ]
+        }]);
+    });
+
+    it('glob-ifies src-level folder name', () => {
+        expect(rokuDeploy.normalizeFilesOption([
+            'manifest',
+            {
+                src: 'components'
+            }
+        ], options.rootDir)).to.eql([{
+            dest: '',
+            src: [
+                'manifest'
+            ],
+        }, {
+            dest: '',
+            src: [
+                'components/**/*'
+            ]
+        }]);
+    });
+
     it('properly handles negated globs', () => {
-        expect(
-            rokuDeploy.normalizeFilesOption([
-                'manifest',
-                'components/**/*',
-                '!components/scenes/**/*'
-            ])
-        ).to.eql([{
+        expect(rokuDeploy.normalizeFilesOption([
+            'manifest',
+            'components/**/*',
+            '!components/scenes/**/*'
+        ], options.rootDir)).to.eql([{
             dest: '',
             src: [
                 'manifest',
@@ -485,19 +532,17 @@ describe('normalizeFilesOption', () => {
         }]);
     });
 
-    it('properly handles negated globs', () => {
-        expect(
-            rokuDeploy.normalizeFilesOption([
-                'manifest',
-                {
-                    src: [
-                        'components/**/*',
-                        '!components/scenes/**/*'
-                    ]
-                },
-                'someOtherFile.brs'
-            ])
-        ).to.eql([{
+    it('properly handles negated globs with {src}', () => {
+        expect(rokuDeploy.normalizeFilesOption([
+            'manifest',
+            {
+                src: [
+                    'components/**/*',
+                    '!components/scenes/**/*'
+                ]
+            },
+            'someOtherFile.brs'
+        ], options.rootDir)).to.eql([{
             src: [
                 'manifest',
                 'someOtherFile.brs'

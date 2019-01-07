@@ -4,7 +4,7 @@
   "description": "Package and publish a Roku application using Node.js",
   "main": "dist/index.js",
   "scripts": {
-    "compile": "npm run tslint && rimraf out && tsc",
+    "compile": "rimraf out && tsc",
     "prepublishOnly": "npm run compile",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
     "test": "nyc mocha src/**/*.spec.ts --full-trace --bail",

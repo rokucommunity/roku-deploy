@@ -14,12 +14,11 @@ export var __request: any = request;
  */
 export async function prepublishToStaging(options: RokuDeployOptions) {
     options = getOptions(options);
-
     //cast some of the options as not null so we don't have to cast them below
     options.rootDir = <string>options.rootDir;
     options.outDir = <string>options.outDir;
 
-    const files = normalizeFilesOption(options.files);
+    const files = normalizeFilesOption(options.files, options.rootDir);
 
     //make all path references absolute
     makeFilesAbsolute(files, options.rootDir);
@@ -63,33 +62,69 @@ export function makeFilesAbsolute(files: { src: string[]; dest: string }[], root
     return files;
 }
 
-export function normalizeFilesOption(files: FilesType[]) {
+function endsWithSlash(dirPath: string) {
+    if (dirPath && (dirPath.lastIndexOf('/') === dirPath.length - 1 || dirPath.lastIndexOf('\\') === dirPath.length - 1)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+export function normalizeFilesOption(files: FilesType[], rootDir: string = './') {
+    debugger;
     const result: { src: string[]; dest: string }[] = [];
     let topLevelGlobs = <string[]>[];
     //standardize the files object
-    for (let fileEntry of files) {
-        let entry = fileEntry as any;
+    for (let fileEntry of (files as any[])) {
 
         //handle single string top-level globs
         if (typeof fileEntry === 'string') {
-            topLevelGlobs.push(fileEntry);
-            continue;
+            //for any folders that are not globbed, set a default glob 
+            if (isDirectorySync(fileEntry) || isDirectorySync(path.join(rootDir, fileEntry))) {
+                let obj = {
+                    src: [
+                        fileEntry + '/**/*'
+                    ],
+                    dest: fileEntry + path.sep
+                };
+                fileEntry = obj;
+            } else {
+                topLevelGlobs.push(fileEntry);
+                continue;
+            }
+
+            //handle src;dest; object with single string for src
+        } else if (typeof fileEntry.src === 'string') {
+            //for any folders that are not globbed, set a default glob 
+            if (isDirectorySync(fileEntry.src) || isDirectorySync(path.join(rootDir, fileEntry.src))) {
+                fileEntry.src = fileEntry.src += '/**/*';
+
+                //if dest does not end in a slash, add one
+                if (!endsWithSlash(fileEntry.dest) && fileEntry.dest && fileEntry.dest !== '') {
+                    fileEntry.dest = fileEntry.dest ? fileEntry.dest : '';
+                    fileEntry.dest += path.sep;
+                }
+            }
+            fileEntry.src = [fileEntry.src];
         }
 
-        //handle src;dest; object with single string for src
-        if (typeof entry.src === 'string') {
-            entry.src = [entry.src];
+        if (!fileEntry.dest) {
+            fileEntry.dest = '';
         }
 
-        if (!entry.dest) {
-            entry.dest = '';
+        //standardize the dest path separator
+        fileEntry.dest = path.normalize(fileEntry.dest).trim();
+        if (fileEntry.dest === '' || fileEntry.dest === '.' || fileEntry.dest === '.\\' || fileEntry.dest === './') {
+            fileEntry.dest = '';
         }
+        //force all slashes to the current platform's version
+        fileEntry.dest = fileEntry.dest.replace('\\', path.sep).replace('/', path.sep);
 
-        if (typeof entry !== 'string' && (!entry || entry.src === null || entry.src === undefined || entry.dest === null || entry.dest === undefined)) {
+        if (typeof fileEntry !== 'string' && (!fileEntry || fileEntry.src === null || fileEntry.src === undefined || fileEntry.dest === null || fileEntry.dest === undefined)) {
             throw new Error('Entry must be a string or a {src;dest;} object');
         }
 
-        result.push(entry);
+        result.push(fileEntry);
     }
 
     //if there are any top level globs, add that entry to the beginning
@@ -99,6 +134,7 @@ export function normalizeFilesOption(files: FilesType[]) {
             dest: ''
         });
     }
+
     return result;
 }
 
@@ -146,18 +182,19 @@ export async function createPackage(options: RokuDeployOptions) {
  */
 async function copyToStaging(files: FilesType[], stagingPath: string) {
     stagingPath = path.normalize(stagingPath);
-    const normalizedFiles = normalizeFilesOption(files);
+    const normalizedFiles = normalizeFilesOption(files, '');
 
     //run glob lookups for every glob string provided
     let filePathObjects = await Promise.all(
         normalizedFiles.map(async (file) => {
+
             let filePathArray = await Q.nfcall(globAll, file.src);
             let result = <{ src: string; dest: string }[]>[];
-            //if found more than one file, then the dest must be empty string or end in a slash
             if (filePathArray.length > 1 && !(file.dest === '' || file.dest.endsWith('/') || file.dest.endsWith('\\'))) {
                 throw new Error(`Files entry matched multiple files, so dest must end in a slash to indicate that it is a folder ${JSON.stringify(file)}`);
             }
             for (let filePath of filePathArray) {
+                //create a src;dest; object for every file or directory that was found
                 result.push({
                     src: filePath,
                     dest: file.dest
@@ -183,6 +220,8 @@ async function copyToStaging(files: FilesType[], stagingPath: string) {
     for (let fileObject of fileObjects) {
         if (path.basename(fileObject.src) === 'manifest') {
             manifestPath = fileObject.src;
+            //we found manifest...no need to loop any more
+            break;
         }
     }
     if (!manifestPath) {
@@ -192,41 +231,100 @@ async function copyToStaging(files: FilesType[], stagingPath: string) {
     //get the full path to the folder containing manifest
     let manifestParentPath = path.dirname(manifestPath);
 
-    //an array of directory paths that should be created in the target
-    let directoryPaths = [];
-
-    //copy each file, retaining their folder structure starting at the manifest location
+    //copy each file, retaining their folder structure relative to the manifest location
     await Promise.all(
         fileObjects.map(async (fileObject: { src: string; dest: string }) => {
-            let relativeSourcePath = fileObject.src.replace(manifestParentPath, '');
+            let src = path.normalize(fileObject.src);
+            let dest = fileObject.dest;
+
+            let relativeSrc = src.replace(manifestParentPath, '');
+            //remove any leading path separator
+            relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
+
+            let sourceIsDirectory = await isDirectory(src);
+            //c:\project\manifest -> C:\out\manifest {src: 'manifest', dest: ''}
+            //C:\project\source -> C:\out\source {src: 'source', dest: 'source'}
+            //C:\project\languages\english.xml -> C:\out\english.xml {src: 'languages\english.xml', dest: 'english.xml'}
+            //C:\project\english-fonts -> C:\out\fonts  {src: 'english-fonts', dest: 'fonts'}
+
             let destinationPath: string;
-            //if the dest ends in a slash (or is empty string), it's a folder and should use the relative source path
-            if (fileObject.dest.endsWith('\\') || fileObject.dest.endsWith('/') || !fileObject.dest) {
-                destinationPath = path.join(stagingPath, fileObject.dest, relativeSourcePath);
-            } else {
-                //dest is a relative path to a destination filename
-                destinationPath = path.join(stagingPath, fileObject.dest);
-            }
 
-            let destinationFolderPath = path.dirname(destinationPath);
-            await fsExtra.ensureDir(destinationFolderPath);
-            let stat = await Q.nfcall(fsExtra.lstat, fileObject.src);
-            //if the src is a directory, make that directory in the destination
-            if (stat.isDirectory()) {
-                directoryPaths.push(destinationPath);
+            //if item is a file
+            if (sourceIsDirectory === false) {
+                //if the dest ends in a slash, use the filename from src, but the folder structure from dest
+                if (dest.endsWith(path.sep)) {
+                    destinationPath = path.join(stagingPath, dest, path.basename(src));
+
+                    //dest is empty, so use the relative path
+                } else if (dest === '') {
+                    destinationPath = path.join(stagingPath, relativeSrc);
+
+                    //use all of dest
+                } else {
+                    destinationPath = path.join(stagingPath, dest);
+                }
+
+                //make sure the containing folder exists
+                await fsExtra.ensureDir(path.dirname(destinationPath));
+
+                //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
+                //Just try a few fimes until it resolves itself. 
+                for (let i = 0; i < 10; i++) {
+                    try {
+                        //copy the src item (file or directory full of files)
+                        await Q.nfcall(fsExtra.copy, fileObject.src, destinationPath);
+                        //copy succeeded, 
+                        break;
+                    } catch (e) {
+                        //wait a small amount of time and try again
+                        await new Promise((resolve) => {
+                            setTimeout(resolve, 50);
+                        });
+                    }
+                }
+
+                //item is a directory
             } else {
-                //it's a file. Copy that file
-                await Q.nfcall(fsExtra.copy, fileObject.src, destinationPath);
+                //ensure that the directory exists
+                await fsExtra.ensureDir(path.join(stagingPath, relativeSrc));
+                // if (relativeSrc === dest || dest === '') {
+                //     //copy the files to the same relative location as from src
+                //     destinationPath = path.join(stagingPath, relativeSrc);
+                // } else {
+                //     //copy the files to the new target dest location
+                //     destinationPath = path.join(stagingPath, dest);
+                // }
             }
         })
     );
+}
 
-    //now that all files have been created, ensure all folders (probably just the empty ones) are created in the destination
-    await Promise.all(
-        directoryPaths.map(async (directoryPath) => {
-            await fsExtra.ensureDir(directoryPath);
-        })
-    );
+/**
+ * Determine if the given path is a directory
+ * @param path 
+ */
+async function isDirectory(pathToDirectoryOrFile: string) {
+    try {
+        let stat = await Q.nfcall(fs.lstat, pathToDirectoryOrFile);
+        return stat.isDirectory();
+    } catch (e) {
+        // lstatSync throws an error if path doesn't exist
+        return false;
+    }
+}
+
+/**
+ * Determine if the given path is a directory, synchronously
+ * @param pathToDirectoryOrFile 
+ */
+function isDirectorySync(dirPath: string) {
+    try {
+        let stat = fs.lstatSync(path.resolve(dirPath));
+        return stat.isDirectory();
+    } catch (e) {
+        // lstatSync throws an error if path doesn't exist
+        return false;
+    }
 }
 
 /**

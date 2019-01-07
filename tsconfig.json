@@ -3,7 +3,7 @@
     "noImplicitAny": false,
     "target": "es5",
     "module": "commonjs",
-    "sourceMap": true,
+    "sourceMap": false,
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,

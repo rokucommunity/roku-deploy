@@ -88,13 +88,24 @@ Here are the available options. The defaults are shown to the right of the optio
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location 
     (i.e. copy from `"ProjectRoot\configs\dev.config.json"` to `"roku-deploy.zip\config.json"`). Here's a sample:  
-    ```
+    ```json
+    //deploy configs/dev.config.json as config.json
     {
          "src": "configs/dev.config.json",
          "dest": "config.json"
     }
     ```
+
+    ```json
+    //you can omit the filename in dest if you want the file to keep its name. Just end dest with a trailing slash.
+    {
+        "src": "languages/english/language.xml",
+        "dest": "languages/"
+    }
+
+    ```
     This will result in the `[sourceFolder]/configs/dev.config.json` file being copied to the zip file and named `"config.json"`.
+
 
     You can also provide negated globs (thanks to [glob-all](https://www.npmjs.com/package/glob-all)). So something like this would include all component files EXCEPT for specs.
     ```
