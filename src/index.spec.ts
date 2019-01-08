@@ -102,18 +102,6 @@ describe('createPackage', function () {
         expect(dir('./.tmp/output/source')).to.exist;
     });
 
-    it('fails with good error message when unable to find manifest', async () => {
-        //wipe out the files array
-        options.files = [];
-        try {
-            await createPackage(options);
-            assert.fail('Should have thrown exception');
-        } catch (e) {
-            assert.equal(e.message, 'Unable to find manifest file');
-            assert.ok('Threw exception as expected');
-        }
-    });
-
     it('should retain the staging directory when told to', async () => {
         let stagingFolderPath = await prepublishToStaging(options);
         expect(dir(stagingFolderPath)).to.exist;
@@ -480,9 +468,31 @@ describe('makeFilesAbsolute', () => {
         }]);
     });
 });
+
 describe('normalizeFilesOption', () => {
-    it('glob-ifies top-level folder name', () => {
-        expect(rokuDeploy.normalizeFilesOption([
+    it('appends trailing slash for dest directories', async () => {
+        await assertThrowsAsync(async () => {
+            await rokuDeploy.normalizeFilesOption([{
+                src: 'components',
+                //bogus dest object
+                dest: <any>true
+            }], options.rootDir);
+        });
+    });
+
+    it('defaults to current directory', async () => {
+        expect(await rokuDeploy.normalizeFilesOption([
+            'readme.md',
+        ])).to.eql([{
+            dest: '',
+            src: [
+                'readme.md'
+            ]
+        }]);
+    });
+
+    it('glob-ifies top-level folder name', async () => {
+        expect(await rokuDeploy.normalizeFilesOption([
             'manifest',
             'components'
         ], options.rootDir)).to.eql([{
@@ -498,8 +508,8 @@ describe('normalizeFilesOption', () => {
         }]);
     });
 
-    it('glob-ifies src-level folder name', () => {
-        expect(rokuDeploy.normalizeFilesOption([
+    it('glob-ifies src-level folder name', async () => {
+        expect(await rokuDeploy.normalizeFilesOption([
             'manifest',
             {
                 src: 'components'
@@ -517,8 +527,8 @@ describe('normalizeFilesOption', () => {
         }]);
     });
 
-    it('properly handles negated globs', () => {
-        expect(rokuDeploy.normalizeFilesOption([
+    it('properly handles negated globs', async () => {
+        expect(await rokuDeploy.normalizeFilesOption([
             'manifest',
             'components/**/*',
             '!components/scenes/**/*'
@@ -532,8 +542,8 @@ describe('normalizeFilesOption', () => {
         }]);
     });
 
-    it('properly handles negated globs with {src}', () => {
-        expect(rokuDeploy.normalizeFilesOption([
+    it('properly handles negated globs with {src}', async () => {
+        expect(await rokuDeploy.normalizeFilesOption([
             'manifest',
             {
                 src: [
@@ -584,6 +594,20 @@ describe('zipFolder', () => {
         await assertThrowsAsync(async () => {
             await rokuDeploy.zipFolder('source', 'some/zip/path/that/does/not/exist');
         });
+    });
+});
+
+describe('endsWithSlash', () => {
+    it('detects slashes', () => {
+        expect(rokuDeploy.endsWithSlash('/')).to.be.true;
+        expect(rokuDeploy.endsWithSlash('\\')).to.be.true;
+    });
+
+    it('detects non slashes', () => {
+        expect(rokuDeploy.endsWithSlash('a')).to.be.false;
+        expect(rokuDeploy.endsWithSlash('')).to.be.false;
+        expect(rokuDeploy.endsWithSlash(' ')).to.be.false;
+        expect(rokuDeploy.endsWithSlash('.')).to.be.false;
     });
 });
 

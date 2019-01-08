@@ -18,7 +18,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
     options.rootDir = <string>options.rootDir;
     options.outDir = <string>options.outDir;
 
-    const files = normalizeFilesOption(options.files, options.rootDir);
+    const files = await normalizeFilesOption(options.files, options.rootDir);
 
     //make all path references absolute
     makeFilesAbsolute(files, options.rootDir);
@@ -32,7 +32,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
 
     //make sure the staging folder exists
     await fsExtra.ensureDir(stagingFolderPath);
-    await copyToStaging(files, stagingFolderPath);
+    await copyToStaging(files, stagingFolderPath, options.rootDir);
     return stagingFolderPath;
 }
 
@@ -62,16 +62,28 @@ export function makeFilesAbsolute(files: { src: string[]; dest: string }[], root
     return files;
 }
 
-function endsWithSlash(dirPath: string) {
-    if (dirPath && (dirPath.lastIndexOf('/') === dirPath.length - 1 || dirPath.lastIndexOf('\\') === dirPath.length - 1)) {
+/**
+ * Determine if a given string ends in a file system slash (\ for windows and / for everything else)
+ * @param dirPath 
+ */
+export function endsWithSlash(dirPath: string) {
+    if ('string' === typeof dirPath && dirPath.length > 0 &&
+        (dirPath.lastIndexOf('/') === dirPath.length - 1 || dirPath.lastIndexOf('\\') === dirPath.length - 1)
+    ) {
         return true;
     } else {
         return false;
     }
 }
 
-export function normalizeFilesOption(files: FilesType[], rootDir: string = './') {
-    debugger;
+/**
+ * Given an array of files, normalize them into a standard {src;dest} object. 
+ * This will make plain folder names into fully qualified paths, add globs to plain folders, etc. 
+ * This makes it easier to reason about later on in the process.
+ * @param files 
+ * @param rootDir 
+ */
+export async function normalizeFilesOption(files: FilesType[], rootDir: string = './') {
     const result: { src: string[]; dest: string }[] = [];
     let topLevelGlobs = <string[]>[];
     //standardize the files object
@@ -80,7 +92,7 @@ export function normalizeFilesOption(files: FilesType[], rootDir: string = './')
         //handle single string top-level globs
         if (typeof fileEntry === 'string') {
             //for any folders that are not globbed, set a default glob 
-            if (isDirectorySync(fileEntry) || isDirectorySync(path.join(rootDir, fileEntry))) {
+            if (await isDirectory(fileEntry) || await isDirectory(path.join(rootDir, fileEntry))) {
                 let obj = {
                     src: [
                         fileEntry + '/**/*'
@@ -96,20 +108,22 @@ export function normalizeFilesOption(files: FilesType[], rootDir: string = './')
             //handle src;dest; object with single string for src
         } else if (typeof fileEntry.src === 'string') {
             //for any folders that are not globbed, set a default glob 
-            if (isDirectorySync(fileEntry.src) || isDirectorySync(path.join(rootDir, fileEntry.src))) {
+            if (await isDirectory(fileEntry.src) || await isDirectory(path.join(rootDir, fileEntry.src))) {
                 fileEntry.src = fileEntry.src += '/**/*';
 
                 //if dest does not end in a slash, add one
-                if (!endsWithSlash(fileEntry.dest) && fileEntry.dest && fileEntry.dest !== '') {
-                    fileEntry.dest = fileEntry.dest ? fileEntry.dest : '';
+                if (!endsWithSlash(fileEntry.dest) && typeof fileEntry.dest === 'string' && fileEntry.dest !== '') {
                     fileEntry.dest += path.sep;
                 }
             }
             fileEntry.src = [fileEntry.src];
         }
 
-        if (!fileEntry.dest) {
-            fileEntry.dest = '';
+        fileEntry.dest = fileEntry.dest ? fileEntry.dest : '';
+
+        //hard-fail if dest is anything other than a string at this point
+        if ('string' !== typeof fileEntry.dest) {
+            throw new Error('dest must be a string');
         }
 
         //standardize the dest path separator
@@ -165,9 +179,6 @@ export async function zipPackage(options: RokuDeployOptions) {
 
 /**
  * Create a zip folder containing all of the specified roku project files.
- * Will scan for a manifest file, and if found, will remove parent folders above manifest for zipped folder.
- * For example, if this is the files glob: ["AppCode/RokuProject/**\/*"], and manifest exists at AppCode/RokuProject/manifest, then
- * the output zip would omit the AppCode/RokuProject folder structure from the zip. 
  * @param options 
  */
 export async function createPackage(options: RokuDeployOptions) {
@@ -180,9 +191,9 @@ export async function createPackage(options: RokuDeployOptions) {
  * @param fileGlobs 
  * @param stagingPath 
  */
-async function copyToStaging(files: FilesType[], stagingPath: string) {
+async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
     stagingPath = path.normalize(stagingPath);
-    const normalizedFiles = normalizeFilesOption(files, '');
+    const normalizedFiles = await normalizeFilesOption(files, '');
 
     //run glob lookups for every glob string provided
     let filePathObjects = await Promise.all(
@@ -215,42 +226,23 @@ async function copyToStaging(files: FilesType[], stagingPath: string) {
         fileObject.src = path.resolve(fileObject.src);
     }
 
-    //find path for the manifest file
-    let manifestPath: string | undefined;
-    for (let fileObject of fileObjects) {
-        if (path.basename(fileObject.src) === 'manifest') {
-            manifestPath = fileObject.src;
-            //we found manifest...no need to loop any more
-            break;
-        }
-    }
-    if (!manifestPath) {
-        throw new Error('Unable to find manifest file');
-    }
-
-    //get the full path to the folder containing manifest
-    let manifestParentPath = path.dirname(manifestPath);
-
-    //copy each file, retaining their folder structure relative to the manifest location
+    //copy each file, retaining their folder structure relative to the rootDir
     await Promise.all(
         fileObjects.map(async (fileObject: { src: string; dest: string }) => {
             let src = path.normalize(fileObject.src);
             let dest = fileObject.dest;
 
-            let relativeSrc = src.replace(manifestParentPath, '');
+            let relativeSrc = src.replace(rootDir, '');
             //remove any leading path separator
+            /* istanbul ignore next */
             relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
 
             let sourceIsDirectory = await isDirectory(src);
-            //c:\project\manifest -> C:\out\manifest {src: 'manifest', dest: ''}
-            //C:\project\source -> C:\out\source {src: 'source', dest: 'source'}
-            //C:\project\languages\english.xml -> C:\out\english.xml {src: 'languages\english.xml', dest: 'english.xml'}
-            //C:\project\english-fonts -> C:\out\fonts  {src: 'english-fonts', dest: 'fonts'}
-
-            let destinationPath: string;
 
             //if item is a file
             if (sourceIsDirectory === false) {
+                let destinationPath: string;
+
                 //if the dest ends in a slash, use the filename from src, but the folder structure from dest
                 if (dest.endsWith(path.sep)) {
                     destinationPath = path.join(stagingPath, dest, path.basename(src));
@@ -269,14 +261,16 @@ async function copyToStaging(files: FilesType[], stagingPath: string) {
 
                 //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
                 //Just try a few fimes until it resolves itself. 
+
                 for (let i = 0; i < 10; i++) {
                     try {
                         //copy the src item (file or directory full of files)
-                        await Q.nfcall(fsExtra.copy, fileObject.src, destinationPath);
+                        await fsExtra.copy(fileObject.src, destinationPath);
                         //copy succeeded, 
-                        break;
+                        i = 10; //break out of the loop and still achieve coverage for i++
                     } catch (e) {
                         //wait a small amount of time and try again
+                        /* istanbul ignore next */
                         await new Promise((resolve) => {
                             setTimeout(resolve, 50);
                         });
@@ -303,23 +297,9 @@ async function copyToStaging(files: FilesType[], stagingPath: string) {
  * Determine if the given path is a directory
  * @param path 
  */
-async function isDirectory(pathToDirectoryOrFile: string) {
+export async function isDirectory(pathToDirectoryOrFile: string) {
     try {
         let stat = await Q.nfcall(fs.lstat, pathToDirectoryOrFile);
-        return stat.isDirectory();
-    } catch (e) {
-        // lstatSync throws an error if path doesn't exist
-        return false;
-    }
-}
-
-/**
- * Determine if the given path is a directory, synchronously
- * @param pathToDirectoryOrFile 
- */
-function isDirectorySync(dirPath: string) {
-    try {
-        let stat = fs.lstatSync(path.resolve(dirPath));
         return stat.isDirectory();
     } catch (e) {
         // lstatSync throws an error if path doesn't exist
@@ -345,6 +325,10 @@ export async function pressHomeButton(host) {
     });
 }
 
+/**
+ * Publish a pre-existing packaged zip file to a remote Roku.
+ * @param options 
+ */
 export async function publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
     options = getOptions(options);
     if (!options.host) {
@@ -444,6 +428,10 @@ export function getOptions(options: RokuDeployOptions = {}) {
     //override the defaults with any found or provided options
     let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
 
+    //fully resolve the folder paths
+    finalOptions.rootDir = path.resolve(finalOptions.rootDir);
+    finalOptions.outDir = path.resolve(finalOptions.outDir);
+
     return finalOptions;
 }
 
@@ -501,7 +489,7 @@ export interface RokuDeployOptions {
      */
     outFile?: string;
     /**
-     * The root path to the folder holding your project. This folder should include the manifest file.
+     * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */
     rootDir?: string;
