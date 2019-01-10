@@ -7,7 +7,7 @@
     "compile": "rimraf out && tsc",
     "prepublishOnly": "npm run compile",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
-    "test": "nyc mocha src/**/*.spec.ts --full-trace --bail",
+    "test": "nyc mocha src/**/*.spec.ts --full-trace",
     "coverage": "nyc report --reporter=text-lcov | coveralls"
   },
   "typings": "dist/index.d.ts",

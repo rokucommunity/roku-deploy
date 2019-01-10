@@ -91,31 +91,11 @@ export async function normalizeFilesOption(files: FilesType[], rootDir: string =
 
         //handle single string top-level globs
         if (typeof fileEntry === 'string') {
-            //for any folders that are not globbed, set a default glob 
-            if (await isDirectory(fileEntry) || await isDirectory(path.join(rootDir, fileEntry))) {
-                let obj = {
-                    src: [
-                        fileEntry + '/**/*'
-                    ],
-                    dest: fileEntry + path.sep
-                };
-                fileEntry = obj;
-            } else {
-                topLevelGlobs.push(fileEntry);
-                continue;
-            }
 
+            topLevelGlobs.push(fileEntry);
+            continue;
             //handle src;dest; object with single string for src
         } else if (typeof fileEntry.src === 'string') {
-            //for any folders that are not globbed, set a default glob 
-            if (await isDirectory(fileEntry.src) || await isDirectory(path.join(rootDir, fileEntry.src))) {
-                fileEntry.src = fileEntry.src += '/**/*';
-
-                //if dest does not end in a slash, add one
-                if (!endsWithSlash(fileEntry.dest) && typeof fileEntry.dest === 'string' && fileEntry.dest !== '') {
-                    fileEntry.dest += path.sep;
-                }
-            }
             fileEntry.src = [fileEntry.src];
         }
 
@@ -136,6 +116,17 @@ export async function normalizeFilesOption(files: FilesType[], rootDir: string =
 
         if (typeof fileEntry !== 'string' && (!fileEntry || fileEntry.src === null || fileEntry.src === undefined || fileEntry.dest === null || fileEntry.dest === undefined)) {
             throw new Error('Entry must be a string or a {src;dest;} object');
+        }
+
+        //if there is a wildcard in any src, ensure a slash in dest
+        {
+            let srcContainsWildcard = (fileEntry.src as Array<string>).findIndex((src) => {
+                return src.indexOf('*') > -1;
+            }) > -1;
+
+            if (fileEntry.dest.length > 0 && !endsWithSlash(fileEntry.dest) && srcContainsWildcard) {
+                fileEntry.dest += path.sep;
+            }
         }
 
         result.push(fileEntry);
@@ -198,17 +189,50 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
     //run glob lookups for every glob string provided
     let filePathObjects = await Promise.all(
         normalizedFiles.map(async (file) => {
+            let pathRemoveFromDest: string;
+            //if we have a single string, and it's a directory, append the wildcard glob on it
+            if (file.src.length === 1) {
+                let fileAsDirPath: string;
+                //try the path as is
+                if (await isDirectory(file.src[0])) {
+                    fileAsDirPath = file.src[0];
+                }
+                /* istanbul ignore next */
+                //assume path is relative, append root dir and try that way
+                if (!fileAsDirPath && await isDirectory(path.join(rootDir, file.src[0]))) {
+                    fileAsDirPath = path.normalize(path.join(rootDir, file.src[0]));
+                }
+                if (fileAsDirPath) {
+                    pathRemoveFromDest = fileAsDirPath;
+
+                    //add the wildcard glob
+                    file.src[0] = path.join(fileAsDirPath, '**', '*');
+                }
+            }
 
             let filePathArray = await Q.nfcall(globAll, file.src);
             let result = <{ src: string; dest: string }[]>[];
-            if (filePathArray.length > 1 && !(file.dest === '' || file.dest.endsWith('/') || file.dest.endsWith('\\'))) {
-                throw new Error(`Files entry matched multiple files, so dest must end in a slash to indicate that it is a folder ${JSON.stringify(file)}`);
-            }
+
             for (let filePath of filePathArray) {
+                let dest = file.dest;
+
+                //if we created this globbed result, maintain the relative position of the files
+                if (pathRemoveFromDest) {
+                    let normalizedFilePath = path.normalize(filePath);
+                    //remove the specified source path
+                    dest = normalizedFilePath.replace(pathRemoveFromDest, '');
+                    //remove the filename if it's a file
+                    if (await isDirectory(filePath) === false) {
+                        dest = path.dirname(dest);
+                    }
+                    //prepend the specified dest
+                    dest = path.join(file.dest, dest, path.basename(normalizedFilePath));
+                }
+
                 //create a src;dest; object for every file or directory that was found
                 result.push({
                     src: filePath,
-                    dest: file.dest
+                    dest: dest
                 });
             }
             return result;

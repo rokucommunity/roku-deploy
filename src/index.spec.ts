@@ -335,30 +335,6 @@ describe('prepublishToStaging', () => {
         expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
     });
 
-    it('throws when src matches multiple files, but dest does not end in a slash', async () => {
-        options.files = [
-            {
-                src: 'manifest',
-                dest: ''
-            },
-            {
-                src: 'source/**/*',
-                dest: 'source'
-            }
-        ];
-        try {
-            await prepublishToStaging(options);
-            expect('Should not have run this line').to.be.false;
-        } catch (e) {
-            let expectedMessage = 'Files entry matched multiple files';
-            let actualMessage = e.message.substring(0, expectedMessage.length);
-
-            if (expectedMessage !== actualMessage) {
-                expect(e.message).to.equal(expectedMessage);
-            }
-        }
-    });
-
     it('handles new src;dest style', async () => {
         options.files = [
             {
@@ -447,6 +423,30 @@ describe('prepublishToStaging', () => {
             expect(true).to.be.true;
         }
     });
+
+    it('retains subfolder structure', async () => {
+        options.files = [
+            'manifest',
+            {
+                src: 'flavors/shared/resources',
+                dest: 'resources'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
+    });
+
+    it('handles multi-globs subfolder structure', async () => {
+        options.files = [
+            'manifest',
+            {
+                src: 'flavors/shared/resources/**/*',
+                dest: 'resources'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/resources/image.jpg')).to.exist;
+    });
 });
 
 describe('makeFilesAbsolute', () => {
@@ -491,42 +491,6 @@ describe('normalizeFilesOption', () => {
         }]);
     });
 
-    it('glob-ifies top-level folder name', async () => {
-        expect(await rokuDeploy.normalizeFilesOption([
-            'manifest',
-            'components'
-        ], options.rootDir)).to.eql([{
-            dest: '',
-            src: [
-                'manifest'
-            ]
-        }, {
-            dest: 'components' + path.sep,
-            src: [
-                'components/**/*'
-            ]
-        }]);
-    });
-
-    it('glob-ifies src-level folder name', async () => {
-        expect(await rokuDeploy.normalizeFilesOption([
-            'manifest',
-            {
-                src: 'components'
-            }
-        ], options.rootDir)).to.eql([{
-            dest: '',
-            src: [
-                'manifest'
-            ],
-        }, {
-            dest: '',
-            src: [
-                'components/**/*'
-            ]
-        }]);
-    });
-
     it('properly handles negated globs', async () => {
         expect(await rokuDeploy.normalizeFilesOption([
             'manifest',
@@ -540,6 +504,15 @@ describe('normalizeFilesOption', () => {
                 '!components/scenes/**/*'
             ],
         }]);
+    });
+
+    it('appends trailing slash to dest when globs are used', async () => {
+        let result = await rokuDeploy.normalizeFilesOption([{
+            src: 'components/**/*',
+            dest: 'components'
+        }], options.rootDir);
+
+        expect(result[0].dest).to.equal('components' + path.sep);
     });
 
     it('properly handles negated globs with {src}', async () => {
