@@ -303,15 +303,8 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
 
                 //item is a directory
             } else {
-                //ensure that the directory exists
-                await fsExtra.ensureDir(path.join(stagingPath, relativeSrc));
-                // if (relativeSrc === dest || dest === '') {
-                //     //copy the files to the same relative location as from src
-                //     destinationPath = path.join(stagingPath, relativeSrc);
-                // } else {
-                //     //copy the files to the new target dest location
-                //     destinationPath = path.join(stagingPath, dest);
-                // }
+                //source is a directory (which is only possible when glob resolves it as such)
+                //do nothing, because we don't want to copy empty directories to output
             }
         })
     );

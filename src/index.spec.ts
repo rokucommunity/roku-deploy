@@ -446,6 +446,7 @@ describe('prepublishToStaging', () => {
         ];
         await prepublishToStaging(options);
         expect(file('out/.roku-deploy-staging/resources/image.jpg')).to.exist;
+        expect(dir('out/.roku-deploy-staging/flavors/shared/resources/images/fhd')).not.to.exist;
     });
 });
 
