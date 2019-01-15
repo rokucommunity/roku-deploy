@@ -226,6 +226,8 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
                     }
                     //prepend the specified dest
                     dest = path.join(file.dest, dest, path.basename(normalizedFilePath));
+                    //blank out originalSrc since we already handled the dest
+                    originalSrc = [];
                 }
 
                 //create a src;dest; object for every file or directory that was found
@@ -260,7 +262,8 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
 
             let relativeSrc: string;
             //if we have an original src, and it contains the ** glob, use the relative position starting at **
-            let globDoubleStarIndex = fileObject.srcOriginal.indexOf('**');
+            let globDoubleStarIndex = fileObject.srcOriginal ? fileObject.srcOriginal.indexOf('**') : -1;
+            
             if (fileObject.srcOriginal && globDoubleStarIndex > -1 && sourceIsDirectory === false) {
                 let pathToDoubleStar = fileObject.srcOriginal.substring(0, globDoubleStarIndex);
                 relativeSrc = src.replace(pathToDoubleStar, '');

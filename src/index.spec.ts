@@ -424,7 +424,7 @@ describe('prepublishToStaging', () => {
         }
     });
 
-    it.only('retains subfolder structure', async () => {
+    it('retains subfolder structure', async () => {
         options.files = [
             'manifest',
             {
@@ -434,6 +434,18 @@ describe('prepublishToStaging', () => {
         ];
         await prepublishToStaging(options);
         expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
+    });
+
+    it('honors the trailing slash in dest', async () => {
+        options.files = [
+            'manifest',
+            {
+                src: 'source/main.brs',
+                dest: 'source1/'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/source1/main.brs')).to.exist;
     });
 
     it('handles multi-globs subfolder structure', async () => {
