@@ -207,9 +207,10 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
                     file.src[0] = path.join(fileAsDirPath, '**', '*');
                 }
             }
+            let originalSrc = file.src;
 
             let filePathArray = await Q.nfcall(globAll, file.src);
-            let output = <{ src: string; dest: string }[]>[];
+            let output = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
 
             for (let filePath of filePathArray) {
                 let dest = file.dest;
@@ -225,19 +226,22 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
                     }
                     //prepend the specified dest
                     dest = path.join(file.dest, dest, path.basename(normalizedFilePath));
+                    //blank out originalSrc since we already handled the dest
+                    originalSrc = [];
                 }
 
                 //create a src;dest; object for every file or directory that was found
                 output.push({
                     src: filePath,
-                    dest: dest
+                    dest: dest,
+                    srcOriginal: originalSrc.length === 1 ? originalSrc[0] : undefined
                 });
             }
             return output;
         })
     );
 
-    let fileObjects = <{ src: string; dest: string }[]>[];
+    let fileObjects = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
     //create a single array of all paths
     for (let filePathObject of filePathObjects) {
         fileObjects = fileObjects.concat(filePathObject);
@@ -251,19 +255,32 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
     let result: { src: string; dest: string; }[] = [];
     //copy each file, retaining their folder structure relative to the rootDir
     await Promise.all(
-        fileObjects.map(async (fileObject: { src: string; dest: string }) => {
+        fileObjects.map(async (fileObject) => {
             let src = path.normalize(fileObject.src);
             let dest = fileObject.dest;
+            let sourceIsDirectory = await isDirectory(src);
 
-            let relativeSrc = src.replace(rootDir, '');
+            let relativeSrc: string;
+            //if we have an original src, and it contains the ** glob, use the relative position starting at **
+            let globDoubleStarIndex = fileObject.srcOriginal ? fileObject.srcOriginal.indexOf('**') : -1;
+            
+            if (fileObject.srcOriginal && globDoubleStarIndex > -1 && sourceIsDirectory === false) {
+                let pathToDoubleStar = fileObject.srcOriginal.substring(0, globDoubleStarIndex);
+                relativeSrc = src.replace(pathToDoubleStar, '');
+                dest = path.join(dest, relativeSrc);
+            } else {
+                relativeSrc = src.replace(rootDir, '');
+            }
+
             //remove any leading path separator
             /* istanbul ignore next */
             relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
 
-            let sourceIsDirectory = await isDirectory(src);
-
             //if item is a file
-            if (sourceIsDirectory === false) {
+            if (sourceIsDirectory) {
+                //source is a directory (which is only possible when glob resolves it as such)
+                //do nothing, because we don't want to copy empty directories to output
+            } else {
                 let destinationPath: string;
 
                 //if the dest ends in a slash, use the filename from src, but the folder structure from dest
@@ -280,15 +297,13 @@ async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: st
                 }
                 fileObject.dest = destinationPath;
 
+                delete fileObject.srcOriginal;
                 //add the file object to the results
                 result.push(fileObject);
-            } else {
-                //source is a directory (which is only possible when glob resolves it as such)
-                //do nothing, because we don't want to copy empty directories to output
             }
         })
     );
-    return fileObjects;
+    return result;
 }
 
 /**

@@ -436,17 +436,30 @@ describe('prepublishToStaging', () => {
         expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
     });
 
+    it('honors the trailing slash in dest', async () => {
+        options.files = [
+            'manifest',
+            {
+                src: 'source/main.brs',
+                dest: 'source1/'
+            }
+        ];
+        await prepublishToStaging(options);
+        expect(file('out/.roku-deploy-staging/source1/main.brs')).to.exist;
+    });
+
     it('handles multi-globs subfolder structure', async () => {
         options.files = [
             'manifest',
             {
+                //the relative structure after /resources should be retained
                 src: 'flavors/shared/resources/**/*',
                 dest: 'resources'
             }
         ];
         await prepublishToStaging(options);
-        expect(file('out/.roku-deploy-staging/resources/image.jpg')).to.exist;
-        expect(dir('out/.roku-deploy-staging/flavors/shared/resources/images/fhd')).not.to.exist;
+        expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
+        expect(file('out/.roku-deploy-staging/resources/image.jpg')).not.to.exist;
     });
 });
 
