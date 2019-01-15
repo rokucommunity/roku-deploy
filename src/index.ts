@@ -178,11 +178,9 @@ export async function createPackage(options: RokuDeployOptions) {
 }
 
 /**
- * Copy all of the files to the staging directory
- * @param fileGlobs 
- * @param stagingPath 
+ * Get all file paths for the specified options
  */
-async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
+async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
     stagingPath = path.normalize(stagingPath);
     const normalizedFiles = await normalizeFilesOption(files, '');
 
@@ -211,7 +209,7 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
             }
 
             let filePathArray = await Q.nfcall(globAll, file.src);
-            let result = <{ src: string; dest: string }[]>[];
+            let output = <{ src: string; dest: string }[]>[];
 
             for (let filePath of filePathArray) {
                 let dest = file.dest;
@@ -230,12 +228,12 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
                 }
 
                 //create a src;dest; object for every file or directory that was found
-                result.push({
+                output.push({
                     src: filePath,
                     dest: dest
                 });
             }
-            return result;
+            return output;
         })
     );
 
@@ -250,6 +248,7 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
         fileObject.src = path.resolve(fileObject.src);
     }
 
+    let result: { src: string; dest: string; }[] = [];
     //copy each file, retaining their folder structure relative to the rootDir
     await Promise.all(
         fileObjects.map(async (fileObject: { src: string; dest: string }) => {
@@ -279,35 +278,48 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
                 } else {
                     destinationPath = path.join(stagingPath, dest);
                 }
+                fileObject.dest = destinationPath;
 
-                //make sure the containing folder exists
-                await fsExtra.ensureDir(path.dirname(destinationPath));
-
-                //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
-                //Just try a few fimes until it resolves itself. 
-
-                for (let i = 0; i < 10; i++) {
-                    try {
-                        //copy the src item (file or directory full of files)
-                        await fsExtra.copy(fileObject.src, destinationPath);
-                        //copy succeeded, 
-                        i = 10; //break out of the loop and still achieve coverage for i++
-                    } catch (e) {
-                        //wait a small amount of time and try again
-                        /* istanbul ignore next */
-                        await new Promise((resolve) => {
-                            setTimeout(resolve, 50);
-                        });
-                    }
-                }
-
-                //item is a directory
+                //add the file object to the results
+                result.push(fileObject);
             } else {
                 //source is a directory (which is only possible when glob resolves it as such)
                 //do nothing, because we don't want to copy empty directories to output
             }
         })
     );
+    return fileObjects;
+}
+
+/**
+ * Copy all of the files to the staging directory
+ * @param fileGlobs 
+ * @param stagingPath 
+ */
+async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
+    let fileObjects = await getFilePaths(files, stagingPath, rootDir);
+    for (let fileObject of fileObjects) {
+        //make sure the containing folder exists
+        await fsExtra.ensureDir(path.dirname(fileObject.dest));
+
+        //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
+        //Just try a few fimes until it resolves itself. 
+
+        for (let i = 0; i < 10; i++) {
+            try {
+                //copy the src item (file or directory full of files)
+                await fsExtra.copy(fileObject.src, fileObject.dest);
+                //copy succeeded, 
+                i = 10; //break out of the loop and still achieve coverage for i++
+            } catch (e) {
+                //wait a small amount of time and try again
+                /* istanbul ignore next */
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 50);
+                });
+            }
+        }
+    }
 }
 
 /**
