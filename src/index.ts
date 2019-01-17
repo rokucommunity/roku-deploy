@@ -180,7 +180,7 @@ export async function createPackage(options: RokuDeployOptions) {
 /**
  * Get all file paths for the specified options
  */
-async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
+export async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
     stagingPath = path.normalize(stagingPath);
     const normalizedFiles = await normalizeFilesOption(files, '');
 
