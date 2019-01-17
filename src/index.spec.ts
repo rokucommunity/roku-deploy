@@ -20,12 +20,15 @@ function getOutputFilePath() {
     return path.join(<string>options.outDir, <string>options.outFile);
 }
 let options: RokuDeployOptions;
-
+let originalCwd = process.cwd();
 beforeEach(() => {
     options = getOptions();
     options.rootDir = './testProject';
 });
 afterEach(() => {
+    //restore the original working directory
+    process.chdir(originalCwd);
+
     //delete the output file and other interum files
     let filePaths = [
         getOutputFilePath(),
@@ -490,7 +493,7 @@ describe('normalizeFilesOption', () => {
                 src: 'components',
                 //bogus dest object
                 dest: <any>true
-            }], options.rootDir);
+            }]);
         });
     });
 
@@ -510,7 +513,7 @@ describe('normalizeFilesOption', () => {
             'manifest',
             'components/**/*',
             '!components/scenes/**/*'
-        ], options.rootDir)).to.eql([{
+        ])).to.eql([{
             dest: '',
             src: [
                 'manifest',
@@ -524,7 +527,7 @@ describe('normalizeFilesOption', () => {
         let result = await rokuDeploy.normalizeFilesOption([{
             src: 'components/**/*',
             dest: 'components'
-        }], options.rootDir);
+        }]);
 
         expect(result[0].dest).to.equal('components' + path.sep);
     });
@@ -539,7 +542,7 @@ describe('normalizeFilesOption', () => {
                 ]
             },
             'someOtherFile.brs'
-        ], options.rootDir)).to.eql([{
+        ])).to.eql([{
             src: [
                 'manifest',
                 'someOtherFile.brs'
@@ -595,6 +598,65 @@ describe('endsWithSlash', () => {
         expect(rokuDeploy.endsWithSlash('')).to.be.false;
         expect(rokuDeploy.endsWithSlash(' ')).to.be.false;
         expect(rokuDeploy.endsWithSlash('.')).to.be.false;
+    });
+});
+
+describe('getFilePaths', () => {
+    it('works when using a different current working directory than rootDir', async () => {
+        let rootProjectDir = path.resolve(options.rootDir);
+        let outDir = path.resolve(options.outDir);
+
+        //sanity check, make sure it works without fiddling with cwd intact
+        let paths = (await rokuDeploy.getFilePaths([
+            'manifest',
+            'images/splash_hd.jpg'
+        ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+
+        expect(paths).to.eql([{
+            src: path.join(rootProjectDir, 'images', 'splash_hd.jpg'),
+            dest: path.join(outDir, 'images', 'splash_hd.jpg')
+        }, {
+            src: path.join(rootProjectDir, 'manifest'),
+            dest: path.join(outDir, 'manifest')
+        }]);
+
+        //change the working directory and verify everything still works
+
+        let wrongCwd = path.dirname(path.resolve(options.rootDir));
+        process.chdir(wrongCwd);
+
+        paths = (await rokuDeploy.getFilePaths([
+            'manifest',
+            'images/splash_hd.jpg'
+        ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+
+        expect(paths).to.eql([{
+            src: path.join(rootProjectDir, 'images', 'splash_hd.jpg'),
+            dest: path.join(outDir, 'images', 'splash_hd.jpg')
+        }, {
+            src: path.join(rootProjectDir, 'manifest'),
+            dest: path.join(outDir, 'manifest')
+        }]);
+
+    });
+});
+
+describe('normalizeRootDir', () => {
+    it('handles falsey values', () => {
+        let cwd = process.cwd();
+        expect(rokuDeploy.normalizeRootDir(null)).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir(undefined)).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir('')).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir(' ')).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir('\t')).to.equal(cwd);
+    });
+
+    it('handles non-falsey values', () => {
+        let cwd = process.cwd();
+
+        expect(rokuDeploy.normalizeRootDir(cwd)).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir('./')).to.equal(cwd);
+        expect(rokuDeploy.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));
     });
 });
 

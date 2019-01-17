@@ -18,7 +18,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
     options.rootDir = <string>options.rootDir;
     options.outDir = <string>options.outDir;
 
-    const files = await normalizeFilesOption(options.files, options.rootDir);
+    const files = await normalizeFilesOption(options.files);
 
     //make all path references absolute
     makeFilesAbsolute(files, options.rootDir);
@@ -81,9 +81,8 @@ export function endsWithSlash(dirPath: string) {
  * This will make plain folder names into fully qualified paths, add globs to plain folders, etc. 
  * This makes it easier to reason about later on in the process.
  * @param files 
- * @param rootDir 
  */
-export async function normalizeFilesOption(files: FilesType[], rootDir: string = './') {
+export async function normalizeFilesOption(files: FilesType[]) {
     const result: { src: string[]; dest: string }[] = [];
     let topLevelGlobs = <string[]>[];
     //standardize the files object
@@ -178,11 +177,26 @@ export async function createPackage(options: RokuDeployOptions) {
 }
 
 /**
+ * Given a root directory, normalize it to a full path.
+ * Fall back to cwd if not specified
+ * @param rootDir 
+ */
+export function normalizeRootDir(rootDir: string) {
+    if (!rootDir || (typeof rootDir === 'string' && rootDir.trim().length === 0)) {
+        return process.cwd();
+    } else {
+        return path.resolve(rootDir);
+    }
+}
+
+/**
  * Get all file paths for the specified options
  */
 export async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
     stagingPath = path.normalize(stagingPath);
-    const normalizedFiles = await normalizeFilesOption(files, '');
+    const normalizedFiles = await normalizeFilesOption(files);
+
+    rootDir = normalizeRootDir(rootDir);
 
     //run glob lookups for every glob string provided
     let filePathObjects = await Promise.all(
@@ -209,7 +223,7 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
             }
             let originalSrc = file.src;
 
-            let filePathArray = await Q.nfcall(globAll, file.src);
+            let filePathArray = await Q.nfcall(globAll, file.src, { cwd: rootDir });
             let output = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
 
             for (let filePath of filePathArray) {
@@ -249,7 +263,14 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
 
     //make all file paths absolute
     for (let fileObject of fileObjects) {
-        fileObject.src = path.resolve(fileObject.src);
+        //only normalize non-absolute paths
+        if (path.isAbsolute(fileObject.src) === false) {
+            fileObject.src = path.normalize(
+                path.resolve(
+                    path.join(rootDir, fileObject.src)
+                )
+            );
+        }
     }
 
     let result: { src: string; dest: string; }[] = [];
@@ -263,7 +284,7 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
             let relativeSrc: string;
             //if we have an original src, and it contains the ** glob, use the relative position starting at **
             let globDoubleStarIndex = fileObject.srcOriginal ? fileObject.srcOriginal.indexOf('**') : -1;
-            
+
             if (fileObject.srcOriginal && globDoubleStarIndex > -1 && sourceIsDirectory === false) {
                 let pathToDoubleStar = fileObject.srcOriginal.substring(0, globDoubleStarIndex);
                 relativeSrc = src.replace(pathToDoubleStar, '');
