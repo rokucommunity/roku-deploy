@@ -18,7 +18,7 @@ export async function prepublishToStaging(options: RokuDeployOptions) {
     options.rootDir = <string>options.rootDir;
     options.outDir = <string>options.outDir;
 
-    const files = await normalizeFilesOption(options.files);
+    const files = normalizeFilesOption(options.files);
 
     //make all path references absolute
     makeFilesAbsolute(files, options.rootDir);
@@ -82,7 +82,7 @@ export function endsWithSlash(dirPath: string) {
  * This makes it easier to reason about later on in the process.
  * @param files 
  */
-export async function normalizeFilesOption(files: FilesType[]) {
+export function normalizeFilesOption(files: FilesType[]) {
     const result: { src: string[]; dest: string }[] = [];
     let topLevelGlobs = <string[]>[];
     //standardize the files object
@@ -194,7 +194,7 @@ export function normalizeRootDir(rootDir: string) {
  */
 export async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
     stagingPath = path.normalize(stagingPath);
-    const normalizedFiles = await normalizeFilesOption(files);
+    const normalizedFiles = normalizeFilesOption(files);
 
     rootDir = normalizeRootDir(rootDir);
 
