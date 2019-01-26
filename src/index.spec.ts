@@ -664,6 +664,30 @@ describe('getFilePaths', () => {
             dest: path.join(outDir, 'docs', 'readme.md')
         }]);
     });
+
+    it('supports relative paths that grab files from outside of the rootDir', async () => {
+        let outDir = path.resolve(options.outDir);
+        let rootProjectDir = path.resolve(options.rootDir);
+
+        let paths = await rokuDeploy.getFilePaths([
+            path.join('..', 'readme.md')
+        ], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'readme.md')
+        }]);
+
+        paths = await rokuDeploy.getFilePaths([{
+            src: path.join('..', 'readme.md'),
+            dest: 'docs'
+        }], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'docs', 'readme.md')
+        }]);
+    });
 });
 
 describe('normalizeRootDir', () => {
