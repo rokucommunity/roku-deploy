@@ -348,7 +348,10 @@ async function copyToStaging(files: FilesType[], stagingPath: string, rootDir: s
         for (let i = 0; i < 10; i++) {
             try {
                 //copy the src item (file or directory full of files)
-                await fsExtra.copy(fileObject.src, fileObject.dest);
+                await fsExtra.copy(fileObject.src, fileObject.dest, {
+                    //copy the actual files that symlinks point to, not the symlinks themselves
+                    dereference: true
+                });
                 //copy succeeded, 
                 i = 10; //break out of the loop and still achieve coverage for i++
             } catch (e) {
