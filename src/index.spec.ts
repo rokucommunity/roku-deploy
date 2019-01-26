@@ -692,7 +692,6 @@ describe('getFilePaths', () => {
 
 describe('normalizeRootDir', () => {
     it('handles falsey values', () => {
-        let cwd = process.cwd();
         expect(rokuDeploy.normalizeRootDir(null)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir(undefined)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('')).to.equal(cwd);
@@ -701,8 +700,6 @@ describe('normalizeRootDir', () => {
     });
 
     it('handles non-falsey values', () => {
-        let cwd = process.cwd();
-
         expect(rokuDeploy.normalizeRootDir(cwd)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('./')).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));
