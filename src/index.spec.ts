@@ -16,6 +16,8 @@ const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
 
+let cwd = process.cwd();
+
 function getOutputFilePath() {
     return path.join(<string>options.outDir, <string>options.outFile);
 }
@@ -637,7 +639,30 @@ describe('getFilePaths', () => {
             src: path.join(rootProjectDir, 'manifest'),
             dest: path.join(outDir, 'manifest')
         }]);
+    });
 
+    it('supports absolute paths from outside of the rootDir', async () => {
+        let outDir = path.resolve(options.outDir);
+        let rootProjectDir = path.resolve(options.rootDir);
+
+        let paths = await rokuDeploy.getFilePaths([
+            path.join(cwd, 'readme.md')
+        ], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'readme.md')
+        }]);
+
+        paths = await rokuDeploy.getFilePaths([{
+            src: path.join(cwd, 'readme.md'),
+            dest: 'docs'
+        }], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'docs', 'readme.md')
+        }]);
     });
 });
 
