@@ -466,6 +466,65 @@ describe('prepublishToStaging', () => {
         expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
         expect(file('out/.roku-deploy-staging/resources/image.jpg')).not.to.exist;
     });
+
+    describe('symlinks', () => {
+        let sourcePath = path.join(cwd, 'testSymlinks.md');
+        let symlinkPath = path.join(cwd, 'testProject', 'testSymlinks.md');
+
+        beforeEach(cleanUp);
+        afterEach(cleanUp);
+
+        async function cleanUp() {
+            try { await fsExtra.remove(sourcePath); } catch (e) { }
+            //delete the symlink if it exists
+            try { await fsExtra.remove(symlinkPath); } catch (e) { }
+        }
+
+        /**
+         * Determine if we have permission to create symlinks
+         */
+        function getIsSymlinksPermitted() {
+            let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
+            //delete the symlink test file
+            try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+            let isPermitted = false;
+            //create the symlink file
+            try {
+                fsExtra.symlinkSync(path.join(cwd, 'readme.md'), testSymlinkFile);
+                isPermitted = true;
+            } catch {
+            }
+            //delete the symlink test file
+            try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+            return isPermitted;
+        }
+
+        let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
+
+        symlinkIt('are dereferenced properly', async () => {
+            //create the actual file
+            await fsExtra.writeFile(sourcePath, 'hello symlink');
+
+            //the source file should exist
+            expect(file(sourcePath)).to.exist;
+
+            //create the symlink in testProject
+            await fsExtra.symlink(sourcePath, symlinkPath);
+
+            //the symlink file should exist
+            expect(file(symlinkPath)).to.exist;
+
+            options.files = [
+                'manifest',
+                'testSymlinks.md'
+            ];
+            await prepublishToStaging(options);
+            let stagedFilePath = path.join(options.outDir, '.roku-deploy-staging', 'testSymlinks.md');
+            expect(file(stagedFilePath)).to.exist;
+            let fileContents = await fsExtra.readFile(stagedFilePath);
+            expect(fileContents.toString()).to.equal('hello symlink');
+        });
+    });
 });
 
 describe('makeFilesAbsolute', () => {
