@@ -16,6 +16,8 @@ const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
 
+let cwd = process.cwd();
+
 function getOutputFilePath() {
     return path.join(<string>options.outDir, <string>options.outFile);
 }
@@ -637,13 +639,59 @@ describe('getFilePaths', () => {
             src: path.join(rootProjectDir, 'manifest'),
             dest: path.join(outDir, 'manifest')
         }]);
+    });
 
+    it('supports absolute paths from outside of the rootDir', async () => {
+        let outDir = path.resolve(options.outDir);
+        let rootProjectDir = path.resolve(options.rootDir);
+
+        let paths = await rokuDeploy.getFilePaths([
+            path.join(cwd, 'readme.md')
+        ], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'readme.md')
+        }]);
+
+        // paths = await rokuDeploy.getFilePaths([{
+        //     src: path.join(cwd, 'readme.md'),
+        //     dest: 'docs'
+        // }], outDir, rootProjectDir);
+
+        // expect(paths).to.eql([{
+        //     src: path.join(cwd, 'readme.md'),
+        //     dest: path.join(outDir, 'docs', 'readme.md')
+        // }]);
+    });
+
+    it('supports relative paths that grab files from outside of the rootDir', async () => {
+        let outDir = path.resolve(options.outDir);
+        let rootProjectDir = path.resolve(options.rootDir);
+
+        let paths = await rokuDeploy.getFilePaths([
+            path.join('..', 'readme.md')
+        ], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'readme.md')
+        }]);
+
+        paths = await rokuDeploy.getFilePaths([{
+            src: path.join('..', 'readme.md'),
+            dest: 'docs'
+        }], outDir, rootProjectDir);
+
+        expect(paths).to.eql([{
+            src: path.join(cwd, 'readme.md'),
+            dest: path.join(outDir, 'docs', 'readme.md')
+        }]);
     });
 });
 
 describe('normalizeRootDir', () => {
     it('handles falsey values', () => {
-        let cwd = process.cwd();
         expect(rokuDeploy.normalizeRootDir(null)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir(undefined)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('')).to.equal(cwd);
@@ -652,8 +700,6 @@ describe('normalizeRootDir', () => {
     });
 
     it('handles non-falsey values', () => {
-        let cwd = process.cwd();
-
         expect(rokuDeploy.normalizeRootDir(cwd)).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('./')).to.equal(cwd);
         expect(rokuDeploy.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));

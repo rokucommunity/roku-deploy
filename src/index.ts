@@ -265,12 +265,12 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
     for (let fileObject of fileObjects) {
         //only normalize non-absolute paths
         if (path.isAbsolute(fileObject.src) === false) {
-            fileObject.src = path.normalize(
-                path.resolve(
-                    path.join(rootDir, fileObject.src)
-                )
+            fileObject.src = path.resolve(
+                path.join(rootDir, fileObject.src)
             );
         }
+        //normalize the path
+        fileObject.src = path.normalize(fileObject.src);
     }
 
     let result: { src: string; dest: string; }[] = [];
@@ -290,31 +290,35 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
                 relativeSrc = src.replace(pathToDoubleStar, '');
                 dest = path.join(dest, relativeSrc);
             } else {
-                relativeSrc = src.replace(rootDir, '');
+                let rootDirWithTrailingSlash = path.normalize(rootDir + path.sep);
+                relativeSrc = src.replace(rootDirWithTrailingSlash, '');
             }
 
-            //remove any leading path separator
-            /* istanbul ignore next */
-            relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
-
-            //if item is a file
+            //if item is a directory
             if (sourceIsDirectory) {
                 //source is a directory (which is only possible when glob resolves it as such)
                 //do nothing, because we don't want to copy empty directories to output
             } else {
                 let destinationPath: string;
 
-                //if the dest ends in a slash, use the filename from src, but the folder structure from dest
-                if (dest.endsWith(path.sep)) {
-                    destinationPath = path.join(stagingPath, dest, path.basename(src));
-
-                    //dest is empty, so use the relative path
-                } else if (dest === '') {
-                    destinationPath = path.join(stagingPath, relativeSrc);
-
-                    //use all of dest
+                //if the relativeSrc is stil absolute, then this file exists outside of the rootDir. Copy to dest, and only retain filename from src
+                if (path.isAbsolute(relativeSrc)) {
+                    destinationPath = path.join(stagingPath, dest, path.basename(relativeSrc));
                 } else {
-                    destinationPath = path.join(stagingPath, dest);
+                    //the relativeSrc is actually relative
+
+                    //if the dest ends in a slash, use the filename from src, but the folder structure from dest
+                    if (dest.endsWith(path.sep)) {
+                        destinationPath = path.join(stagingPath, dest, path.basename(src));
+
+                        //dest is empty, so use the relative path
+                    } else if (dest === '') {
+                        destinationPath = path.join(stagingPath, relativeSrc);
+
+                        //use all of dest
+                    } else {
+                        destinationPath = path.join(stagingPath, dest);
+                    }
                 }
                 fileObject.dest = destinationPath;
 
