@@ -296,7 +296,7 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
             //remove any leading path separator
             /* istanbul ignore next */
             relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
-
+            console.log('relativeSrc', relativeSrc);
             //if item is a directory
             if (sourceIsDirectory) {
                 //source is a directory (which is only possible when glob resolves it as such)
@@ -306,8 +306,10 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
 
                 //if the relativeSrc is stil absolute, then this file exists outside of the rootDir. Copy to dest, and only retain filename from src
                 if (path.isAbsolute(relativeSrc)) {
+                    console.log('isAbsolute', relativeSrc);
                     destinationPath = path.join(stagingPath, dest, path.basename(relativeSrc));
                 } else {
+                    console.log('is not absolute', relativeSrc);
                     //the relativeSrc is actually relative
 
                     //if the dest ends in a slash, use the filename from src, but the folder structure from dest
