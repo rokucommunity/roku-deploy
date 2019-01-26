@@ -641,7 +641,7 @@ describe('getFilePaths', () => {
         }]);
     });
 
-    it.only('supports absolute paths from outside of the rootDir', async () => {
+    it('supports absolute paths from outside of the rootDir', async () => {
         let outDir = path.resolve(options.outDir);
         let rootProjectDir = path.resolve(options.rootDir);
 

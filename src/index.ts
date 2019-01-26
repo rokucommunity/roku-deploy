@@ -193,15 +193,10 @@ export function normalizeRootDir(rootDir: string) {
  * Get all file paths for the specified options
  */
 export async function getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
-    console.log('stagingPath', stagingPath);
-    console.log('rootDir', rootDir);
     stagingPath = path.normalize(stagingPath);
-    console.log('files', JSON.stringify(files));
     const normalizedFiles = normalizeFilesOption(files);
-    console.log('files after normalize', JSON.stringify(files));
 
     rootDir = normalizeRootDir(rootDir);
-    console.log('normalized root dir', rootDir);
 
     //run glob lookups for every glob string provided
     let filePathObjects = await Promise.all(
@@ -261,7 +256,6 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
     );
 
     let fileObjects = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
-    console.log('fileObjects', JSON.stringify(fileObjects));
     //create a single array of all paths
     for (let filePathObject of filePathObjects) {
         fileObjects = fileObjects.concat(filePathObject);
@@ -271,16 +265,12 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
     for (let fileObject of fileObjects) {
         //only normalize non-absolute paths
         if (path.isAbsolute(fileObject.src) === false) {
-            console.log('fileObject is absolute', JSON.stringify(fileObject));
             fileObject.src = path.resolve(
                 path.join(rootDir, fileObject.src)
             );
-        } else {
-            console.log('fileObject is not absolute', JSON.stringify(fileObject));
         }
         //normalize the path
         fileObject.src = path.normalize(fileObject.src);
-        console.log('fileObject.src after normalize', fileObject.src);
     }
 
     let result: { src: string; dest: string; }[] = [];
@@ -300,13 +290,10 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
                 relativeSrc = src.replace(pathToDoubleStar, '');
                 dest = path.join(dest, relativeSrc);
             } else {
-                relativeSrc = src.replace(rootDir, '');
+                let rootDirWithTrailingSlash = path.normalize(rootDir + path.sep);
+                relativeSrc = src.replace(rootDirWithTrailingSlash, '');
             }
 
-            //remove any leading path separator
-            /* istanbul ignore next */
-            relativeSrc = relativeSrc.indexOf(path.sep) !== 0 ? relativeSrc : relativeSrc.substring(1);
-            console.log('relativeSrc', relativeSrc);
             //if item is a directory
             if (sourceIsDirectory) {
                 //source is a directory (which is only possible when glob resolves it as such)
@@ -316,10 +303,8 @@ export async function getFilePaths(files: FilesType[], stagingPath: string, root
 
                 //if the relativeSrc is stil absolute, then this file exists outside of the rootDir. Copy to dest, and only retain filename from src
                 if (path.isAbsolute(relativeSrc)) {
-                    console.log('isAbsolute', relativeSrc);
                     destinationPath = path.join(stagingPath, dest, path.basename(relativeSrc));
                 } else {
-                    console.log('is not absolute', relativeSrc);
                     //the relativeSrc is actually relative
 
                     //if the dest ends in a slash, use the filename from src, but the folder structure from dest
