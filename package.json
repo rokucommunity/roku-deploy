@@ -47,8 +47,8 @@
     "@types/archiver": "^2.1.2",
     "@types/chai": "^4.1.2",
     "@types/fs-extra": "^5.0.1",
-    "@types/mocha": "^2.2.48",
-    "@types/node": "^9.4.7",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.12.23",
     "@types/request": "^2.47.0",
     "adm-zip": "^0.4.11",
     "chai": "^4.2.0",
@@ -60,13 +60,13 @@
     "rimraf": "^2.6.2",
     "source-map-support": "^0.5.3",
     "testdouble": "^3.5.2",
-    "ts-node": "^7.0.1",
+    "ts-node": "^8.0.2",
     "tslint": "^5.9.1",
-    "typescript": "^2.7.2"
+    "typescript": "^3.3.3"
   },
   "dependencies": {
     "archiver": "^3.0.0",
-    "fs-extra": "^5.0.0",
+    "fs-extra": "^7.0.1",
     "glob-all": "^3.1.0",
     "path": "^0.12.7",
     "q": "^1.5.1",
