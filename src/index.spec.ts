@@ -134,7 +134,7 @@ describe('index', function () {
 
             await rokuDeploy.createPackage(options, spy);
 
-            if(spy.notCalled) {
+            if (spy.notCalled) {
                 assert.fail('Callback not called');
             }
         });
@@ -337,13 +337,13 @@ describe('index', function () {
             fsExtra.copySync(src, dest);
         });
 
-        it('should return our error if signingKey is not supplied', async () => {
-            options.signingKey = undefined;
+        it('should return our error if signingPassword is not supplied', async () => {
+            options.signingPassword = undefined;
             try {
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect(e.message).to.equal('Must supply signingKey');
+                expect(e.message).to.equal('Must supply signingPassword');
             }
         });
 

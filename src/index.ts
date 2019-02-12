@@ -493,8 +493,8 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
  */
 export async function signExistingPackage(options: RokuDeployOptions): Promise<string> {
     options = getOptions(options);
-    if (!options.signingKey) {
-        throw new Error('Must supply signingKey');
+    if (!options.signingPassword) {
+        throw new Error('Must supply signingPassword');
     }
 
     let manifestPath = path.join(getStagingFolderPath(options), 'manifest');
@@ -505,7 +505,7 @@ export async function signExistingPackage(options: RokuDeployOptions): Promise<s
     requestOptions.formData = {
         mysubmit: 'Package',
         pkg_time: (new Date()).getTime(),
-        passwd: options.signingKey,
+        passwd: options.signingPassword,
         app_name: appName,
     };
 
@@ -735,7 +735,7 @@ export function zipFolder(srcFolder: string, zipFilePath: string) {
 
 export interface RokuDeployOptions {
     /**
-     * A full path to the folder where the zip package should be placed
+     * A full path to the folder where the zip/pkg package should be placed
      * @default "./out"
      */
     outDir?: string;
@@ -764,7 +764,7 @@ export interface RokuDeployOptions {
     // tslint:enable:jsdoc-format
     files?: FilesType[];
     /**
-     * Set this to true prevent the staging folder from being deleted after creating the package
+     * Set this to true to prevent the staging folder from being deleted after creating the package
      * @default false
      */
     retainStagingFolder?: boolean;
@@ -787,12 +787,12 @@ export interface RokuDeployOptions {
      */
     password?: string;
     /**
-     * The key used for creating signed packages
+     * The password used for creating signed packages
      * @required
      */
-    signingKey?: string;
+    signingPassword?: string;
     /**
-     * If true we increment the build number to be a timestamp in the format
+     * If true we increment the build number to be a timestamp in the format yymmddHHMM
      * @required
      */
     incrementBuildNumber?: boolean;
@@ -813,7 +813,5 @@ export interface RokuDeployBeforeZipCallbackInfo {
     manifestData: ManifestData;
     stagingFolderPath: string;
 }
-
-
 
 export type FilesType = (string | string[] | { src: string | string[]; dest?: string });
