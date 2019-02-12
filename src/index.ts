@@ -494,7 +494,7 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
 export async function signExistingPackage(options: RokuDeployOptions): Promise<string> {
     options = getOptions(options);
     if (!options.signingKey) {
-        throw new Error('must supply signingKey');
+        throw new Error('Must supply signingKey');
     }
 
     let manifestPath = path.join(getStagingFolderPath(options), 'manifest');
@@ -537,7 +537,7 @@ export async function signExistingPackage(options: RokuDeployOptions): Promise<s
                 return pkgSearchMatches[1];
             }
 
-            error = new Error('Unknown error signing package' + results.body);
+            error = new Error('Unknown error signing package');
             error.results = results;
             return Q.reject(error);
         });
@@ -588,6 +588,7 @@ export async function deploy(options?: RokuDeployOptions, beforeZipCallback?: (i
 export async function deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: RokuDeployBeforeZipCallbackInfo) => void): Promise<string> {
     options = getOptions(options);
     let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
+    options.retainStagingFolder = true;
     await deploy(options, beforeZipCallback);
     let remotePkgPath = await signExistingPackage(options);
     let localPkgFilePath = await retrieveSignedPackage(remotePkgPath, options);

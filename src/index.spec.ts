@@ -44,6 +44,41 @@ describe('index', function () {
         sinon.restore();
     });
 
+    describe('getStagingFolderPath', function () {
+        it('returns correct path', async () => {
+            let outputPath = rokuDeploy.getStagingFolderPath(options);
+            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), '.roku-deploy-staging'));
+        });
+    });
+
+    describe('getOutputPkgFilePath', function () {
+        it('should return correct path if given basename', async () => {
+            options.outFile = 'roku-deploy';
+            let outputPath = rokuDeploy.getOutputPkgFilePath(options);
+            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.pkg'));
+        });
+
+        it('should return correct path if given outFile option ending in .zip', async () => {
+            options.outFile = 'roku-deploy.zip';
+            let outputPath = rokuDeploy.getOutputPkgFilePath(options);
+            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.pkg'));
+        });
+    });
+
+    describe('getOutputZipFilePath', function () {
+        it('should return correct path if given basename', async () => {
+            options.outFile = 'roku-deploy';
+            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.zip'));
+        });
+
+        it('should return correct path if given outFile option ending in .zip', async () => {
+            options.outFile = 'roku-deploy.zip';
+            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.zip'));
+        });
+    });
+
     describe('createPackage', function () {
         it('should throw error when no files were found to copy', async () => {
             try {
@@ -90,6 +125,33 @@ describe('index', function () {
             await rokuDeploy.zipPackage(options);
             expect(dir(stagingFolderPath)).to.exist;
         });
+
+        it('should call our callback with correct information', async () => {
+            let spy = sinon.spy((info: rokuDeploy.RokuDeployBeforeZipCallbackInfo) => {
+                expect(dir(info.stagingFolderPath)).to.exist;
+                expect(info.manifestData.major_version).to.equal('1');
+            });
+
+            await rokuDeploy.createPackage(options, spy);
+
+            if(spy.notCalled) {
+                assert.fail('Callback not called');
+            }
+        });
+
+        it('should increment the build number if requested', async () => {
+            options.incrementBuildNumber = true;
+            await rokuDeploy.createPackage(options, (info) => {
+                expect(info.manifestData.build_version).to.not.equal('0');
+            });
+        });
+
+        it('should not increment the build number if not requested', async () => {
+            options.incrementBuildNumber = false;
+            await rokuDeploy.createPackage(options, (info) => {
+                expect(info.manifestData.build_version).to.equal('0');
+            });
+        });
     });
 
     it('runs via the command line using the rokudeploy.json file', function (done) {
@@ -109,7 +171,7 @@ describe('index', function () {
     describe('press home button', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => callback(new Error()));
+            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
             return rokuDeploy.pressHomeButton({}).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
@@ -155,9 +217,6 @@ describe('index', function () {
                 } else {
                     process.nextTick(callback);
                 }
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -175,11 +234,8 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = 'Install Failure: Compilation Failed.';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((data, callback) => {
+            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -196,9 +252,6 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 401 }, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -215,9 +268,6 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -234,9 +284,6 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -252,9 +299,6 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 123 }, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -271,9 +315,6 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, undefined, body);
-                return {
-                    auth: () => { }
-                };
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -284,6 +325,95 @@ describe('index', function () {
             });
         });
 
+    });
+
+    describe('signExistingPackage', () => {
+        beforeEach(() => {
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath();
+            fsExtra.ensureDirSync(stagingFolderPath);
+
+            let src = path.join(options.rootDir, 'manifest');
+            let dest = path.join(stagingFolderPath, 'manifest');
+            fsExtra.copySync(src, dest);
+        });
+
+        it('should return our error if signingKey is not supplied', async () => {
+            options.signingKey = undefined;
+            try {
+                await rokuDeploy.signExistingPackage(options);
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e.message).to.equal('Must supply signingKey');
+            }
+        });
+
+        it('should return an error if there is a problem with the network request', async () => {
+            let error = new Error('Network Error');
+            try {
+                //intercept the post requests
+                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback, error));
+                await rokuDeploy.signExistingPackage(options);
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.equal(error);
+            }
+        });
+
+        it('should return our error if it received invalid data', async () => {
+            try {
+                //intercept the post requests
+                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback));
+                await rokuDeploy.signExistingPackage(options);
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e.message).to.equal('Invalid response');
+            }
+        });
+
+        it('should return an error if failure returned in response', async () => {
+            let body = `   <div style="display:none">
+    <font color="red">Failed: Invalid Password.
+</font>
+  </div>`;
+            //intercept the post requests
+            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, {}, body);
+            });
+
+            try {
+                await rokuDeploy.signExistingPackage(options);
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e.message).to.equal('Invalid Password.');
+            }
+        });
+
+        it('should return created pkg on success', async () => {
+            let body = `            var pkgDiv = document.createElement('div');
+            pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+            node.appendChild(pkgDiv);`;
+
+            //intercept the post requests
+            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, {}, body);
+            });
+
+            let pkgPath = await rokuDeploy.signExistingPackage(options);
+            expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
+        });
+
+        it('should return our fallback error if neither error or package link was detected', async () => {
+            try {
+                //intercept the post requests
+                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+                    process.nextTick(callback, undefined, {}, '');
+                });
+                await rokuDeploy.signExistingPackage(options);
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e.message).to.equal('Unknown error signing package');
+            }
+        });
     });
 
     describe('prepublishToStaging', () => {
@@ -597,9 +727,6 @@ describe('index', function () {
         it('does the whole migration', async () => {
             sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, '');
-                return {
-                    auth: () => { }
-                };
             });
 
             let result = await rokuDeploy.deploy();
