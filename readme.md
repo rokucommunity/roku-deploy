@@ -54,11 +54,11 @@ From an npm script in package.json. (Requires rokudeploy.json to exist at the ro
         }
     }
 
-A callback has also been added to the higher level methods so you can modify the copied contents before the package is zipped. An info object is passed in with the following attributes
+You can provide a callback in any of the higher level methods, which allows you to modify the copied contents before the package is zipped. An info object is passed in with the following attributes
 - **manifestData:** [key: string]: string
     Contains all the parsed values from the manifest file
 - **stagingFolderPath:** string
-    Path to staging folder for easy access to know where to modify relative to
+    Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
 
         let options = {
             host: 'ip-of-roku',
@@ -91,7 +91,7 @@ Here are the available options. The defaults are shown to the right of the optio
     A full path to the folder where the zip/pkg package should be placed
 
 - **outFile?:** string = `"roku-deploy"`  
-    Basename the zip/pkg file should be given..
+    The base filename the zip/pkg file should be given (excluding the extension)
 
 - **rootDir?:** string = `'./'`  
     The root path to the folder holding your project. The manifest file should be directly underneath this folder. Use this option when your roku project is in a subdirectory of where roku-deploy is installed.

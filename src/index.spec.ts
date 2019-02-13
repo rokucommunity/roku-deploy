@@ -92,14 +92,14 @@ describe('index', function () {
 
         it('should create package in proper directory', async function () {
             await rokuDeploy.createPackage(options);
-            expect(file(await rokuDeploy.getOutputZipFilePath(options))).to.exist;
+            expect(file(rokuDeploy.getOutputZipFilePath(options))).to.exist;
         });
 
         it('should only include the specified files', async () => {
             try {
                 options.files = ['manifest'];
                 await rokuDeploy.createPackage(options);
-                let zip = new AdmZip(await rokuDeploy.getOutputZipFilePath(options));
+                let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
                 await fsExtra.ensureDir('.tmp');
                 zip.extractAllTo('.tmp/output', true);
                 expect(file('./.tmp/output/manifest')).to.exist;
@@ -110,7 +110,7 @@ describe('index', function () {
 
         it('generates full package with defaults', async () => {
             await rokuDeploy.createPackage(options);
-            let zip = new AdmZip(await rokuDeploy.getOutputZipFilePath(options));
+            let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
             await fsExtra.ensureDir('.tmp');
             zip.extractAllTo('.tmp/output', true);
             expect(dir('./.tmp/output/components')).to.exist;
@@ -127,7 +127,7 @@ describe('index', function () {
         });
 
         it('should call our callback with correct information', async () => {
-            let spy = sinon.spy((info: rokuDeploy.RokuDeployBeforeZipCallbackInfo) => {
+            let spy = sinon.spy((info: rokuDeploy.BeforeZipCallbackInfo) => {
                 expect(dir(info.stagingFolderPath)).to.exist;
                 expect(info.manifestData.major_version).to.equal('1');
             });
@@ -371,6 +371,7 @@ describe('index', function () {
         });
 
         it('should return an error if failure returned in response', async () => {
+            // This is formatted exactly how it is output in the Roku's HTML body so mock matches exactly and less chance for test passing here but not in the actual device
             let body = `   <div style="display:none">
     <font color="red">Failed: Invalid Password.
 </font>

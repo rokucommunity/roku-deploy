@@ -14,7 +14,7 @@ export var __request: any = request;
  * Copies all of the referenced files to the staging folder
  * @param options
  */
-export async function prepublishToStaging(options: RokuDeployOptions): Promise<string> {
+export async function prepublishToStaging(options: RokuDeployOptions) {
     options = getOptions(options);
     //cast some of the options as not null so we don't have to cast them below
     options.rootDir = <string>options.rootDir;
@@ -166,7 +166,7 @@ export async function zipPackage(options: RokuDeployOptions) {
  * Create a zip folder containing all of the specified roku project files.
  * @param options
  */
-export async function createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: RokuDeployBeforeZipCallbackInfo) => void) {
+export async function createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
     options = getOptions(options);
 
     await prepublishToStaging(options);
@@ -182,7 +182,7 @@ export async function createPackage(options: RokuDeployOptions, beforeZipCallbac
     }
 
     if (beforeZipCallback) {
-        let info: RokuDeployBeforeZipCallbackInfo = {
+        let info: BeforeZipCallbackInfo = {
             manifestData: parsedManifest,
             stagingFolderPath: stagingFolderPath
         };
@@ -509,38 +509,36 @@ export async function signExistingPackage(options: RokuDeployOptions): Promise<s
         app_name: appName,
     };
 
-    return Promise.all([]).then(function () {
-        return new Promise<any>(function (resolve, reject) {
-            request.post(requestOptions, function (err, resp, body) {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        }).then(function (results) {
-            let error: any;
-            if (!results || !results.response || typeof results.body !== 'string') {
-                error = new Error('Invalid response');
-                error.results = results;
-                return Q.reject(error);
+    return new Promise<any>(function (resolve, reject) {
+        request.post(requestOptions, function (err, resp, body) {
+            if (err) {
+                return reject(err);
             }
-
-            let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
-            if (failedSearchMatches) {
-                error = new Error(failedSearchMatches[1]);
-                error.results = results;
-                return Q.reject(error);
-            }
-
-            let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
-            if (pkgSearchMatches) {
-                return pkgSearchMatches[1];
-            }
-
-            error = new Error('Unknown error signing package');
+            return resolve({ response: resp, body: body });
+        });
+    }).then(function (results) {
+        let error: any;
+        if (!results || !results.response || typeof results.body !== 'string') {
+            error = new Error('Invalid response');
             error.results = results;
             return Q.reject(error);
-        });
+        }
+
+        let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
+        if (failedSearchMatches) {
+            error = new Error(failedSearchMatches[1]);
+            error.results = results;
+            return Q.reject(error);
+        }
+
+        let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
+        if (pkgSearchMatches) {
+            return pkgSearchMatches[1];
+        }
+
+        error = new Error('Unknown error signing package');
+        error.results = results;
+        return Q.reject(error);
     });
 }
 
@@ -574,7 +572,7 @@ export async function retrieveSignedPackage(pkgPath: string, options: RokuDeploy
  * Create a zip of the project, and then publish to the target Roku device
  * @param options
  */
-export async function deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: RokuDeployBeforeZipCallbackInfo) => void) {
+export async function deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
     options = getOptions(options);
     await createPackage(options, beforeZipCallback);
     let result = await publish(options);
@@ -585,7 +583,7 @@ export async function deploy(options?: RokuDeployOptions, beforeZipCallback?: (i
  * executes sames steps as deploy and signs the package and stores it in the out folder
  * @param options
  */
-export async function deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: RokuDeployBeforeZipCallbackInfo) => void): Promise<string> {
+export async function deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
     options = getOptions(options);
     let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
     options.retainStagingFolder = true;
@@ -636,7 +634,7 @@ export function getOptions(options: RokuDeployOptions = {}) {
     return finalOptions;
 }
 
-export function getStagingFolderPath(options?: RokuDeployOptions): string {
+export function getStagingFolderPath(options?: RokuDeployOptions) {
     options = getOptions(options);
 
     let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
@@ -649,7 +647,7 @@ export function getStagingFolderPath(options?: RokuDeployOptions): string {
  * Centralizes getting output zip file path based on passed in options
  * @param options
  */
-export function getOutputZipFilePath(options: RokuDeployOptions): string {
+export function getOutputZipFilePath(options: RokuDeployOptions) {
     options = getOptions(options);
 
     let zipFileName = <string>options.outFile;
@@ -666,7 +664,7 @@ export function getOutputZipFilePath(options: RokuDeployOptions): string {
  * Centralizes getting output pkg file path based on passed in options
  * @param options
  */
-export function getOutputPkgFilePath(options?: RokuDeployOptions): string {
+export function getOutputPkgFilePath(options?: RokuDeployOptions) {
     options = getOptions(options);
 
     let pkgFileName = <string>options.outFile;
@@ -740,7 +738,7 @@ export interface RokuDeployOptions {
      */
     outDir?: string;
     /**
-     * Basename the zip/pkg file should be given.
+     * The base filename the zip/pkg file should be given (excluding the extension)
      * @default "roku-deploy"
      */
     outFile?: string;
@@ -806,7 +804,7 @@ export interface ManifestData {
     [key: string]: string;
 }
 
-export interface RokuDeployBeforeZipCallbackInfo {
+export interface BeforeZipCallbackInfo {
     /**
      * Contains an associative array of the parsed values in the manifest
      */
