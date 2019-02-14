@@ -442,48 +442,45 @@ export async function publish(options: RokuDeployOptions): Promise<{ message: st
         archive: fs.createReadStream(zipFilePath)
     };
 
-    return Promise.all([]).then(function () {
-        // upload the package to the Roku
-        return new Promise<any>(function (resolve, reject) {
-            request.post(requestOptions, function (err, resp, body) {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        }).then(function (results) {
-            let error: any;
-            if (!results || !results.response || typeof results.body !== 'string') {
-                error = new Error('Invalid response');
-                error.results = results;
-                return Q.reject(error);
+    return new Promise<any>(function (resolve, reject) {
+        request.post(requestOptions, function (err, resp, body) {
+            if (err) {
+                return reject(err);
             }
-
-            if (options.failOnCompileError) {
-                if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                    error = new Error('Compile error');
-                    console.log(results.body);
-
-                    error.results = results;
-                    return Q.reject(error);
-                }
-            }
-
-            if (results.response.statusCode === 200) {
-                if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-                    return { message: 'Identical to previous version -- not replacing', results: results };
-                }
-                return { message: 'Successful deploy', results: results };
-            } else {
-                if (results.response.statusCode === 401) {
-                    error = new Error('Unauthorized. Please verify username and password for target Roku.');
-                } else {
-                    error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
-                }
-                error.results = results;
-                return Q.reject(error);
-            }
+            return resolve({ response: resp, body: body });
         });
+    }).then(function (results) {
+        let error: any;
+        if (!results || !results.response || typeof results.body !== 'string') {
+            error = new Error('Invalid response');
+            error.results = results;
+            return Q.reject(error);
+        }
+
+        if (options.failOnCompileError) {
+            if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                error = new Error('Compile error');
+                console.log(results.body);
+
+                error.results = results;
+                return Q.reject(error);
+            }
+        }
+
+        if (results.response.statusCode === 200) {
+            if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                return { message: 'Identical to previous version -- not replacing', results: results };
+            }
+            return { message: 'Successful deploy', results: results };
+        } else {
+            if (results.response.statusCode === 401) {
+                error = new Error('Unauthorized. Please verify username and password for target Roku.');
+            } else {
+                error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
+            }
+            error.results = results;
+            return Q.reject(error);
+        }
     });
 }
 
