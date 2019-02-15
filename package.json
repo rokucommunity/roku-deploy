@@ -24,7 +24,8 @@
   "license": "ISC",
   "nyc": {
     "include": [
-      "src/index.ts"
+      "src/index.ts",
+      "src/RokuDeploy.ts"
     ],
     "extension": [
       ".ts"
