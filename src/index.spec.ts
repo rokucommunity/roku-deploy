@@ -8,7 +8,7 @@ import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
 let sinon = sinonImport.createSandbox();
 
-import * as rokuDeploy from './index';
+import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo } from './RokuDeploy';
 
 chai.use(chaiFiles);
 
@@ -17,9 +17,13 @@ const file = chaiFiles.file;
 const dir = chaiFiles.dir;
 
 describe('index', function () {
+    let rokuDeploy: RokuDeploy;
+    beforeEach(() => {
+        rokuDeploy = new RokuDeploy();
+    });
     let cwd = process.cwd();
 
-    let options: rokuDeploy.RokuDeployOptions;
+    let options: RokuDeployOptions;
     let originalCwd = process.cwd();
 
     beforeEach(() => {
@@ -127,7 +131,7 @@ describe('index', function () {
         });
 
         it('should call our callback with correct information', async () => {
-            let spy = sinon.spy((info: rokuDeploy.BeforeZipCallbackInfo) => {
+            let spy = sinon.spy((info: BeforeZipCallbackInfo) => {
                 expect(dir(info.stagingFolderPath)).to.exist;
                 expect(info.manifestData.major_version).to.equal('1');
             });
@@ -171,7 +175,7 @@ describe('index', function () {
     describe('press home button', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
             return rokuDeploy.pressHomeButton({}).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
@@ -209,7 +213,7 @@ describe('index', function () {
 
         it('rejects when package upload fails', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((data, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((data, callback) => {
                 if (data.url === `http://${options.host}/plugin_install`) {
                     process.nextTick(() => {
                         callback(new Error('Failed to publish to server'));
@@ -234,7 +238,7 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = 'Install Failure: Compilation Failed.';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
             });
 
@@ -250,7 +254,7 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = '';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 401 }, body);
             });
 
@@ -266,7 +270,7 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = '';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
             });
 
@@ -282,7 +286,7 @@ describe('index', function () {
 
             let body = 'Identical to previous version -- not replacing.';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
             });
 
@@ -297,7 +301,7 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = 'Identical to previous version -- not replacing.';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 123 }, body);
             });
 
@@ -313,7 +317,7 @@ describe('index', function () {
             options.failOnCompileError = true;
             let body = 'Identical to previous version -- not replacing.';
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, undefined, body);
             });
 
@@ -351,7 +355,7 @@ describe('index', function () {
             let error = new Error('Network Error');
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback, error));
+                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, error));
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
             } catch (e) {
@@ -362,7 +366,7 @@ describe('index', function () {
         it('should return our error if it received invalid data', async () => {
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => process.nextTick(callback));
+                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback));
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
             } catch (e) {
@@ -377,7 +381,7 @@ describe('index', function () {
 </font>
   </div>`;
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
             });
 
@@ -395,7 +399,7 @@ describe('index', function () {
             node.appendChild(pkgDiv);`;
 
             //intercept the post requests
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
             });
 
@@ -406,7 +410,7 @@ describe('index', function () {
         it('should return our fallback error if neither error or package link was detected', async () => {
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                     process.nextTick(callback, undefined, {}, '');
                 });
                 await rokuDeploy.signExistingPackage(options);
@@ -726,7 +730,7 @@ describe('index', function () {
 
     describe('deploy', () => {
         it('does the whole migration', async () => {
-            sinon.stub(rokuDeploy.__request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, '');
             });
 
