@@ -456,7 +456,7 @@ export class RokuDeploy {
             if (!results || !results.response || typeof results.body !== 'string') {
                 error = new Error('Invalid response');
                 error.results = results;
-                return Q.reject(error);
+                return Promise.reject(error);
             }
 
             if (options.failOnCompileError) {
@@ -465,7 +465,7 @@ export class RokuDeploy {
                     console.log(results.body);
 
                     error.results = results;
-                    return Q.reject(error);
+                    return Promise.reject<any>(error);
                 }
             }
 
@@ -481,7 +481,7 @@ export class RokuDeploy {
                     error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
                 }
                 error.results = results;
-                return Q.reject(error);
+                return Promise.reject(error);
             }
         });
     }
@@ -520,14 +520,14 @@ export class RokuDeploy {
             if (!results || !results.response || typeof results.body !== 'string') {
                 error = new Error('Invalid response');
                 error.results = results;
-                return Q.reject(error);
+                return Promise.reject(error);
             }
 
             let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
             if (failedSearchMatches) {
                 error = new Error(failedSearchMatches[1]);
                 error.results = results;
-                return Q.reject(error);
+                return Promise.reject<any>(error);
             }
 
             let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
@@ -537,7 +537,7 @@ export class RokuDeploy {
 
             error = new Error('Unknown error signing package');
             error.results = results;
-            return Q.reject(error);
+            return Promise.reject(error);
         });
     }
 
@@ -679,7 +679,7 @@ export class RokuDeploy {
 
     public async parseManifest(manifestPath: string): Promise<ManifestData> {
         if (!await fsExtra.pathExists(manifestPath)) {
-            return Q.reject(new Error(manifestPath + ' does not exist'));
+            return Promise.reject(new Error(manifestPath + ' does not exist'));
         }
 
         let manifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
