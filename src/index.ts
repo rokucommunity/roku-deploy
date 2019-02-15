@@ -24,12 +24,13 @@ let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
-
-let __request = rokuDeploy.request;
+let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
+let retrieveSignedPackage = RokuDeploy.prototype.retrieveSignedPackage.bind(rokuDeploy);
 
 export {
     createPackage,
     deploy,
+    deployAndSignPackage,
     endsWithSlash,
     getFilePaths,
     getOptions,
@@ -39,12 +40,12 @@ export {
     prepublishToStaging,
     pressHomeButton,
     publish,
+    retrieveSignedPackage,
     signExistingPackage,
     zipFolder,
     zipPackage,
 
     //remove these
-    __request,
     getStagingFolderPath,
     getOutputZipFilePath,
     parseManifest,
