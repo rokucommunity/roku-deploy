@@ -28,23 +28,25 @@ let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDe
 let __request = RokuDeploy.request;
 
 export {
-    __request,
     createPackage,
     deploy,
     endsWithSlash,
     getFilePaths,
     getOptions,
-    getOutputZipFilePath,
-    getStagingFolderPath,
     makeFilesAbsolute,
     normalizeFilesOption,
     normalizeRootDir,
-    parseManifest,
     prepublishToStaging,
     pressHomeButton,
     publish,
     signExistingPackage,
     zipFolder,
     zipPackage,
+
+    //remove these
+    __request,
+    getStagingFolderPath,
+    getOutputZipFilePath,
+    parseManifest,
     getOutputPkgFilePath
 };
