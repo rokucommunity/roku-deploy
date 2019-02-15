@@ -7,7 +7,7 @@
     "compile": "rimraf out && tsc",
     "prepublishOnly": "npm run compile",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
-    "test": "nyc mocha src/index.spec.ts --full-trace",
+    "test": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
     "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
     "coverage": "nyc report --reporter=text-lcov | coveralls"
