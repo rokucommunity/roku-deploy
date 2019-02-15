@@ -9,6 +9,7 @@ import * as sinonImport from 'sinon';
 let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo } from './RokuDeploy';
+import { Request } from 'request';
 
 chai.use(chaiFiles);
 
@@ -18,8 +19,11 @@ const dir = chaiFiles.dir;
 
 describe('index', function () {
     let rokuDeploy: RokuDeploy;
+    //make an <any> ref to rokuDeploy to make some things easier
+    let rd: any;
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
+        rd = rokuDeploy;
     });
     let cwd = process.cwd();
 
@@ -175,7 +179,10 @@ describe('index', function () {
     describe('press home button', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, new Error());
+                return {} as any;
+            });
             return rokuDeploy.pressHomeButton({}).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
@@ -213,7 +220,7 @@ describe('index', function () {
 
         it('rejects when package upload fails', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((data, callback) => {
+            sinon.stub(rokuDeploy.request, 'post').callsFake((data: any, callback: any) => {
                 if (data.url === `http://${options.host}/plugin_install`) {
                     process.nextTick(() => {
                         callback(new Error('Failed to publish to server'));
@@ -221,6 +228,7 @@ describe('index', function () {
                 } else {
                     process.nextTick(callback);
                 }
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -240,6 +248,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -256,6 +265,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 401 }, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then(() => {
@@ -272,6 +282,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -288,6 +299,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -303,6 +315,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 123 }, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -319,6 +332,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, undefined, body);
+                return {} as any;
             });
 
             return rokuDeploy.publish(options).then((result) => {
@@ -355,7 +369,10 @@ describe('index', function () {
             let error = new Error('Network Error');
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, error));
+                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                    process.nextTick(callback, error);
+                    return {} as any;
+                });
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
             } catch (e) {
@@ -366,7 +383,10 @@ describe('index', function () {
         it('should return our error if it received invalid data', async () => {
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback));
+                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                    process.nextTick(callback);
+                    return {} as any;
+                });
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
             } catch (e) {
@@ -383,6 +403,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
+                return {} as any;
             });
 
             try {
@@ -401,6 +422,7 @@ describe('index', function () {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, {}, body);
+                return {} as any;
             });
 
             let pkgPath = await rokuDeploy.signExistingPackage(options);
@@ -412,6 +434,7 @@ describe('index', function () {
                 //intercept the post requests
                 sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                     process.nextTick(callback, undefined, {}, '');
+                    return {} as any;
                 });
                 await rokuDeploy.signExistingPackage(options);
                 assert.fail('Exception should have been thrown');
@@ -732,6 +755,7 @@ describe('index', function () {
         it('does the whole migration', async () => {
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, '');
+                return {} as any;
             });
 
             let result = await rokuDeploy.deploy();
@@ -901,3 +925,13 @@ describe('index', function () {
         }
     }
 });
+
+// class MockRequest {
+//     constructor(
+//         private request: Request
+//     ) {
+//         //overwrite the request with mocks
+//         sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
+
+//     }
+// }
