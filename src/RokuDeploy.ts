@@ -1,8 +1,8 @@
 import * as path from 'path';
-import * as fsExtra from 'fs-extra';
+import * as fsExtra1 from 'fs-extra';
 import * as Q from 'q';
 import * as globAll from 'glob-all';
-import * as request1 from 'request';
+import * as request from 'request';
 import * as fs from 'fs';
 import * as archiver from 'archiver';
 import * as ini from 'ini';
@@ -10,7 +10,8 @@ import * as dateformat from 'dateformat';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
-    public request = request1;
+    public request = request;
+    public fsExtra = fsExtra1;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -30,10 +31,10 @@ export class RokuDeploy {
         let stagingFolderPath = this.getStagingFolderPath(options);
 
         //clean the staging directory
-        await fsExtra.remove(stagingFolderPath);
+        await this.fsExtra.remove(stagingFolderPath);
 
         //make sure the staging folder exists
-        await fsExtra.ensureDir(stagingFolderPath);
+        await this.fsExtra.ensureDir(stagingFolderPath);
         await this.copyToStaging(files, stagingFolderPath, options.rootDir);
         return stagingFolderPath;
     }
@@ -160,7 +161,7 @@ export class RokuDeploy {
 
         //delete the staging folder unless told to retain it.
         if (options.retainStagingFolder !== true) {
-            await fsExtra.remove(stagingFolderPath);
+            await this.fsExtra.remove(stagingFolderPath);
         }
     }
 
@@ -180,7 +181,7 @@ export class RokuDeploy {
         if (options.incrementBuildNumber) {
             let timestamp = dateformat(new Date(), 'yymmddHHMM');
             parsedManifest.build_version = timestamp;
-            await fsExtra.writeFile(manifestPath, ini.stringify(parsedManifest));
+            await this.fsExtra.writeFile(manifestPath, ini.stringify(parsedManifest));
         }
 
         if (beforeZipCallback) {
@@ -358,7 +359,7 @@ export class RokuDeploy {
         let fileObjects = await this.getFilePaths(files, stagingPath, rootDir);
         for (let fileObject of fileObjects) {
             //make sure the containing folder exists
-            await fsExtra.ensureDir(path.dirname(fileObject.dest));
+            await this.fsExtra.ensureDir(path.dirname(fileObject.dest));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
             //Just try a few fimes until it resolves itself.
@@ -366,7 +367,7 @@ export class RokuDeploy {
             for (let i = 0; i < 10; i++) {
                 try {
                     //copy the src item (file or directory full of files)
-                    await fsExtra.copy(fileObject.src, fileObject.dest, {
+                    await this.fsExtra.copy(fileObject.src, fileObject.dest, {
                         //copy the actual files that symlinks point to, not the symlinks themselves
                         dereference: true
                     });
@@ -383,7 +384,7 @@ export class RokuDeploy {
         }
     }
 
-    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request1.OptionsWithUrl {
+    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
         let url = `http://${options.host}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
@@ -415,16 +416,10 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      * @param host
      */
-    public async  pressHomeButton(host) {
-        let homeClickUrl = `http://${host}:8060/keypress/Home`;
+    public async pressHomeButton(host) {
         // press the home button to return to the main screen
-        return new Promise((resolve, reject) => {
-            this.request.post(homeClickUrl, (err, response) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve(response);
-            });
+        return await this.doPostRequest({
+            url: `http://${host}:8060/keypress/Home`
         });
     }
 
@@ -444,46 +439,39 @@ export class RokuDeploy {
             archive: fs.createReadStream(zipFilePath)
         };
 
-        return new Promise<any>((resolve, reject) => {
-            this.request.post(requestOptions, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        }).then((results) => {
-            let error: any;
-            if (!results || !results.response || typeof results.body !== 'string') {
-                error = new Error('Invalid response');
-                error.results = results;
-                return Promise.reject(error);
+        let results = await this.doPostRequest(requestOptions);
+
+        let error: any;
+        if (!results || !results.response || typeof results.body !== 'string') {
+            error = new Error('Invalid response');
+            (error as any).results = results;
+            throw error;
+        }
+
+        if (options.failOnCompileError) {
+            if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                error = new Error('Compile error');
+                console.log(results.body);
+
+                (error as any).results = results;
+                throw error;
             }
+        }
 
-            if (options.failOnCompileError) {
-                if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                    error = new Error('Compile error');
-                    console.log(results.body);
-
-                    error.results = results;
-                    return Promise.reject<any>(error);
-                }
+        if (results.response.statusCode === 200) {
+            if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                return { message: 'Identical to previous version -- not replacing', results: results };
             }
-
-            if (results.response.statusCode === 200) {
-                if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-                    return { message: 'Identical to previous version -- not replacing', results: results };
-                }
-                return { message: 'Successful deploy', results: results };
+            return { message: 'Successful deploy', results: results };
+        } else {
+            if (results.response.statusCode === 401) {
+                error = new Error('Unauthorized. Please verify username and password for target Roku.');
             } else {
-                if (results.response.statusCode === 401) {
-                    error = new Error('Unauthorized. Please verify username and password for target Roku.');
-                } else {
-                    error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
-                }
-                error.results = results;
-                return Promise.reject(error);
+                error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
             }
-        });
+            error.results = results;
+            throw error;
+        }
     }
 
     /**
@@ -552,7 +540,7 @@ export class RokuDeploy {
 
         let pkgFilePath = this.getOutputPkgFilePath(options);
 
-        await fsExtra.ensureDir(path.dirname(pkgFilePath));
+        await this.fsExtra.ensureDir(path.dirname(pkgFilePath));
 
         return new Promise<string>((resolve, reject) => {
             this.request.get(requestOptions)
@@ -564,6 +552,21 @@ export class RokuDeploy {
                     resolve(pkgFilePath);
                 })
                 .pipe(fs.createWriteStream(pkgFilePath));
+        });
+    }
+
+    /**
+     * Centralized function for handling http requests
+     * @param params 
+     */
+    private doPostRequest(params: any): Promise<{ response: any; body: any }> {
+        return new Promise((resolve, reject) => {
+            this.request.post(params, (err, resp, body) => {
+                if (err) {
+                    return reject(err);
+                }
+                return resolve({ response: resp, body: body });
+            });
         });
     }
 
@@ -590,7 +593,7 @@ export class RokuDeploy {
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
         if (originalOptionValueRetainStagingFolder !== true) {
-            await fsExtra.remove(this.getStagingFolderPath(options));
+            await this.fsExtra.remove(this.getStagingFolderPath(options));
         }
         return localPkgFilePath;
     }
@@ -602,8 +605,8 @@ export class RokuDeploy {
     public getOptions(options: RokuDeployOptions = {}) {
         let fileOptions: RokuDeployOptions = {};
         //load a rokudeploy.json file if it exists
-        if (fsExtra.existsSync('rokudeploy.json')) {
-            let configFileText = fsExtra.readFileSync('rokudeploy.json').toString();
+        if (this.fsExtra.existsSync('rokudeploy.json')) {
+            let configFileText = this.fsExtra.readFileSync('rokudeploy.json').toString();
             fileOptions = JSON.parse(configFileText);
         }
 
@@ -678,11 +681,11 @@ export class RokuDeploy {
     }
 
     public async parseManifest(manifestPath: string): Promise<ManifestData> {
-        if (!await fsExtra.pathExists(manifestPath)) {
-            return Promise.reject(new Error(manifestPath + ' does not exist'));
+        if (!await this.fsExtra.pathExists(manifestPath)) {
+            throw new Error(manifestPath + ' does not exist');
         }
 
-        let manifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
+        let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
         let parsedManifest = ini.parse(manifestContents);
         return parsedManifest;
     }
