@@ -3,7 +3,6 @@ import * as fsExtra1 from 'fs-extra';
 import * as Q from 'q';
 import * as globAll from 'glob-all';
 import * as request from 'request';
-import * as fs from 'fs';
 import * as archiver from 'archiver';
 import * as ini from 'ini';
 import * as dateformat from 'dateformat';
@@ -403,7 +402,7 @@ export class RokuDeploy {
      */
     public async isDirectory(pathToDirectoryOrFile: string) {
         try {
-            let stat = await Q.nfcall(fs.lstat, pathToDirectoryOrFile);
+            let stat = await Q.nfcall(this.fsExtra.lstat, pathToDirectoryOrFile);
             return stat.isDirectory();
         } catch (e) {
             // lstatSync throws an error if path doesn't exist
@@ -436,7 +435,7 @@ export class RokuDeploy {
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
         requestOptions.formData = {
             mysubmit: 'Replace',
-            archive: fs.createReadStream(zipFilePath)
+            archive: this.fsExtra.createReadStream(zipFilePath)
         };
 
         let results = await this.doPostRequest(requestOptions);
@@ -551,7 +550,7 @@ export class RokuDeploy {
                     }
                     resolve(pkgFilePath);
                 })
-                .pipe(fs.createWriteStream(pkgFilePath));
+                .pipe(this.fsExtra.createWriteStream(pkgFilePath));
         });
     }
 
@@ -697,7 +696,7 @@ export class RokuDeploy {
      */
     public zipFolder(srcFolder: string, zipFilePath: string) {
         return new Promise((resolve, reject) => {
-            let output = fs.createWriteStream(zipFilePath);
+            let output = this.fsExtra.createWriteStream(zipFilePath);
             let archive = archiver('zip');
 
             output.on('close', () => {
