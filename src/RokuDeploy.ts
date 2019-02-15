@@ -584,7 +584,7 @@ export class RokuDeploy {
      * executes sames steps as deploy and signs the package and stores it in the out folder
      * @param options
      */
-    public async  deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
+    public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
         options = this.getOptions(options);
         let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
         options.retainStagingFolder = true;

@@ -914,6 +914,82 @@ describe('index', function () {
         });
     });
 
+    describe('retrieveSignedPackage', () => {
+        let onHandler: any;
+        beforeEach(() => {
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((pth: string, callback: (err: Error) => void) => {
+                //do nothing, assume the dir gets created
+            });
+
+            //fake out the write stream function
+            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
+
+            //intercept the http request
+            sinon.stub(rokuDeploy.request, 'get').callsFake(() => {
+                let request: any = {
+                    on: (event, callback) => {
+                        process.nextTick(() => {
+                            onHandler(event, callback);
+                        });
+                        return request;
+                    },
+                    pipe: () => { }
+                };
+                return request;
+            });
+
+        });
+        it('returns a pkg file path on success', async () => {
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200,
+                    });
+                }
+            };
+            let pkgFilePath = await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
+                outFile: 'roku-deploy-test'
+            });
+            expect(pkgFilePath).to.equal(path.join(process.cwd(), 'out', 'roku-deploy-test.pkg'));
+        });
+
+        it('throws when error in request is encountered', async () => {
+            onHandler = (event, callback) => {
+                if (event === 'error') {
+                    callback(new Error('Some error'));
+                }
+            };
+            try {
+                await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
+                    outFile: 'roku-deploy-test'
+                });
+                assert.fail(null, null, 'Should not have succeeded');
+            } catch (e) {
+                expect(e.message).to.equal('Some error');
+
+            }
+        });
+
+        it('throws when status code is non 200', async () => {
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 500
+                    });
+                }
+            };
+            try {
+                await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
+                    outFile: 'roku-deploy-test'
+                });
+                assert.fail(null, null, 'Should not have succeeded');
+            } catch (e) {
+                expect(e.message.indexOf('Invalid response code')).to.equal(0);
+
+            }
+        });
+    });
+
     async function assertThrowsAsync(fn) {
         let f = () => { };
         try {
