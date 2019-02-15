@@ -990,6 +990,42 @@ describe('index', function () {
         });
     });
 
+    describe('deployAndSignPackage', () => {
+        it('succeeds and does proper things with staging folder', async () => {
+            //pretend the deploy worked
+            sinon.stub(rokuDeploy, 'deploy').returns(Promise.resolve<any>(null));
+            //pretend the sign worked
+            sinon.stub(rokuDeploy, 'signExistingPackage').returns(Promise.resolve<any>(null));
+            //pretend fetching the signed package worked
+            sinon.stub(rokuDeploy, 'retrieveSignedPackage').returns(Promise.resolve<any>('some_local_path'));
+
+            let stub = sinon.stub(rd.fsExtra, 'remove').returns(Promise.resolve());
+
+            //this should not fail
+            let pkgFilePath = await rokuDeploy.deployAndSignPackage({
+                retainStagingFolder: false
+            });
+
+            //the return value should equal what retrieveSignedPackage returned.
+            expect(pkgFilePath).to.equal('some_local_path');
+
+            //fsExtra.remove should have been called
+            expect(stub.getCalls()).to.be.lengthOf(1);
+
+            //call it again, but specify true for retainStagingFolder
+            await rokuDeploy.deployAndSignPackage({
+                retainStagingFolder: true
+            });
+            //call count should NOT increase
+            expect(stub.getCalls()).to.be.lengthOf(1);
+
+            //call it again, but don't specify retainStagingFolder at all (it should default to FALSE)
+            await rokuDeploy.deployAndSignPackage({});
+            //call count should NOT increase
+            expect(stub.getCalls()).to.be.lengthOf(2);
+        });
+    });
+
     async function assertThrowsAsync(fn) {
         let f = () => { };
         try {

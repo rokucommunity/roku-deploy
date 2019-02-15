@@ -585,8 +585,8 @@ export class RokuDeploy {
      * @param options
      */
     public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
-        options = this.getOptions(options);
         let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
+        options = this.getOptions(options);
         options.retainStagingFolder = true;
         await this.deploy(options, beforeZipCallback);
         let remotePkgPath = await this.signExistingPackage(options);
