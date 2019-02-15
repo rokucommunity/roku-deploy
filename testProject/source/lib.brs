@@ -1,3 +1,3 @@
-Sub GetNumber()
+Function GetNumber() as Integer
     return 1
-End Sub
+End Function

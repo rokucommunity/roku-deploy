@@ -5,21 +5,19 @@ Publish Roku projects to a Roku device by using Node.js.
 
 [![Build Status](https://travis-ci.org/TwitchBronBron/roku-deploy.svg?branch=master)](https://travis-ci.org/TwitchBronBron/roku-deploy)
 [![Coverage Status](https://coveralls.io/repos/github/TwitchBronBron/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/TwitchBronBron/roku-deploy?branch=master)
- [![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy) [![Greenkeeper badge](https://badges.greenkeeper.io/TwitchBronBron/roku-deploy.svg)](https://greenkeeper.io/)
+[![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy) [![Greenkeeper badge](https://badges.greenkeeper.io/TwitchBronBron/roku-deploy.svg)](https://greenkeeper.io/)
 ## Installation
 
     npm install roku-deploy
 
 ## Requirements
 
- 1. Your project must be structured the way that Roku expects. The source files can be in a subdirectory (using the `rootDir` config option), but whever your roku files exist, they must align with the following folder structure:  
-     
-     components/  
-     images/  
-     source/  
-     manifest
+1. Your project must be structured the way that Roku expects. The source files can be in a subdirectory (using the `rootDir` config option), but whever your roku files exist, they must align with the following folder structure:  
 
-    
+    components/  
+    images/  
+    source/  
+    manifest
 
 2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible.
 
@@ -56,6 +54,27 @@ From an npm script in package.json. (Requires rokudeploy.json to exist at the ro
         }
     }
 
+You can provide a callback in any of the higher level methods, which allows you to modify the copied contents before the package is zipped. An info object is passed in with the following attributes
+- **manifestData:** [key: string]: string
+    Contains all the parsed values from the manifest file
+- **stagingFolderPath:** string
+    Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
+
+        let options = {
+            host: 'ip-of-roku',
+            password: 'password for roku dev admin portal'
+            //other options if necessary
+        };
+
+        rokuDeploy.deploy({options, (info) => {
+            // Do what you whatever modification you want to do here.
+        }
+	}).then(function(){
+            //it worked
+        }, function(){
+            //it failed
+        });
+
 ## Options
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
 
@@ -65,11 +84,14 @@ Here are the available options. The defaults are shown to the right of the optio
 - **password:** string (*required*)  
     The password for logging in to the developer portal on the target Roku device
 
-- **outDir?:** string = `"./out"`  
-    A full path to the folder where the zip package should be placed  
+- **signingPassword:** string (*required for signing*)  
+    The password used for creating signed packages
 
-- **outFile?:** string = `"roku-deploy.zip"`  
-    The name the zip file should be given.  
+- **outDir?:** string = `"./out"`  
+    A full path to the folder where the zip/pkg package should be placed
+
+- **outFile?:** string = `"roku-deploy"`  
+    The base filename the zip/pkg file should be given (excluding the extension)
 
 - **rootDir?:** string = `'./'`  
     The root path to the folder holding your project. The manifest file should be directly underneath this folder. Use this option when your roku project is in a subdirectory of where roku-deploy is installed.
@@ -91,8 +113,8 @@ Here are the available options. The defaults are shown to the right of the optio
     ```json
     //deploy configs/dev.config.json as config.json
     {
-         "src": "configs/dev.config.json",
-         "dest": "config.json"
+        "src": "configs/dev.config.json",
+        "dest": "config.json"
     }
     ```
 
@@ -118,12 +140,14 @@ Here are the available options. The defaults are shown to the right of the optio
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
     
 - **retainStagingFolder?:** boolean = `false`  
-    Set this to true prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
+    Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
+
+- **incrementBuildNumber?:** boolean = `false`  
+    If true we increment the build number to be a timestamp in the format yymmddHHMM
 
 - **username?:** string = `"rokudev"`  
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
     just in case roku adds support for custom usernames in the future
-   
 
 Click [here](https://github.com/TwitchBronBron/roku-deploy/blob/2648069de1f3e889c58b8119b5f852f126e60042/src/index.ts#L288) to see the typescript interface for these options
 
