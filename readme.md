@@ -35,6 +35,7 @@ From a node script
 ```javascript
 var rokuDeploy = require('roku-deploy');
 
+//deploy a .zip package of your project to a roku device
 rokuDeploy.deploy({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal'
@@ -45,8 +46,22 @@ rokuDeploy.deploy({
     //it failed
 });
 ```
+Or 
+```javascript
+//create a signed package of your project
+rokuDeploy.deployAndSignPackage({
+    host: 'ip-of-roku',
+    password: 'password for roku dev admin portal',
+    signingPassword: 'signing password'
+    //other options if necessary
+}).then(function(pathToSignedPackage){
+    console.log('Signed package created at ', pathToSignedPackage);
+}, function(){
+    //it failed
+});
+```
 
-From an npm script in package.json. (Requires rokudeploy.json to exist at the root level where this is being run)
+From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
 
     {
         "scripts": {
@@ -66,10 +81,9 @@ You can provide a callback in any of the higher level methods, which allows you 
             //other options if necessary
         };
 
-        rokuDeploy.deploy({options, (info) => {
-            // Do what you whatever modification you want to do here.
-        }
-	}).then(function(){
+        rokuDeploy.deploy(options, (info) => {
+            //modify staging dir before it's zipped
+	    }).then(function(){
             //it worked
         }, function(){
             //it failed
