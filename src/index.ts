@@ -25,7 +25,7 @@ let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
 
-let __request = RokuDeploy.request;
+let __request = rokuDeploy.request;
 
 export {
     createPackage,

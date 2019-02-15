@@ -2,14 +2,15 @@ import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import * as Q from 'q';
 import * as globAll from 'glob-all';
-import * as request from 'request';
+import * as request1 from 'request';
 import * as fs from 'fs';
 import * as archiver from 'archiver';
 import * as ini from 'ini';
 import * as dateformat from 'dateformat';
 
 export class RokuDeploy {
-    public static request = request;
+    //store the import on the class to make testing easier
+    public request = request1;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -382,7 +383,7 @@ export class RokuDeploy {
         }
     }
 
-    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
+    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request1.OptionsWithUrl {
         let url = `http://${options.host}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
@@ -417,8 +418,8 @@ export class RokuDeploy {
     public async  pressHomeButton(host) {
         let homeClickUrl = `http://${host}:8060/keypress/Home`;
         // press the home button to return to the main screen
-        return new Promise(function (resolve, reject) {
-            request.post(homeClickUrl, function (err, response) {
+        return new Promise((resolve, reject) => {
+            this.request.post(homeClickUrl, (err, response) => {
                 if (err) {
                     return reject(err);
                 }
@@ -443,14 +444,14 @@ export class RokuDeploy {
             archive: fs.createReadStream(zipFilePath)
         };
 
-        return new Promise<any>(function (resolve, reject) {
-            request.post(requestOptions, function (err, resp, body) {
+        return new Promise<any>((resolve, reject) => {
+            this.request.post(requestOptions, (err, resp, body) => {
                 if (err) {
                     return reject(err);
                 }
                 return resolve({ response: resp, body: body });
             });
-        }).then(function (results) {
+        }).then((results) => {
             let error: any;
             if (!results || !results.response || typeof results.body !== 'string') {
                 error = new Error('Invalid response');
@@ -507,14 +508,14 @@ export class RokuDeploy {
             app_name: appName,
         };
 
-        return new Promise<any>(function (resolve, reject) {
-            request.post(requestOptions, function (err, resp, body) {
+        return new Promise<any>((resolve, reject) => {
+            this.request.post(requestOptions, (err, resp, body) => {
                 if (err) {
                     return reject(err);
                 }
                 return resolve({ response: resp, body: body });
             });
-        }).then(function (results) {
+        }).then((results) => {
             let error: any;
             if (!results || !results.response || typeof results.body !== 'string') {
                 error = new Error('Invalid response');
@@ -554,7 +555,7 @@ export class RokuDeploy {
         await fsExtra.ensureDir(path.dirname(pkgFilePath));
 
         return new Promise<string>((resolve, reject) => {
-            request.get(requestOptions)
+            this.request.get(requestOptions)
                 .on('error', (err) => reject(err))
                 .on('response', (response) => {
                     if (response.statusCode !== 200) {
@@ -705,7 +706,7 @@ export class RokuDeploy {
             });
 
             /* istanbul ignore next */
-            archive.on('warning', function (err) {
+            archive.on('warning', (err) => {
                 if (err.code === 'ENOENT') {
                     console.warn(err);
                 } else {
