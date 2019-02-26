@@ -5,7 +5,7 @@ Publish Roku projects to a Roku device by using Node.js.
 
 [![Build Status](https://travis-ci.org/TwitchBronBron/roku-deploy.svg?branch=master)](https://travis-ci.org/TwitchBronBron/roku-deploy)
 [![Coverage Status](https://coveralls.io/repos/github/TwitchBronBron/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/TwitchBronBron/roku-deploy?branch=master)
-[![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy) [![Greenkeeper badge](https://badges.greenkeeper.io/TwitchBronBron/roku-deploy.svg)](https://greenkeeper.io/)
+[![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy)
 ## Installation
 
     npm install roku-deploy
