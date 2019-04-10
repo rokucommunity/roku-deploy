@@ -13,6 +13,7 @@ let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDe
 let pressHomeButton = RokuDeploy.prototype.pressHomeButton.bind(rokuDeploy);
 let publish = RokuDeploy.prototype.publish.bind(rokuDeploy);
 let getStagingFolderPath = RokuDeploy.prototype.getStagingFolderPath.bind(rokuDeploy);
+let rekeyDevice = RokuDeploy.prototype.rekeyDevice.bind(rokuDeploy);
 let signExistingPackage = RokuDeploy.prototype.signExistingPackage.bind(rokuDeploy);
 let makeFilesAbsolute = RokuDeploy.prototype.makeFilesAbsolute.bind(rokuDeploy);
 let normalizeFilesOption = RokuDeploy.prototype.normalizeFilesOption.bind(rokuDeploy);
@@ -41,11 +42,10 @@ export {
     pressHomeButton,
     publish,
     retrieveSignedPackage,
+    rekeyDevice,
     signExistingPackage,
     zipFolder,
     zipPackage,
-
-    //remove these
     getStagingFolderPath,
     getOutputZipFilePath,
     parseManifest,

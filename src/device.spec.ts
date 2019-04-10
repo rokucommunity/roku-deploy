@@ -50,10 +50,11 @@ describe('device', function () {
             options.password = 'NOT_THE_PASSWORD';
             try {
                 let response = await rokuDeploy.deploy(options);
-                assert.fail('Should have rejected');
             } catch (e) {
                 assert.equal(e.message, 'Unauthorized. Please verify username and password for target Roku.');
+                return;
             }
+            assert.fail('Should have rejected');
         });
     });
 

@@ -5,12 +5,12 @@
     "version": "0.1.0",
     "configurations": [
 		{
-            "name": "Debug index.spec.ts Tests",
+            "name": "Debug RokuDeploy.spec.ts Tests",
             "type": "node",
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
-            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/index.spec.ts"],
+            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts"],
             "cwd": "${workspaceRoot}",
             "protocol": "inspector",
             "internalConsoleOptions": "openOnSessionStart"
