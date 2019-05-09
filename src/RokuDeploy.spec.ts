@@ -1197,7 +1197,7 @@ describe('index', function () {
     });
 
     function mockDoGetRequest(body = '', statusCode = 200) {
-        sinon.stub(rokuDeploy, 'doGetRequest').callsFake((params) => {
+        sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: {statusCode: statusCode}, body: body };
             (rokuDeploy as any).checkRequest(results);
             return Promise.resolve(results);
