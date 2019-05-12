@@ -101,6 +101,13 @@ Here are the available options. The defaults are shown to the right of the optio
 - **signingPassword:** string (*required for signing*)  
     The password used for creating signed packages
 
+- **rekeySignedPackage:** string (*required for rekeying*)  
+    Path to a copy of the signed package you want to use for rekeying
+
+- **devId:** string  
+    Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
+    
+
 - **outDir?:** string = `"./out"`  
     A full path to the folder where the zip/pkg package should be placed
 

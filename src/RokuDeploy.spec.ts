@@ -9,7 +9,7 @@ import * as sinonImport from 'sinon';
 let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo } from './RokuDeploy';
-import { Request } from 'request';
+import * as errors from './Errors';
 
 chai.use(chaiFiles);
 
@@ -87,15 +87,99 @@ describe('index', function () {
         });
     });
 
+    describe('doPostRequest', function () {
+        it('should not throw an error for a successful request', async () => {
+            let body = 'responseBody';
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, {statusCode: 200}, body);
+                return {} as any;
+            });
+
+            let results = await (rokuDeploy as any).doPostRequest({});
+            expect(results.body).to.equal(body);
+        });
+
+        it('should throw an error for a network error', async () => {
+            let error = new Error('Network Error');
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, error);
+                return {} as any;
+            });
+
+            try {
+                await (rokuDeploy as any).doPostRequest({});
+            } catch (e) {
+                expect(e).to.equal(error);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+    });
+
+    describe('doGetRequest', function () {
+        it('should not throw an error for a successful request', async () => {
+            let body = 'responseBody';
+            sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, {statusCode: 200}, body);
+                return {} as any;
+            });
+
+            let results = await (rokuDeploy as any).doGetRequest({});
+            expect(results.body).to.equal(body);
+        });
+
+        it('should throw an error for a network error', async () => {
+            let error = new Error('Network Error');
+            sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
+                process.nextTick(callback, error);
+                return {} as any;
+            });
+
+            try {
+                await (rokuDeploy as any).doGetRequest({});
+            } catch (e) {
+                expect(e).to.equal(error);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+    });
+
+    describe('getDevId', function () {
+        it('should return the current Dev ID if successful', async () => {
+            let body = `{
+                            var devDiv = document.createElement('div');
+                            devDiv.className="roku-font-5";
+                            devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
+                            node.appendChild(devDiv);
+                        }`;
+            mockDoGetRequest(body);
+            let devId = await rokuDeploy.getDevId(options);
+            expect(devId).to.equal('c6fdc2019903ac3332f624b0b2c2fe2c733c3e74');
+        });
+
+        it('should throw our error on failure', async () => {
+            mockDoGetRequest();
+            try {
+                await rokuDeploy.getDevId(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+    });
+
     describe('createPackage', function () {
         it('should throw error when no files were found to copy', async () => {
             try {
                 options.files = [];
                 await rokuDeploy.createPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
 
         it('should create package in proper directory', async function () {
@@ -218,7 +302,7 @@ describe('index', function () {
             });
         });
 
-        it('rejects when package upload fails', () => {
+        it('throws when package upload fails', async () => {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((data: any, callback: any) => {
                 if (data.url === `http://${options.host}/plugin_install`) {
@@ -231,25 +315,19 @@ describe('index', function () {
                 return {} as any;
             });
 
-            return rokuDeploy.publish(options).then(() => {
-                expect(true, 'Should not have succeeded').to.be.false;
-                return Promise.reject('Should not have succeeded');
-            }).then(() => {
-                assert.fail('Should not have succeeded');
-            }, () => {
-                expect(true).to.be.true;
-            });
-            // expect(true).to.be.true;
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                return;
+            }
+            assert.fail('Should not have succeeded');
         });
 
         it('rejects when response contains compile error wording', () => {
             options.failOnCompileError = true;
             let body = 'Install Failure: Compilation Failed.';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, {}, body);
-                return {} as any;
-            });
+            mockDoPostRequest(body);
 
             return rokuDeploy.publish(options).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
@@ -261,12 +339,7 @@ describe('index', function () {
 
         it('rejects when response contains invalid password status code', () => {
             options.failOnCompileError = true;
-            let body = '';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 401 }, body);
-                return {} as any;
-            });
+            mockDoPostRequest('', 401);
 
             return rokuDeploy.publish(options).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
@@ -278,12 +351,7 @@ describe('index', function () {
 
         it('handles successful deploy', () => {
             options.failOnCompileError = true;
-            let body = '';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 200 }, body);
-                return {} as any;
-            });
+            mockDoPostRequest();
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
@@ -296,11 +364,7 @@ describe('index', function () {
             options.failOnCompileError = false;
 
             let body = 'Identical to previous version -- not replacing.';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 200 }, body);
-                return {} as any;
-            });
+            mockDoPostRequest(body);
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.results.body).to.equal(body);
@@ -309,40 +373,161 @@ describe('index', function () {
             });
         });
 
-        it('rejects when response is unknown error code', () => {
+        it('rejects when response is unknown status code', async () => {
             options.failOnCompileError = true;
             let body = 'Identical to previous version -- not replacing.';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 123 }, body);
-                return {} as any;
-            });
+            mockDoPostRequest(body, 123);
 
-            return rokuDeploy.publish(options).then((result) => {
-                expect(result.results.body).to.equal(body);
-                assert.fail('Should have rejected promise');
-            }, (err) => {
-                expect(true).to.be.true;
-            });
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
         });
 
-        it('rejects when encountering an undefined response', () => {
+        it('rejects when user is unauthorized', async () => {
             options.failOnCompileError = true;
-            let body = 'Identical to previous version -- not replacing.';
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, undefined, body);
-                return {} as any;
-            });
+            mockDoPostRequest('', 401);
 
-            return rokuDeploy.publish(options).then((result) => {
-                expect(result.results.body).to.equal(body);
-                assert.fail('Should have rejected promise');
-            }, (err) => {
-                expect(err.message).to.equal('Invalid response');
-            });
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnauthorizedDeviceResponseError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
         });
 
+        it('rejects when encountering an undefined response', async () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest(null);
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+    });
+
+    describe('rekeyDevice', () => {
+        beforeEach(() => {
+            let body = `      {
+            var devDiv = document.createElement('div');
+            devDiv.className="roku-font-5";
+            devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
+            node.appendChild(devDiv);
+        }`;
+            mockDoGetRequest(body);
+        });
+
+        it('should work with relative path', async () => {
+            let body = `  <div style="display:none">
+                <font color="red">Success.</font>
+            </div>`;
+            mockDoPostRequest(body);
+
+            options.rekeySignedPackage = '../testSignedPackage.pkg';
+            await rokuDeploy.rekeyDevice(options);
+        });
+
+        it('should work with absolute path', async () => {
+            let body = `  <div style="display:none">
+                <font color="red">Success.</font>
+            </div>`;
+            mockDoPostRequest(body);
+
+            options.rekeySignedPackage = path.join(path.resolve(options.rootDir, '../testSignedPackage.pkg'));
+            await rokuDeploy.rekeyDevice(options);
+        });
+
+        it('should work with absolute path', async () => {
+            let body = `  <div style="display:none">
+                <font color="red">Success.</font>
+            </div>`;
+            mockDoPostRequest(body);
+
+            options.rekeySignedPackage = path.join(path.resolve(options.rootDir, '../testSignedPackage.pkg'));
+            await rokuDeploy.rekeyDevice(options);
+        });
+
+        it('should not return an error if dev ID is set and matches output', async () => {
+            let body = `  <div style="display:none">
+                <font color="red">Success.</font>
+            </div>`;
+            mockDoPostRequest(body);
+
+            options.devId = 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74';
+            await rokuDeploy.rekeyDevice(options);
+        });
+
+        it('should throw error if missing rekeySignedPackage option', async () => {
+            try {
+                options.rekeySignedPackage = null;
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('should throw error if missing signingPassword option', async () => {
+            try {
+                options.signingPassword = null;
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('should throw error if response is not parsable', async () => {
+            try {
+                mockDoPostRequest();
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('should throw error if we could not verify a successful call', async () => {
+            try {
+                let body = `  <div style="display:none">
+                    <font color="red">Invalid public key.</font>
+                </div>`;
+                mockDoPostRequest(body);
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.FailedDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('should throw error if resulting Dev ID is not the one we are expecting', async () => {
+            try {
+                let body = `  <div style="display:none">
+                    <font color="red">Success.</font>
+                </div>`;
+                mockDoPostRequest(body);
+
+                options.devId = '45fdc2019903ac333ff624b0b2cddd2c733c3e74';
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
     });
 
     describe('signExistingPackage', () => {
@@ -359,10 +544,11 @@ describe('index', function () {
             options.signingPassword = undefined;
             try {
                 await rokuDeploy.signExistingPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e.message).to.equal('Must supply signingPassword');
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
 
         it('should return an error if there is a problem with the network request', async () => {
@@ -374,56 +560,45 @@ describe('index', function () {
                     return {} as any;
                 });
                 await rokuDeploy.signExistingPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.equal(error);
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
 
         it('should return our error if it received invalid data', async () => {
             try {
-                //intercept the post requests
-                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                    process.nextTick(callback);
-                    return {} as any;
-                });
+                mockDoPostRequest(null);
                 await rokuDeploy.signExistingPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect(e.message).to.equal('Invalid response');
+                expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
 
         it('should return an error if failure returned in response', async () => {
-            // This is formatted exactly how it is output in the Roku's HTML body so mock matches exactly and less chance for test passing here but not in the actual device
-            let body = `   <div style="display:none">
-    <font color="red">Failed: Invalid Password.
-</font>
-  </div>`;
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, {}, body);
-                return {} as any;
-            });
+            let body = `<div style="display:none">
+                            <font color="red">Failed: Invalid Password.
+                        </font>
+                        </div>`;
+            mockDoPostRequest(body);
 
             try {
                 await rokuDeploy.signExistingPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e.message).to.equal('Invalid Password.');
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
 
         it('should return created pkg on success', async () => {
-            let body = `            var pkgDiv = document.createElement('div');
-            pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
-            node.appendChild(pkgDiv);`;
-
-            //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, {}, body);
-                return {} as any;
-            });
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
 
             let pkgPath = await rokuDeploy.signExistingPackage(options);
             expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
@@ -431,16 +606,13 @@ describe('index', function () {
 
         it('should return our fallback error if neither error or package link was detected', async () => {
             try {
-                //intercept the post requests
-                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                    process.nextTick(callback, undefined, {}, '');
-                    return {} as any;
-                });
+                mockDoPostRequest();
                 await rokuDeploy.signExistingPackage(options);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e.message).to.equal('Unknown error signing package');
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
     });
 
@@ -753,10 +925,7 @@ describe('index', function () {
 
     describe('deploy', () => {
         it('does the whole migration', async () => {
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 200 }, '');
-                return {} as any;
-            });
+            mockDoPostRequest();
 
             let result = await rokuDeploy.deploy();
             expect(result).not.to.be.undefined;
@@ -790,10 +959,11 @@ describe('index', function () {
             let invalidManifestPath = 'invalid-path';
             try {
                 await rokuDeploy.parseManifest(invalidManifestPath);
-                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e.message).to.equal(invalidManifestPath + ' does not exist');
+                return;
             }
+            assert.fail('Exception should have been thrown');
         });
     });
 
@@ -963,11 +1133,11 @@ describe('index', function () {
                 await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
                     outFile: 'roku-deploy-test'
                 });
-                assert.fail(null, null, 'Should not have succeeded');
             } catch (e) {
                 expect(e.message).to.equal('Some error');
-
+                return;
             }
+            assert.fail('Should not have succeeded');
         });
 
         it('throws when status code is non 200', async () => {
@@ -982,11 +1152,11 @@ describe('index', function () {
                 await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
                     outFile: 'roku-deploy-test'
                 });
-                assert.fail(null, null, 'Should not have succeeded');
             } catch (e) {
                 expect(e.message.indexOf('Invalid response code')).to.equal(0);
-
+                return;
             }
+            assert.fail('Should not have succeeded');
         });
     });
 
@@ -1026,6 +1196,22 @@ describe('index', function () {
         });
     });
 
+    function mockDoGetRequest(body = '', statusCode = 200) {
+        sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
+            let results = { response: {statusCode: statusCode}, body: body };
+            (rokuDeploy as any).checkRequest(results);
+            return Promise.resolve(results);
+        });
+    }
+
+    function mockDoPostRequest(body = '', statusCode = 200) {
+        sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+            let results = { response: {statusCode: statusCode}, body: body };
+            (rokuDeploy as any).checkRequest(results);
+            return Promise.resolve(results);
+        });
+    }
+
     async function assertThrowsAsync(fn) {
         let f = () => { };
         try {
@@ -1038,12 +1224,6 @@ describe('index', function () {
     }
 });
 
-// class MockRequest {
-//     constructor(
-//         private request: Request
-//     ) {
-//         //overwrite the request with mocks
-//         sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => process.nextTick(callback, new Error()));
 
-//     }
-// }
+
+

@@ -6,6 +6,7 @@ import * as request from 'request';
 import * as archiver from 'archiver';
 import * as ini from 'ini';
 import * as dateformat from 'dateformat';
+import * as errors from './Errors';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
@@ -429,7 +430,7 @@ export class RokuDeploy {
     public async publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
         options = this.getOptions(options);
         if (!options.host) {
-            throw new Error('must specify the host for the Roku device');
+            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
         let zipFilePath = this.getOutputZipFilePath(options);
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -439,37 +440,61 @@ export class RokuDeploy {
         };
 
         let results = await this.doPostRequest(requestOptions);
-
-        let error: any;
-        if (!results || !results.response || typeof results.body !== 'string') {
-            error = new Error('Invalid response');
-            (error as any).results = results;
-            throw error;
-        }
-
         if (options.failOnCompileError) {
             if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                error = new Error('Compile error');
-                console.log(results.body);
-
-                (error as any).results = results;
-                throw error;
+                throw new errors.CompileError('Compile error', results);
             }
         }
 
-        if (results.response.statusCode === 200) {
-            if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-                return { message: 'Identical to previous version -- not replacing', results: results };
+        if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+            return { message: 'Identical to previous version -- not replacing', results: results };
+        }
+        return { message: 'Successful deploy', results: results };
+    }
+
+    /**
+     * resign Roku Device with supplied pkg and
+     * @param options
+     */
+    public async rekeyDevice(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+        if (!options.rekeySignedPackage) {
+            throw new errors.MissingRequiredOptionError('Must supply rekeySignedPackage');
+        }
+
+        if (!options.signingPassword) {
+            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
+        }
+
+        let rekeySignedPackagePath = options.rekeySignedPackage;
+        if (!path.isAbsolute(options.rekeySignedPackage)) {
+            rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
+        }
+
+        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options);
+        requestOptions.formData = {
+            mysubmit: 'Rekey',
+            passwd: options.signingPassword,
+            archive: this.fsExtra.createReadStream(rekeySignedPackagePath)
+        };
+
+        let results = await this.doPostRequest(requestOptions);
+        let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
+        if (!resultTextSearch) {
+            throw new errors.UnparsableDeviceResponseError('Unknown Rekey Failure');
+        }
+
+        if (resultTextSearch[1] !== 'Success.') {
+            throw new errors.FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1]);
+        }
+
+        if (options.devId) {
+            let devId = await this.getDevId(options);
+            console.log('devId = ' + devId);
+
+            if (devId !== options.devId) {
+                throw new errors.UnknownDeviceResponseError('Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"');
             }
-            return { message: 'Successful deploy', results: results };
-        } else {
-            if (results.response.statusCode === 401) {
-                error = new Error('Unauthorized. Please verify username and password for target Roku.');
-            } else {
-                error = new Error('Error, statusCode other than 200: ' + results.response.statusCode);
-            }
-            error.results = results;
-            throw error;
         }
     }
 
@@ -480,7 +505,7 @@ export class RokuDeploy {
     public async signExistingPackage(options: RokuDeployOptions): Promise<string> {
         options = this.getOptions(options);
         if (!options.signingPassword) {
-            throw new Error('Must supply signingPassword');
+            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
         }
         let stagingFolderpath = this.getStagingFolderPath(options);
         let manifestPath = path.join(stagingFolderpath, 'manifest');
@@ -488,6 +513,7 @@ export class RokuDeploy {
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
         let requestOptions = this.generateBaseRequestOptions('plugin_package', options);
+
         requestOptions.formData = {
             mysubmit: 'Package',
             pkg_time: (new Date()).getTime(),
@@ -495,37 +521,19 @@ export class RokuDeploy {
             app_name: appName,
         };
 
-        return new Promise<any>((resolve, reject) => {
-            this.request.post(requestOptions, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        }).then((results) => {
-            let error: any;
-            if (!results || !results.response || typeof results.body !== 'string') {
-                error = new Error('Invalid response');
-                error.results = results;
-                return Promise.reject(error);
-            }
+        let results = await this.doPostRequest(requestOptions);
 
-            let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
-            if (failedSearchMatches) {
-                error = new Error(failedSearchMatches[1]);
-                error.results = results;
-                return Promise.reject<any>(error);
-            }
+        let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
+        if (failedSearchMatches) {
+            throw new errors.FailedDeviceResponseError(failedSearchMatches[1], results);
+        }
 
-            let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
-            if (pkgSearchMatches) {
-                return pkgSearchMatches[1];
-            }
+        let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
+        if (pkgSearchMatches) {
+            return pkgSearchMatches[1];
+        }
 
-            error = new Error('Unknown error signing package');
-            error.results = results;
-            return Promise.reject(error);
-        });
+        throw new errors.UnknownDeviceResponseError('Unknown error signing package', results);
     }
 
     /**
@@ -555,11 +563,11 @@ export class RokuDeploy {
     }
 
     /**
-     * Centralized function for handling http requests
-     * @param params 
+     * Centralized function for handling POST http requests
+     * @param params
      */
-    private doPostRequest(params: any): Promise<{ response: any; body: any }> {
-        return new Promise((resolve, reject) => {
+    private async doPostRequest(params: any) {
+        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             this.request.post(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
@@ -567,6 +575,39 @@ export class RokuDeploy {
                 return resolve({ response: resp, body: body });
             });
         });
+        this.checkRequest(results);
+        return results;
+    }
+
+    /**
+     * Centralized function for handling GET http requests
+     * @param params
+     */
+    private async doGetRequest(params: any) {
+        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+            this.request.get(params, (err, resp, body) => {
+                if (err) {
+                    return reject(err);
+                }
+                return resolve({ response: resp, body: body });
+            });
+        });
+        this.checkRequest(results);
+        return results;
+    }
+
+    private checkRequest(results) {
+        if (!results || !results.response || typeof results.body !== 'string') {
+            throw new errors.UnparsableDeviceResponseError('Invalid response', results);
+        }
+
+        if (results.response.statusCode === 401) {
+            throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
+        }
+
+        if (results.response.statusCode !== 200) {
+            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.statusCode);
+        }
     }
 
     /**
@@ -679,6 +720,20 @@ export class RokuDeploy {
         return outPkgFilePath;
     }
 
+    public async getDevId(options?: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        let requestOptions = this.generateBaseRequestOptions('plugin_package', options);
+        let results = await this.doGetRequest(requestOptions);
+
+        let devIdSearchMatches = /Your Dev ID:[^>]+>([^<]+)</.exec(results.body);
+        if (devIdSearchMatches) {
+            return devIdSearchMatches[1].trim();
+        }
+
+        throw new errors.UnparsableDeviceResponseError('Could not retrieve Dev ID', results);
+    }
+
     public async parseManifest(manifestPath: string): Promise<ManifestData> {
         if (!await this.fsExtra.pathExists(manifestPath)) {
             throw new Error(manifestPath + ' does not exist');
@@ -738,16 +793,19 @@ export interface RokuDeployOptions {
      * @default "./out"
      */
     outDir?: string;
+
     /**
      * The base filename the zip/pkg file should be given (excluding the extension)
      * @default "roku-deploy"
      */
     outFile?: string;
+
     /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */
     rootDir?: string;
+
     // tslint:disable:jsdoc-format
     /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
@@ -762,11 +820,13 @@ export interface RokuDeployOptions {
      */
     // tslint:enable:jsdoc-format
     files?: FilesType[];
+
     /**
      * Set this to true to prevent the staging folder from being deleted after creating the package
      * @default false
      */
     retainStagingFolder?: boolean;
+
     /**
      * The IP address or hostname of the target Roku device.
      * @required
@@ -774,27 +834,43 @@ export interface RokuDeployOptions {
      *
      */
     host?: string;
+
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
      * @default "rokudev"
      */
     username?: string;
+
     /**
      * The password for logging in to the developer portal on the target Roku device
      * @required
      */
     password?: string;
+
     /**
      * The password used for creating signed packages
      * @required
      */
     signingPassword?: string;
+
+    /**
+     * Path to a copy of the signed package you want to use for rekeying
+     * @required
+     */
+    rekeySignedPackage?: string;
+
+    /**
+     * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
+     */
+    devId?: string;
+
     /**
      * If true we increment the build number to be a timestamp in the format yymmddHHMM
      * @required
      */
     incrementBuildNumber?: boolean;
+
     /**
      * If true, the publish will fail on compile error
      */
