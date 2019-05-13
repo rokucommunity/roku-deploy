@@ -42,8 +42,9 @@ rokuDeploy.deploy({
     //other options if necessary
 }).then(function(){
     //it worked
-}, function(){
+}, function(error) {
     //it failed
+    console.error(error);
 });
 ```
 Or 
@@ -56,8 +57,9 @@ rokuDeploy.deployAndSignPackage({
     //other options if necessary
 }).then(function(pathToSignedPackage){
     console.log('Signed package created at ', pathToSignedPackage);
-}, function(){
+}, function(error) {
     //it failed
+    console.error(error);
 });
 ```
 
