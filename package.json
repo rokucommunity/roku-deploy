@@ -4,7 +4,7 @@
   "description": "Package and publish a Roku application using Node.js",
   "main": "dist/index.js",
   "scripts": {
-    "compile": "rimraf out && tsc",
+    "build": "rimraf out && tsc",
     "prepublishOnly": "npm run compile",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
     "test": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
@@ -60,7 +60,7 @@
     "coveralls": "^3.0.0",
     "mocha": "^5.2.0",
     "node-run-cmd": "^1.0.1",
-    "nyc": "^13.1.0",
+    "nyc": "^14.1.1",
     "rimraf": "^2.6.2",
     "sinon": "^7.2.3",
     "source-map-support": "^0.5.3",
