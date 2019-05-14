@@ -418,11 +418,11 @@ describe('index', function () {
     describe('rekeyDevice', () => {
         beforeEach(() => {
             let body = `      {
-            var devDiv = document.createElement('div');
-            devDiv.className="roku-font-5";
-            devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
-            node.appendChild(devDiv);
-        }`;
+                var devDiv = document.createElement('div');
+                devDiv.className="roku-font-5";
+                devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
+                node.appendChild(devDiv);
+            }`;
             mockDoGetRequest(body);
         });
 
