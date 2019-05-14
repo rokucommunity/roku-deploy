@@ -17,7 +17,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "script": "compile",
+            "script": "build",
             "problemMatcher": [
                 "$tslint5",
                 "$tsc"
