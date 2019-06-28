@@ -4,3 +4,4 @@ minor_version=0
 build_version=0
 splash_screen_hd=pkg:/images/splash_hd.jpg
 ui_resolutions=hd
+bs_const=IS_DEV_BUILD=false
