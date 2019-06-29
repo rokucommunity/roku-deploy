@@ -181,7 +181,7 @@ export class RokuDeploy {
         if (options.incrementBuildNumber) {
             let timestamp = dateformat(new Date(), 'yymmddHHMM');
             parsedManifest.build_version = timestamp;
-            await this.fsExtra.writeFile(manifestPath, ini.stringify(parsedManifest));
+            await this.fsExtra.writeFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
         if (beforeZipCallback) {
@@ -742,6 +742,27 @@ export class RokuDeploy {
         let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
         let parsedManifest = ini.parse(manifestContents);
         return parsedManifest;
+    }
+
+    public stringifyManifest(manifestData: ManifestData): Promise<string> {
+        let bsConst: string
+        // bs_const uses equal signs in the right hand side which ini then adds quotes around the whole thing.
+        // It doesn't seem like a fix will be available soon (https://github.com/npm/ini/issues/57)
+        // so we remove it before stringifying and add it back in afterwards to get around this.
+        if(manifestData.bs_const) {
+            bsConst = manifestData.bs_const
+
+            manifestData = Object.assign({}, manifestData)
+            delete manifestData.bs_const
+        }
+
+        let result = ini.stringify(manifestData);
+
+        if(bsConst) {
+            result += 'bs_const=' + bsConst
+        }
+
+        return result;
     }
 
     /**
