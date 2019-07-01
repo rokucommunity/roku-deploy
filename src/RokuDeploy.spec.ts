@@ -416,6 +416,40 @@ describe('index', function () {
 
     });
 
+    describe('convertToSquashfs', () => {
+        it('should not return an error if successful', async () => {
+            mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                assert.fail('Should not have been hit');
+            }
+        });
+
+        it('should return MissingRequiredOptionError if host was not provided', async () => {
+            mockDoPostRequest();
+            try {
+                options.host = undefined;
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        it('should return ConvertError if converting failed', async () => {
+            mockDoPostRequest();
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConvertError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+    });
+
     describe('rekeyDevice', () => {
         beforeEach(() => {
             let body = `      {
@@ -1200,14 +1234,16 @@ describe('index', function () {
     });
 
     describe('deployAndSignPackage', () => {
-        it('succeeds and does proper things with staging folder', async () => {
-            //pretend the deploy worked
+        beforeEach(() => {
+             //pretend the deploy worked
             sinon.stub(rokuDeploy, 'deploy').returns(Promise.resolve<any>(null));
             //pretend the sign worked
             sinon.stub(rokuDeploy, 'signExistingPackage').returns(Promise.resolve<any>(null));
             //pretend fetching the signed package worked
             sinon.stub(rokuDeploy, 'retrieveSignedPackage').returns(Promise.resolve<any>('some_local_path'));
+        });
 
+        it('succeeds and does proper things with staging folder', async () => {
             let stub = sinon.stub(rd.fsExtra, 'remove').returns(Promise.resolve());
 
             //this should not fail
@@ -1233,6 +1269,13 @@ describe('index', function () {
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(2);
         });
+
+        it('converts to squashfs if we request it to', async () => {
+            options.convertToSquashfs = true;
+            let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
+            await rokuDeploy.deployAndSignPackage(options);
+            expect(stub.getCalls()).to.be.lengthOf(1);
+        })
     });
 
     function mockDoGetRequest(body = '', statusCode = 200) {
@@ -1262,7 +1305,3 @@ describe('index', function () {
         }
     }
 });
-
-
-
-

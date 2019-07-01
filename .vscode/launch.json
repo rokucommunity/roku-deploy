@@ -40,7 +40,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
-            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/**/*.spec.ts", "--grep", "descriptionOfTestYouWantToRun"],
+            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts", "--grep", "descriptionOfTestYouWantToRun"],
             "cwd": "${workspaceRoot}",
             "protocol": "inspector",
             "internalConsoleOptions": "openOnSessionStart"
