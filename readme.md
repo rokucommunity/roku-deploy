@@ -165,6 +165,9 @@ Here are the available options. The defaults are shown to the right of the optio
 - **retainStagingFolder?:** boolean = `false`  
     Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
+- **convertToSquashfs?:** boolean = `false`  
+   If true we convert to squashfs before creating the pkg file
+
 - **incrementBuildNumber?:** boolean = `false`  
     If true we increment the build number to be a timestamp in the format yymmddHHMM
 
@@ -173,4 +176,3 @@ Here are the available options. The defaults are shown to the right of the optio
     just in case roku adds support for custom usernames in the future
 
 Click [here](https://github.com/TwitchBronBron/roku-deploy/blob/2648069de1f3e889c58b8119b5f852f126e60042/src/index.ts#L288) to see the typescript interface for these options
-
