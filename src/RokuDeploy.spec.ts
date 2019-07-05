@@ -447,16 +447,6 @@ describe('index', function () {
             await rokuDeploy.rekeyDevice(options);
         });
 
-        it('should work with absolute path', async () => {
-            let body = `  <div style="display:none">
-                <font color="red">Success.</font>
-            </div>`;
-            mockDoPostRequest(body);
-
-            options.rekeySignedPackage = path.join(path.resolve(options.rootDir, '../testSignedPackage.pkg'));
-            await rokuDeploy.rekeyDevice(options);
-        });
-
         it('should not return an error if dev ID is set and matches output', async () => {
             let body = `  <div style="display:none">
                 <font color="red">Success.</font>
@@ -1262,7 +1252,3 @@ describe('index', function () {
         }
     }
 });
-
-
-
-
