@@ -92,7 +92,7 @@ describe('index', function () {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, {statusCode: 200}, body);
+                process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
 
@@ -121,7 +121,7 @@ describe('index', function () {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, {statusCode: 200}, body);
+                process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
 
@@ -1026,7 +1026,7 @@ describe('index', function () {
             let manifestPath = path.join(rootProjectDir, 'manifest');
 
             let inputParsedManifest = await rokuDeploy.parseManifest(manifestPath);
-            delete inputParsedManifest.bs_const
+            delete inputParsedManifest.bs_const;
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
             let outputParsedManifest = ini.parse(outputStringifiedManifest);
 
@@ -1235,7 +1235,7 @@ describe('index', function () {
 
     describe('deployAndSignPackage', () => {
         beforeEach(() => {
-             //pretend the deploy worked
+            //pretend the deploy worked
             sinon.stub(rokuDeploy, 'deploy').returns(Promise.resolve<any>(null));
             //pretend the sign worked
             sinon.stub(rokuDeploy, 'signExistingPackage').returns(Promise.resolve<any>(null));
@@ -1275,12 +1275,12 @@ describe('index', function () {
             let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
             await rokuDeploy.deployAndSignPackage(options);
             expect(stub.getCalls()).to.be.lengthOf(1);
-        })
+        });
     });
 
     function mockDoGetRequest(body = '', statusCode = 200) {
         sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
-            let results = { response: {statusCode: statusCode}, body: body };
+            let results = { response: { statusCode: statusCode }, body: body };
             (rokuDeploy as any).checkRequest(results);
             return Promise.resolve(results);
         });
@@ -1288,7 +1288,7 @@ describe('index', function () {
 
     function mockDoPostRequest(body = '', statusCode = 200) {
         sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
-            let results = { response: {statusCode: statusCode}, body: body };
+            let results = { response: { statusCode: statusCode }, body: body };
             (rokuDeploy as any).checkRequest(results);
             return Promise.resolve(results);
         });

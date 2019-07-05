@@ -468,7 +468,7 @@ export class RokuDeploy {
         };
 
         let results = await this.doPostRequest(requestOptions);
-        if (results.body.indexOf('Conversion succeeded') == -1) {
+        if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new errors.ConvertError('Squashfs conversion failed');
         }
     }
@@ -651,8 +651,8 @@ export class RokuDeploy {
         options.retainStagingFolder = true;
         await this.deploy(options, beforeZipCallback);
 
-        if(options.convertToSquashfs) {
-            await this.convertToSquashfs(options)
+        if (options.convertToSquashfs) {
+            await this.convertToSquashfs(options);
         }
 
         let remotePkgPath = await this.signExistingPackage(options);
@@ -770,21 +770,21 @@ export class RokuDeploy {
     }
 
     public stringifyManifest(manifestData: ManifestData): Promise<string> {
-        let bsConst: string
+        let bsConst: string;
         // bs_const uses equal signs in the right hand side which ini then adds quotes around the whole thing.
         // It doesn't seem like a fix will be available soon (https://github.com/npm/ini/issues/57)
         // so we remove it before stringifying and add it back in afterwards to get around this.
-        if(manifestData.bs_const) {
-            bsConst = manifestData.bs_const
+        if (manifestData.bs_const) {
+            bsConst = manifestData.bs_const;
 
-            manifestData = Object.assign({}, manifestData)
-            delete manifestData.bs_const
+            manifestData = Object.assign({}, manifestData);
+            delete manifestData.bs_const;
         }
 
         let result = ini.stringify(manifestData);
 
-        if(bsConst) {
-            result += 'bs_const=' + bsConst
+        if (bsConst) {
+            result += 'bs_const=' + bsConst;
         }
 
         return result;
