@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "rimraf out && tsc",
+    "preversion": "npm run build && npm run tslint && npm run test",
     "prepublishOnly": "npm run build",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
     "test": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
