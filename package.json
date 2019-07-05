@@ -10,7 +10,7 @@
     "test": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
     "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
-    "coverage": "nyc report --reporter=text-lcov | coveralls"
+    "publish-coverage-results": "nyc report --reporter=text-lcov | coveralls"
   },
   "typings": "dist/index.d.ts",
   "bin": {
