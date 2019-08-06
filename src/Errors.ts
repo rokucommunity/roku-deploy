@@ -54,6 +54,13 @@ export class CompileError extends Error {
     }
 }
 
+export class ConvertError extends Error {
+    constructor(message: string) {
+        super(message);
+        Object.setPrototypeOf(this, ConvertError.prototype);
+    }
+}
+
 export class MissingRequiredOptionError extends Error {
     constructor(message: string) {
         super(message);
