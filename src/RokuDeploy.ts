@@ -453,6 +453,27 @@ export class RokuDeploy {
     }
 
     /**
+     * Converts existing loaded package to squashfs for faster loading packages
+     * @param options
+     */
+    public async convertToSquashfs(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+        if (!options.host) {
+            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
+        }
+        let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
+        requestOptions.formData = {
+            archive: '',
+            mysubmit: 'Convert to squashfs'
+        };
+
+        let results = await this.doPostRequest(requestOptions);
+        if (results.body.indexOf('Conversion succeeded') === -1) {
+            throw new errors.ConvertError('Squashfs conversion failed');
+        }
+    }
+
+    /**
      * resign Roku Device with supplied pkg and
      * @param options
      */
@@ -490,7 +511,6 @@ export class RokuDeploy {
 
         if (options.devId) {
             let devId = await this.getDevId(options);
-            console.log('devId = ' + devId);
 
             if (devId !== options.devId) {
                 throw new errors.UnknownDeviceResponseError('Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"');
@@ -630,6 +650,11 @@ export class RokuDeploy {
         options = this.getOptions(options);
         options.retainStagingFolder = true;
         await this.deploy(options, beforeZipCallback);
+
+        if (options.convertToSquashfs) {
+            await this.convertToSquashfs(options);
+        }
+
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
         if (originalOptionValueRetainStagingFolder !== true) {
@@ -745,21 +770,21 @@ export class RokuDeploy {
     }
 
     public stringifyManifest(manifestData: ManifestData): Promise<string> {
-        let bsConst: string
+        let bsConst: string;
         // bs_const uses equal signs in the right hand side which ini then adds quotes around the whole thing.
         // It doesn't seem like a fix will be available soon (https://github.com/npm/ini/issues/57)
         // so we remove it before stringifying and add it back in afterwards to get around this.
-        if(manifestData.bs_const) {
-            bsConst = manifestData.bs_const
+        if (manifestData.bs_const) {
+            bsConst = manifestData.bs_const;
 
-            manifestData = Object.assign({}, manifestData)
-            delete manifestData.bs_const
+            manifestData = Object.assign({}, manifestData);
+            delete manifestData.bs_const;
         }
 
         let result = ini.stringify(manifestData);
 
-        if(bsConst) {
-            result += 'bs_const=' + bsConst
+        if (bsConst) {
+            result += 'bs_const=' + bsConst;
         }
 
         return result;
@@ -888,9 +913,13 @@ export interface RokuDeployOptions {
 
     /**
      * If true we increment the build number to be a timestamp in the format yymmddHHMM
-     * @required
      */
     incrementBuildNumber?: boolean;
+
+    /**
+     * If true we convert to squashfs before creating the pkg file
+     */
+    convertToSquashfs?: boolean;
 
     /**
      * If true, the publish will fail on compile error
