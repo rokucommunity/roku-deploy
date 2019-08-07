@@ -4,7 +4,6 @@ import * as Q from 'q';
 import * as globAll from 'glob-all';
 import * as request from 'request';
 import * as archiver from 'archiver';
-import * as ini from 'ini';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 
@@ -765,29 +764,48 @@ export class RokuDeploy {
         }
 
         let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
-        let parsedManifest = ini.parse(manifestContents);
-        return parsedManifest;
+        return this.parseManifestFromString(manifestContents);
     }
 
-    public stringifyManifest(manifestData: ManifestData): Promise<string> {
-        let bsConst: string;
-        // bs_const uses equal signs in the right hand side which ini then adds quotes around the whole thing.
-        // It doesn't seem like a fix will be available soon (https://github.com/npm/ini/issues/57)
-        // so we remove it before stringifying and add it back in afterwards to get around this.
-        if (manifestData.bs_const) {
-            bsConst = manifestData.bs_const;
+    public parseManifestFromString(manifestContents: string): ManifestData {
+        let manifestLines = manifestContents.split('\n');
+        let manifestData: ManifestData = {};
+        manifestData.keyIndexes = {};
+        manifestData.lineCount = manifestLines.length;
+        manifestLines.map((line, index) => {
+            let match = /(\w+)=(.+)/.exec(line);
+            if (match) {
+                let key = match[1];
+                manifestData[key] = match[2];
+                manifestData.keyIndexes[key] = index;
+            }
+        });
 
-            manifestData = Object.assign({}, manifestData);
-            delete manifestData.bs_const;
+        return manifestData;
+    }
+
+    public stringifyManifest(manifestData: ManifestData): string {
+        let output = [];
+
+        if (manifestData.keyIndexes && manifestData.lineCount) {
+            output.fill('', 0, manifestData.lineCount);
+
+            let key;
+            for (key in manifestData) {
+                if (key === 'lineCount' || key === 'keyIndexes') {
+                    continue;
+                }
+
+                let index = manifestData.keyIndexes[key];
+                output[index] = `${key}=${manifestData[key]}`;
+            }
+        } else {
+            output = Object.keys(manifestData).map((key) => {
+                return `${key}=${manifestData[key]}`;
+            });
         }
 
-        let result = ini.stringify(manifestData);
-
-        if (bsConst) {
-            result += 'bs_const=' + bsConst;
-        }
-
-        return result;
+        return output.join('\n');
     }
 
     /**
@@ -836,13 +854,13 @@ export class RokuDeploy {
 export interface RokuDeployOptions {
     /**
      * A full path to the folder where the zip/pkg package should be placed
-     * @default "./out"
+     * @default './out'
      */
     outDir?: string;
 
     /**
      * The base filename the zip/pkg file should be given (excluding the extension)
-     * @default "roku-deploy"
+     * @default 'roku-deploy'
      */
     outFile?: string;
 
@@ -858,10 +876,10 @@ export interface RokuDeployOptions {
      * where the source files are and where they should be placed
      * in the output directory
      * @default [
-            "source/**\/*.*",
-            "components/**\/*.*",
-            "images/**\/*.*",
-            "manifest"
+            'source/**\/*.*',
+            'components/**\/*.*',
+            'images/**\/*.*',
+            'manifest'
         ],
      */
     // tslint:enable:jsdoc-format
@@ -876,7 +894,7 @@ export interface RokuDeployOptions {
     /**
      * The IP address or hostname of the target Roku device.
      * @required
-     * @example "192.168.1.21"
+     * @example '192.168.1.21'
      *
      */
     host?: string;
@@ -884,7 +902,7 @@ export interface RokuDeployOptions {
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
-     * @default "rokudev"
+     * @default 'rokudev'
      */
     username?: string;
 
@@ -928,7 +946,9 @@ export interface RokuDeployOptions {
 }
 
 export interface ManifestData {
-    [key: string]: string;
+    [key: string]: any;
+    keyIndexes?: { [id: string]: number };
+    lineCount?: number;
 }
 
 export interface BeforeZipCallbackInfo {
