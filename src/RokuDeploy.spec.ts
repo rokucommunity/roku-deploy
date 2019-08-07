@@ -6,10 +6,9 @@ import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
-import * as ini from 'ini';
 let sinon = sinonImport.createSandbox();
 
-import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo } from './RokuDeploy';
+import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
 import * as errors from './Errors';
 
 chai.use(chaiFiles);
@@ -989,6 +988,7 @@ describe('index', function () {
             expect(parsedManifest.splash_screen_hd).to.equal('pkg:/images/splash_hd.jpg');
             expect(parsedManifest.ui_resolutions).to.equal('hd');
             expect(parsedManifest.bs_const).to.equal('IS_DEV_BUILD=false');
+            expect(parsedManifest.splash_color).to.equal('#000000');
         });
 
         it('Throws our error message for a missing file', async () => {
@@ -1004,32 +1004,28 @@ describe('index', function () {
     });
 
     describe('stringifyManifest', () => {
-        it('correctly converts back to a valid manifest with bs_const', async () => {
+        let inputManifestContents;
+        let inputParsedManifest: ManifestData;
+
+        beforeEach(async () => {
             let rootProjectDir = path.resolve(options.rootDir);
             let manifestPath = path.join(rootProjectDir, 'manifest');
 
-            let inputParsedManifest = await rokuDeploy.parseManifest(manifestPath);
-            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
-            let outputParsedManifest = ini.parse(outputStringifiedManifest);
-
-            expect(outputParsedManifest.title).to.equal(inputParsedManifest.title);
-            expect(outputParsedManifest.major_version).to.equal(inputParsedManifest.major_version);
-            expect(outputParsedManifest.minor_version).to.equal(inputParsedManifest.minor_version);
-            expect(outputParsedManifest.build_version).to.equal(inputParsedManifest.build_version);
-            expect(outputParsedManifest.splash_screen_hd).to.equal(inputParsedManifest.splash_screen_hd);
-            expect(outputParsedManifest.ui_resolutions).to.equal(inputParsedManifest.ui_resolutions);
-            expect(outputParsedManifest.bs_const).to.equal(inputParsedManifest.bs_const);
+            inputManifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
+            inputManifestContents = inputManifestContents.trim();
+            inputParsedManifest = await rokuDeploy.parseManifestFromString(inputManifestContents);
         });
 
-        it('correctly converts back to a valid manifest without bs_const', async () => {
-            let rootProjectDir = path.resolve(options.rootDir);
-            let manifestPath = path.join(rootProjectDir, 'manifest');
-
-            let inputParsedManifest = await rokuDeploy.parseManifest(manifestPath);
-            delete inputParsedManifest.bs_const;
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', async () => {
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
-            let outputParsedManifest = ini.parse(outputStringifiedManifest);
+            expect(outputStringifiedManifest).to.equal(inputManifestContents);
+        });
 
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', async () => {
+            delete inputParsedManifest.keyIndexes
+            delete inputParsedManifest.lineCount
+            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
+            let outputParsedManifest = rokuDeploy.parseManifestFromString(outputStringifiedManifest);
             expect(outputParsedManifest.title).to.equal(inputParsedManifest.title);
             expect(outputParsedManifest.major_version).to.equal(inputParsedManifest.major_version);
             expect(outputParsedManifest.minor_version).to.equal(inputParsedManifest.minor_version);
