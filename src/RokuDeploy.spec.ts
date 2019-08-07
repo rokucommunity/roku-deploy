@@ -1022,8 +1022,8 @@ describe('index', function () {
         });
 
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', async () => {
-            delete inputParsedManifest.keyIndexes
-            delete inputParsedManifest.lineCount
+            delete inputParsedManifest.keyIndexes;
+            delete inputParsedManifest.lineCount;
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
             let outputParsedManifest = rokuDeploy.parseManifestFromString(outputStringifiedManifest);
             expect(outputParsedManifest.title).to.equal(inputParsedManifest.title);

@@ -764,20 +764,20 @@ export class RokuDeploy {
         }
 
         let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
-        return this.parseManifestFromString(manifestContents)
+        return this.parseManifestFromString(manifestContents);
     }
 
     public parseManifestFromString(manifestContents: string): ManifestData {
         let manifestLines = manifestContents.split('\n');
         let manifestData: ManifestData = {};
-        manifestData.keyIndexes = {}
-        manifestData.lineCount = manifestLines.length
+        manifestData.keyIndexes = {};
+        manifestData.lineCount = manifestLines.length;
         manifestLines.map((line, index) => {
-            let match;
-            if (match = /(\w+)=(.+)/.exec(line)) {
-                let key = match[1]
+            let match = /(\w+)=(.+)/.exec(line);
+            if (match) {
+                let key = match[1];
                 manifestData[key] = match[2];
-                manifestData.keyIndexes[key] = index
+                manifestData.keyIndexes[key] = index;
             }
         });
 
@@ -792,14 +792,16 @@ export class RokuDeploy {
 
             let key;
             for (key in manifestData) {
-                if (key === "lineCount" || key === "keyIndexes") continue;
+                if (key === 'lineCount' || key === 'keyIndexes') {
+                    continue;
+                }
 
                 let index = manifestData.keyIndexes[key];
                 output[index] = `${key}=${manifestData[key]}`;
             }
         } else {
             output = Object.keys(manifestData).map((key) => {
-                return `${key}=${manifestData[key]}`
+                return `${key}=${manifestData[key]}`;
             });
         }
 
@@ -852,13 +854,13 @@ export class RokuDeploy {
 export interface RokuDeployOptions {
     /**
      * A full path to the folder where the zip/pkg package should be placed
-     * @default "./out"
+     * @default './out'
      */
     outDir?: string;
 
     /**
      * The base filename the zip/pkg file should be given (excluding the extension)
-     * @default "roku-deploy"
+     * @default 'roku-deploy'
      */
     outFile?: string;
 
@@ -874,10 +876,10 @@ export interface RokuDeployOptions {
      * where the source files are and where they should be placed
      * in the output directory
      * @default [
-            "source/**\/*.*",
-            "components/**\/*.*",
-            "images/**\/*.*",
-            "manifest"
+            'source/**\/*.*',
+            'components/**\/*.*',
+            'images/**\/*.*',
+            'manifest'
         ],
      */
     // tslint:enable:jsdoc-format
@@ -892,7 +894,7 @@ export interface RokuDeployOptions {
     /**
      * The IP address or hostname of the target Roku device.
      * @required
-     * @example "192.168.1.21"
+     * @example '192.168.1.21'
      *
      */
     host?: string;
@@ -900,7 +902,7 @@ export interface RokuDeployOptions {
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
-     * @default "rokudev"
+     * @default 'rokudev'
      */
     username?: string;
 
@@ -945,7 +947,7 @@ export interface RokuDeployOptions {
 
 export interface ManifestData {
     [key: string]: any;
-    keyIndexes?: { [id: string] : number }
+    keyIndexes?: { [id: string]: number };
     lineCount?: number;
 }
 
