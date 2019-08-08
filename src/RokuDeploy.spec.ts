@@ -1008,7 +1008,9 @@ describe('index', function () {
 
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', async () => {
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
-            expect(outputStringifiedManifest).to.equal(inputManifestContents);
+            let outputNormalized = outputStringifiedManifest.replace(/\r\n/g, '\n');
+            let inputNormalized = inputManifestContents.replace(/\r\n/g, '\n');
+            expect(outputNormalized).to.equal(inputNormalized);
         });
 
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', async () => {
