@@ -6,79 +6,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.2.1] - 2019-08-07
+### Fixed
+ - colors starting with # symbol in manifest file that were being treated as comments. This removes the dependency on `ini` in favor of a local function.
+
+
+
 ## [2.2.0] - 2019-07-05
-# Added
+### Added
  - support for converting to squashfs
-# Fixed
+### Fixed
  - issue where manifest files with `bs_const` weren't being handled correctly
 
 
 
-# [2.1.0] - 2019-05-14
-# Added
+## [2.1.0] - 2019-05-14
+### Added
  - rekeying capability
 
 
 
-# [2.1.0-beta1] - 2019-02-15
-# Added
+## [2.1.0-beta1] - 2019-02-15
+### Added
  - Support for signed package creation
  - ability to register a callback function before the package is zipped. 
  - `incrementBuildNumber` option
-# Changed
+### Changed
  - Stop calling home button on deploy
  - `outFile` to be `baseName` so it can be used for both zip and pkg file names
 
 
 
-# [2.0.0] - 2019-01-07
-#Added
+## [2.0.0] - 2019-01-07
+### Added
  - support for absolute file paths in the `files` property
  - dereference symlinks on file copy
 
 
 
-# [2.0.0-beta5] - 2019-01-18
-# Changed
+## [2.0.0-beta5] - 2019-01-18
+### Changed
  - Changed `normalizeFilesOption` to be sync instead of async, since it didn't need to be async.
 
 
 
-# [2.0.0-beta4] - 2019-01-17
-# Fixed
+## [2.0.0-beta4] - 2019-01-17
+### Fixed
  - bug that wasn't using rootDir for glob matching
 
 
 
-# [2.0.0-beta3] - 2019-01-17
-# Changed
+## [2.0.0-beta3] - 2019-01-17
+### Changed
  - export the `getFilepaths` for use in external libraries
 
 
 
-# [2.0.0-beta2] - 2019-01-15
-# Changed
+## [2.0.0-beta2] - 2019-01-15
+### Changed
  - prevent empty directories from being created
-# Fixed
+### Fixed
  - bug in `src`/`dest` globs.
  - bug that wasn't copying folders properly
 
 
 
-# [2.0.0-beta1] - 2019-01-07
-# Changed
+## [2.0.0-beta1] - 2019-01-07
+### Changed
  - removed the requirement for manifest to be located at the top of `rootDir`. Instead, it is simply assumed to exist.
-#Fixed
+### Fixed
  - regression issue that prevented folder names from being used without globs
 
 
 
-# [1.0.0] - 2018-12-18
-# Added
+## [1.0.0] - 2018-12-18
+### Added
  - support for negated globs
 
 
-
+[2.2.1]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.2.0...v2.2.1
 [2.2.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0...v2.2.0
 [2.1.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0-beta1...v2.1.0
 [2.1.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0-beta1...v2.1.0
