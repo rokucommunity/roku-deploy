@@ -178,4 +178,4 @@ Here are the available options. The defaults are shown to the right of the optio
 Click [here](https://github.com/TwitchBronBron/roku-deploy/blob/2648069de1f3e889c58b8119b5f852f126e60042/src/index.ts#L288) to see the typescript interface for these options
 
 ## Changelog
-Click [here](readme.md) to view the changelog
+Click [here](CHANGELOG.md) to view the changelog
