@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.3.0] - 2019-08-07
+### Added
+ - support for returning a promise in the `createPackage` `beforeZipCallback` parameter.
+
+
+
 ## [2.2.1] - 2019-08-07
 ### Fixed
  - colors starting with # symbol in manifest file that were being treated as comments. This removes the dependency on `ini` in favor of a local function.
@@ -84,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[2.3.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.2.1...v2.3.0
 [2.2.1]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.2.0...v2.2.1
 [2.2.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0...v2.2.0
 [2.1.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0-beta1...v2.1.0

@@ -231,6 +231,18 @@ describe('index', function () {
             }
         });
 
+        it('should wait for promise returned by pre-zip callback', async () => {
+            let count = 0;
+            await rokuDeploy.createPackage(options, (info) => {
+                return Promise.resolve().then(() => {
+                    count++;
+                }).then(() => {
+                    count++;
+                });
+            });
+            expect(count).to.equal(2);
+        });
+
         it('should increment the build number if requested', async () => {
             options.incrementBuildNumber = true;
             await rokuDeploy.createPackage(options, (info) => {

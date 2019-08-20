@@ -168,7 +168,7 @@ export class RokuDeploy {
      * Create a zip folder containing all of the specified roku project files.
      * @param options
      */
-    public async createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
+    public async createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => Promise<void> | void) {
         options = this.getOptions(options);
 
         await this.prepublishToStaging(options);
@@ -189,7 +189,7 @@ export class RokuDeploy {
                 stagingFolderPath: stagingFolderPath
             };
 
-            beforeZipCallback(info);
+            await Promise.resolve(beforeZipCallback(info));
         }
         await this.zipPackage(options);
     }
