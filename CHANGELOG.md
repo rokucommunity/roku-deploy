@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.4.0] - 2019-08-23
+### Added
+ - `deleteInstalledChannel` method that will delete the installed channel on the remote Roku
+
+### Changed
+ - `deploy` now deletes any installed channel before publishing the new channel
+
+
+
 ## [2.3.0] - 2019-08-07
 ### Added
  - support for returning a promise in the `createPackage` `beforeZipCallback` parameter.
@@ -90,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[2.4.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.3.0...v2.4.0
 [2.3.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.2.1...v2.3.0
 [2.2.1]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.2.0...v2.2.1
 [2.2.0]:  https://github.com/TwitchBronBron/roku-deploy/compare/v2.1.0...v2.2.0
