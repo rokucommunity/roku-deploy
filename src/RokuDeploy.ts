@@ -636,8 +636,24 @@ export class RokuDeploy {
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options);
         await this.createPackage(options, beforeZipCallback);
+        await this.deleteInstalledChannel(options);
         let result = await this.publish(options);
         return result;
+    }
+
+    /**
+     * Deletes any installed dev channel on the target Roku device
+     * @param options
+     */
+    public async deleteInstalledChannel(options?: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'Delete',
+            archive: ''
+        };
+        return (await this.doPostRequest(deleteOptions));
     }
 
     /**
