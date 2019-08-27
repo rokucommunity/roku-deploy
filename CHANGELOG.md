@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [2.4.0] - 2019-08-23
+## [2.4.0] - 2019-08-26
 ### Added
  - `deleteInstalledChannel` method that will delete the installed channel on the remote Roku
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [2.3.0] - 2019-08-07
+## [2.3.0] - 2019-08-20
 ### Added
  - support for returning a promise in the `createPackage` `beforeZipCallback` parameter.
 
