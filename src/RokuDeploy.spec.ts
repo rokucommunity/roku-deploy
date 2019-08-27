@@ -968,6 +968,15 @@ describe('index', function () {
         });
     });
 
+    describe('deleteInstalledChannel', () => {
+        it('attempts to delete any installed dev channel on the device', async () => {
+            mockDoPostRequest();
+
+            let result = await rokuDeploy.deleteInstalledChannel();
+            expect(result).not.to.be.undefined;
+        });
+    });
+
     describe('zipFolder', () => {
         //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
         it('rejects the promise when an error occurs', async () => {
