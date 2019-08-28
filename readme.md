@@ -3,8 +3,8 @@
 Publish Roku projects to a Roku device by using Node.js.
 
 
-[![Build Status](https://travis-ci.org/TwitchBronBron/roku-deploy.svg?branch=master)](https://travis-ci.org/TwitchBronBron/roku-deploy)
-[![Coverage Status](https://coveralls.io/repos/github/TwitchBronBron/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/TwitchBronBron/roku-deploy?branch=master)
+[![Build Status](https://travis-ci.org/RokuCommunity/roku-deploy.svg?branch=master)](https://travis-ci.org/RokuCommunity/roku-deploy)
+[![Coverage Status](https://coveralls.io/repos/github/RokuCommunity/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/RokuCommunity/roku-deploy?branch=master)
 [![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy)
 ## Installation
 
@@ -175,7 +175,7 @@ Here are the available options. The defaults are shown to the right of the optio
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
     just in case roku adds support for custom usernames in the future
 
-Click [here](https://github.com/TwitchBronBron/roku-deploy/blob/2648069de1f3e889c58b8119b5f852f126e60042/src/index.ts#L288) to see the typescript interface for these options
+Click [here](https://github.com/rokucommunity/roku-deploy/blob/6ecc8642c77b9df59bf087f3d74d31275fc9e11a/src/RokuDeploy.ts#L870) to see the typescript interface for these options
 
 ## Changelog
 Click [here](CHANGELOG.md) to view the changelog
