@@ -4,7 +4,7 @@ Publish Roku projects to a Roku device by using Node.js.
 
 
 [![Build Status](https://travis-ci.org/RokuCommunity/roku-deploy.svg?branch=master)](https://travis-ci.org/RokuCommunity/roku-deploy)
-[![Coverage Status](https://coveralls.io/repos/github/RokuCommunity/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/RokuCommunity/roku-deploy?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/rokucommunity/roku-deploy/badge.svg?branch=master)](https://coveralls.io/github/rokucommunity/roku-deploy?branch=master)
 [![NPM Version](https://badge.fury.io/js/roku-deploy.svg?style=flat)](https://npmjs.org/package/roku-deploy)
 ## Installation
 
