@@ -153,10 +153,10 @@ export class RokuDeploy {
 
         let stagingFolderPath = this.getStagingFolderPath(options);
 
-        let zipFilePath = this.getOutputZipFilePath(options);
-
         //make sure the output folder exists
         await this.fsExtra.ensureDir(options.outDir);
+
+        let zipFilePath = this.getOutputZipFilePath(options);
 
         //create a zip of the staging folder
         await this.zipFolder(stagingFolderPath, zipFilePath);
@@ -434,6 +434,9 @@ export class RokuDeploy {
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
+        //make sure the outDir exists
+        await this.fsExtra.ensureDir(options.outDir);
+
         let zipFilePath = this.getOutputZipFilePath(options);
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
         requestOptions.formData = {
