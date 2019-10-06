@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fsExtra1 from 'fs-extra';
+import * as _fsExtra from 'fs-extra';
 import * as Q from 'q';
 import * as globAll from 'glob-all';
 import * as request from 'request';
@@ -10,7 +10,7 @@ import * as errors from './Errors';
 export class RokuDeploy {
     //store the import on the class to make testing easier
     public request = request;
-    public fsExtra = fsExtra1;
+    public fsExtra = _fsExtra;
 
     /**
      * Copies all of the referenced files to the staging folder
