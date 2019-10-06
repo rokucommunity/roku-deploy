@@ -155,6 +155,9 @@ export class RokuDeploy {
 
         let zipFilePath = this.getOutputZipFilePath(options);
 
+        //make sure the output folder exists
+        await this.fsExtra.ensureDir(options.outDir);
+
         //create a zip of the staging folder
         await this.zipFolder(stagingFolderPath, zipFilePath);
 
@@ -719,9 +722,13 @@ export class RokuDeploy {
     public getStagingFolderPath(options?: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
-        stagingFolderPath = path.resolve(stagingFolderPath);
-        return stagingFolderPath;
+        if (options.stagingFolderPath) {
+            return path.resolve(options.stagingFolderPath);
+        } else {
+            let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
+            stagingFolderPath = path.resolve(stagingFolderPath);
+            return stagingFolderPath;
+        }
     }
 
     /**
@@ -906,6 +913,11 @@ export interface RokuDeployOptions {
      * @default false
      */
     retainStagingFolder?: boolean;
+
+    /**
+     * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
+     */
+    stagingFolderPath?: string;
 
     /**
      * The IP address or hostname of the target Roku device.
