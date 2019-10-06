@@ -171,6 +171,12 @@ describe('index', function () {
     });
 
     describe('createPackage', function () {
+        it('works with custom stagingFolderPath', async () => {
+            let opts = { ...options, stagingFolderPath: 'dist' };
+            await rokuDeploy.createPackage(opts);
+            expect(file(rokuDeploy.getOutputZipFilePath(opts))).to.exist;
+        });
+
         it('should throw error when no files were found to copy', async () => {
             try {
                 options.files = [];
@@ -656,6 +662,11 @@ describe('index', function () {
         it('should use outDir for staging folder', async () => {
             await rokuDeploy.prepublishToStaging(options);
             expect(dir('out/.roku-deploy-staging')).to.exist;
+        });
+
+        it('should support overriding the staging folder', async () => {
+            await rokuDeploy.prepublishToStaging({ ...options, stagingFolderPath: '.tmp/custom-out-dir' });
+            expect(dir('.tmp/custom-out-dir')).to.exist;
         });
 
         it('handles old glob-style', async () => {

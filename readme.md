@@ -165,6 +165,9 @@ Here are the available options. The defaults are shown to the right of the optio
 - **retainStagingFolder?:** boolean = `false`  
     Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
+- **stagingFolderPath?:** string = `` `${options.outDir}/.roku-deploy-staging` ``  
+   The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
+    
 - **convertToSquashfs?:** boolean = `false`  
    If true we convert to squashfs before creating the pkg file
 
