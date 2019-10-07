@@ -8,7 +8,7 @@ import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
 let sinon = sinonImport.createSandbox();
 
-import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FilesType } from './RokuDeploy';
 import * as errors from './Errors';
 
 chai.use(chaiFiles);
@@ -901,7 +901,16 @@ describe('index', function () {
         });
     });
 
-    describe.only('normalizeFilesArray', () => {
+    describe('normalizeFilesArray', () => {
+        it('normalizes directory separators paths', () => {
+            expect(rokuDeploy.normalizeFilesArray([{
+                src: `long\\source/path`,
+                dest: `long/dest\\path`
+            }])).to.eql([{
+                src: n('long/source/path'),
+                dest: n('long/dest/path')
+            }]);
+        });
         it('works for simple strings', () => {
             expect(rokuDeploy.normalizeFilesArray([
                 'manifest',
@@ -910,7 +919,7 @@ describe('index', function () {
                 src: 'manifest',
                 dest: undefined
             }, {
-                src: 'source/main.brs',
+                src: n('source/main.brs'),
                 dest: undefined
             }]);
         });
@@ -960,7 +969,7 @@ describe('index', function () {
                 src: 'manifest',
                 dest: undefined
             }, {
-                src: 'source/main.brs',
+                src: n('source/main.brs'),
                 dest: undefined
             }]);
         });
@@ -972,8 +981,8 @@ describe('index', function () {
                     dest: 'source/config.brs'
                 }
             ])).to.eql([{
-                src: 'source/config.dev.brs',
-                dest: 'source/config.brs'
+                src: n('source/config.dev.brs'),
+                dest: n('source/config.brs')
             }]);
         });
 
@@ -1094,8 +1103,77 @@ describe('index', function () {
     });
 
     describe('getFilePaths', () => {
+        let tempPath = n(`${cwd}/getFilePaths_temp`);
+        let rootDir = n(`${tempPath}/src`);
+        let stagingPathAbsolute = n(`${tmpPath}/staging`);
+
+        //create baseline project structure
+        before(async () => {
+            await fsExtra.remove(tempPath);
+
+            await fsExtra.ensureDir(`${rootDir}/source`);
+            await fsExtra.ensureDir(`${rootDir}/components`);
+            await fsExtra.ensureDir(`${rootDir}/components/emptyFolder`);
+
+            await fsExtra.writeFile(`${rootDir}/manifest`, '');
+            await fsExtra.writeFile(`${rootDir}/source/main.brs`, '');
+            await fsExtra.writeFile(`${rootDir}/source/lib.brs`, '');
+            await fsExtra.writeFile(`${rootDir}/components/component1.xml`, '');
+            await fsExtra.writeFile(`${rootDir}/components/component1.brs`, '');
+        });
+        after(async () => {
+            await fsExtra.remove(tempPath);
+        });
+
+        async function getFilePaths(files: FilesType[], stagingPath = stagingPathAbsolute, rootPathAbsolute = rootDir) {
+            return (await rokuDeploy.getFilePaths(files, stagingPathAbsolute, rootDir))
+                .sort((a, b) => a.src.localeCompare(b.src));
+        }
+
+        describe.only('rewrite', () => {
+            // it('works for direct file refs', async () => {
+            //     expect(await getFilePaths(['manifest', 'source/main.brs'])).to.eql([{
+            //         src: n(`${rootDir}/manifest`),
+            //         dest: n(`${stagingPathAbsolute}/manifest`)
+            //     }, {
+            //         src: n(`${rootDir}/source/main.brs`),
+            //         dest: n(`${stagingPathAbsolute}/source/main.brs`)
+            //     }]);
+            // });
+            it('relative folder path copies entire directory', async () => {
+                expect(await getFilePaths(['components'])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.xml`)
+                }]);
+            });
+
+            it('relative folder path does not copy empty folders', async () => {
+                expect(
+                    (await getFilePaths(['components'])).map(x => x.src)
+                ).not.to.include(n(`${rootDir}/components/emptyFolder`));
+            });
+
+            it('absolute folder path copies entire directory', async () => {
+                expect(await getFilePaths([`${rootDir}/components`])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.xml`)
+                }]);
+            });
+
+            it('absolute folder path does not copy empty folders', async () => {
+                expect(
+                    (await getFilePaths([`${rootDir}/components`])).map(x => x.src)
+                ).not.to.include(n(`${rootDir}/components/emptyFolder`));
+            });
+        });
+
         it('works with custom stagingFolderPath', async () => {
-            let rootDir = n(`${tmpPath}/src`);
             await fsExtra.ensureDir(`${rootDir}/source`);
             await fsExtra.ensureDir(`${rootDir}/components`);
 

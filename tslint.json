@@ -9,6 +9,8 @@
         "quotemark": {
             "options": "single"
         },
+        "no-var-requires": false,
+        "no-floating-promises": true,
         "max-classes-per-file": false,
         "max-line-length": false,
         "no-trailing-whitespace": false,
@@ -41,7 +43,8 @@
         "object-literal-shorthand": false,
         "only-arrow-functions": false,
         "space-before-function-paren": false,
-        "no-unused-expression": false
+        "no-unused-expression": false,
+        "arrow-parens": false
     },
     "rulesDirectory": []
 }
