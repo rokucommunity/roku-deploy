@@ -50,13 +50,24 @@ export class Util {
     }
 
     /**
+     * Determine if `childPath` is contained within the `parentPath`
+     * @param parentPath 
+     * @param childPath 
+     */
+    public isParentOfPath(parentPath: string, childPath: string) {
+        const relative = path.relative(parentPath, childPath);
+        return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+    }
+    /**
      * Determines if the given path is a file
      * @param filePathAbsolute 
      */
-    public async isFile(filePathAbsolute: string) {
+    public async isFile(filePathAbsolute: string, cwd?: string) {
         try {
-            let stat = await fsExtra.lstat(filePathAbsolute);
-            return stat.isFile();
+            return await this.cwdRun(cwd, async () => {
+                let stat = await fsExtra.lstat(filePathAbsolute);
+                return stat.isFile();
+            });
         } catch (e) {
             // lstatSync throws an error if path doesn't exist
             return false;

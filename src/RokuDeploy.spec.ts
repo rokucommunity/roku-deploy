@@ -10,10 +10,11 @@ let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FilesType } from './RokuDeploy';
 import * as errors from './Errors';
+import { util } from './util';
 
 chai.use(chaiFiles);
 
-let n = path.normalize;
+let n = util.standardizePath;
 
 const expect = chai.expect;
 const file = chaiFiles.file;
@@ -1106,10 +1107,15 @@ describe('index', function () {
         let tempPath = n(`${cwd}/getFilePaths_temp`);
         let rootDir = n(`${tempPath}/src`);
         let stagingPathAbsolute = n(`${tmpPath}/staging`);
+        let otherProjectDir = n(`${tempPath}/otherProjectSrc`);
 
         //create baseline project structure
         before(async () => {
             await fsExtra.remove(tempPath);
+
+            await fsExtra.ensureDir(`${otherProjectDir}/source`);
+            await fsExtra.writeFile(`${otherProjectDir}/manifest`, '');
+            await fsExtra.writeFile(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
 
             await fsExtra.ensureDir(`${rootDir}/source`);
             await fsExtra.ensureDir(`${rootDir}/components`);
@@ -1171,6 +1177,64 @@ describe('index', function () {
                     (await getFilePaths([`${rootDir}/components`])).map(x => x.src)
                 ).not.to.include(n(`${rootDir}/components/emptyFolder`));
             });
+
+            it('copies relative file paths', async () => {
+                expect(
+                    (await getFilePaths([`source/main.brs`, `source\\lib.brs`]))
+                ).to.eql([{
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                }, {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                }]);
+            });
+
+            it('copies absolute file paths to root of stagingPath even though they reside within rootDir', async () => {
+                expect(
+                    (await getFilePaths([`${rootDir}/source/main.brs`, `${rootDir}/source/lib.brs`]))
+                ).to.eql([{
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`${stagingPathAbsolute}/lib.brs`)
+                }, {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/main.brs`)
+                }]);
+            });
+
+            it('copies files outside of rootDir to root of stagingPath when no dest specified', async () => {
+                expect(
+                    (await getFilePaths([`${otherProjectDir}/source/thirdPartyLib.brs`]))
+                ).to.eql([{
+                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                    dest: n(`${stagingPathAbsolute}/thirdPartyLib.brs`)
+                }]);
+            });
+
+            it('copies absolute path files to specified dest', async () => {
+                expect(
+                    (await getFilePaths([{
+                        src: `${otherProjectDir}/source/thirdPartyLib.brs`,
+                        dest: 'lib/'
+                    }]))
+                ).to.eql([{
+                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                    dest: n(`${stagingPathAbsolute}/lib/thirdPartyLib.brs`)
+                }]);
+            });
+
+            it('copies relative path files to specified dest', async () => {
+                expect(
+                    (await getFilePaths([{
+                        src: `${otherProjectDir}/../src/source/main.brs`,
+                        dest: 'source/'
+                    }]))
+                ).to.eql([{
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                }]);
+            });
+
         });
 
         it('works with custom stagingFolderPath', async () => {

@@ -7,7 +7,7 @@ import * as errors from './Errors';
 import * as denodeify from 'denodeify';
 const glob = denodeify(require('glob'));
 
-import { util } from './util';
+import { util, Util } from './util';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
@@ -313,8 +313,9 @@ export class RokuDeploy {
         //container for the files for this entry
         let result = [] as StandardizedFileEntry[];
 
-        //if src is a directory, include the entire folder and its contents
+        //if src is a directory
         if (await util.isDirectory(entry.src, rootDir)) {
+            //include the entire folder and its contents
             let files: string[] = await glob(`${entry.src}/**/*`, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
@@ -332,6 +333,49 @@ export class RokuDeploy {
                     });
                 }
             }
+
+            //if src is a file
+        } else if (await util.isFile(entry.src, rootDir)) {
+            let isSrcPathAbsolute = path.isAbsolute(entry.src);
+            let srcPathAbsolute = isSrcPathAbsolute ?
+                entry.src :
+                util.standardizePath(`${rootDir}/${entry.src}`);
+
+            let isSrcChildOfRootDir = util.isParentOfPath(rootDir, srcPathAbsolute);
+
+            let fileNameAndExtension = path.basename(srcPathAbsolute);
+
+            let destPath: string;
+
+            //no dest
+            if (!entry.dest) {
+
+                //no dest, absolute path or file outside of rootDir
+                if (isSrcPathAbsolute || isSrcChildOfRootDir === false) {
+                    //copy file to root of staging folder
+                    destPath = util.standardizePath(`${stagingFolderPath}/${fileNameAndExtension}`);
+
+                    //no dest, relative path, lives INSIDE rootDir
+                } else {
+                    //copy relative file structure to root of staging folder
+                    let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
+                    destPath = util.standardizePath(`${stagingFolderPath}/${srcPathRelative}`);
+                }
+
+                //dest ends with slash (indicating it's a folder)
+            } else if (entry.dest.endsWith(path.sep)) {
+                //keep the filename, but put it in the dest folder
+                destPath = util.standardizePath(`${stagingFolderPath}/${entry.dest}/${fileNameAndExtension}`);
+
+                //dest includes the filename (and extension if applicable)
+            } else {
+                destPath = util.standardizePath(`${stagingFolderPath}/${entry.dest}`);
+            }
+
+            result.push({
+                src: util.standardizePath(srcPathAbsolute),
+                dest: destPath
+            });
         }
 
         return result;

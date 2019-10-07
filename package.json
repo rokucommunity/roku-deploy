@@ -8,7 +8,7 @@
     "preversion": "npm run build && npm run tslint && npm run test",
     "prepublishOnly": "npm run build",
     "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
-    "test": "ts-mocha src/RokuDeploy.spec.ts --full-trace",
+    "test": "ts-mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:coverage": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
     "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
