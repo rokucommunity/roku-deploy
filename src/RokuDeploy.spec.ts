@@ -13,9 +13,13 @@ import * as errors from './Errors';
 
 chai.use(chaiFiles);
 
+let n = path.normalize;
+
 const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
+let cwd = process.cwd();
+const tmpPath = n(`${cwd}/.tmp`);
 
 describe('index', function () {
     let rokuDeploy: RokuDeploy;
@@ -25,7 +29,6 @@ describe('index', function () {
         rokuDeploy = new RokuDeploy();
         rd = rokuDeploy;
     });
-    let cwd = process.cwd();
 
     let options: RokuDeployOptions;
     let originalCwd = process.cwd();
@@ -898,75 +901,91 @@ describe('index', function () {
         });
     });
 
-    describe('normalizeFilesOption', () => {
-        it('appends trailing slash for dest directories', async () => {
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.normalizeFilesOption([{
-                    src: 'components',
-                    //bogus dest object
-                    dest: <any>true
-                }]);
-            });
-        });
-
-        it('defaults to current directory', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
-                'readme.md',
-            ])).to.eql([{
-                dest: '',
-                src: [
-                    'readme.md'
-                ]
-            }]);
-        });
-
-        it('properly handles negated globs', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
+    describe.only('normalizeFilesArray', () => {
+        it('works for simple strings', () => {
+            expect(rokuDeploy.normalizeFilesArray([
                 'manifest',
-                'components/**/*',
-                '!components/scenes/**/*'
+                'source/main.brs'
             ])).to.eql([{
-                dest: '',
-                src: [
-                    'manifest',
-                    'components/**/*',
-                    '!components/scenes/**/*'
-                ],
+                src: 'manifest',
+                dest: undefined
+            }, {
+                src: 'source/main.brs',
+                dest: undefined
             }]);
         });
 
-        it('appends trailing slash to dest when globs are used', async () => {
-            let result = await rokuDeploy.normalizeFilesOption([{
-                src: 'components/**/*',
-                dest: 'components'
+        it('works for negated strings', () => {
+            expect(rokuDeploy.normalizeFilesArray([
+                '!.git',
+            ])).to.eql([{
+                src: '!.git',
+                dest: undefined
             }]);
-
-            expect(result[0].dest).to.equal('components' + path.sep);
         });
 
-        it('properly handles negated globs with {src}', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
+        it('skips falsey and bogus entries', () => {
+            expect(rokuDeploy.normalizeFilesArray([
+                '',
                 'manifest',
+                <any>false,
+                undefined,
+                null
+            ])).to.eql([{
+                src: 'manifest',
+                dest: undefined
+            }]);
+        });
+
+        it('works for {src:string} objects', () => {
+            expect(rokuDeploy.normalizeFilesArray([
+                {
+                    src: 'manifest'
+                }
+            ])).to.eql([{
+                src: 'manifest',
+                dest: undefined
+            }]);
+        });
+
+        it('works for {src:string[]} objects', () => {
+            expect(rokuDeploy.normalizeFilesArray([
                 {
                     src: [
-                        'components/**/*',
-                        '!components/scenes/**/*'
+                        'manifest',
+                        'source/main.brs'
                     ]
-                },
-                'someOtherFile.brs'
+                }
             ])).to.eql([{
-                src: [
-                    'manifest',
-                    'someOtherFile.brs'
-                ],
-                dest: '',
+                src: 'manifest',
+                dest: undefined
             }, {
-                src: [
-                    'components/**/*',
-                    '!components/scenes/**/*'
-                ],
-                dest: '',
+                src: 'source/main.brs',
+                dest: undefined
             }]);
+        });
+
+        it('retains dest option', () => {
+            expect(rokuDeploy.normalizeFilesArray([
+                {
+                    src: 'source/config.dev.brs',
+                    dest: 'source/config.brs'
+                }
+            ])).to.eql([{
+                src: 'source/config.dev.brs',
+                dest: 'source/config.brs'
+            }]);
+        });
+
+        it('throws when encountering invalid entries', () => {
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[true])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[/asdf/])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[new Date()])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[1])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: true }])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: /asdf/ }])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: new Date() }])).to.throw();
+            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: 1 }])).to.throw();
         });
     });
 
@@ -1075,6 +1094,37 @@ describe('index', function () {
     });
 
     describe('getFilePaths', () => {
+        it('works with custom stagingFolderPath', async () => {
+            let rootDir = n(`${tmpPath}/src`);
+            await fsExtra.ensureDir(`${rootDir}/source`);
+            await fsExtra.ensureDir(`${rootDir}/components`);
+
+            await fsExtra.writeFile(`${rootDir}/source/main.brs`, '');
+            await fsExtra.writeFile(`${rootDir}/manifest`, '');
+            await fsExtra.writeFile(`${rootDir}/components/component1.xml`, '');
+
+            let paths = (await rokuDeploy.getFilePaths(
+                [
+                    'source/**/*',
+                    'components/**/*',
+                    'manifest'
+                ],
+                'dist',
+                rootDir
+            )).sort((a, b) => a.src.localeCompare(b.src));
+
+            expect(paths).to.eql([{
+                src: path.join(rootDir, 'components', 'component1.xml'),
+                dest: path.join(cwd, 'dist', 'components', 'component.xml')
+            }, {
+                src: path.join(rootDir, 'manifest'),
+                dest: path.join(cwd, 'dist', 'manifest')
+            }, {
+                src: path.join(rootDir, 'source', 'main.brs'),
+                dest: path.join(cwd, 'dist', 'source', 'main.brs')
+            }]);
+        });
+
         it('works when using a different current working directory than rootDir', async () => {
             let rootProjectDir = path.resolve(options.rootDir);
             let outDir = path.resolve(options.outDir);

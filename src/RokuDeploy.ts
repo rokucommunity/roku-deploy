@@ -22,7 +22,7 @@ export class RokuDeploy {
         options.rootDir = <string>options.rootDir;
         options.outDir = <string>options.outDir;
 
-        const files = this.normalizeFilesOption(options.files);
+        const files = this.normalizeFilesArray(options.files);
 
         //make all path references absolute
         this.makeFilesAbsolute(files, options.rootDir);
@@ -79,12 +79,68 @@ export class RokuDeploy {
     }
 
     /**
-     * Given an array of files, normalize them into a standard {src;dest} object.
+     * Given an array of `FilesType`, normalize each of them into a standard {src;dest} object.
+     * Each entry in the array or inner `src` array will be extracted out into its own object.
+     * This makes it easier to reason about later on in the process.
+     * @param files
+     */
+    public normalizeFilesArray(files: FilesType[]) {
+        const result: { src: string; dest: string | undefined }[] = [];
+
+        for (let i = 0; i < files.length; i++) {
+            let entry = files[i];
+            //skip falsey and blank entries
+            if (!entry) {
+                continue;
+
+                //string entries
+            } else if (typeof entry === 'string') {
+                result.push({
+                    src: entry,
+                    dest: undefined
+                });
+
+                //objects with src: (string | string[])
+            } else if ('src' in entry) {
+                //validate dest
+                if (entry.dest !== undefined && entry.dest !== null && typeof entry.dest !== 'string') {
+                    throw new Error(`Invalid type for "dest" at index ${i} of files array`);
+                }
+
+                //objects with src: string
+                if (typeof entry.src === 'string') {
+                    result.push({
+                        src: entry.src,
+                        dest: entry.dest
+                    });
+
+                    //objects with src:string[]
+                } else if ('src' in entry && Array.isArray(entry.src)) {
+                    //create a distinct entry for each item in the src array
+                    for (let srcEntry of entry.src) {
+                        result.push({
+                            src: srcEntry,
+                            dest: entry.dest
+                        });
+                    }
+                } else {
+                    throw new Error(`Invalid type for "src" at index ${i} of files array`);
+                }
+            } else {
+                throw new Error(`Invalid entry at index ${i} in files array`);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Given an array of `FilesType`, normalize them into a standard {src;dest} object.
      * This will make plain folder names into fully qualified paths, add globs to plain folders, etc.
      * This makes it easier to reason about later on in the process.
      * @param files
      */
-    public normalizeFilesOption(files: FilesType[]) {
+    public normalizeFilesOption_old(files: FilesType[]) {
         const result: { src: string[]; dest: string }[] = [];
         let topLevelGlobs = <string[]>[];
         //standardize the files object
@@ -119,17 +175,6 @@ export class RokuDeploy {
                 throw new Error('Entry must be a string or a {src;dest;} object');
             }
 
-            //if there is a wildcard in any src, ensure a slash in dest
-            {
-                let srcContainsWildcard = (fileEntry.src as Array<string>).findIndex((src) => {
-                    return src.indexOf('*') > -1;
-                }) > -1;
-
-                if (fileEntry.dest.length > 0 && !this.endsWithSlash(fileEntry.dest) && srcContainsWildcard) {
-                    fileEntry.dest += path.sep;
-                }
-            }
-
             result.push(fileEntry);
         }
 
@@ -141,6 +186,19 @@ export class RokuDeploy {
             });
         }
 
+        //if there is a wildcard in any src, ensure a slash in dest
+        for (let fileObj of result) {
+            {
+                let srcContainsWildcard = (fileObj.src as Array<string>).findIndex((src) => {
+                    return src.indexOf('*') > -1;
+                }) > -1;
+
+                if (fileObj.dest.length > 0 && !this.endsWithSlash(fileObj.dest) && srcContainsWildcard) {
+                    fileObj.dest += path.sep;
+                }
+            }
+
+        }
         return result;
     }
 
@@ -213,9 +271,16 @@ export class RokuDeploy {
     /**
      * Get all file paths for the specified options
      */
-    public async getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
+    public async getFilePaths(files: FilesType[], stagingPath: string, rootDir: string): Promise<any> {
+
+    }
+
+    /**
+     * Get all file paths for the specified options
+     */
+    public async getFilePaths_old(files: FilesType[], stagingPath: string, rootDir: string) {
         stagingPath = path.normalize(stagingPath);
-        const normalizedFiles = this.normalizeFilesOption(files);
+        const normalizedFiles = this.normalizeFilesArray(files);
 
         rootDir = this.normalizeRootDir(rootDir);
 
@@ -230,8 +295,8 @@ export class RokuDeploy {
                     if (await this.isDirectory(file.src[0])) {
                         fileAsDirPath = file.src[0];
                     }
-                    /* istanbul ignore next */
-                    //assume path is relative, append root dir and try that way
+
+                    //assume path is relative, prepend root dir and try that way
                     if (!fileAsDirPath && await this.isDirectory(path.join(rootDir, file.src[0]))) {
                         fileAsDirPath = path.normalize(path.join(rootDir, file.src[0]));
                     }
@@ -242,6 +307,19 @@ export class RokuDeploy {
                         file.src[0] = path.join(fileAsDirPath, '**', '*');
                     }
                 }
+
+                //prepend rootDir to any paths starting with wildcards
+                for (let i = 0; i < file.src.length; i++) {
+                    let srcPath = file.src[i];
+                    if (srcPath.indexOf('**') === 0) {
+                        file.src[i] = path.normalize(`${rootDir}/${srcPath}`);
+                        //negated 
+                    } else if (srcPath.indexOf('!**') === 0) {
+                        //remove the 
+                        file.src[i] = '!' + path.normalize(`${rootDir}/${srcPath.substring(1)}`);
+                    }
+                }
+
                 let originalSrc = file.src;
 
                 let filePathArray = await Q.nfcall(globAll, file.src, { cwd: rootDir });
