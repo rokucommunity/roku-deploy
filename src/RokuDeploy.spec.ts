@@ -1300,6 +1300,18 @@ describe('index', function () {
                     dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
                 }]);
             });
+
+            it('copies files from non-rootDir double-star globs', async () => {
+                expect(
+                    (await getFilePaths([`../otherProjectSrc/**/*`]))
+                ).to.eql([{
+                    src: n(`${otherProjectDir}/manifest`),
+                    dest: n(`${stagingPathAbsolute}/manifest`)
+                }, {
+                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/thirdPartyLib.brs`)
+                }]);
+            });
         });
 
         it('works with custom stagingFolderPath', async () => {
