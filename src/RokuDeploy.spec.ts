@@ -1118,7 +1118,7 @@ describe('index', function () {
             await fsExtra.writeFile(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
 
             await fsExtra.ensureDir(`${rootDir}/source`);
-            await fsExtra.ensureDir(`${rootDir}/components`);
+            await fsExtra.ensureDir(`${rootDir}/components/screen1`);
             await fsExtra.ensureDir(`${rootDir}/components/emptyFolder`);
 
             await fsExtra.writeFile(`${rootDir}/manifest`, '');
@@ -1126,6 +1126,8 @@ describe('index', function () {
             await fsExtra.writeFile(`${rootDir}/source/lib.brs`, '');
             await fsExtra.writeFile(`${rootDir}/components/component1.xml`, '');
             await fsExtra.writeFile(`${rootDir}/components/component1.brs`, '');
+            await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.xml`, '');
+            await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.brs`, '');
         });
         after(async () => {
             await fsExtra.remove(tempPath);
@@ -1137,15 +1139,6 @@ describe('index', function () {
         }
 
         describe.only('rewrite', () => {
-            // it('works for direct file refs', async () => {
-            //     expect(await getFilePaths(['manifest', 'source/main.brs'])).to.eql([{
-            //         src: n(`${rootDir}/manifest`),
-            //         dest: n(`${stagingPathAbsolute}/manifest`)
-            //     }, {
-            //         src: n(`${rootDir}/source/main.brs`),
-            //         dest: n(`${stagingPathAbsolute}/source/main.brs`)
-            //     }]);
-            // });
             it('relative folder path copies entire directory', async () => {
                 expect(await getFilePaths(['components'])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
@@ -1153,6 +1146,31 @@ describe('index', function () {
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
                     dest: n(`${stagingPathAbsolute}/components/component1.xml`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.xml`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
+                }]);
+            });
+
+            it('relative folder path copies entire directory', async () => {
+                expect(await getFilePaths([{
+                    src: 'components',
+                    dest: 'subfolder'
+                }])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/subfolder/components/component1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`${stagingPathAbsolute}/subfolder/components/component1.xml`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/subfolder/components/screen1/screen1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.xml`),
+                    dest: n(`${stagingPathAbsolute}/subfolder/components/screen1/screen1.xml`)
                 }]);
             });
 
@@ -1169,6 +1187,12 @@ describe('index', function () {
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
                     dest: n(`${stagingPathAbsolute}/components/component1.xml`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.xml`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
                 }]);
             });
 
@@ -1235,6 +1259,47 @@ describe('index', function () {
                 }]);
             });
 
+            it('copies single-star globs', async () => {
+                expect(
+                    (await getFilePaths(['source/*.brs']))
+                ).to.eql([{
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                }, {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                }]);
+            });
+
+            it('copies rootDir-level relative double-star globs', async () => {
+                expect(
+                    (await getFilePaths(['**/*.brs']))
+                ).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                }, {
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                }, {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                }]);
+            });
+
+            it('copies subdir-level relative double-star globs', async () => {
+                expect(
+                    (await getFilePaths(['components/**/*.brs']))
+                ).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                }, {
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                }]);
+            });
         });
 
         it('works with custom stagingFolderPath', async () => {

@@ -8,6 +8,7 @@ import * as denodeify from 'denodeify';
 const glob = denodeify(require('glob'));
 
 import { util, Util } from './util';
+import { scrypt } from 'crypto';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
@@ -320,7 +321,7 @@ export class RokuDeploy {
             for (let srcPathAbsolute of files) {
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
                 let entryStagingFolderPath = entry.dest ?
-                    path.resolve(entry.dest) :
+                    path.resolve(stagingFolderPath, entry.dest) :
                     stagingFolderPath;
 
                 let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
@@ -376,6 +377,49 @@ export class RokuDeploy {
                 src: util.standardizePath(srcPathAbsolute),
                 dest: destPath
             });
+
+            //if src contains double wildcard folder
+        } else if (entry.src.indexOf('**') > -1) {
+            //run the glob lookup
+            let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
+            for (let srcPathAbsolute of files) {
+                srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+                let entryStagingFolderPath = entry.dest ?
+                    path.resolve(stagingFolderPath, entry.dest) :
+                    stagingFolderPath;
+
+                //all double-star wildcard matches should be copied relative to the rootDir
+                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
+
+                //only keep files (i.e. discard directory paths)
+                if (await util.isFile(srcPathAbsolute)) {
+                    result.push({
+                        src: srcPathAbsolute,
+                        dest: util.standardizePath(`${entryStagingFolderPath}/${srcPathRelative}`)
+                    });
+                }
+            }
+
+            //if src is some other type of glob 
+        } else {
+            //run the glob lookup
+            let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
+            for (let srcPathAbsolute of files) {
+                srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+                let entryStagingFolderPath = entry.dest ?
+                    path.resolve(stagingFolderPath, entry.dest) :
+                    stagingFolderPath;
+
+                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
+
+                //only keep files (i.e. discard directory paths)
+                if (await util.isFile(srcPathAbsolute)) {
+                    result.push({
+                        src: srcPathAbsolute,
+                        dest: util.standardizePath(`${entryStagingFolderPath}/${srcPathRelative}`)
+                    });
+                }
+            }
         }
 
         return result;
