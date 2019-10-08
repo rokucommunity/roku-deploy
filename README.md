@@ -77,19 +77,113 @@ You can provide a callback in any of the higher level methods, which allows you 
 - **stagingFolderPath:** string
     Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
 
-        let options = {
-            host: 'ip-of-roku',
-            password: 'password for roku dev admin portal'
-            //other options if necessary
-        };
+    ```javascript
+    let options = {
+        host: 'ip-of-roku',
+        password: 'password for roku dev admin portal'
+        //other options if necessary
+    };
 
-        rokuDeploy.deploy(options, (info) => {
-            //modify staging dir before it's zipped
-	    }).then(function(){
-            //it worked
-        }, function(){
-            //it failed
-        });
+    rokuDeploy.deploy(options, (info) => {
+        //modify staging dir before it's zipped
+    }).then(function(){
+        //it worked
+    }, function(){
+        //it failed
+    });
+    ```
+
+## Files Array
+
+Probably the most important part of `roku-deploy` is the files array. This is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include filters, meaning that if the file matches the pattern, it is included. 
+
+For most standard projects, the default files array should work just fine:
+
+```json
+{
+    "files": [
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "manifest"
+    ]
+}
+```
+
+This will copy all files from the standard roku locations directly into the package while maintaining locations relative to `rootDir`. 
+
+If you want to include additonal files, you will need to provide the entire array. For example, if you have a folder with other assets, you could do the following:
+
+```json
+{
+    "files": [
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "manifest"
+        //your folder with other assets
+        "assets/**/*", 
+    ]
+}
+```
+
+### Excluding files
+You can also prefix your file patterns with `!` which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
+
+```json
+{
+    "files": [
+        "source/**/*",
+        "!source/some/unwanted/file.brs"
+    ]
+}
+```
+
+### Advanced Usage
+For more advanced use cases, you may provide an object which contains the source patter, and the output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
+
+The object structure is as follows: 
+
+```typescript
+{
+    /**
+     * a glob string or file path, or an array of glob strings and/or file paths.
+     * These can be relative paths or absolute paths. 
+     * All non-absolute paths are treated as relative to the rootDir
+     */
+    src: Array<string|string[]>;
+    /**
+     * The relative path to the location in the output folder where the files should be placed.
+     */
+    dest: string|undefined
+}
+```
+
+### Collision Handling
+`roku-deploy` processes file entries in order, so if you want to override a file, just make sure the one you want to keep is later in the files array
+
+For example, if you have a base project, and then a child project that wants to override specific files, you could do the following: 
+```json
+{
+    "files": [
+        {
+            //copy all files from the base project
+            "src": "../BaseProject/**/*"
+        },
+        //override "../BaseProject/themes/theme.brs" file "${rootDir}/themes/theme.brs"
+        "themes/theme.brs"
+    ]
+}
+```
+
+
+## Rules
+1. top-level string patterns act as  file _matchers_. Any file that matches the pattern will be included 
+1. All top-level string patterns **must** be relative to `rootDir`. `roku-deploy` will throw an exception for any matched file that does not reside within `rootDir`.
+1. 
+
+
+
 
 ## Options
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:

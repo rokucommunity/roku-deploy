@@ -36,7 +36,7 @@ describe('index', function () {
 
     beforeEach(() => {
         options = rokuDeploy.getOptions();
-        options.rootDir = './testProject';
+        options.rootDir = '.tmp/testProject';
     });
 
     afterEach(() => {
@@ -882,26 +882,6 @@ describe('index', function () {
         });
     });
 
-    describe('makeFilesAbsolute', () => {
-        it('handles negated entries', () => {
-            expect(
-                rokuDeploy.makeFilesAbsolute([{
-                    dest: '',
-                    src: [
-                        'components/**/*',
-                        '!components/scenes/**/*'
-                    ]
-                }], 'C:/somepath/')
-            ).to.eql([{
-                dest: '',
-                src: [
-                    path.normalize('C:/somepath/components/**/*'),
-                    `!${path.normalize('C:/somepath/components/scenes/**/*')}`
-                ]
-            }]);
-        });
-    });
-
     describe('normalizeFilesArray', () => {
         it('normalizes directory separators paths', () => {
             expect(rokuDeploy.normalizeFilesArray([{
@@ -1139,8 +1119,12 @@ describe('index', function () {
         }
 
         describe.only('rewrite', () => {
-            it('relative folder path copies entire directory', async () => {
-                expect(await getFilePaths(['components'])).to.eql([{
+            it('supports custom stagingFolderPath', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    'components/**/*',
+                    'manifest'
+                ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
                     dest: n(`${stagingPathAbsolute}/components/component1.brs`)
                 }, {
@@ -1152,54 +1136,16 @@ describe('index', function () {
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
                     dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
+                }, {
+                    src: n(`${rootDir}/manifest`),
+                    dest: n(`${stagingPathAbsolute}/manifest`)
+                }, {
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                }, {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
                 }]);
-            });
-
-            it('relative folder path copies entire directory', async () => {
-                expect(await getFilePaths([{
-                    src: 'components',
-                    dest: 'subfolder'
-                }])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`${stagingPathAbsolute}/subfolder/components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`${stagingPathAbsolute}/subfolder/components/component1.xml`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`${stagingPathAbsolute}/subfolder/components/screen1/screen1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`${stagingPathAbsolute}/subfolder/components/screen1/screen1.xml`)
-                }]);
-            });
-
-            it('relative folder path does not copy empty folders', async () => {
-                expect(
-                    (await getFilePaths(['components'])).map(x => x.src)
-                ).not.to.include(n(`${rootDir}/components/emptyFolder`));
-            });
-
-            it('absolute folder path copies entire directory', async () => {
-                expect(await getFilePaths([`${rootDir}/components`])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.xml`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
-                }]);
-            });
-
-            it('absolute folder path does not copy empty folders', async () => {
-                expect(
-                    (await getFilePaths([`${rootDir}/components`])).map(x => x.src)
-                ).not.to.include(n(`${rootDir}/components/emptyFolder`));
             });
 
             it('copies relative file paths', async () => {
@@ -1211,27 +1157,6 @@ describe('index', function () {
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
                     dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
-            });
-
-            it('copies absolute file paths to root of stagingPath even though they reside within rootDir', async () => {
-                expect(
-                    (await getFilePaths([`${rootDir}/source/main.brs`, `${rootDir}/source/lib.brs`]))
-                ).to.eql([{
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`${stagingPathAbsolute}/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/main.brs`)
-                }]);
-            });
-
-            it('copies files outside of rootDir to root of stagingPath when no dest specified', async () => {
-                expect(
-                    (await getFilePaths([`${otherProjectDir}/source/thirdPartyLib.brs`]))
-                ).to.eql([{
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`${stagingPathAbsolute}/thirdPartyLib.brs`)
                 }]);
             });
 
@@ -1301,47 +1226,11 @@ describe('index', function () {
                 }]);
             });
 
-            it('copies files from non-rootDir double-star globs', async () => {
-                expect(
-                    (await getFilePaths([`../otherProjectSrc/**/*`]))
-                ).to.eql([{
-                    src: n(`${otherProjectDir}/manifest`),
-                    dest: n(`${stagingPathAbsolute}/manifest`)
-                }, {
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/thirdPartyLib.brs`)
-                }]);
+            it('throws exception when top-level strings reference files not under rootDir', async () => {
+                await expectThrowsAsync(async () => {
+                    await getFilePaths([`../otherProjectSrc/**/*`]);
+                });
             });
-        });
-
-        it('works with custom stagingFolderPath', async () => {
-            await fsExtra.ensureDir(`${rootDir}/source`);
-            await fsExtra.ensureDir(`${rootDir}/components`);
-
-            await fsExtra.writeFile(`${rootDir}/source/main.brs`, '');
-            await fsExtra.writeFile(`${rootDir}/manifest`, '');
-            await fsExtra.writeFile(`${rootDir}/components/component1.xml`, '');
-
-            let paths = (await rokuDeploy.getFilePaths(
-                [
-                    'source/**/*',
-                    'components/**/*',
-                    'manifest'
-                ],
-                'dist',
-                rootDir
-            )).sort((a, b) => a.src.localeCompare(b.src));
-
-            expect(paths).to.eql([{
-                src: path.join(rootDir, 'components', 'component1.xml'),
-                dest: path.join(cwd, 'dist', 'components', 'component.xml')
-            }, {
-                src: path.join(rootDir, 'manifest'),
-                dest: path.join(cwd, 'dist', 'manifest')
-            }, {
-                src: path.join(rootDir, 'source', 'main.brs'),
-                dest: path.join(cwd, 'dist', 'source', 'main.brs')
-            }]);
         });
 
         it('works when using a different current working directory than rootDir', async () => {
@@ -1385,21 +1274,17 @@ describe('index', function () {
             let outDir = path.resolve(options.outDir);
             let rootProjectDir = path.resolve(options.rootDir);
 
-            let paths = await rokuDeploy.getFilePaths([
+            expect(await rokuDeploy.getFilePaths([
                 path.join(cwd, 'readme.md')
-            ], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
+            ], outDir, rootProjectDir)).to.eql([{
                 src: path.join(cwd, 'readme.md'),
                 dest: path.join(outDir, 'readme.md')
             }]);
 
-            paths = await rokuDeploy.getFilePaths([{
+            expect(await rokuDeploy.getFilePaths([{
                 src: path.join(cwd, 'readme.md'),
-                dest: 'docs'
-            }], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
+                dest: 'docs/'
+            }], outDir, rootProjectDir)).to.eql([{
                 src: path.join(cwd, 'readme.md'),
                 dest: path.join(outDir, 'docs', 'readme.md')
             }]);
@@ -1409,21 +1294,17 @@ describe('index', function () {
             let outDir = path.resolve(options.outDir);
             let rootProjectDir = path.resolve(options.rootDir);
 
-            let paths = await rokuDeploy.getFilePaths([
+            expect(await rokuDeploy.getFilePaths([
                 path.join('..', 'readme.md')
-            ], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
+            ], outDir, rootProjectDir)).to.eql([{
                 src: path.join(cwd, 'readme.md'),
                 dest: path.join(outDir, 'readme.md')
             }]);
 
-            paths = await rokuDeploy.getFilePaths([{
+            expect(await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'readme.md'),
-                dest: 'docs'
-            }], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
+                dest: 'docs/'
+            }], outDir, rootProjectDir)).to.eql([{
                 src: path.join(cwd, 'readme.md'),
                 dest: path.join(outDir, 'docs', 'readme.md')
             }]);
@@ -1594,3 +1475,16 @@ describe('index', function () {
         }
     }
 });
+
+
+async function expectThrowsAsync(callback: () => Promise<any>, message = 'Expected to throw but did not') {
+    let wasExceptionThrown = false;
+    try {
+        await callback();
+    } catch (e) {
+        wasExceptionThrown = true;
+    }
+    if (wasExceptionThrown === false) {
+        throw new Error(message);
+    }
+}

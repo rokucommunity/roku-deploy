@@ -27,9 +27,6 @@ export class RokuDeploy {
 
         const files = this.normalizeFilesArray(options.files);
 
-        //make all path references absolute
-        this.makeFilesAbsolute(files, options.rootDir);
-
         let stagingFolderPath = this.getStagingFolderPath(options);
 
         //clean the staging directory
@@ -39,31 +36,6 @@ export class RokuDeploy {
         await this.fsExtra.ensureDir(stagingFolderPath);
         await this.copyToStaging(files, stagingFolderPath, options.rootDir);
         return stagingFolderPath;
-    }
-
-    /**
-     * Make all file references absolute
-     * @param files
-     * @param rootDir
-     */
-    public makeFilesAbsolute(files: FilesType[], rootDir: string) {
-        let normalizedFiles = this.normalizeFilesArray(files);
-        //prepend the rootDir to every relative glob and string file entry
-        for (let fileEntry of normalizedFiles) {
-            let src = fileEntry.src;
-            let isNegated = src.indexOf('!') === 0;
-            if (isNegated) {
-                src = src.substring(1);
-            }
-            if (path.isAbsolute(src) === false) {
-                let absoluteSource = path.join(rootDir, src);
-                if (isNegated) {
-                    absoluteSource = '!' + absoluteSource;
-                }
-                fileEntry.src = absoluteSource;
-            }
-        }
-        return files;
     }
 
     /**
@@ -87,7 +59,7 @@ export class RokuDeploy {
      * @param files
      */
     public normalizeFilesArray(files: FilesType[]) {
-        const result: StandardizedFileEntry[] = [];
+        const result: Array<string | StandardizedFileEntry> = [];
 
         for (let i = 0; i < files.length; i++) {
             let entry = files[i];
@@ -97,10 +69,7 @@ export class RokuDeploy {
 
                 //string entries
             } else if (typeof entry === 'string') {
-                result.push({
-                    src: util.standardizePath(entry),
-                    dest: undefined
-                });
+                result.push(entry);
 
                 //objects with src: (string | string[])
             } else if ('src' in entry) {
@@ -133,74 +102,6 @@ export class RokuDeploy {
             }
         }
 
-        return result;
-    }
-
-    /**
-     * Given an array of `FilesType`, normalize them into a standard {src;dest} object.
-     * This will make plain folder names into fully qualified paths, add globs to plain folders, etc.
-     * This makes it easier to reason about later on in the process.
-     * @param files
-     */
-    public normalizeFilesOption_old(files: FilesType[]) {
-        const result: { src: string[]; dest: string }[] = [];
-        let topLevelGlobs = <string[]>[];
-        //standardize the files object
-        for (let fileEntry of (files as any[])) {
-
-            //handle single string top-level globs
-            if (typeof fileEntry === 'string') {
-
-                topLevelGlobs.push(fileEntry);
-                continue;
-                //handle src;dest; object with single string for src
-            } else if (typeof fileEntry.src === 'string') {
-                fileEntry.src = [fileEntry.src];
-            }
-
-            fileEntry.dest = fileEntry.dest ? fileEntry.dest : '';
-
-            //hard-fail if dest is anything other than a string at this point
-            if ('string' !== typeof fileEntry.dest) {
-                throw new Error('dest must be a string');
-            }
-
-            //standardize the dest path separator
-            fileEntry.dest = util.standardizePath(fileEntry.dest).trim();
-            if (fileEntry.dest === '' || fileEntry.dest === '.' || fileEntry.dest === '.\\' || fileEntry.dest === './') {
-                fileEntry.dest = '';
-            }
-            //force all slashes to the current platform's version
-            fileEntry.dest = fileEntry.dest.replace('\\', path.sep).replace('/', path.sep);
-
-            if (typeof fileEntry !== 'string' && (!fileEntry || fileEntry.src === null || fileEntry.src === undefined || fileEntry.dest === null || fileEntry.dest === undefined)) {
-                throw new Error('Entry must be a string or a {src;dest;} object');
-            }
-
-            result.push(fileEntry);
-        }
-
-        //if there are any top level globs, add that entry to the beginning
-        if (topLevelGlobs.length > 0) {
-            result.splice(0, 0, {
-                src: topLevelGlobs,
-                dest: ''
-            });
-        }
-
-        //if there is a wildcard in any src, ensure a slash in dest
-        for (let fileObj of result) {
-            {
-                let srcContainsWildcard = (fileObj.src as Array<string>).findIndex((src) => {
-                    return src.indexOf('*') > -1;
-                }) > -1;
-
-                if (fileObj.dest.length > 0 && !this.endsWithSlash(fileObj.dest) && srcContainsWildcard) {
-                    fileObj.dest += path.sep;
-                }
-            }
-
-        }
         return result;
     }
 
@@ -283,18 +184,21 @@ export class RokuDeploy {
         let result = [] as StandardizedFileEntry[];
 
         for (let entry of normalizedFiles) {
-            let src = entry.src;
+            let src = typeof entry === 'string' ? entry : entry.src;
+
             //if starts with !, this is a negated glob. 
             let isNegated = src.indexOf('!') === 0;
+
             //remove the ! so the glob will match properly
             if (isNegated) {
                 src = src.substring(1);
             }
 
-            let entryResults = await this.getFilePathsForEntry({
-                src: src,
-                dest: entry.dest
-            }, stagingFolderPath, rootDir);
+            let entryResults = await this.getFilePathsForEntry(
+                typeof entry === 'string' ? src : { ...entry, src: src },
+                stagingFolderPath,
+                rootDir
+            );
 
             //if negated, remove all of the negated matches from the results
             if (isNegated) {
@@ -310,32 +214,27 @@ export class RokuDeploy {
         return result;
     }
 
-    private async getFilePathsForEntry(entry: StandardizedFileEntry, stagingFolderPath: string, rootDir: string) {
+    private async getFilePathsForEntry(entry: StandardizedFileEntry | string, stagingFolderPath: string, rootDir: string) {
         //container for the files for this entry
         let result = [] as StandardizedFileEntry[];
 
-        //if src is a directory
-        if (await util.isDirectory(entry.src, rootDir)) {
-            //include the entire folder and its contents
-            let files: string[] = await glob(`${entry.src}/**/*`, { cwd: rootDir, absolute: true });
+        //root-level files array strings are treated like file filters. These must be globs/paths relative to `rootDir`
+        if (typeof entry === 'string') {
+            let files: string[] = await glob(entry, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
+                if ((await util.isParentOfPath(rootDir, srcPathAbsolute)) === false) {
+                    throw new Error('Top-level patterns may not reference files outside of rootDir');
+                }
+                //normalize the path
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
-                let entryStagingFolderPath = entry.dest ?
-                    path.resolve(stagingFolderPath, entry.dest) :
-                    stagingFolderPath;
-
                 let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
-
-                //only keep files (i.e. discard directory paths)
                 if (await util.isFile(srcPathAbsolute)) {
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`${entryStagingFolderPath}/${srcPathRelative}`)
+                        dest: util.standardizePath(`${stagingFolderPath}/${srcPathRelative}`)
                     });
                 }
             }
-
-            //if src is a file
         } else if (await util.isFile(entry.src, rootDir)) {
             let isSrcPathAbsolute = path.isAbsolute(entry.src);
             let srcPathAbsolute = isSrcPathAbsolute ?
