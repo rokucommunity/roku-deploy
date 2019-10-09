@@ -288,17 +288,9 @@ export class RokuDeploy {
                     path.resolve(stagingFolderPath, entry.dest) :
                     stagingFolderPath;
 
-                let srcPathRelative: string;
-
-                //matches found INTERNAL to rootDir should retain structure relative to rootDir
-                if (util.isParentOfPath(rootDir, srcPathAbsolute)) {
-                    srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
-
-                    //matches found EXTERNAL to rootDir should retain structure relative to star star
-                } else {
-                    let absolutePathToStarStar = path.resolve(rootDir, entry.src.split('**')[0]);
-                    srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, absolutePathToStarStar, '');
-                }
+                //matches should retain structure relative to star star
+                let absolutePathToStarStar = path.resolve(rootDir, entry.src.split('**')[0]);
+                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, absolutePathToStarStar, '');
 
                 //only keep files (i.e. discard directory paths)
                 if (await util.isFile(srcPathAbsolute)) {

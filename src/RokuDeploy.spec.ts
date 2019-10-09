@@ -1093,14 +1093,10 @@ describe('index', function () {
         before(async () => {
             await fsExtra.remove(tempPath);
 
-            await fsExtra.ensureDir(`${otherProjectDir}/source`);
-            await fsExtra.writeFile(`${otherProjectDir}/manifest`, '');
-            await fsExtra.writeFile(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
-
+            //src
             await fsExtra.ensureDir(`${rootDir}/source`);
             await fsExtra.ensureDir(`${rootDir}/components/screen1`);
             await fsExtra.ensureDir(`${rootDir}/components/emptyFolder`);
-
             await fsExtra.writeFile(`${rootDir}/manifest`, '');
             await fsExtra.writeFile(`${rootDir}/source/main.brs`, '');
             await fsExtra.writeFile(`${rootDir}/source/lib.brs`, '');
@@ -1108,6 +1104,13 @@ describe('index', function () {
             await fsExtra.writeFile(`${rootDir}/components/component1.brs`, '');
             await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.xml`, '');
             await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.brs`, '');
+
+            //otherProjectSrc
+            await fsExtra.ensureDir(`${otherProjectDir}/source`);
+            await fsExtra.writeFile(`${otherProjectDir}/manifest`, '');
+            await fsExtra.writeFile(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
+            await fsExtra.ensureDir(`${otherProjectDir}/components/component1/subComponent`);
+            await fsExtra.writeFile(`${otherProjectDir}/components/component1/subComponent/screen.brs`, '');
         });
         after(async () => {
             await fsExtra.remove(tempPath);
@@ -1118,118 +1121,178 @@ describe('index', function () {
                 .sort((a, b) => a.src.localeCompare(b.src));
         }
 
-        describe.only('rewrite', () => {
-            it('supports custom stagingFolderPath', async () => {
-                expect(await getFilePaths([
-                    'source/**/*',
-                    'components/**/*',
-                    'manifest'
-                ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.xml`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
-                }, {
-                    src: n(`${rootDir}/manifest`),
-                    dest: n(`${stagingPathAbsolute}/manifest`)
-                }, {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
+        describe('rewrite', () => {
+            describe('top-level-patterns', () => {
+                it('works for multile entries', async () => {
+                    expect(await getFilePaths([
+                        'source/**/*',
+                        'components/**/*',
+                        'manifest'
+                    ])).to.eql([{
+                        src: n(`${rootDir}/components/component1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/component1.xml`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.xml`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.xml`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
+                    }, {
+                        src: n(`${rootDir}/manifest`),
+                        dest: n(`${stagingPathAbsolute}/manifest`)
+                    }, {
+                        src: n(`${rootDir}/source/lib.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                    }, {
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                    }]);
+                });
+
+                it('copies relative file paths with mixed path separators', async () => {
+                    expect(await getFilePaths([
+                        `source/main.brs`,
+                        `source\\lib.brs`
+                    ])).to.eql([{
+                        src: n(`${rootDir}/source/lib.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                    }, {
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                    }]);
+                });
+
+                it('copies top-level-string single-star globs', async () => {
+                    expect(await getFilePaths([
+                        'source/*.brs'
+                    ])).to.eql([{
+                        src: n(`${rootDir}/source/lib.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                    }, {
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                    }]);
+                });
+
+                it('works for double-star globs', async () => {
+                    expect(await getFilePaths([
+                        '**/*.brs'
+                    ])).to.eql([{
+                        src: n(`${rootDir}/components/component1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                    }, {
+                        src: n(`${rootDir}/source/lib.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/lib.brs`)
+                    }, {
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                    }]);
+                });
+
+                it('copies subdir-level relative double-star globs', async () => {
+                    expect(await getFilePaths([
+                        'components/**/*.brs'
+                    ])).to.eql([{
+                        src: n(`${rootDir}/components/component1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                    }]);
+                });
+
+                it('throws exception when top-level strings reference files not under rootDir', async () => {
+                    await expectThrowsAsync(async () => {
+                        await getFilePaths([
+                            `../otherProjectSrc/**/*`
+                        ]);
+                    });
+                });
+
+                it('applies negated patterns', async () => {
+                    expect(await getFilePaths([
+                        //include all components
+                        'components/**/*.brs',
+                        //exclude all xml files
+                        '!components/**/*.xml',
+                        //re-include a specific xml file
+                        'components/screen1/screen1.xml'
+                    ])).to.eql([{
+                        src: n(`${rootDir}/components/component1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.xml`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
+                    }]);
+                });
             });
 
-            it('copies relative file paths', async () => {
-                expect(
-                    (await getFilePaths([`source/main.brs`, `source\\lib.brs`]))
-                ).to.eql([{
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
-            });
-
-            it('copies absolute path files to specified dest', async () => {
-                expect(
-                    (await getFilePaths([{
+            describe('{src;dest} objects', () => {
+                it('copies absolute path files to specified dest', async () => {
+                    expect(await getFilePaths([{
                         src: `${otherProjectDir}/source/thirdPartyLib.brs`,
                         dest: 'lib/'
-                    }]))
-                ).to.eql([{
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`${stagingPathAbsolute}/lib/thirdPartyLib.brs`)
-                }]);
-            });
+                    }])).to.eql([{
+                        src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                        dest: n(`${stagingPathAbsolute}/lib/thirdPartyLib.brs`)
+                    }]);
+                });
 
-            it('copies relative path files to specified dest', async () => {
-                expect(
-                    (await getFilePaths([{
+                it('copies relative path files to specified dest', async () => {
+                    expect(await getFilePaths([{
                         src: `${otherProjectDir}/../src/source/main.brs`,
                         dest: 'source/'
-                    }]))
-                ).to.eql([{
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
-            });
-
-            it('copies single-star globs', async () => {
-                expect(
-                    (await getFilePaths(['source/*.brs']))
-                ).to.eql([{
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
-            });
-
-            it('copies rootDir-level relative double-star globs', async () => {
-                expect(
-                    (await getFilePaths(['**/*.brs']))
-                ).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
-                }, {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPathAbsolute}/source/main.brs`)
-                }]);
-            });
-
-            it('copies subdir-level relative double-star globs', async () => {
-                expect(
-                    (await getFilePaths(['components/**/*.brs']))
-                ).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
-                }]);
-            });
-
-            it('throws exception when top-level strings reference files not under rootDir', async () => {
-                await expectThrowsAsync(async () => {
-                    await getFilePaths([`../otherProjectSrc/**/*`]);
+                    }])).to.eql([{
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: n(`${stagingPathAbsolute}/source/main.brs`)
+                    }]);
                 });
+
+                it('maintains relative path after **', async () => {
+                    expect(await getFilePaths([{
+                        src: `../otherProjectSrc/**/*`,
+                        dest: 'outFolder/'
+                    }])).to.eql([{
+                        src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
+                        dest: n(`${stagingPathAbsolute}/outFolder/components/component1/subComponent/screen.brs`)
+                    }, {
+                        src: n(`${otherProjectDir}/manifest`),
+                        dest: n(`${stagingPathAbsolute}/outFolder/manifest`)
+                    }, {
+                        src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                        dest: n(`${stagingPathAbsolute}/outFolder/source/thirdPartyLib.brs`)
+                    }]);
+                });
+
+                it('applies negated patterns', async () => {
+                    expect(await getFilePaths([
+                        //include all components
+                        { src: 'components/**/*.brs', dest: 'components' },
+                        //exclude all xml files
+                        '!components/**/*.xml',
+                        //re-include a specific xml file
+                        { src: 'components/screen1/screen1.xml', dest: 'components/screen1/screen1.xml' }
+                    ])).to.eql([{
+                        src: n(`${rootDir}/components/component1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/component1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.brs`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.brs`)
+                    }, {
+                        src: n(`${rootDir}/components/screen1/screen1.xml`),
+                        dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
+                    }]);
+                });
+
             });
         });
 

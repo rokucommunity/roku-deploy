@@ -95,7 +95,7 @@ You can provide a callback in any of the higher level methods, which allows you 
 
 ## Files Array
 
-The files array is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include filters, meaning that if a file matches the pattern, it is included. 
+The files array is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include _filters_, meaning that if a file matches the pattern, it is included. 
 
 For most standard projects, the default files array should work just fine:
 
