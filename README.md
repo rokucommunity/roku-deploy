@@ -95,7 +95,7 @@ You can provide a callback in any of the higher level methods, which allows you 
 
 ## Files Array
 
-Probably the most important part of `roku-deploy` is the files array. This is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include filters, meaning that if the file matches the pattern, it is included. 
+The files array is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include filters, meaning that if a file matches the pattern, it is included. 
 
 For most standard projects, the default files array should work just fine:
 
@@ -110,7 +110,7 @@ For most standard projects, the default files array should work just fine:
 }
 ```
 
-This will copy all files from the standard roku locations directly into the package while maintaining locations relative to `rootDir`. 
+This will copy all files from the standard roku folders directly into the package while maintaining paths relative to `rootDir`. 
 
 If you want to include additonal files, you will need to provide the entire array. For example, if you have a folder with other assets, you could do the following:
 
@@ -128,7 +128,7 @@ If you want to include additonal files, you will need to provide the entire arra
 ```
 
 ### Excluding files
-You can also prefix your file patterns with `!` which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
+You can also prefix your file patterns with "`!`" which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
 
 ```json
 {
@@ -140,24 +140,36 @@ You can also prefix your file patterns with `!` which will _exclude_ files from 
 ```
 
 ### Advanced Usage
-For more advanced use cases, you may provide an object which contains the source patter, and the output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
+For more advanced use cases, you may provide an object which contains the source pattern and output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
 
 The object structure is as follows: 
 
 ```typescript
 {
     /**
-     * a glob string or file path, or an array of glob strings and/or file paths.
+     * a glob pattern string or file path, or an array of glob pattern strings and/or file paths.
      * These can be relative paths or absolute paths. 
      * All non-absolute paths are treated as relative to the rootDir
      */
     src: Array<string|string[]>;
     /**
-     * The relative path to the location in the output folder where the files should be placed.
+     * The relative path to the location in the output folder where the files should be placed, relative to the root of the output folder
      */
     dest: string|undefined
 }
 ```
+
+Here are the rules that are applied to the `{src;dest}` object:
+
+ - if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:   
+ `{ src: 'lib/Promise/promise.brs', dest: 'source/promise.brs'}`
+
+ - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:  
+ `{ src: 'lib/*.brs', dest: 'source/lib'}`
+
+ - if `src` is a glob pattern that includes `**`, then all files found in `src` after the `**` will retain their relative paths in `src` when copied to `dest`. For example:  
+ `{ src: 'lib/*.brs', dest: 'source/lib'}`
+ - if `dest` is not specified, the root of the output folder is assumed
 
 ### Collision Handling
 `roku-deploy` processes file entries in order, so if you want to override a file, just make sure the one you want to keep is later in the files array
@@ -170,20 +182,11 @@ For example, if you have a base project, and then a child project that wants to 
             //copy all files from the base project
             "src": "../BaseProject/**/*"
         },
-        //override "../BaseProject/themes/theme.brs" file "${rootDir}/themes/theme.brs"
+        //override "../BaseProject/themes/theme.brs" with "${rootDir}/themes/theme.brs"
         "themes/theme.brs"
     ]
 }
 ```
-
-
-## Rules
-1. top-level string patterns act as  file _matchers_. Any file that matches the pattern will be included 
-1. All top-level string patterns **must** be relative to `rootDir`. `roku-deploy` will throw an exception for any matched file that does not reside within `rootDir`.
-1. 
-
-
-
 
 ## Options
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
