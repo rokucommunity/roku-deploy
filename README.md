@@ -143,7 +143,7 @@ You can also prefix your file patterns with "`!`" which will _exclude_ files fro
  - All patterns will be resolved relative to `rootDir`, with their relative positions within `rootDir` maintained.
 
  - No pattern may reference a file outside of `rootDir`. (You can use `{src;dest}` objects to accomplish) For example:  
-     ```
+     ```jsonc
      {
          "rootDir": "C:/projects/CatVideoPlayer",
          "files": [
@@ -159,7 +159,7 @@ You can also prefix your file patterns with "`!`" which will _exclude_ files fro
 
  - Empty folders are not copied
  
- - Paths to folders will have the entire folder contents recursively copied
+ - Paths to folders will have the entire folder contents recursively copied (the same as if you did `some_folder/**/*`)
 
 ### Advanced Usage
 For more advanced use cases, you may provide an object which contains the source pattern and output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
