@@ -23,7 +23,7 @@ Publish Roku projects to a Roku device by using Node.js.
 
 sample rokudeploy.json
 
-```json
+```jsonc
 {
     "host": "192.168.1.101",
     "password": "securePassword"
@@ -99,7 +99,7 @@ The files array is how you specify what files are included in your project. Any 
 
 For most standard projects, the default files array should work just fine:
 
-```json
+```jsonc
 {
     "files": [
         "source",
@@ -114,7 +114,7 @@ This will copy all files from the standard roku folders directly into the packag
 
 If you want to include additonal files, you will need to provide the entire array. For example, if you have a folder with other assets, you could do the following:
 
-```json
+```jsonc
 {
     "files": [
         "source",
@@ -130,7 +130,7 @@ If you want to include additonal files, you will need to provide the entire arra
 ### Excluding Files
 You can also prefix your file patterns with "`!`" which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
 
-```json
+```jsonc
 {
     "files": [
         "source/**/*",
@@ -197,7 +197,7 @@ The object structure is as follows:
 `roku-deploy` processes file entries in order, so if you want to override a file, just make sure the one you want to keep is later in the files array
 
 For example, if you have a base project, and then a child project that wants to override specific files, you could do the following: 
-```json
+```jsonc
 {
     "files": [
         {
@@ -254,7 +254,7 @@ Here are the available options. The defaults are shown to the right of the optio
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location 
     (i.e. copy from `"ProjectRoot\configs\dev.config.json"` to `"roku-deploy.zip\config.json"`). Here's a sample:  
-    ```json
+    ```jsonc
     //deploy configs/dev.config.json as config.json
     {
         "src": "configs/dev.config.json",
@@ -262,7 +262,7 @@ Here are the available options. The defaults are shown to the right of the optio
     }
     ```
 
-    ```json
+    ```jsonc
     //you can omit the filename in dest if you want the file to keep its name. Just end dest with a trailing slash.
     {
         "src": "languages/english/language.xml",
