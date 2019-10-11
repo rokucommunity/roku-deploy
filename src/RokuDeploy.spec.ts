@@ -884,6 +884,43 @@ describe('index', function () {
     });
 
     describe('normalizeFilesArray', () => {
+        it('catches invalid dest entries', () => {
+            expect(() => {
+                rokuDeploy.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>true
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rokuDeploy.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>false
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rokuDeploy.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>/asdf/gi
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rokuDeploy.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>{}
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rokuDeploy.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>[]
+                }]);
+            }).to.throw();
+        });
+
         it('normalizes directory separators paths', () => {
             expect(rokuDeploy.normalizeFilesArray([{
                 src: `long\\source/path`,
@@ -1292,6 +1329,20 @@ describe('index', function () {
         });
 
         describe('{src;dest} objects', () => {
+            it('uses the root of staging folder for dest when not specified with star star', async () => {
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/**/*`
+                }])).to.eql([{
+                    src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
+                    dest: n(`${stagingPathAbsolute}/components/component1/subComponent/screen.brs`)
+                }, {
+                    src: n(`${otherProjectDir}/manifest`),
+                    dest: n(`${stagingPathAbsolute}/manifest`)
+                }, {
+                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/thirdPartyLib.brs`)
+                }]);
+            });
             it('copies absolute path files to specified dest', async () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/source/thirdPartyLib.brs`,
