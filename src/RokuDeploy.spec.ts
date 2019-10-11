@@ -1379,6 +1379,38 @@ describe('index', function () {
                 }]);
             });
 
+            it('works for other globs', async () => {
+                expect(await getFilePaths([{
+                    src: `components/screen1/*creen1.brs`,
+                    dest: 'source'
+                }])).to.eql([{
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/source/screen1.brs`)
+                }]);
+            });
+
+            it('works for other globs without dest', async () => {
+                expect(await getFilePaths([{
+                    src: `components/screen1/*creen1.brs`
+                }])).to.eql([{
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`${stagingPathAbsolute}/screen1.brs`)
+                }]);
+            });
+
+            it('skips directory folder names for other globs without dest', async () => {
+                expect(await getFilePaths([{
+                    //straight wildcard matches folder names too
+                    src: `components/*`
+                }])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`${stagingPathAbsolute}/component1.brs`)
+                },{
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`${stagingPathAbsolute}/component1.xml`)
+                }]);
+            });
+
             it('applies negated patterns', async () => {
                 expect(await getFilePaths([
                     //include all components

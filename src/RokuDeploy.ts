@@ -334,18 +334,18 @@ export class RokuDeploy {
                     path.resolve(stagingFolderPath, entry.dest) :
                     stagingFolderPath;
 
-                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
+                let fileNameAndExtension = path.basename(srcPathAbsolute);
 
                 //only keep files (i.e. discard directory paths)
                 if (await util.isFile(srcPathAbsolute)) {
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`${entryStagingFolderPath}/${srcPathRelative}`)
+                        dest: util.standardizePath(`${entryStagingFolderPath}/${fileNameAndExtension}`)
                     });
                 }
             }
+            return result;
         }
-        return result;
     }
 
     /**
