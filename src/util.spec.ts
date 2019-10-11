@@ -25,4 +25,14 @@ describe('util', () => {
             expect(util.isParentOfPath('C:/projects///SomeProject/', 'C://projects////SomeProject//SomeFile.txt')).to.be.true;
         });
     });
+
+    describe('stringReplaceInsensitive', () => {
+        it('works for varying case', () => {
+            expect(util.stringReplaceInsensitive('aBcD', 'bCd', 'bcd')).to.equal('abcd');
+        });
+
+        it('returns the original string if the needle was not found in the haystack', () => {
+            expect(util.stringReplaceInsensitive('abcd', 'efgh', 'EFGH')).to.equal('abcd');
+        });
+    });
 });
