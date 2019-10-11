@@ -102,32 +102,32 @@ For most standard projects, the default files array should work just fine:
 ```json
 {
     "files": [
-        "source/**/*.*",
-        "components/**/*.*",
-        "images/**/*.*",
+        "source",
+        "components",
+        "images",
         "manifest"
     ]
 }
 ```
 
-This will copy all files from the standard roku folders directly into the package while maintaining paths relative to `rootDir`. 
+This will copy all files from the standard roku folders directly into the package while maintaining each file's relative file path within `rootDir`. 
 
 If you want to include additonal files, you will need to provide the entire array. For example, if you have a folder with other assets, you could do the following:
 
 ```json
 {
     "files": [
-        "source/**/*.*",
-        "components/**/*.*",
-        "images/**/*.*",
+        "source",
+        "components",
+        "images",
         "manifest"
         //your folder with other assets
-        "assets/**/*", 
+        "assets", 
     ]
 }
 ```
 
-### Excluding files
+### Excluding Files
 You can also prefix your file patterns with "`!`" which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
 
 ```json
@@ -139,6 +139,28 @@ You can also prefix your file patterns with "`!`" which will _exclude_ files fro
 }
 ```
 
+#### Top-level String Rules
+ - All patterns will be resolved relative to `rootDir`, with their relative positions within `rootDir` maintained.
+
+ - No pattern may reference a file outside of `rootDir`. (You can use `{src;dest}` objects to accomplish) For example:  
+     ```
+     {
+         "rootDir": "C:/projects/CatVideoPlayer",
+         "files": [
+             "source/main.brs",
+
+             //NOT allowed because it navigates outside the rootDir
+             "../common/promise.brs"
+         ]
+     }
+     ```
+
+ - Any valid glob pattern is supported. See [glob on npm](https://www.npmjs.com/package/glob) for more information.
+
+ - Empty folders are not copied
+ 
+ - Paths to folders will have the entire folder contents recursively copied
+
 ### Advanced Usage
 For more advanced use cases, you may provide an object which contains the source pattern and output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
 
@@ -149,7 +171,7 @@ The object structure is as follows:
     /**
      * a glob pattern string or file path, or an array of glob pattern strings and/or file paths.
      * These can be relative paths or absolute paths. 
-     * All non-absolute paths are treated as relative to the rootDir
+     * All non-absolute paths are processed as relative to the rootDir
      */
     src: Array<string|string[]>;
     /**
@@ -158,20 +180,20 @@ The object structure is as follows:
     dest: string|undefined
 }
 ```
-
-Here are the rules that are applied to the `{src;dest}` object:
-
+#### { src; dest } Object Rules
  - if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:   
- `{ src: 'lib/Promise/promise.brs', dest: 'source/promise.brs'}`
+ `{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:  
- `{ src: 'lib/*.brs', dest: 'source/lib'}`
+ `{ src: "lib/*.brs", dest: "source/lib"}`
 
  - if `src` is a glob pattern that includes `**`, then all files found in `src` after the `**` will retain their relative paths in `src` when copied to `dest`. For example:  
- `{ src: 'lib/*.brs', dest: 'source/lib'}`
+ `{ src: "lib/*.brs", dest: "source/lib"}`
+ - if `src` is a path to a folder, it is treated the same way as `**`, where all files found after the folder name will retain their relative paths in `src` when copied to `dest`. For example:  
+  `{ src: "lib/vendor", dest: "vendor" }`
  - if `dest` is not specified, the root of the output folder is assumed
 
-### Collision Handling
+ ### Collision Handling
 `roku-deploy` processes file entries in order, so if you want to override a file, just make sure the one you want to keep is later in the files array
 
 For example, if you have a base project, and then a child project that wants to override specific files, you could do the following: 
@@ -188,7 +210,9 @@ For example, if you have a base project, and then a child project that wants to 
 }
 ```
 
-## Options
+
+
+## roku-deploy Options
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
 
 - **host:** string (*required*)  

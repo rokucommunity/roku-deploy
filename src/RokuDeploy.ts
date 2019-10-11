@@ -177,7 +177,7 @@ export class RokuDeploy {
      * @param stagingFolderPath - the absolute path to the staging folder
      * @param rootDir - the absolute path to the root dir where relative files entries are relative to
      */
-    public async getFilePaths(files: FilesType[], stagingFolderPath: string, rootDir: string): Promise<any> {
+    public async getFilePaths(files: FilesType[], stagingFolderPath: string, rootDir: string) {
         stagingFolderPath = util.standardizePath(stagingFolderPath);
         const normalizedFiles = this.normalizeFilesArray(files);
 
@@ -203,7 +203,7 @@ export class RokuDeploy {
             //if negated, remove all of the negated matches from the results
             if (isNegated) {
                 let paths = entryResults.map(x => x.src);
-                result.filter(x => paths.indexOf(x.src) === -1);
+                result = result.filter(x => paths.indexOf(x.src) === -1);
 
                 //add all of the entries to the results
             } else {
@@ -220,6 +220,13 @@ export class RokuDeploy {
 
         //root-level files array strings are treated like file filters. These must be globs/paths relative to `rootDir`
         if (typeof entry === 'string') {
+            //if entry is a folder, copy all files recursively
+            if (await util.isDirectory(path.resolve(rootDir, entry))) {
+                entry = entry + '/**/*';
+            }
+
+            //glob doesn't support windows slashes, so translate those slashes to unix
+            entry = entry.replace(/\\/g, '/');
             let files: string[] = await glob(entry, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
                 if ((await util.isParentOfPath(rootDir, srcPathAbsolute)) === false) {
@@ -235,7 +242,10 @@ export class RokuDeploy {
                     });
                 }
             }
-        } else if (await util.isFile(entry.src, rootDir)) {
+            return result;
+        }
+
+        if (await util.isFile(entry.src, rootDir)) {
             let isSrcPathAbsolute = path.isAbsolute(entry.src);
             let srcPathAbsolute = isSrcPathAbsolute ?
                 entry.src :
@@ -277,9 +287,18 @@ export class RokuDeploy {
                 dest: destPath
             });
 
-            //if src contains double wildcard folder
-        } else if (entry.src.indexOf('**') > -1) {
+            return result;
+        }
 
+        //if the entry is a directory, turn it into a double-glob wildcard matcher
+        if (await util.isDirectory(path.resolve(rootDir, entry.src))) {
+            entry.src = entry.src + '/**/*';
+        }
+
+        //if src contains double wildcard folder
+        if (entry.src.indexOf('**') > -1) {
+            //glob doesn't support windows slashes, so translate those slashes to unix
+            entry.src = entry.src.replace(/\\/g, '/');
             //run the glob lookup
             let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
@@ -300,9 +319,13 @@ export class RokuDeploy {
                     });
                 }
             }
+            return result;
+        }
 
-            //if src is some other type of glob 
-        } else {
+        //src is some other type of glob 
+        {
+            //glob doesn't support windows slashes, so translate those slashes to unix
+            entry.src = entry.src.replace(/\\/g, '/');
             //run the glob lookup
             let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
@@ -322,7 +345,6 @@ export class RokuDeploy {
                 }
             }
         }
-
         return result;
     }
 
