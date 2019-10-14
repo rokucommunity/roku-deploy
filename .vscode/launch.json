@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
-            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts"],
+            "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts", "./src/util.spec.ts"],
             "cwd": "${workspaceRoot}",
             "protocol": "inspector",
             "internalConsoleOptions": "openOnSessionStart"

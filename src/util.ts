@@ -1,5 +1,6 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
+import { SourceNode } from 'source-map';
 
 export class Util {
     /**
@@ -100,6 +101,52 @@ export class Util {
         } else {
             return haystack;
         }
+    }
+
+    public async getSourceMap(sourcePathAbsolute: string) {
+        let text = (await fsExtra.readFileSync(sourcePathAbsolute)).toString();
+        let lines = text.split(/\r?\n/g);
+        let chunks = [] as SourceNode[];
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            //include the newline if applicable
+            line = i === 0 ? '' : '\n' + line;
+            chunks.push(
+                //SourceNode line numbers start at 1
+                new SourceNode(i + 1, 0, sourcePathAbsolute, line)
+            );
+        }
+        let result = new SourceNode(null, null, sourcePathAbsolute, chunks).toStringWithSourceMap();
+        return result;
+    }
+
+    /**
+     * Keep calling the callback until it does NOT throw an exception, or until the max number of tries has been reached.
+     * @param callback 
+     * @param maxTries 
+     * @param sleepMilliseconds 
+     */
+    /* istanbul ignore next */ //typescript generates some weird while statement that can't get fully covered for some reason
+    public async tryRepeatAsync<T>(callback, maxTries = 10, sleepMilliseconds = 50): Promise<T> {
+        let tryCount = 0;
+        while (true) {
+            try {
+                return await Promise.resolve(callback());
+            } catch (e) {
+                tryCount++;
+                if (tryCount > maxTries) {
+                    throw e;
+                } else {
+                    await this.sleep(sleepMilliseconds);
+                }
+            }
+        }
+    }
+
+    public async sleep(milliseconds: number) {
+        await new Promise((resolve) => {
+            setTimeout(resolve, milliseconds);
+        });
     }
 }
 

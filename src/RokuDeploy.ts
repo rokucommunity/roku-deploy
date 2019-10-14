@@ -5,6 +5,7 @@ import * as archiver from 'archiver';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as denodeify from 'denodeify';
+import { SourceNode } from 'source-map';
 const glob = denodeify(require('glob'));
 
 import { util, Util } from './util';
@@ -34,7 +35,7 @@ export class RokuDeploy {
 
         //make sure the staging folder exists
         await this.fsExtra.ensureDir(stagingFolderPath);
-        await this.copyToStaging(files, stagingFolderPath, options.rootDir);
+        await this.copyToStaging(files, stagingFolderPath, options.rootDir, options.sourceMap);
         return stagingFolderPath;
     }
 
@@ -175,9 +176,15 @@ export class RokuDeploy {
      * Get all file paths for the specified options
      * @param files
      * @param stagingFolderPath - the absolute path to the staging folder
-     * @param rootDir - the absolute path to the root dir where relative files entries are relative to
+     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
      */
     public async getFilePaths(files: FilesType[], stagingFolderPath: string, rootDir: string) {
+        if (path.isAbsolute(stagingFolderPath) === false) {
+            throw new Error('stagingFolderPath must be absolute');
+        }
+        if (path.isAbsolute(rootDir) === false) {
+            throw new Error('rootDir must be absolute');
+        }
         stagingFolderPath = util.standardizePath(stagingFolderPath);
         const normalizedFiles = this.normalizeFilesArray(files);
 
@@ -353,32 +360,29 @@ export class RokuDeploy {
      * @param fileGlobs
      * @param stagingPath
      */
-    private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
+    private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string, generateSourceMaps = false) {
         let fileObjects = await this.getFilePaths(files, stagingPath, rootDir);
         for (let fileObject of fileObjects) {
             //make sure the containing folder exists
             await this.fsExtra.ensureDir(path.dirname(fileObject.dest));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
-            //Just try a few fimes until it resolves itself.
-
-            for (let i = 0; i < 10; i++) {
-                try {
-                    //copy the src item (file or directory full of files)
+            await util.tryRepeatAsync(async () => {
+                //generate sourcemaps for the file
+                if (generateSourceMaps) {
+                    let sourceMap = await util.getSourceMap(fileObject.src);
+                    await Promise.all([
+                        this.fsExtra.writeFile(fileObject.dest, sourceMap.code),
+                        this.fsExtra.writeFile(`${fileObject.dest}.map`, sourceMap.map)
+                    ]);
+                } else {
+                    //copy the src item using the filesystem
                     await this.fsExtra.copy(fileObject.src, fileObject.dest, {
                         //copy the actual files that symlinks point to, not the symlinks themselves
                         dereference: true
                     });
-                    //copy succeeded,
-                    i = 10; //break out of the loop and still achieve coverage for i++
-                } catch (e) {
-                    //wait a small amount of time and try again
-                    /* istanbul ignore next */
-                    await new Promise((resolve) => {
-                        setTimeout(resolve, 50);
-                    });
                 }
-            }
+            }, 10);
         }
     }
 
@@ -684,6 +688,7 @@ export class RokuDeploy {
             retainStagingFolder: false,
             incrementBuildNumber: false,
             failOnCompileError: true,
+            sourceMap: false,
             rootDir: './',
             files: [
                 'source/**/*.*',
@@ -898,6 +903,15 @@ export interface RokuDeployOptions {
      * @default false
      */
     retainStagingFolder?: boolean;
+
+    /**
+     * Should a source map be generated for each file during staging and zipping. There are no transformations applied, 
+     * but this helps track the original location of the file.
+     * This may incur a slight performance penalty, as every must be loaded into memory (not all at once)
+     * in order to properly generate the sourcemap. 
+     * @default false
+     */
+    sourceMap?: boolean;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging

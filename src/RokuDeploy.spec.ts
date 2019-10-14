@@ -1149,8 +1149,8 @@ describe('index', function () {
             await fsExtra.remove(tempPath);
         });
 
-        async function getFilePaths(files: FilesType[], stagingPath = stagingPathAbsolute, rootPathAbsolute = rootDir) {
-            return (await rokuDeploy.getFilePaths(files, stagingPathAbsolute, rootDir))
+        async function getFilePaths(files: FilesType[], stagingPathOverride = stagingPathAbsolute, rootDirOverride = rootDir) {
+            return (await rokuDeploy.getFilePaths(files, stagingPathOverride, rootDirOverride))
                 .sort((a, b) => a.src.localeCompare(b.src));
         }
 
@@ -1405,7 +1405,7 @@ describe('index', function () {
                 }])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
                     dest: n(`${stagingPathAbsolute}/component1.brs`)
-                },{
+                }, {
                     src: n(`${rootDir}/components/component1.xml`),
                     dest: n(`${stagingPathAbsolute}/component1.xml`)
                 }]);
@@ -1429,6 +1429,22 @@ describe('index', function () {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
                     dest: n(`${stagingPathAbsolute}/components/screen1/screen1.xml`)
                 }]);
+            });
+        });
+
+        it('fails when given non-absolute stagingFolderPath', async () => {
+            await expectThrowsAsync(async () => {
+                await getFilePaths([
+                    'source/main.brs'
+                ], '../out', rootDir);
+            });
+        });
+
+        it('fails when given non-absolute rootDir', async () => {
+            await expectThrowsAsync(async () => {
+                await getFilePaths([
+                    'source/main.brs'
+                ], stagingPathAbsolute, '../rootDir');
             });
         });
 
@@ -1473,6 +1489,7 @@ describe('index', function () {
             let outDir = path.resolve(options.outDir);
             let rootProjectDir = path.resolve(options.rootDir);
 
+            //dest not specified
             expect(await rokuDeploy.getFilePaths([
                 { src: path.join(cwd, 'readme.md') }
             ], outDir, rootProjectDir)).to.eql([{
@@ -1480,6 +1497,7 @@ describe('index', function () {
                 dest: path.join(outDir, 'readme.md')
             }]);
 
+            //dest specified
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join(cwd, 'readme.md'),
                 dest: 'docs/'
@@ -1602,6 +1620,119 @@ describe('index', function () {
         });
     });
 
+    describe('copyToStaging', () => {
+        it('skips sourcemaps by default', async () => {
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath(options);
+            let rootDir = options.rootDir;
+            let generateSourceMaps = false;
+            await (rokuDeploy as any).copyToStaging([
+                'source/main.brs'
+            ], path.resolve(stagingFolderPath), path.resolve(rootDir));
+            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
+            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).not.to.exist;
+        });
+
+        it('creates sourcemaps when specified', async () => {
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath(options);
+            let rootDir = options.rootDir;
+            let generateSourceMaps = true;
+            await (rokuDeploy as any).copyToStaging([
+                'source/main.brs'
+            ], path.resolve(stagingFolderPath), path.resolve(rootDir), generateSourceMaps);
+            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
+            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).to.exist;
+        });
+    });
+
+    describe('prepublishToStaging', () => {
+        it('produces source maps when enabled', async () => {
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+            await rokuDeploy.prepublishToStaging({
+                stagingFolderPath: stagingFolderPath,
+                sourceMap: true,
+                files: [
+                    'source/main.brs',
+                    'components/components/Loader/Loader.brs'
+                ]
+            });
+            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).to.exist;
+            expect(file(n(`${stagingFolderPath}/components/components/Loader/Loader.brs`))).to.exist;
+        });
+
+        it('is resilient to file system errors', async () => {
+            let copy = rokuDeploy.fsExtra.copy;
+            let count = 0;
+
+            //mock writeFile so we can throw a few errors during the test
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake(async (...args) => {
+                count = count + 1;
+                //fail a few times
+                if (count < 5) {
+                    throw new Error('fake error thrown as part of the unit test');
+                } else {
+                    return await copy.apply(rokuDeploy.fsExtra, args);
+                }
+            });
+
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+
+            //override the retry milliseconds to make test run faster
+            let orig = util.tryRepeatAsync.bind(util);
+            sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
+                return await orig(args[0], args[1], 0);
+            });
+
+            await rokuDeploy.prepublishToStaging({
+                stagingFolderPath: stagingFolderPath,
+                sourceMap: false,
+                files: [
+                    'source/main.brs'
+                ]
+            });
+            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
+            expect(count).to.be.greaterThan(4);
+        });
+
+        it('throws underlying error after the max fs error threshold is reached', async () => {
+            let copy = rokuDeploy.fsExtra.copy;
+            let count = 0;
+
+            //mock writeFile so we can throw a few errors during the test
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake(async (...args) => {
+                count = count + 1;
+                //fail a few times
+                if (count < 15) {
+                    throw new Error('fake error thrown as part of the unit test');
+                } else {
+                    return await copy.apply(rokuDeploy.fsExtra, args);
+                }
+            });
+
+            //override the timeout for tryRepeatAsync so this test runs faster
+            let orig = util.tryRepeatAsync.bind(util);
+            sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
+                return await orig(args[0], args[1], 0);
+            });
+
+            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+
+            let error: Error;
+            try {
+                await rokuDeploy.prepublishToStaging({
+                    stagingFolderPath: stagingFolderPath,
+                    sourceMap: false,
+                    files: [
+                        'source/main.brs'
+                    ]
+                });
+            } catch (e) {
+                error = e;
+            }
+            expect(error, 'Should have thrown error').to.exist;
+            expect(error.message).to.equal('fake error thrown as part of the unit test');
+        });
+    });
+
     describe('deployAndSignPackage', () => {
         beforeEach(() => {
             //pretend the deploy worked
@@ -1674,7 +1805,6 @@ describe('index', function () {
         }
     }
 });
-
 
 async function expectThrowsAsync(callback: () => Promise<any>, message = 'Expected to throw but did not') {
     let wasExceptionThrown = false;

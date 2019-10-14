@@ -171,7 +171,7 @@ The object structure is as follows:
     /**
      * a glob pattern string or file path, or an array of glob pattern strings and/or file paths.
      * These can be relative paths or absolute paths. 
-     * All non-absolute paths are processed as relative to the rootDir
+     * All non-absolute paths are resolved relative to the rootDir
      */
     src: Array<string|string[]>;
     /**
@@ -188,7 +188,7 @@ The object structure is as follows:
  `{ src: "lib/*.brs", dest: "source/lib"}`
 
  - if `src` is a glob pattern that includes `**`, then all files found in `src` after the `**` will retain their relative paths in `src` when copied to `dest`. For example:  
- `{ src: "lib/*.brs", dest: "source/lib"}`
+ `{ src: "lib/**.brs", dest: "source/lib"}`
  - if `src` is a path to a folder, it is treated the same way as `**`, where all files found after the folder name will retain their relative paths in `src` when copied to `dest`. For example:  
   `{ src: "lib/vendor", dest: "vendor" }`
  - if `dest` is not specified, the root of the output folder is assumed
