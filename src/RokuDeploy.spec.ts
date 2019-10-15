@@ -56,13 +56,6 @@ describe('index', function () {
         sinon.restore();
     });
 
-    describe('getStagingFolderPath', function () {
-        it('returns correct path', async () => {
-            let outputPath = rokuDeploy.getStagingFolderPath(options);
-            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), '.roku-deploy-staging'));
-        });
-    });
-
     describe('getOutputPkgFilePath', function () {
         it('should return correct path if given basename', async () => {
             options.outFile = 'roku-deploy';
@@ -578,7 +571,7 @@ describe('index', function () {
 
     describe('signExistingPackage', () => {
         beforeEach(() => {
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath();
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
             fsExtra.ensureDirSync(stagingFolderPath);
 
             let src = path.join(options.rootDir, 'manifest');
@@ -842,34 +835,13 @@ describe('index', function () {
             function getIsSymlinksPermitted() {
                 let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
                 //delete the symlink test file
-                console.log('deleting symlink test file');
-                try {
-                    fsExtra.removeSync(testSymlinkFile);
-                    console.log('symlink test file deleted');
-                } catch (e) {
-                    console.log('Symlink test file NOT deleted', e);
-                }
+                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
                 //create the symlink file
-                try {
-                    let filePath = path.join(cwd, 'readme.md');
-                    console.log('creating symlink for ' + filePath);
-                    fsExtra.symlinkSync(filePath, testSymlinkFile);
-                    console.log('symlinks are permitted');
-                } catch (e) {
-                    console.log('Symlinks are not permissted', e);
-                }
-                console.log('does symlink path exist: ', testSymlinkFile);
+                try { fsExtra.symlinkSync(path.join(cwd, 'readme.md'), testSymlinkFile); } catch (e) { }
                 let isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
-                console.log(`symlink path does ${isPermitted ? '' : 'NOT'} exist`, testSymlinkFile);
 
                 //delete the symlink test file
-                try {
-                    console.log('Deleting test file', testSymlinkFile);
-                    fsExtra.removeSync(testSymlinkFile);
-                    console.log('symlink file deleted');
-                } catch (e) {
-                    console.log('symlink test file not deleted', e);
-                }
+                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
                 return isPermitted;
             }
 
@@ -887,13 +859,16 @@ describe('index', function () {
 
                 //the symlink file should exist
                 expect(file(symlinkPath)).to.exist;
+                let opts = {
+                    ...options,
+                    files: [
+                        'manifest',
+                        'testSymlinks.md'
+                    ]
+                };
 
-                options.files = [
-                    'manifest',
-                    'testSymlinks.md'
-                ];
-                await rokuDeploy.prepublishToStaging(options);
-                let stagedFilePath = path.join(options.outDir, '.roku-deploy-staging', 'testSymlinks.md');
+                await rokuDeploy.prepublishToStaging(opts);
+                let stagedFilePath = n(`${rokuDeploy.getOptions().stagingFolderPath}/testSymlinks.md`);
                 expect(file(stagedFilePath)).to.exist;
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
@@ -1640,7 +1615,7 @@ describe('index', function () {
 
     describe('copyToStaging', () => {
         it('skips sourcemaps by default', async () => {
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath(options);
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
             let rootDir = options.rootDir;
             let generateSourceMaps = false;
             await (rokuDeploy as any).copyToStaging([
@@ -1651,7 +1626,7 @@ describe('index', function () {
         });
 
         it('creates sourcemaps when specified', async () => {
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath(options);
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
             let rootDir = options.rootDir;
             let generateSourceMaps = true;
             await (rokuDeploy as any).copyToStaging([
@@ -1664,7 +1639,7 @@ describe('index', function () {
 
     describe('prepublishToStaging', () => {
         it('produces source maps when enabled', async () => {
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
             await rokuDeploy.prepublishToStaging({
                 stagingFolderPath: stagingFolderPath,
                 sourceMap: true,
@@ -1692,7 +1667,7 @@ describe('index', function () {
                 }
             });
 
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
 
             //override the retry milliseconds to make test run faster
             let orig = util.tryRepeatAsync.bind(util);
@@ -1732,7 +1707,7 @@ describe('index', function () {
                 return await orig(args[0], args[1], 0);
             });
 
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath({});
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
 
             let error: Error;
             try {

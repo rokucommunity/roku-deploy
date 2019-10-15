@@ -28,15 +28,13 @@ export class RokuDeploy {
 
         const files = this.normalizeFilesArray(options.files);
 
-        let stagingFolderPath = this.getStagingFolderPath(options);
-
         //clean the staging directory
-        await this.fsExtra.remove(stagingFolderPath);
+        await this.fsExtra.remove(options.stagingFolderPath);
 
         //make sure the staging folder exists
-        await this.fsExtra.ensureDir(stagingFolderPath);
-        await this.copyToStaging(files, stagingFolderPath, options.rootDir, options.sourceMap);
-        return stagingFolderPath;
+        await this.fsExtra.ensureDir(options.stagingFolderPath);
+        await this.copyToStaging(files, options.stagingFolderPath, options.rootDir, options.sourceMap);
+        return options.stagingFolderPath;
     }
 
     /**
@@ -113,19 +111,17 @@ export class RokuDeploy {
     public async zipPackage(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let stagingFolderPath = this.getStagingFolderPath(options);
-
         //make sure the output folder exists
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
 
         //create a zip of the staging folder
-        await this.zipFolder(stagingFolderPath, zipFilePath);
+        await this.zipFolder(options.stagingFolderPath, zipFilePath);
 
         //delete the staging folder unless told to retain it.
         if (options.retainStagingFolder !== true) {
-            await this.fsExtra.remove(stagingFolderPath);
+            await this.fsExtra.remove(options.stagingFolderPath);
         }
     }
 
@@ -138,8 +134,7 @@ export class RokuDeploy {
 
         await this.prepublishToStaging(options);
 
-        let stagingFolderPath = this.getStagingFolderPath(options);
-        let manifestPath = path.join(stagingFolderPath, 'manifest');
+        let manifestPath = util.standardizePath(`${options.stagingFolderPath}/manifest`);
         let parsedManifest = await this.parseManifest(manifestPath);
 
         if (options.incrementBuildNumber) {
@@ -151,7 +146,7 @@ export class RokuDeploy {
         if (beforeZipCallback) {
             let info: BeforeZipCallbackInfo = {
                 manifestData: parsedManifest,
-                stagingFolderPath: stagingFolderPath
+                stagingFolderPath: options.stagingFolderPath
             };
 
             await Promise.resolve(beforeZipCallback(info));
@@ -518,8 +513,7 @@ export class RokuDeploy {
         if (!options.signingPassword) {
             throw new errors.MissingRequiredOptionError('Must supply signingPassword');
         }
-        let stagingFolderpath = this.getStagingFolderPath(options);
-        let manifestPath = path.join(stagingFolderpath, 'manifest');
+        let manifestPath = path.join(options.stagingFolderPath, 'manifest');
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
@@ -665,7 +659,7 @@ export class RokuDeploy {
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
         if (originalOptionValueRetainStagingFolder !== true) {
-            await this.fsExtra.remove(this.getStagingFolderPath(options));
+            await this.fsExtra.remove(options.stagingFolderPath);
         }
         return localPkgFilePath;
     }
@@ -706,19 +700,20 @@ export class RokuDeploy {
         finalOptions.rootDir = path.resolve(finalOptions.rootDir);
         finalOptions.outDir = path.resolve(finalOptions.outDir);
 
-        return finalOptions;
-    }
-
-    public getStagingFolderPath(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
-
-        if (options.stagingFolderPath) {
-            return path.resolve(options.stagingFolderPath);
-        } else {
-            let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
-            stagingFolderPath = path.resolve(stagingFolderPath);
-            return stagingFolderPath;
+        //stagingFolderPath
+        {
+            if (finalOptions.stagingFolderPath) {
+                finalOptions.stagingFolderPath = path.resolve(options.stagingFolderPath);
+            } else {
+                finalOptions.stagingFolderPath = path.resolve(
+                    util.standardizePath(
+                        `${finalOptions.outDir}/.roku-deploy-staging`
+                    )
+                );
+            }
         }
+
+        return finalOptions;
     }
 
     /**
