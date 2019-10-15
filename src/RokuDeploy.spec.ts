@@ -1489,25 +1489,27 @@ describe('index', function () {
             }]);
         });
 
-        it('supports absolute paths from outside of the rootDir', async () => {
-            let outDir = path.resolve(options.outDir);
-            let rootProjectDir = path.resolve(options.rootDir);
+        it.only('supports absolute paths from outside of the rootDir', async () => {
+            options = rokuDeploy.getOptions(options);
+            console.log(options);
 
             //dest not specified
             expect(await rokuDeploy.getFilePaths([
-                { src: path.join(cwd, 'readme.md') }
-            ], outDir, rootProjectDir)).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+                {
+                    src: n(`${cwd}/readme.md`)
+                }
+            ], options.stagingFolderPath, options.rootDir)).to.eql([{
+                src: n(`${cwd}/readme.md`),
+                dest: n(`${options.stagingFolderPath}/readme.md`)
             }]);
 
             //dest specified
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join(cwd, 'readme.md'),
-                dest: 'docs/'
-            }], outDir, rootProjectDir)).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                dest: 'docs/readme.md'
+            }], options.stagingFolderPath, options.rootDir)).to.eql([{
+                src: n(`${cwd}/readme.md`),
+                dest: n(`${options.stagingFolderPath}/docs/readme.md`)
             }]);
         });
 

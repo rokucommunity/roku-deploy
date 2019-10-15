@@ -222,6 +222,7 @@ export class RokuDeploy {
 
         //root-level files array strings are treated like file filters. These must be globs/paths relative to `rootDir`
         if (typeof entry === 'string') {
+            console.log('is string');
             //if entry is a folder, copy all files recursively
             if (await util.isDirectory(path.resolve(rootDir, entry))) {
                 entry = entry + '/**/*';
@@ -230,6 +231,9 @@ export class RokuDeploy {
             //glob doesn't support windows slashes, so translate those slashes to unix
             entry = entry.replace(/\\/g, '/');
             let files: string[] = await glob(entry, { cwd: rootDir, absolute: true });
+            console.log('rootDir: ', rootDir);
+            console.log('entry: ', entry);
+            console.log('files: ', files);
             for (let srcPathAbsolute of files) {
                 if ((await util.isParentOfPath(rootDir, srcPathAbsolute)) === false) {
                     throw new Error('Top-level patterns may not reference files outside of rootDir');
@@ -247,7 +251,9 @@ export class RokuDeploy {
             return result;
         }
 
+        console.log('is entry.src a file?', entry);
         if (await util.isFile(entry.src, rootDir)) {
+            console.log('entry.src IS a file');
             let isSrcPathAbsolute = path.isAbsolute(entry.src);
             let srcPathAbsolute = isSrcPathAbsolute ?
                 entry.src :
@@ -261,7 +267,7 @@ export class RokuDeploy {
 
             //no dest
             if (!entry.dest) {
-
+                console.log('entry.dest is not specified');
                 //no dest, absolute path or file outside of rootDir
                 if (isSrcPathAbsolute || isSrcChildOfRootDir === false) {
                     //copy file to root of staging folder
@@ -274,12 +280,7 @@ export class RokuDeploy {
                     destPath = util.standardizePath(`${stagingFolderPath}/${srcPathRelative}`);
                 }
 
-                //dest ends with slash (indicating it's a folder)
-            } else if (entry.dest.endsWith(path.sep)) {
-                //keep the filename, but put it in the dest folder
-                destPath = util.standardizePath(`${stagingFolderPath}/${entry.dest}/${fileNameAndExtension}`);
-
-                //dest includes the filename (and extension if applicable)
+                //assume entry.dest is the relative path to the folder AND file if applicable
             } else {
                 destPath = util.standardizePath(`${stagingFolderPath}/${entry.dest}`);
             }
@@ -697,15 +698,16 @@ export class RokuDeploy {
         let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
 
         //fully resolve the folder paths
-        finalOptions.rootDir = path.resolve(finalOptions.rootDir);
-        finalOptions.outDir = path.resolve(finalOptions.outDir);
+        finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
+        finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
 
         //stagingFolderPath
         {
             if (finalOptions.stagingFolderPath) {
-                finalOptions.stagingFolderPath = path.resolve(options.stagingFolderPath);
+                finalOptions.stagingFolderPath = path.resolve(process.cwd(), options.stagingFolderPath);
             } else {
                 finalOptions.stagingFolderPath = path.resolve(
+                    process.cwd(),
                     util.standardizePath(
                         `${finalOptions.outDir}/.roku-deploy-staging`
                     )
