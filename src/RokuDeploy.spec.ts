@@ -849,17 +849,19 @@ describe('index', function () {
                 } catch (e) {
                     console.log('Symlink test file NOT deleted', e);
                 }
-                let isPermitted = false;
                 //create the symlink file
                 try {
                     let filePath = path.join(cwd, 'readme.md');
                     console.log('creating symlink for ' + filePath);
                     fsExtra.symlinkSync(filePath, testSymlinkFile);
-                    isPermitted = true;
                     console.log('symlinks are permitted');
                 } catch (e) {
                     console.log('Symlinks are not permissted', e);
                 }
+                console.log('does symlink path exist: ', testSymlinkFile);
+                let isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
+                console.log(`symlink path does ${isPermitted ? '' : 'NOT'} exist`, testSymlinkFile);
+
                 //delete the symlink test file
                 try {
                     console.log('Deleting test file', testSymlinkFile);
