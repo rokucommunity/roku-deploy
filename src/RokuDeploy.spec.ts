@@ -1489,27 +1489,27 @@ describe('index', function () {
             }]);
         });
 
-        it.only('supports absolute paths from outside of the rootDir', async () => {
+        it('supports absolute paths from outside of the rootDir', async () => {
             options = rokuDeploy.getOptions(options);
             console.log(options);
 
             //dest not specified
             expect(await rokuDeploy.getFilePaths([
                 {
-                    src: n(`${cwd}/readme.md`)
+                    src: n(`${cwd}/README.md`)
                 }
             ], options.stagingFolderPath, options.rootDir)).to.eql([{
-                src: n(`${cwd}/readme.md`),
-                dest: n(`${options.stagingFolderPath}/readme.md`)
+                src: n(`${cwd}/README.md`),
+                dest: n(`${options.stagingFolderPath}/README.md`)
             }]);
 
             //dest specified
             expect(await rokuDeploy.getFilePaths([{
-                src: path.join(cwd, 'readme.md'),
-                dest: 'docs/readme.md'
+                src: path.join(cwd, 'README.md'),
+                dest: 'docs/README.md'
             }], options.stagingFolderPath, options.rootDir)).to.eql([{
-                src: n(`${cwd}/readme.md`),
-                dest: n(`${options.stagingFolderPath}/docs/readme.md`)
+                src: n(`${cwd}/README.md`),
+                dest: n(`${options.stagingFolderPath}/docs/README.md`)
             }]);
         });
 
@@ -1518,18 +1518,18 @@ describe('index', function () {
             let rootProjectDir = path.resolve(options.rootDir);
 
             expect(await rokuDeploy.getFilePaths([
-                { src: path.join('..', 'readme.md') }
+                { src: path.join('..', 'README.md') }
             ], outDir, rootProjectDir)).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'README.md')
             }]);
 
             expect(await rokuDeploy.getFilePaths([{
-                src: path.join('..', 'readme.md'),
+                src: path.join('..', 'README.md'),
                 dest: 'docs/'
             }], outDir, rootProjectDir)).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'docs', 'README.md')
             }]);
         });
     });
