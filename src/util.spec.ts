@@ -4,27 +4,35 @@ import { expect } from 'chai';
 describe('util', () => {
     describe('isChildOfPath', () => {
         it('works for child path', () => {
-            let parentPath = 'C:\\projects\\SomeProject';
-            let childPath = 'C:\\projects\\SomeProject\\SomeFile.txt';
+            let parentPath = `${process.cwd()}\\testProject`;
+            let childPath = `${process.cwd()}\\testProject\\manifest`;
             expect(util.isParentOfPath(parentPath, childPath), `expected '${childPath}' to be child path of '${parentPath}'`).to.be.true;
             //inverse is not true
             expect(util.isParentOfPath(childPath, parentPath), `expected '${parentPath}' NOT to be child path of '${childPath}'`).to.be.false;
         });
 
         it('handles mixed path separators', () => {
-            expect(util.isParentOfPath('C:\\projects/SomeProject', 'C:/projects\\SomeProject/SomeFile.txt')).to.be.true;
+            let parentPath = `${process.cwd()}\\testProject`;
+            let childPath = `${process.cwd()}\\testProject/manifest`;
+            expect(util.isParentOfPath(parentPath, childPath), `expected '${childPath}' to be child path of '${parentPath}'`).to.be.true;
         });
 
         it('handles relative path traversals', () => {
-            expect(util.isParentOfPath('C:/projects/SomeProject', 'C:/projects/SomeProject/../SomeProject/SomeFile.txt')).to.be.true;
+            let parentPath = `${process.cwd()}\\testProject`;
+            let childPath = `${process.cwd()}/testProject/../testProject/manifest`;
+            expect(util.isParentOfPath(parentPath, childPath), `expected '${childPath}' to be child path of '${parentPath}'`).to.be.true;
         });
 
         it('works with trailing slashes', () => {
-            expect(util.isParentOfPath('C:/projects/SomeProject/', 'C:/projects/SomeProject/SomeFile.txt')).to.be.true;
+            let parentPath = `${process.cwd()}/testProject/`;
+            let childPath = `${process.cwd()}/testProject/../testProject/manifest`;
+            expect(util.isParentOfPath(parentPath, childPath), `expected '${childPath}' to be child path of '${parentPath}'`).to.be.true;
         });
 
         it('works with duplicate slashes', () => {
-            expect(util.isParentOfPath('C:/projects///SomeProject/', 'C://projects////SomeProject//SomeFile.txt')).to.be.true;
+            let parentPath = `${process.cwd()}///testProject/`;
+            let childPath = `${process.cwd()}/testProject///testProject//manifest`;
+            expect(util.isParentOfPath(parentPath, childPath), `expected '${childPath}' to be child path of '${parentPath}'`).to.be.true;
         });
     });
 

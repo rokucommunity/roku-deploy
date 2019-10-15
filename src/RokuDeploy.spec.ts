@@ -790,18 +790,6 @@ describe('index', function () {
             expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
         });
 
-        it('honors the trailing slash in dest', async () => {
-            options.files = [
-                'manifest',
-                {
-                    src: 'source/main.brs',
-                    dest: 'source1/'
-                }
-            ];
-            await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/source1/main.brs')).to.exist;
-        });
-
         it('handles multi-globs subfolder structure', async () => {
             options.files = [
                 'manifest',
@@ -1350,7 +1338,7 @@ describe('index', function () {
             it('copies absolute path files to specified dest', async () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/source/thirdPartyLib.brs`,
-                    dest: 'lib/'
+                    dest: 'lib/thirdPartyLib.brs'
                 }])).to.eql([{
                     src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
                     dest: n(`${stagingPathAbsolute}/lib/thirdPartyLib.brs`)
@@ -1360,7 +1348,7 @@ describe('index', function () {
             it('copies relative path files to specified dest', async () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/../src/source/main.brs`,
-                    dest: 'source/'
+                    dest: 'source/main.brs'
                 }])).to.eql([{
                     src: n(`${rootDir}/source/main.brs`),
                     dest: n(`${stagingPathAbsolute}/source/main.brs`)
@@ -1491,7 +1479,6 @@ describe('index', function () {
 
         it('supports absolute paths from outside of the rootDir', async () => {
             options = rokuDeploy.getOptions(options);
-            console.log(options);
 
             //dest not specified
             expect(await rokuDeploy.getFilePaths([
@@ -1526,7 +1513,7 @@ describe('index', function () {
 
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'README.md'),
-                dest: 'docs/'
+                dest: 'docs/README.md'
             }], outDir, rootProjectDir)).to.eql([{
                 src: path.join(cwd, 'README.md'),
                 dest: path.join(outDir, 'docs', 'README.md')
