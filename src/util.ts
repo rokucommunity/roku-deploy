@@ -1,5 +1,6 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
+import * as fs from 'fs';
 import { SourceNode } from 'source-map';
 
 export class Util {
@@ -66,7 +67,9 @@ export class Util {
     public async isFile(filePathAbsolute: string, cwd?: string) {
         try {
             return await this.cwdRun(cwd, async () => {
-                let stat = await fsExtra.lstat(filePathAbsolute);
+                //get the full path to the file. This should be the same path for files, and the actual path for any symlinks
+                let realPathAbsolute = fs.realpathSync(filePathAbsolute);
+                let stat = await fsExtra.lstat(realPathAbsolute);
                 return stat.isFile();
             });
         } catch (e) {

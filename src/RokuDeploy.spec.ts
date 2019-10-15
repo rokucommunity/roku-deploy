@@ -817,8 +817,9 @@ describe('index', function () {
         });
 
         describe('symlinks', () => {
-            let sourcePath = path.join(cwd, 'testSymlinks.md');
-            let symlinkPath = path.join(cwd, 'testProject', 'testSymlinks.md');
+            let sourcePath = n(`${cwd}/test.md`);
+            let rootDir = n(`${cwd}/.tmp/testProject`);
+            let symlinkPath = n(`${rootDir}/renamed_test.md`);
 
             beforeEach(cleanUp);
             afterEach(cleanUp);
@@ -848,6 +849,8 @@ describe('index', function () {
             let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
 
             symlinkIt('are dereferenced properly', async () => {
+                //make sure the output dir exists
+                await fsExtra.ensureDir(path.dirname(symlinkPath));
                 //create the actual file
                 await fsExtra.writeFile(sourcePath, 'hello symlink');
 
@@ -861,14 +864,22 @@ describe('index', function () {
                 expect(file(symlinkPath)).to.exist;
                 let opts = {
                     ...options,
+                    rootDir: rootDir,
                     files: [
                         'manifest',
-                        'testSymlinks.md'
+                        'renamed_test.md'
                     ]
                 };
 
+                let stagingFolderPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                //getFilePaths detects the file
+                expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.stagingFolderPath, opts.rootDir)).to.eql([{
+                    src: n(`${opts.rootDir}/renamed_test.md`),
+                    dest: n(`${opts.stagingFolderPath}/renamed_test.md`),
+                }]);
+
                 await rokuDeploy.prepublishToStaging(opts);
-                let stagedFilePath = n(`${rokuDeploy.getOptions().stagingFolderPath}/testSymlinks.md`);
+                let stagedFilePath = n(`${stagingFolderPath}/renamed_test.md`);
                 expect(file(stagedFilePath)).to.exist;
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
