@@ -842,16 +842,25 @@ describe('index', function () {
             function getIsSymlinksPermitted() {
                 let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
                 //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+                try {
+                    fsExtra.removeSync(testSymlinkFile);
+                } catch (e) {
+                    console.log(e);
+                }
                 let isPermitted = false;
                 //create the symlink file
                 try {
                     fsExtra.symlinkSync(path.join(cwd, 'readme.md'), testSymlinkFile);
                     isPermitted = true;
-                } catch {
+                } catch (e) {
+                    console.log(e);
                 }
                 //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+                try {
+                    fsExtra.removeSync(testSymlinkFile);
+                } catch (e) {
+                    console.log(e);
+                }
                 return isPermitted;
             }
 
