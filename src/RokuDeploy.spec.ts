@@ -822,11 +822,12 @@ describe('index', function () {
              * Determine if we have permission to create symlinks
              */
             function getIsSymlinksPermitted() {
+                let originalFilePath = path.join(cwd, 'README.md');
                 let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
                 //delete the symlink test file
                 try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
                 //create the symlink file
-                try { fsExtra.symlinkSync(path.join(cwd, 'readme.md'), testSymlinkFile); } catch (e) { }
+                try { fsExtra.symlinkSync(originalFilePath, testSymlinkFile); } catch (e) { }
                 let isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
 
                 //delete the symlink test file

@@ -19,7 +19,7 @@
             },
             "args": [
                 "run",
-                "test",
+                "test:nocover",
                 "--silent"
             ],
             "problemMatcher": []
