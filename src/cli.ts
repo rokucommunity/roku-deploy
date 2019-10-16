@@ -1,3 +1,7 @@
 #!/usr/bin/env node
 import { deploy } from './index';
-deploy();
+deploy().then((...args) => {
+    console.log(...args);
+}, (...args) => {
+    console.error(...args);
+});

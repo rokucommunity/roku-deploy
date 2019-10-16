@@ -7,7 +7,7 @@
     "build": "rimraf out && tsc",
     "preversion": "npm run build && npm run tslint && npm run test",
     "prepublishOnly": "npm run build",
-    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
+    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths --project tsconfig.json",
     "test": "nyc mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:nocover": "ts-mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
