@@ -56,6 +56,8 @@ export class Util {
      * @param childPath 
      */
     public isParentOfPath(parentPath: string, childPath: string) {
+        parentPath = util.standardizePath(parentPath);
+        childPath = util.standardizePath(childPath);
         const relative = path.relative(parentPath, childPath);
         return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
     }

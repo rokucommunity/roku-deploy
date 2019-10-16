@@ -7,11 +7,12 @@
     "build": "rimraf out && tsc",
     "preversion": "npm run build && npm run tslint && npm run test",
     "prepublishOnly": "npm run build",
-    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
+    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths --project tsconfig.json",
     "test": "nyc mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:nocover": "ts-mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
     "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
+    "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
     "publish-coverage-results": "nyc report --reporter=text-lcov | coveralls"
   },
   "typings": "dist/index.d.ts",
@@ -66,12 +67,12 @@
     "nyc": "^14.1.1",
     "rimraf": "^2.6.2",
     "sinon": "^7.2.3",
-    "source-map-support": "^0.5.3",
+    "source-map-support": "^0.5.13",
     "testdouble": "^3.5.2",
     "ts-mocha": "^6.0.0",
-    "ts-node": "^8.0.2",
+    "ts-node": "^8.4.1",
     "tslint": "^5.9.1",
-    "typescript": "^3.3.3"
+    "typescript": "^3.6.4"
   },
   "dependencies": {
     "archiver": "^3.0.0",
