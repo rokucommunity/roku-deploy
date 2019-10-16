@@ -5,7 +5,6 @@ import * as archiver from 'archiver';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as denodeify from 'denodeify';
-import { SourceNode } from 'source-map';
 const glob = denodeify(require('glob'));
 
 import { util, Util } from './util';
@@ -33,7 +32,7 @@ export class RokuDeploy {
 
         //make sure the staging folder exists
         await this.fsExtra.ensureDir(options.stagingFolderPath);
-        await this.copyToStaging(files, options.stagingFolderPath, options.rootDir, options.sourceMap);
+        await this.copyToStaging(files, options.stagingFolderPath, options.rootDir);
         return options.stagingFolderPath;
     }
 
@@ -349,7 +348,7 @@ export class RokuDeploy {
      * @param fileGlobs
      * @param stagingPath
      */
-    private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string, generateSourceMaps = false) {
+    private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
         let fileObjects = await this.getFilePaths(files, stagingPath, rootDir);
         for (let fileObject of fileObjects) {
             //make sure the containing folder exists
@@ -357,20 +356,11 @@ export class RokuDeploy {
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
             await util.tryRepeatAsync(async () => {
-                //generate sourcemaps for the file
-                if (generateSourceMaps) {
-                    let sourceMap = await util.getSourceMap(fileObject.src);
-                    await Promise.all([
-                        this.fsExtra.writeFile(fileObject.dest, sourceMap.code),
-                        this.fsExtra.writeFile(`${fileObject.dest}.map`, sourceMap.map)
-                    ]);
-                } else {
-                    //copy the src item using the filesystem
-                    await this.fsExtra.copy(fileObject.src, fileObject.dest, {
-                        //copy the actual files that symlinks point to, not the symlinks themselves
-                        dereference: true
-                    });
-                }
+                //copy the src item using the filesystem
+                await this.fsExtra.copy(fileObject.src, fileObject.dest, {
+                    //copy the actual files that symlinks point to, not the symlinks themselves
+                    dereference: true
+                });
             }, 10);
         }
     }
@@ -676,7 +666,6 @@ export class RokuDeploy {
             retainStagingFolder: false,
             incrementBuildNumber: false,
             failOnCompileError: true,
-            sourceMap: false,
             rootDir: './',
             files: [
                 'source/**/*.*',
@@ -893,15 +882,6 @@ export interface RokuDeployOptions {
      * @default false
      */
     retainStagingFolder?: boolean;
-
-    /**
-     * Should a source map be generated for each file during staging and zipping. There are no transformations applied, 
-     * but this helps track the original location of the file.
-     * This may incur a slight performance penalty, as every must be loaded into memory (not all at once)
-     * in order to properly generate the sourcemap. 
-     * @default false
-     */
-    sourceMap?: boolean;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging

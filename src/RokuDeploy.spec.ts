@@ -1613,45 +1613,7 @@ describe('index', function () {
         });
     });
 
-    describe('copyToStaging', () => {
-        it('skips sourcemaps by default', async () => {
-            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
-            let rootDir = options.rootDir;
-            let generateSourceMaps = false;
-            await (rokuDeploy as any).copyToStaging([
-                'source/main.brs'
-            ], path.resolve(stagingFolderPath), path.resolve(rootDir));
-            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
-            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).not.to.exist;
-        });
-
-        it('creates sourcemaps when specified', async () => {
-            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
-            let rootDir = options.rootDir;
-            let generateSourceMaps = true;
-            await (rokuDeploy as any).copyToStaging([
-                'source/main.brs'
-            ], path.resolve(stagingFolderPath), path.resolve(rootDir), generateSourceMaps);
-            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
-            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).to.exist;
-        });
-    });
-
     describe('prepublishToStaging', () => {
-        it('produces source maps when enabled', async () => {
-            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
-            await rokuDeploy.prepublishToStaging({
-                stagingFolderPath: stagingFolderPath,
-                sourceMap: true,
-                files: [
-                    'source/main.brs',
-                    'components/components/Loader/Loader.brs'
-                ]
-            });
-            expect(file(n(`${stagingFolderPath}/source/main.brs.map`))).to.exist;
-            expect(file(n(`${stagingFolderPath}/components/components/Loader/Loader.brs`))).to.exist;
-        });
-
         it('is resilient to file system errors', async () => {
             let copy = rokuDeploy.fsExtra.copy;
             let count = 0;
@@ -1677,7 +1639,6 @@ describe('index', function () {
 
             await rokuDeploy.prepublishToStaging({
                 stagingFolderPath: stagingFolderPath,
-                sourceMap: false,
                 files: [
                     'source/main.brs'
                 ]
@@ -1713,7 +1674,6 @@ describe('index', function () {
             try {
                 await rokuDeploy.prepublishToStaging({
                     stagingFolderPath: stagingFolderPath,
-                    sourceMap: false,
                     files: [
                         'source/main.brs'
                     ]
