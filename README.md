@@ -85,7 +85,11 @@ You can provide a callback in any of the higher level methods, which allows you 
     };
 
     rokuDeploy.deploy(options, (info) => {
-        //modify staging dir before it's zipped
+        //modify staging dir before it's zipped. 
+        //At this point, all files have been copied to the staging directory. 
+        manipulateFilesInStagingFolder(info.stagingFolderPath)
+        //this function can also return a promise, 
+        //which will be awaited before roku-deploy starts deploying. 
     }).then(function(){
         //it worked
     }, function(){
