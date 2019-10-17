@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [3.0.0-beta.1] - 2019-10-16
+### Added
+ - information in the readme about the `files` array
+ - support for file overrides in the `files` array. This supports including the same file from A and B, and letting the final file override previous files. 
+### Changed
+ - the files array is now a bit more strict, and has a more consistent approach.
+
 
 ## [2.5.0] - 2019-10-05
 ### Added
@@ -111,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.0.0-beta.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v3.0.0-beta.1
 [2.5.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.1...v2.5.0
 [2.4.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.0...v2.4.1
 [2.4.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.3.0...v2.4.0
