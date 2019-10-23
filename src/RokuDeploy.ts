@@ -197,7 +197,6 @@ export class RokuDeploy {
 
             let entryResults = await this.getFilePathsForEntry(
                 typeof entry === 'string' ? src : { ...entry, src: src },
-                stagingFolderPath,
                 rootDir
             );
 
@@ -215,7 +214,7 @@ export class RokuDeploy {
         return result;
     }
 
-    private async getFilePathsForEntry(entry: StandardizedFileEntry | string, stagingFolderPath: string, rootDir: string) {
+    private async getFilePathsForEntry(entry: StandardizedFileEntry | string, rootDir: string) {
         //container for the files for this entry
         let result = [] as StandardizedFileEntry[];
 
@@ -239,7 +238,7 @@ export class RokuDeploy {
                 if (await util.isFile(srcPathAbsolute)) {
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`${stagingFolderPath}/${srcPathRelative}`)
+                        dest: util.standardizePath(`/${srcPathRelative}`)
                     });
                 }
             }
@@ -263,23 +262,23 @@ export class RokuDeploy {
                 //no dest, absolute path or file outside of rootDir
                 if (isSrcPathAbsolute || isSrcChildOfRootDir === false) {
                     //copy file to root of staging folder
-                    destPath = util.standardizePath(`${stagingFolderPath}/${fileNameAndExtension}`);
+                    destPath = fileNameAndExtension;
 
                     //no dest, relative path, lives INSIDE rootDir
                 } else {
                     //copy relative file structure to root of staging folder
                     let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
-                    destPath = util.standardizePath(`${stagingFolderPath}/${srcPathRelative}`);
+                    destPath = srcPathRelative;
                 }
 
                 //assume entry.dest is the relative path to the folder AND file if applicable
             } else {
-                destPath = util.standardizePath(`${stagingFolderPath}/${entry.dest}`);
+                destPath = entry.dest;
             }
 
             result.push({
                 src: util.standardizePath(srcPathAbsolute),
-                dest: destPath
+                dest: util.standardizePath(`/${destPath}`)
             });
 
             return result;
@@ -298,9 +297,6 @@ export class RokuDeploy {
             let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
-                let entryStagingFolderPath = entry.dest ?
-                    path.resolve(stagingFolderPath, entry.dest) :
-                    stagingFolderPath;
 
                 //matches should retain structure relative to star star
                 let absolutePathToStarStar = path.resolve(rootDir, entry.src.split('**')[0]);
@@ -308,9 +304,10 @@ export class RokuDeploy {
 
                 //only keep files (i.e. discard directory paths)
                 if (await util.isFile(srcPathAbsolute)) {
+                    let dest = entry.dest ? entry.dest : '';
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`${entryStagingFolderPath}/${srcPathRelative}`)
+                        dest: util.standardizePath(`/${dest}/${srcPathRelative}`)
                     });
                 }
             }
@@ -325,17 +322,15 @@ export class RokuDeploy {
             let files: string[] = await glob(entry.src, { cwd: rootDir, absolute: true });
             for (let srcPathAbsolute of files) {
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
-                let entryStagingFolderPath = entry.dest ?
-                    path.resolve(stagingFolderPath, entry.dest) :
-                    stagingFolderPath;
 
                 let fileNameAndExtension = path.basename(srcPathAbsolute);
 
                 //only keep files (i.e. discard directory paths)
                 if (await util.isFile(srcPathAbsolute)) {
+                    let dest = entry.dest ? entry.dest : '';
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`${entryStagingFolderPath}/${fileNameAndExtension}`)
+                        dest: util.standardizePath(`${dest}/${fileNameAndExtension}`)
                     });
                 }
             }
@@ -357,7 +352,7 @@ export class RokuDeploy {
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
             await util.tryRepeatAsync(async () => {
                 //copy the src item using the filesystem
-                await this.fsExtra.copy(fileObject.src, fileObject.dest, {
+                await this.fsExtra.copy(fileObject.src, util.standardizePath(`${stagingPath}/${fileObject.dest}`), {
                     //copy the actual files that symlinks point to, not the symlinks themselves
                     dereference: true
                 });
@@ -957,7 +952,13 @@ export interface BeforeZipCallbackInfo {
 }
 
 export interface StandardizedFileEntry {
+    /**
+     * The full path to the source file
+     */
     src: string;
+    /**
+     * The path relative to the root of the pkg to where the file should be placed 
+     */
     dest: string;
 }
 
