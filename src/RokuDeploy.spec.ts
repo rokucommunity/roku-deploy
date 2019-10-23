@@ -169,7 +169,13 @@ describe('index', function () {
 
     describe('createPackage', function () {
         it('works with custom stagingFolderPath', async () => {
-            let opts = { ...options, stagingFolderPath: '.tmp/dist' };
+            let opts = {
+                ...options,
+                files: [
+                    'manifest'
+                ],
+                stagingFolderPath: '.tmp/dist'
+            };
             await rokuDeploy.createPackage(opts);
             expect(file(rokuDeploy.getOutputZipFilePath(opts))).to.exist;
         });
@@ -186,7 +192,12 @@ describe('index', function () {
         });
 
         it('should create package in proper directory', async function () {
-            await rokuDeploy.createPackage(options);
+            await rokuDeploy.createPackage({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            });
             expect(file(rokuDeploy.getOutputZipFilePath(options))).to.exist;
         });
 
@@ -204,9 +215,18 @@ describe('index', function () {
         });
 
         it('generates full package with defaults', async () => {
-            await rokuDeploy.createPackage(options);
+            await rokuDeploy.createPackage({
+                ...options,
+                //target a subset of the files to make the test faster
+                files: [
+                    'components/components/Loader/Loader.brs',
+                    'images/splash_hd.jpg',
+                    'source/main.brs',
+                    'manifest'
+                ]
+            });
             let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
-            await fsExtra.ensureDir('.tmp');
+            fsExtra.ensureDirSync('.tmp');
             zip.extractAllTo('.tmp/output', true);
             expect(dir('./.tmp/output/components')).to.exist;
             expect(dir('./.tmp/output/images')).to.exist;
@@ -214,7 +234,12 @@ describe('index', function () {
         });
 
         it('should retain the staging directory when told to', async () => {
-            let stagingFolderPath = await rokuDeploy.prepublishToStaging(options);
+            let stagingFolderPath = await rokuDeploy.prepublishToStaging({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            });
             expect(dir(stagingFolderPath)).to.exist;
             options.retainStagingFolder = true;
             await rokuDeploy.zipPackage(options);
@@ -236,7 +261,10 @@ describe('index', function () {
 
         it('should wait for promise returned by pre-zip callback', async () => {
             let count = 0;
-            await rokuDeploy.createPackage(options, (info) => {
+            await rokuDeploy.createPackage({
+                ...options,
+                files: ['manifest']
+            }, (info) => {
                 return Promise.resolve().then(() => {
                     count++;
                 }).then(() => {
@@ -248,14 +276,26 @@ describe('index', function () {
 
         it('should increment the build number if requested', async () => {
             options.incrementBuildNumber = true;
-            await rokuDeploy.createPackage(options, (info) => {
-                expect(info.manifestData.build_version).to.not.equal('0');
+            //make the zipping immediately resolve
+            sinon.stub(rokuDeploy, 'zipPackage').returns(Promise.resolve());
+            let beforeZipInfo: BeforeZipCallbackInfo;
+            await rokuDeploy.createPackage({
+                ...options,
+                files: ['manifest']
+            }, (info) => {
+                beforeZipInfo = info;
             });
+            expect(beforeZipInfo.manifestData.build_version).to.not.equal('0');
         });
 
         it('should not increment the build number if not requested', async () => {
             options.incrementBuildNumber = false;
-            await rokuDeploy.createPackage(options, (info) => {
+            await rokuDeploy.createPackage({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            }, (info) => {
                 expect(info.manifestData.build_version).to.equal('0');
             });
         });
@@ -657,12 +697,20 @@ describe('index', function () {
 
     describe('prepublishToStaging', () => {
         it('should use outDir for staging folder', async () => {
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging({
+                files: [
+                    'manifest'
+                ]
+            });
             expect(dir('out/.roku-deploy-staging')).to.exist;
         });
 
         it('should support overriding the staging folder', async () => {
-            await rokuDeploy.prepublishToStaging({ ...options, stagingFolderPath: '.tmp/custom-out-dir' });
+            await rokuDeploy.prepublishToStaging({
+                ...options,
+                files: ['manifest'],
+                stagingFolderPath: '.tmp/custom-out-dir'
+            });
             expect(dir('.tmp/custom-out-dir')).to.exist;
         });
 
@@ -1028,7 +1076,7 @@ describe('index', function () {
         it('rejects the promise when an error occurs', async () => {
             //zip path doesn't exist
             await assertThrowsAsync(async () => {
-                await rokuDeploy.zipFolder('source', 'some/zip/path/that/does/not/exist');
+                await rokuDeploy.zipFolder('source', '.tmp/some/zip/path/that/does/not/exist');
             });
         });
     });
