@@ -36,26 +36,12 @@ export class RokuDeploy {
     }
 
     /**
-     * Determine if a given string ends in a file system slash (\ for windows and / for everything else)
-     * @param dirPath
-     */
-    public endsWithSlash(dirPath: string) {
-        if ('string' === typeof dirPath && dirPath.length > 0 &&
-            (dirPath.lastIndexOf('/') === dirPath.length - 1 || dirPath.lastIndexOf('\\') === dirPath.length - 1)
-        ) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /**
      * Given an array of `FilesType`, normalize each of them into a standard {src;dest} object.
      * Each entry in the array or inner `src` array will be extracted out into its own object.
      * This makes it easier to reason about later on in the process.
      * @param files
      */
-    public normalizeFilesArray(files: FilesType[]) {
+    private normalizeFilesArray(files: FilesType[]) {
         const result: Array<string | StandardizedFileEntry> = [];
 
         for (let i = 0; i < files.length; i++) {

@@ -912,7 +912,7 @@ describe('index', function () {
                 //getFilePaths detects the file
                 expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
                     src: n(`${opts.rootDir}/renamed_test.md`),
-                    dest: n(`${opts.stagingFolderPath}/renamed_test.md`),
+                    dest: n(`renamed_test.md`),
                 }]);
 
                 await rokuDeploy.prepublishToStaging(opts);
@@ -927,35 +927,35 @@ describe('index', function () {
     describe('normalizeFilesArray', () => {
         it('catches invalid dest entries', () => {
             expect(() => {
-                rokuDeploy.normalizeFilesArray([{
+                rd.normalizeFilesArray([{
                     src: 'some/path',
                     dest: <any>true
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy.normalizeFilesArray([{
+                rd.normalizeFilesArray([{
                     src: 'some/path',
                     dest: <any>false
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy.normalizeFilesArray([{
+                rd.normalizeFilesArray([{
                     src: 'some/path',
                     dest: <any>/asdf/gi
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy.normalizeFilesArray([{
+                rd.normalizeFilesArray([{
                     src: 'some/path',
                     dest: <any>{}
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy.normalizeFilesArray([{
+                rd.normalizeFilesArray([{
                     src: 'some/path',
                     dest: <any>[]
                 }]);
@@ -963,7 +963,7 @@ describe('index', function () {
         });
 
         it('normalizes directory separators paths', () => {
-            expect(rokuDeploy.normalizeFilesArray([{
+            expect(rd.normalizeFilesArray([{
                 src: `long\\source/path`,
                 dest: `long/dest\\path`
             }])).to.eql([{
@@ -972,7 +972,7 @@ describe('index', function () {
             }]);
         });
         it('works for simple strings', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 'manifest',
                 'source/main.brs'
             ])).to.eql([
@@ -982,7 +982,7 @@ describe('index', function () {
         });
 
         it('works for negated strings', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 '!.git',
             ])).to.eql([
                 '!.git'
@@ -990,7 +990,7 @@ describe('index', function () {
         });
 
         it('skips falsey and bogus entries', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 '',
                 'manifest',
                 <any>false,
@@ -1002,7 +1002,7 @@ describe('index', function () {
         });
 
         it('works for {src:string} objects', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 {
                     src: 'manifest'
                 }
@@ -1013,7 +1013,7 @@ describe('index', function () {
         });
 
         it('works for {src:string[]} objects', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 {
                     src: [
                         'manifest',
@@ -1030,7 +1030,7 @@ describe('index', function () {
         });
 
         it('retains dest option', () => {
-            expect(rokuDeploy.normalizeFilesArray([
+            expect(rd.normalizeFilesArray([
                 {
                     src: 'source/config.dev.brs',
                     dest: 'source/config.brs'
@@ -1042,14 +1042,14 @@ describe('index', function () {
         });
 
         it('throws when encountering invalid entries', () => {
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[true])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[/asdf/])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[new Date()])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[1])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: true }])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: /asdf/ }])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: new Date() }])).to.throw();
-            expect(() => rokuDeploy.normalizeFilesArray(<any>[{ src: 1 }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[true])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[/asdf/])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[new Date()])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[1])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: true }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: /asdf/ }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: new Date() }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: 1 }])).to.throw();
         });
     });
 
@@ -1140,20 +1140,6 @@ describe('index', function () {
             expect(outputParsedManifest.splash_screen_hd).to.equal(inputParsedManifest.splash_screen_hd);
             expect(outputParsedManifest.ui_resolutions).to.equal(inputParsedManifest.ui_resolutions);
             expect(outputParsedManifest.bs_const).to.equal(inputParsedManifest.bs_const);
-        });
-    });
-
-    describe('endsWithSlash', () => {
-        it('detects slashes', () => {
-            expect(rokuDeploy.endsWithSlash('/')).to.be.true;
-            expect(rokuDeploy.endsWithSlash('\\')).to.be.true;
-        });
-
-        it('detects non slashes', () => {
-            expect(rokuDeploy.endsWithSlash('a')).to.be.false;
-            expect(rokuDeploy.endsWithSlash('')).to.be.false;
-            expect(rokuDeploy.endsWithSlash(' ')).to.be.false;
-            expect(rokuDeploy.endsWithSlash('.')).to.be.false;
         });
     });
 
