@@ -1203,25 +1203,25 @@ describe('index', function () {
                     'manifest'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`/components/component1.xml`)
+                    dest: n(`components/component1.xml`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`/components/screen1/screen1.xml`)
+                    dest: n(`components/screen1/screen1.xml`)
                 }, {
                     src: n(`${rootDir}/manifest`),
-                    dest: n(`/manifest`)
+                    dest: n(`manifest`)
                 }, {
                     src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`/source/lib.brs`)
+                    dest: n(`source/lib.brs`)
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1231,10 +1231,10 @@ describe('index', function () {
                     `source\\lib.brs`
                 ])).to.eql([{
                     src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`/source/lib.brs`)
+                    dest: n(`source/lib.brs`)
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1243,10 +1243,10 @@ describe('index', function () {
                     'source/*.brs'
                 ])).to.eql([{
                     src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`/source/lib.brs`)
+                    dest: n(`source/lib.brs`)
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1255,16 +1255,16 @@ describe('index', function () {
                     '**/*.brs'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`/source/lib.brs`)
+                    dest: n(`source/lib.brs`)
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1273,10 +1273,10 @@ describe('index', function () {
                     'components/**/*.brs'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }]);
             });
 
@@ -1298,13 +1298,13 @@ describe('index', function () {
                     'components/screen1/screen1.xml'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`/components/screen1/screen1.xml`)
+                    dest: n(`components/screen1/screen1.xml`)
                 }]);
             });
 
@@ -1313,8 +1313,8 @@ describe('index', function () {
                     'components/**/*',
                     '!components/screen1/**/*'
                 ])).map(x => x.dest)).to.eql([
-                    n(`/components/component1.brs`),
-                    n(`/components/component1.xml`)
+                    n(`components/component1.brs`),
+                    n(`components/component1.xml`)
                 ]);
             });
 
@@ -1326,25 +1326,25 @@ describe('index', function () {
                     '!components/scenes/**/*'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`/components/component1.xml`)
+                    dest: n(`components/component1.xml`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`/components/screen1/screen1.xml`)
+                    dest: n(`components/screen1/screen1.xml`)
                 }, {
                     src: n(`${rootDir}/manifest`),
-                    dest: n(`/manifest`)
+                    dest: n(`manifest`)
                 }, {
                     src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`/source/lib.brs`)
+                    dest: n(`source/lib.brs`)
                 }, {
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1354,16 +1354,16 @@ describe('index', function () {
                     'components'
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`/components/component1.xml`)
+                    dest: n(`components/component1.xml`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`/components/screen1/screen1.xml`)
+                    dest: n(`components/screen1/screen1.xml`)
                 }]);
             });
 
@@ -1375,13 +1375,13 @@ describe('index', function () {
                     src: `${otherProjectDir}/**/*`
                 }])).to.eql([{
                     src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
-                    dest: n(`/components/component1/subComponent/screen.brs`)
+                    dest: n(`components/component1/subComponent/screen.brs`)
                 }, {
                     src: n(`${otherProjectDir}/manifest`),
-                    dest: n(`/manifest`)
+                    dest: n(`manifest`)
                 }, {
                     src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`/source/thirdPartyLib.brs`)
+                    dest: n(`source/thirdPartyLib.brs`)
                 }]);
             });
             it('copies absolute path files to specified dest', async () => {
@@ -1390,7 +1390,7 @@ describe('index', function () {
                     dest: 'lib/thirdPartyLib.brs'
                 }])).to.eql([{
                     src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`/lib/thirdPartyLib.brs`)
+                    dest: n(`lib/thirdPartyLib.brs`)
                 }]);
             });
 
@@ -1400,7 +1400,7 @@ describe('index', function () {
                     dest: 'source/main.brs'
                 }])).to.eql([{
                     src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`/source/main.brs`)
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1410,13 +1410,13 @@ describe('index', function () {
                     dest: 'outFolder/'
                 }])).to.eql([{
                     src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
-                    dest: n(`/outFolder/components/component1/subComponent/screen.brs`)
+                    dest: n(`outFolder/components/component1/subComponent/screen.brs`)
                 }, {
                     src: n(`${otherProjectDir}/manifest`),
-                    dest: n(`/outFolder/manifest`)
+                    dest: n(`outFolder/manifest`)
                 }, {
                     src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`/outFolder/source/thirdPartyLib.brs`)
+                    dest: n(`outFolder/source/thirdPartyLib.brs`)
                 }]);
             });
 
@@ -1426,7 +1426,7 @@ describe('index', function () {
                     dest: n('/source')
                 }])).to.eql([{
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/source/screen1.brs`)
+                    dest: n(`source/screen1.brs`)
                 }]);
             });
 
@@ -1435,7 +1435,7 @@ describe('index', function () {
                     src: `components/screen1/*creen1.brs`
                 }])).to.eql([{
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/screen1.brs`)
+                    dest: n(`screen1.brs`)
                 }]);
             });
 
@@ -1445,10 +1445,10 @@ describe('index', function () {
                     src: `components/*`
                 }])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/component1.brs`)
+                    dest: n(`component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`/component1.xml`)
+                    dest: n(`component1.xml`)
                 }]);
             });
 
@@ -1462,13 +1462,13 @@ describe('index', function () {
                     { src: 'components/screen1/screen1.xml', dest: 'components/screen1/screen1.xml' }
                 ])).to.eql([{
                     src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`/components/component1.brs`)
+                    dest: n(`components/component1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`/components/screen1/screen1.brs`)
+                    dest: n(`components/screen1/screen1.brs`)
                 }, {
                     src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`/components/screen1/screen1.xml`)
+                    dest: n(`components/screen1/screen1.xml`)
                 }]);
             });
         });
@@ -1493,10 +1493,10 @@ describe('index', function () {
 
             expect(paths).to.eql([{
                 src: n(`${rootProjectDir}/images/splash_hd.jpg`),
-                dest: n(`/images/splash_hd.jpg`)
+                dest: n(`images/splash_hd.jpg`)
             }, {
                 src: n(`${rootProjectDir}/manifest`),
-                dest: n(`/manifest`)
+                dest: n(`manifest`)
             }]);
 
             //change the working directory and verify everything still works
@@ -1511,10 +1511,10 @@ describe('index', function () {
 
             expect(paths).to.eql([{
                 src: n(`${rootProjectDir}/images/splash_hd.jpg`),
-                dest: n(`/images/splash_hd.jpg`)
+                dest: n(`images/splash_hd.jpg`)
             }, {
                 src: n(`${rootProjectDir}/manifest`),
-                dest: n(`/manifest`)
+                dest: n(`manifest`)
             }]);
         });
 
@@ -1526,7 +1526,7 @@ describe('index', function () {
                 src: n(`${cwd}/README.md`)
             }], options.rootDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
-                dest: n(`/README.md`)
+                dest: n(`README.md`)
             }]);
 
             //dest specified
@@ -1535,7 +1535,7 @@ describe('index', function () {
                 dest: 'docs/README.md'
             }], options.rootDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
-                dest: n(`/docs/README.md`)
+                dest: n(`docs/README.md`)
             }]);
         });
 
@@ -1547,7 +1547,7 @@ describe('index', function () {
                 { src: path.join('..', 'README.md') }
             ], rootProjectDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
-                dest: n(`/README.md`)
+                dest: n(`README.md`)
             }]);
 
             expect(await rokuDeploy.getFilePaths([{
@@ -1555,7 +1555,7 @@ describe('index', function () {
                 dest: 'docs/README.md'
             }], rootProjectDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
-                dest: n(`/docs/README.md`)
+                dest: n(`docs/README.md`)
             }]);
         });
     });

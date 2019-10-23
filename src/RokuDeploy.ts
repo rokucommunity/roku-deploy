@@ -202,6 +202,10 @@ export class RokuDeploy {
 
                 //add all of the entries to the results
             } else {
+                entryResults.forEach((entryResult) => {
+                    //remove any leading slashes from dest
+                    entryResult.dest = entryResult.dest.replace(/^[\/\\]*/, '');
+                });
                 result.push(...entryResults);
             }
         }
@@ -233,7 +237,7 @@ export class RokuDeploy {
                 if (await util.isFile(srcPathAbsolute)) {
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`/${srcPathRelative}`)
+                        dest: util.standardizePath(`${srcPathRelative}`)
                     });
                 }
             }
@@ -273,7 +277,7 @@ export class RokuDeploy {
 
             result.push({
                 src: util.standardizePath(srcPathAbsolute),
-                dest: util.standardizePath(`/${destPath}`)
+                dest: util.standardizePath(`${destPath}`)
             });
 
             return result;
@@ -302,7 +306,7 @@ export class RokuDeploy {
                     let dest = entry.dest ? entry.dest : '';
                     result.push({
                         src: srcPathAbsolute,
-                        dest: util.standardizePath(`/${dest}/${srcPathRelative}`)
+                        dest: util.standardizePath(`${dest}/${srcPathRelative}`)
                     });
                 }
             }
