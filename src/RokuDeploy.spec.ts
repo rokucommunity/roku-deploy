@@ -910,7 +910,7 @@ describe('index', function () {
 
                 let stagingFolderPath = rokuDeploy.getOptions(opts).stagingFolderPath;
                 //getFilePaths detects the file
-                expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.stagingFolderPath, opts.rootDir)).to.eql([{
+                expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
                     src: n(`${opts.rootDir}/renamed_test.md`),
                     dest: n(`${opts.stagingFolderPath}/renamed_test.md`),
                 }]);
@@ -1190,8 +1190,8 @@ describe('index', function () {
             await fsExtra.remove(tempPath);
         });
 
-        async function getFilePaths(files: FilesType[], stagingPathOverride = stagingPathAbsolute, rootDirOverride = rootDir) {
-            return (await rokuDeploy.getFilePaths(files, stagingPathOverride, rootDirOverride))
+        async function getFilePaths(files: FilesType[], rootDirOverride = rootDir) {
+            return (await rokuDeploy.getFilePaths(files, rootDirOverride))
                 .sort((a, b) => a.src.localeCompare(b.src));
         }
 
@@ -1473,19 +1473,11 @@ describe('index', function () {
             });
         });
 
-        it('fails when given non-absolute stagingFolderPath', async () => {
-            await expectThrowsAsync(async () => {
-                await getFilePaths([
-                    'source/main.brs'
-                ], '../out', rootDir);
-            });
-        });
-
         it('fails when given non-absolute rootDir', async () => {
             await expectThrowsAsync(async () => {
                 await getFilePaths([
                     'source/main.brs'
-                ], stagingPathAbsolute, '../rootDir');
+                ], '../rootDir');
             });
         });
 
@@ -1497,7 +1489,7 @@ describe('index', function () {
             let paths = (await rokuDeploy.getFilePaths([
                 'manifest',
                 'images/splash_hd.jpg'
-            ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+            ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
                 src: n(`${rootProjectDir}/images/splash_hd.jpg`),
@@ -1515,7 +1507,7 @@ describe('index', function () {
             paths = (await rokuDeploy.getFilePaths([
                 'manifest',
                 'images/splash_hd.jpg'
-            ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+            ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
                 src: n(`${rootProjectDir}/images/splash_hd.jpg`),
@@ -1532,7 +1524,7 @@ describe('index', function () {
             //dest not specified
             expect(await rokuDeploy.getFilePaths([{
                 src: n(`${cwd}/README.md`)
-            }], options.stagingFolderPath, options.rootDir)).to.eql([{
+            }], options.rootDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
                 dest: n(`/README.md`)
             }]);
@@ -1541,7 +1533,7 @@ describe('index', function () {
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join(cwd, 'README.md'),
                 dest: 'docs/README.md'
-            }], options.stagingFolderPath, options.rootDir)).to.eql([{
+            }], options.rootDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
                 dest: n(`/docs/README.md`)
             }]);
@@ -1553,7 +1545,7 @@ describe('index', function () {
 
             expect(await rokuDeploy.getFilePaths([
                 { src: path.join('..', 'README.md') }
-            ], outDir, rootProjectDir)).to.eql([{
+            ], rootProjectDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
                 dest: n(`/README.md`)
             }]);
@@ -1561,7 +1553,7 @@ describe('index', function () {
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'README.md'),
                 dest: 'docs/README.md'
-            }], outDir, rootProjectDir)).to.eql([{
+            }], rootProjectDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
                 dest: n(`/docs/README.md`)
             }]);

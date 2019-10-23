@@ -172,14 +172,10 @@ export class RokuDeploy {
      * @param stagingFolderPath - the absolute path to the staging folder
      * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
      */
-    public async getFilePaths(files: FilesType[], stagingFolderPath: string, rootDir: string) {
-        if (path.isAbsolute(stagingFolderPath) === false) {
-            throw new Error('stagingFolderPath must be absolute');
-        }
+    public async getFilePaths(files: FilesType[], rootDir: string) {
         if (path.isAbsolute(rootDir) === false) {
             throw new Error('rootDir must be absolute');
         }
-        stagingFolderPath = util.standardizePath(stagingFolderPath);
         const normalizedFiles = this.normalizeFilesArray(files);
 
         let result = [] as StandardizedFileEntry[];
