@@ -7,8 +7,7 @@ import * as errors from './Errors';
 import * as denodeify from 'denodeify';
 const glob = denodeify(require('glob'));
 
-import { util, Util } from './util';
-import { scrypt } from 'crypto';
+import { util } from './util';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
