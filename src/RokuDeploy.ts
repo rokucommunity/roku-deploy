@@ -344,8 +344,9 @@ export class RokuDeploy {
      * @param stagingPath
      */
     private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
-        let fileObjects = await this.getFilePaths(files, stagingPath, rootDir);
-        for (let fileObject of fileObjects) {
+        let fileObjects = await this.getFilePaths(files, rootDir);
+        //copy all of the files 
+        await Promise.all(fileObjects.map(async (fileObject) => {
             //make sure the containing folder exists
             await this.fsExtra.ensureDir(path.dirname(fileObject.dest));
 
@@ -357,7 +358,7 @@ export class RokuDeploy {
                     dereference: true
                 });
             }, 10);
-        }
+        }));
     }
 
     private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
