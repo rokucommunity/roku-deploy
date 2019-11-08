@@ -79,7 +79,7 @@
     "dateformat": "^3.0.3",
     "denodeify": "^1.2.1",
     "fs-extra": "^7.0.1",
-    "glob": "^7.1.4",
+    "glob": "^7.1.6",
     "path": "^0.12.7",
     "request": "^2.88.0"
   }
