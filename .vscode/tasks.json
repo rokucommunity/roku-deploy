@@ -3,7 +3,7 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "test",
+            "label": "test:nocover",
             "command": "npm",
             "group": {
                 "kind": "test",

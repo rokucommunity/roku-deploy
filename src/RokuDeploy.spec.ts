@@ -8,7 +8,7 @@ import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
 let sinon = sinonImport.createSandbox();
 
-import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FilesType } from './RokuDeploy';
+import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FileEntry } from './RokuDeploy';
 import * as errors from './Errors';
 import { util } from './util';
 
@@ -728,7 +728,7 @@ describe('index', function () {
             options.files = [
                 'manifest',
                 {
-                    src: 'source',
+                    src: 'source/**/*',
                     dest: 'source'
                 }
             ];
@@ -830,7 +830,7 @@ describe('index', function () {
             options.files = [
                 'manifest',
                 {
-                    src: 'flavors/shared/resources',
+                    src: 'flavors/shared/resources/**/*',
                     dest: 'resources'
                 }
             ];
@@ -1176,7 +1176,7 @@ describe('index', function () {
             await fsExtra.remove(tempPath);
         });
 
-        async function getFilePaths(files: FilesType[], rootDirOverride = rootDir) {
+        async function getFilePaths(files: FileEntry[], rootDirOverride = rootDir) {
             return (await rokuDeploy.getFilePaths(files, rootDirOverride))
                 .sort((a, b) => a.src.localeCompare(b.src));
         }
@@ -1307,7 +1307,7 @@ describe('index', function () {
             it('applies multi-glob paths relative to rootDir', async () => {
                 expect(await getFilePaths([
                     'manifest',
-                    'source',
+                    'source/**/*',
                     'components/**/*',
                     '!components/scenes/**/*'
                 ])).to.eql([{
@@ -1334,23 +1334,11 @@ describe('index', function () {
                 }]);
             });
 
-            it('copies folders', async () => {
+            it('ignores non-glob folder paths', async () => {
                 expect(await getFilePaths([
                     //this is the folder called "components"
                     'components'
-                ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`components/component1.xml`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
-                }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
-                }]);
+                ])).to.eql([]); //there should be no matches because rokudeploy ignores folders
             });
 
         });
