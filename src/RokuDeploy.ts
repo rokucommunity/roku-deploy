@@ -205,11 +205,6 @@ export class RokuDeploy {
 
         //root-level files array strings are treated like file filters. These must be globs/paths relative to `rootDir`
         if (typeof entry === 'string') {
-            //if entry is a folder, copy all files recursively
-            if (await util.isDirectory(path.resolve(rootDir, entry))) {
-                entry = entry + '/**/*';
-            }
-
             //glob doesn't support windows slashes, so translate those slashes to unix
             entry = entry.replace(/\\/g, '/');
             let files: string[] = await glob(entry, { cwd: rootDir, absolute: true });
@@ -230,6 +225,7 @@ export class RokuDeploy {
             return result;
         }
 
+        //if entry.src is an explicit file reference
         if (await util.isFile(entry.src, rootDir)) {
             let isSrcPathAbsolute = path.isAbsolute(entry.src);
             let srcPathAbsolute = isSrcPathAbsolute ?
@@ -267,11 +263,6 @@ export class RokuDeploy {
             });
 
             return result;
-        }
-
-        //if the entry is a directory, turn it into a double-glob wildcard matcher
-        if (await util.isDirectory(path.resolve(rootDir, entry.src))) {
-            entry.src = entry.src + '/**/*';
         }
 
         //if src contains double wildcard folder

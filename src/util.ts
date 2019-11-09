@@ -35,22 +35,6 @@ export class Util {
     }
 
     /**
-     * Determine if the given path is a directory
-     * @param path
-     */
-    public async isDirectory(pathToDirectoryOrFile: string, cwd?: string) {
-        try {
-            return await this.cwdRun(cwd, async () => {
-                let stat = await fsExtra.lstat(pathToDirectoryOrFile);
-                return stat.isDirectory();
-            });
-        } catch (e) {
-            // lstatSync throws an error if path doesn't exist
-            return false;
-        }
-    }
-
-    /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath 
      * @param childPath 

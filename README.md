@@ -106,9 +106,9 @@ For most standard projects, the default files array should work just fine:
 ```jsonc
 {
     "files": [
-        "source",
-        "components",
-        "images",
+        "source/**/*",
+        "components/**/*",
+        "images/**/*",
         "manifest"
     ]
 }
@@ -121,12 +121,12 @@ If you want to include additonal files, you will need to provide the entire arra
 ```jsonc
 {
     "files": [
-        "source",
-        "components",
-        "images",
+        "source/**/*",
+        "components/**/*",
+        "images/**/*",
         "manifest"
         //your folder with other assets
-        "assets", 
+        "assets/**/*", 
     ]
 }
 ```
@@ -163,7 +163,7 @@ You can also prefix your file patterns with "`!`" which will _exclude_ files fro
 
  - Empty folders are not copied
  
- - Paths to folders will have the entire folder contents recursively copied (the same as if you did `some_folder/**/*`)
+ - Paths to folders will be ignored. If you want to copy a folder and its contents, use the glob syntax (i.e. `some_folder/**/*`)
 
 ### Advanced Usage
 For more advanced use cases, you may provide an object which contains the source pattern and output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
@@ -193,8 +193,10 @@ The object structure is as follows:
 
  - if `src` is a glob pattern that includes `**`, then all files found in `src` after the `**` will retain their relative paths in `src` when copied to `dest`. For example:  
  `{ src: "lib/**.brs", dest: "source/lib"}`
- - if `src` is a path to a folder, it is treated the same way as `**`, where all files found after the folder name will retain their relative paths in `src` when copied to `dest`. For example:  
-  `{ src: "lib/vendor", dest: "vendor" }`
+
+ - if `src` is a path to a folder, it will be ignored. If you want to copy a folder and its contents, use the glob syntax. The following example will copy all files from the `lib/vendor` folder recursively: 
+`{ src: "lib/vendor/**/*", dest: "vendor" }`
+
  - if `dest` is not specified, the root of the output folder is assumed
 
  ### Collision Handling
