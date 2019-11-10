@@ -216,7 +216,7 @@ export class RokuDeploy {
             if (await util.isFile(filePathAbsolute)) {
                 result.push({
                     src: util.standardizePath(filePathAbsolute),
-                    dest: this.getDestPath(filePathAbsolute, fileEntries, rootDir)
+                    dest: this.getDestPath(filePathAbsolute, fileEntries, rootDir, true)
                 });
             }
         }
