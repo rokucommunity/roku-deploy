@@ -4,37 +4,6 @@ import * as fs from 'fs';
 
 export class Util {
     /**
-     * Do work within the context of a changed current working directory
-     * @param targetCwd
-     * @param callback
-     */
-    public async cwdRun<T>(targetCwd: string | null | undefined, callback: () => Promise<T>) {
-        let originalCwd = process.cwd();
-        if (targetCwd) {
-            process.chdir(targetCwd);
-        }
-
-        let result;
-        let err;
-
-        try {
-            result = await callback();
-        } catch (e) {
-            err = e;
-        }
-
-        if (targetCwd) {
-            process.chdir(originalCwd);
-        }
-
-        if (err) {
-            throw err;
-        } else {
-            return result;
-        }
-    }
-
-    /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath 
      * @param childPath 
@@ -49,14 +18,12 @@ export class Util {
      * Determines if the given path is a file
      * @param filePathAbsolute 
      */
-    public async isFile(filePathAbsolute: string, cwd?: string) {
+    public async isFile(filePathAbsolute: string) {
         try {
-            return await this.cwdRun(cwd, async () => {
-                //get the full path to the file. This should be the same path for files, and the actual path for any symlinks
-                let realPathAbsolute = fs.realpathSync(filePathAbsolute);
-                let stat = await fsExtra.lstat(realPathAbsolute);
-                return stat.isFile();
-            });
+            //get the full path to the file. This should be the same path for files, and the actual path for any symlinks
+            let realPathAbsolute = fs.realpathSync(filePathAbsolute);
+            let stat = await fsExtra.lstat(realPathAbsolute);
+            return stat.isFile();
         } catch (e) {
             // lstatSync throws an error if path doesn't exist
             return false;
@@ -74,6 +41,13 @@ export class Util {
         return path.normalize(
             thePath.replace(/[\/\\]+/g, path.sep)
         );
+    }
+
+    /**
+     * Convert all slashes to forward slashes
+     */
+    public toForwardSlashes(thePath: string) {
+        return thePath.replace(/[\/\\]+/g, '/');
     }
 
     /**

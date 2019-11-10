@@ -11,6 +11,7 @@ let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
+let getDestPath = RokuDeploy.prototype.getDestPath.bind(rokuDeploy);
 let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
@@ -31,6 +32,7 @@ export {
     deleteInstalledChannel,
     deploy,
     deployAndSignPackage,
+    getDestPath,
     getFilePaths,
     getOptions,
     getOutputPkgFilePath,

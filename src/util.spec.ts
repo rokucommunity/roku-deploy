@@ -2,6 +2,14 @@ import { util } from './util';
 import { expect } from 'chai';
 
 describe('util', () => {
+    describe('isFile', () => {
+        it('recognizes valid files', async () => {
+            expect(await util.isFile(util.standardizePath(`${process.cwd()}/README.md`))).to.be.true;
+        });
+        it('recognizes non-existant files', async () => {
+            expect(await util.isFile(util.standardizePath(`${process.cwd()}/FILE_THAT_DOES_NOT_EXIST.md`))).to.be.false;
+        });
+    });
     describe('isChildOfPath', () => {
         it('works for child path', () => {
             let parentPath = `${process.cwd()}\\testProject`;

@@ -190,10 +190,6 @@ export class RokuDeploy {
 
                 //add all of the entries to the results
             } else {
-                entryResults.forEach((entryResult) => {
-                    //remove any leading slashes from dest
-                    entryResult.dest = entryResult.dest.replace(/^[\/\\]*/, '');
-                });
                 result.push(...entryResults);
             }
         }
@@ -214,6 +210,10 @@ export class RokuDeploy {
         for (let filePathAbsolute of files) {
             //only include files (i.e. skip directories)
             if (await util.isFile(filePathAbsolute)) {
+                //throw an exception when a top-level string references a file outside of the rootDir
+                if (typeof entry === 'string' && util.isParentOfPath(rootDir, filePathAbsolute) === false) {
+                    throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+                }
                 result.push({
                     src: util.standardizePath(filePathAbsolute),
                     dest: this.getDestPath(filePathAbsolute, fileEntries, rootDir, true)
@@ -237,10 +237,10 @@ export class RokuDeploy {
 
         //walk through the entire files array and find the last dest entry that matches
         for (let entry of standardizedFiles) {
-            let src = typeof entry === 'string' ? entry : entry?.src;
-            const isNegated = src.startsWith('!');
+            let srcGlobPattern = typeof entry === 'string' ? entry : entry.src;
+            const isNegated = srcGlobPattern.startsWith('!');
             if (isNegated) {
-                src = src.substring(1);
+                srcGlobPattern = srcGlobPattern.substring(1);
             }
             let isMatch: boolean;
 
@@ -248,7 +248,10 @@ export class RokuDeploy {
             if (skipMatch === true) {
                 isMatch = true;
             } else {
-                isMatch = minimatch(srcPathAbsolute, src);
+                //make the glob path absolute
+                srcGlobPattern = path.resolve(util.toForwardSlashes(rootDir), srcGlobPattern);
+
+                isMatch = minimatch(util.toForwardSlashes(srcPathAbsolute), srcGlobPattern);
             }
 
             //if not a match, move to the next pattern
@@ -328,7 +331,8 @@ export class RokuDeploy {
                 continue;
             }
         }
-
+        //remove any leading slash
+        dest = dest?.replace(/^[\/\\]*/, '');
         return dest;
     }
 

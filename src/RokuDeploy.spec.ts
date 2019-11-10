@@ -1534,6 +1534,69 @@ describe('index', function () {
         });
     });
 
+    describe('getDestPath', () => {
+        let rootDir = cwd;
+        it('finds dest path for top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    n(`${rootDir}/components/comp1/comp1.brs`),
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.equal(n('components/comp1/comp1.brs'));
+        });
+
+        it('does not find dest path for non-matched top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    n(`${rootDir}/source/main.brs`),
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    n(`${rootDir}/source/main.brs`),
+                    [
+                        'source/**/*',
+                        '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated in src;dest;', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    n(`${rootDir}/source/main.brs`),
+                    [
+                        'source/**/*',
+                        {
+                            src: '!source/main.brs'
+                        }
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file found outside the root dir', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    n(`${rootDir}/../source/main.brs`),
+                    [
+                        '../source/**/*',
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+    });
+
     describe('normalizeRootDir', () => {
         it('handles falsey values', () => {
             expect(rokuDeploy.normalizeRootDir(null)).to.equal(cwd);
