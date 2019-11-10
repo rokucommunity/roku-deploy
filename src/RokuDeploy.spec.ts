@@ -1211,19 +1211,6 @@ describe('index', function () {
                 }]);
             });
 
-            it('copies relative file paths with mixed path separators', async () => {
-                expect(await getFilePaths([
-                    `source/main.brs`,
-                    `source\\lib.brs`
-                ])).to.eql([{
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
-                }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
-                }]);
-            });
-
             it('copies top-level-string single-star globs', async () => {
                 expect(await getFilePaths([
                     'source/*.brs'
