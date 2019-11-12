@@ -47,7 +47,11 @@ export class Util {
      * Convert all slashes to forward slashes
      */
     public toForwardSlashes(thePath: string) {
-        return thePath.replace(/[\/\\]+/g, '/');
+        if (typeof thePath === 'string') {
+            return thePath.replace(/[\/\\]+/g, '/');
+        } else {
+            return undefined;
+        }
     }
 
     /**

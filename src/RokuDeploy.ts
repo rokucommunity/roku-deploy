@@ -43,7 +43,7 @@ export class RokuDeploy {
      * This makes it easier to reason about later on in the process.
      * @param files
      */
-    private normalizeFilesArray(files: FileEntry[]) {
+    public normalizeFilesArray(files: FileEntry[]) {
         const result: Array<string | StandardizedFileEntry> = [];
 
         for (let i = 0; i < files.length; i++) {
