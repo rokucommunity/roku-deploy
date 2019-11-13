@@ -332,7 +332,7 @@ export class RokuDeploy {
             }
         }
         //remove any leading slash
-        dest = dest?.replace(/^[\/\\]*/, '');
+        dest = typeof dest === 'string' ? dest.replace(/^[\/\\]*/, '') : undefined;
         return dest;
     }
 

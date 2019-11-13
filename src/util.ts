@@ -50,7 +50,7 @@ export class Util {
         if (typeof thePath === 'string') {
             return thePath.replace(/[\/\\]+/g, '/');
         } else {
-            return undefined;
+            return thePath;
         }
     }
 

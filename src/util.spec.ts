@@ -10,6 +10,13 @@ describe('util', () => {
             expect(await util.isFile(util.standardizePath(`${process.cwd()}/FILE_THAT_DOES_NOT_EXIST.md`))).to.be.false;
         });
     });
+
+    describe('toForwardSlashes', () => {
+        it('returns original value for non-strings', () => {
+            expect(util.toForwardSlashes(undefined)).to.be.undefined;
+            expect(util.toForwardSlashes(<any>false)).to.be.false;
+        });
+    });
     describe('isChildOfPath', () => {
         it('works for child path', () => {
             let parentPath = `${process.cwd()}\\testProject`;
