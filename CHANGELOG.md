@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-beta.3] - 2019-11-12
+### Added
+ - `RokuDeploy.getDestPath` function which returns the dest path for a full file path. Useful for figuring out where a file will be placed in the pkg. 
+### Changed
+ - made `RokuDeploy.normalizeFilesArray` public
+ - disallow using explicit folder paths in files array. You must use globs for folders.
+
+
+
 ## [3.0.0-beta.2] - 2019-10-23
 ### Changed
  - signature of `getFilePaths()` to no longer accept `stagingFolderPath`
@@ -126,6 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.0.0-beta.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.2...v3.0.0-beta.3
 [3.0.0-beta.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.1...v3.0.0-beta.2
 [3.0.0-beta.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v3.0.0-beta.1
 [2.5.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.1...v2.5.0
