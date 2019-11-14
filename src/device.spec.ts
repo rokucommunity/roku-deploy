@@ -40,7 +40,7 @@ describe('device', function () {
 
     this.timeout(20000);
 
-    describe.only('deploy', function () {
+    describe('deploy', function () {
         it('works', async function () {
             let response = await rokuDeploy.deploy(options);
             assert.equal(response.message, 'Successful deploy');

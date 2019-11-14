@@ -418,7 +418,7 @@ export class RokuDeploy {
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
      * @param host - the host
-     * @param options - the rokuDeploy options
+     * @param port - the port that should be used for the request. defaults to 8060
      */
     public async pressHomeButton(host, port?: number) {
         port = port ? port : this.getOptions().remotePort;
