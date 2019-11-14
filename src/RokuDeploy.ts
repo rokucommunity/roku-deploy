@@ -387,7 +387,8 @@ export class RokuDeploy {
     }
 
     private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
-        let url = `http://${options.host}/${requestPath}`;
+        options = this.getOptions(options);
+        let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
             auth: {
@@ -416,12 +417,14 @@ export class RokuDeploy {
     /**
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
-     * @param host
+     * @param host - the host
+     * @param options - the rokuDeploy options
      */
-    public async pressHomeButton(host) {
+    public async pressHomeButton(host, port?: number) {
+        port = port ? port : this.getOptions().remotePort;
         // press the home button to return to the main screen
         return await this.doPostRequest({
-            url: `http://${host}:8060/keypress/Home`
+            url: `http://${host}:${port}/keypress/Home`
         });
     }
 
@@ -702,6 +705,8 @@ export class RokuDeploy {
             retainStagingFolder: false,
             incrementBuildNumber: false,
             failOnCompileError: true,
+            packagePort: 80,
+            remotePort: 8060,
             rootDir: './',
             files: [
                 'source/**/*.*',
@@ -929,6 +934,20 @@ export interface RokuDeployOptions {
      *
      */
     host?: string;
+
+    /**
+     * The port that should be used when installing the package. Defaults to 80. 
+     * This is mainly useful for things like emulators that use alternate ports,
+     * or when publishing through some type of port forwarding configuration. 
+     */
+    packagePort?: number;
+
+    /**
+     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060. 
+     * This is mainly useful for things like emulators that use alternate ports,
+     * or when sending commands through some type of port forwarding.
+     */
+    remotePort?: number;
 
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
