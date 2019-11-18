@@ -1211,9 +1211,9 @@ describe('index', function () {
     describe('retrieveSignedPackage', () => {
         let onHandler: any;
         beforeEach(() => {
-            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((pth: string, callback: (err: Error) => void) => {
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
                 //do nothing, assume the dir gets created
-            });
+            }) as any);
 
             //fake out the write stream function
             sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
