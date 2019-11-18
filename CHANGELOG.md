@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.6.0] - TBA
+### Added
+ - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards. 
+
+
 ## [2.5.0] - 2019-10-05
 ### Added
  - `stagingFolderPath` option to allow overriding the location of the staging folder
