@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.6.0]
+### Added
+ - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards.
+
+
+
 ## [2.6.0-beta.0]
 ### Added
  - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards. 
