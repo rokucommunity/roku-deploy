@@ -1148,22 +1148,22 @@ describe('index', function () {
             let rootProjectDir = path.resolve(options.rootDir);
 
             let paths = await rokuDeploy.getFilePaths([
-                path.join(cwd, 'readme.md')
+                path.join(cwd, 'README.md')
             ], outDir, rootProjectDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'README.md')
             }]);
 
             paths = await rokuDeploy.getFilePaths([{
-                src: path.join(cwd, 'readme.md'),
+                src: path.join(cwd, 'README.md'),
                 dest: 'docs'
             }], outDir, rootProjectDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'docs', 'README.md')
             }]);
         });
 
@@ -1172,22 +1172,22 @@ describe('index', function () {
             let rootProjectDir = path.resolve(options.rootDir);
 
             let paths = await rokuDeploy.getFilePaths([
-                path.join('..', 'readme.md')
+                path.join('..', 'README.md')
             ], outDir, rootProjectDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'README.md')
             }]);
 
             paths = await rokuDeploy.getFilePaths([{
-                src: path.join('..', 'readme.md'),
+                src: path.join('..', 'README.md'),
                 dest: 'docs'
             }], outDir, rootProjectDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                src: path.join(cwd, 'README.md'),
+                dest: path.join(outDir, 'docs', 'README.md')
             }]);
         });
     });
