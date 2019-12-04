@@ -31,6 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [2.6.0]
+### Added
+ - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards.
+
+
+
+## [2.6.0-beta.0]
+### Added
+ - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards. 
+
+
+
 ## [2.5.0] - 2019-10-05
 ### Added
  - `stagingFolderPath` option to allow overriding the location of the staging folder
@@ -138,6 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.0.0-beta.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.2...v3.0.0-beta.3
 [3.0.0-beta.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.1...v3.0.0-beta.2
 [3.0.0-beta.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v3.0.0-beta.1
+[2.6.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v2.6.0
+[2.6.0-beta.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v2.6.0-beta.0
 [2.5.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.1...v2.5.0
 [2.4.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.0...v2.4.1
 [2.4.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.3.0...v2.4.0

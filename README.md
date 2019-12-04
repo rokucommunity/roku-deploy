@@ -305,6 +305,12 @@ Here are the available options. The defaults are shown to the right of the optio
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
     just in case roku adds support for custom usernames in the future
 
+- **packagePort?:** string = 80
+    The port used for package-related requests. This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward. 
+
+- **remotePort?:** string = 8060
+    The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward. 
+
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/6ecc8642c77b9df59bf087f3d74d31275fc9e11a/src/RokuDeploy.ts#L870) to see the typescript interface for these options
 
 ## Changelog
