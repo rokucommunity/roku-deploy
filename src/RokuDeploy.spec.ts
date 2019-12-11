@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
+import * as deferred from 'deferred';
 let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FileEntry } from './RokuDeploy';
@@ -315,7 +316,17 @@ describe('index', function () {
         });
     });
 
-    describe('press home button', () => {
+    describe('generateBaseRequestOptions', () => {
+        it('uses default port', () => {
+            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+        });
+
+        it('uses overridden port', () => {
+            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4', packagePort: 999 }).url).to.equal('http://1.2.3.4:999/a_b_c');
+        });
+    });
+
+    describe('pressHomeButton', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
@@ -327,6 +338,26 @@ describe('index', function () {
             }, () => {
                 expect(true).to.be.true;
             });
+        });
+
+        it('uses default port', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake(async (opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4');
+            await d.promise;
+        });
+
+        it('uses overridden port', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake(async (opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4', 987);
+            await d.promise;
         });
     });
 
@@ -1603,9 +1634,9 @@ describe('index', function () {
     describe('retrieveSignedPackage', () => {
         let onHandler: any;
         beforeEach(() => {
-            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((pth: string, callback: (err: Error) => void) => {
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
                 //do nothing, assume the dir gets created
-            });
+            }) as any);
 
             //fake out the write stream function
             sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
@@ -1746,6 +1777,25 @@ describe('index', function () {
             }
             expect(error, 'Should have thrown error').to.exist;
             expect(error.message).to.equal('fake error thrown as part of the unit test');
+        });
+    });
+
+    describe('getOptions', () => {
+        describe('packagePort', () => {
+            it('defaults to 80', () => {
+                expect(rokuDeploy.getOptions({}).packagePort).to.equal(80);
+            });
+            it('can be overridden', () => {
+                expect(rokuDeploy.getOptions({ packagePort: 95 }).packagePort).to.equal(95);
+            });
+        });
+        describe('remotePort', () => {
+            it('defaults to 8060', () => {
+                expect(rokuDeploy.getOptions({}).remotePort).to.equal(8060);
+            });
+            it('can be overridden', () => {
+                expect(rokuDeploy.getOptions({ remotePort: 1234 }).remotePort).to.equal(1234);
+            });
         });
     });
 

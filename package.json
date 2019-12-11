@@ -63,6 +63,7 @@
     "chai": "^4.2.0",
     "chai-files": "^1.4.0",
     "coveralls": "^3.0.0",
+    "deferred": "^0.7.11",
     "mocha": "^6.2.1",
     "node-run-cmd": "^1.0.1",
     "nyc": "^14.1.1",
