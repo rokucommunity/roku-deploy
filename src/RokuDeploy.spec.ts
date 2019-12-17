@@ -1529,15 +1529,35 @@ describe('index', function () {
                 src: n(`${cwd}/README.md`),
                 dest: n(`docs/README.md`)
             }]);
+
+            let outDir = path.resolve(options.outDir);
+            let paths: any[];
+
+            paths = await rokuDeploy.getFilePaths([{
+                src: n(`${cwd}/README.md`),
+                dest: n('docs/README.md')
+            }], outDir);
+
+            expect(paths).to.eql([{
+                src: n(`${cwd}/README.md`),
+                dest: n('docs/README.md')
+            }]);
+
+            //top-level string paths pointing to files outside the root should thrown an exception
+            expectThrowsAsync(async () => {
+                paths = await rokuDeploy.getFilePaths([
+                    n(`${cwd}/README.md`),
+                ], outDir);
+            });
         });
 
         it('supports relative paths that grab files from outside of the rootDir', async () => {
             let outDir = path.resolve(options.outDir);
             let rootProjectDir = path.resolve(options.rootDir);
 
-            expect(await rokuDeploy.getFilePaths([
-                { src: path.join('..', 'README.md') }
-            ], rootProjectDir)).to.eql([{
+            expect(await rokuDeploy.getFilePaths([{
+                src: path.join('..', 'README.md')
+            }], rootProjectDir)).to.eql([{
                 src: n(`${cwd}/README.md`),
                 dest: n(`README.md`)
             }]);
@@ -1549,6 +1569,13 @@ describe('index', function () {
                 src: n(`${cwd}/README.md`),
                 dest: n(`docs/README.md`)
             }]);
+
+            //should throw exception because we can't have top-level string paths pointed to files outside the root
+            expectThrowsAsync(async () => {
+                let paths = await rokuDeploy.getFilePaths([
+                    path.join('..', 'README.md')
+                ], outDir);
+            });
         });
     });
 
@@ -1602,7 +1629,10 @@ describe('index', function () {
             ).to.be.undefined;
         });
 
-        it('excludes a file found outside the root dir', () => {
+        it('excludes a file found outside the root dir', async () => {
+            options = rokuDeploy.getOptions(options);
+            let outDir = path.resolve(options.outDir);
+
             expect(
                 rokuDeploy.getDestPath(
                     n(`${rootDir}/../source/main.brs`),
@@ -1612,6 +1642,16 @@ describe('index', function () {
                     rootDir
                 )
             ).to.be.undefined;
+
+            let paths = await rokuDeploy.getFilePaths([{
+                src: path.join('..', 'README.md'),
+                dest: n('docs/README.md')
+            }], outDir);
+
+            expect(paths).to.eql([{
+                src: n(`${cwd}/README.md`),
+                dest: n('docs/README.md')
+            }]);
         });
     });
 
