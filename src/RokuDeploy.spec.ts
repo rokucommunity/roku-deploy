@@ -1544,7 +1544,7 @@ describe('index', function () {
             }]);
 
             //top-level string paths pointing to files outside the root should thrown an exception
-            expectThrowsAsync(async () => {
+            await expectThrowsAsync(async () => {
                 paths = await rokuDeploy.getFilePaths([
                     n(`${cwd}/README.md`),
                 ], outDir);
@@ -1571,7 +1571,7 @@ describe('index', function () {
             }]);
 
             //should throw exception because we can't have top-level string paths pointed to files outside the root
-            expectThrowsAsync(async () => {
+            await expectThrowsAsync(async () => {
                 let paths = await rokuDeploy.getFilePaths([
                     path.join('..', 'README.md')
                 ], outDir);
