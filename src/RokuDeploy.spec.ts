@@ -342,6 +342,17 @@ describe('index', function () {
             try { fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json'); } catch (e) { }
         });
 
+        it('fails when the zip file is missing', async () => {
+            options.outFile = 'fileThatDoesNotExist.zip';
+            try {
+                await rokuDeploy.publish(options);
+                throw new Error('publish should have thrown an exception');
+            } catch (e) {
+                let zipFilePath = rokuDeploy.getOutputZipFilePath(options);
+                expect(e.message).to.equal(`Cannot publish because file does not exist at '${zipFilePath}'`);
+            }
+        });
+
         it('fails when no host is provided', () => {
             expect(file('rokudeploy.json')).not.to.exist;
             return rokuDeploy.publish({ host: undefined }).then(() => {

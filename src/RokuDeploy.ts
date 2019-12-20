@@ -441,10 +441,18 @@ export class RokuDeploy {
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
+        if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
+            throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
+        }
+        let readStream = this.fsExtra.createReadStream(zipFilePath);
+        //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
+        await new Promise((resolve) => {
+            readStream.on('open', resolve);
+        });
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
         requestOptions.formData = {
             mysubmit: 'Replace',
-            archive: this.fsExtra.createReadStream(zipFilePath)
+            archive: readStream
         };
 
         let results = await this.doPostRequest(requestOptions);
