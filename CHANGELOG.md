@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for file overrides in the `files` array. This supports including the same file from A and B, and letting the final file override previous files. 
 ### Changed
  - the files array is now a bit more strict, and has a more consistent approach.
+## [2.6.1] - 2019-12-20
+### Fixed
+ - Throw better error message during publish when missing the zip file.
 
 
 
@@ -157,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.0.0-beta.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.2...v3.0.0-beta.3
 [3.0.0-beta.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.1...v3.0.0-beta.2
 [3.0.0-beta.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v3.0.0-beta.1
+[2.6.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.6.0...v2.6.1
 [2.6.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v2.6.0
 [2.6.0-beta.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v2.6.0-beta.0
 [2.5.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.4.1...v2.5.0
