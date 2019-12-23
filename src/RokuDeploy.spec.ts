@@ -1192,28 +1192,29 @@ describe('index', function () {
         let otherProjectDir = n(`${tempPath}/otherProjectSrc`);
 
         //create baseline project structure
-        before(async () => {
-            await fsExtra.remove(tempPath);
+        before(() => {
+            fsExtra.removeSync(tempPath);
 
-            //src
-            await fsExtra.ensureDir(`${rootDir}/source`);
-            await fsExtra.ensureDir(`${rootDir}/components/screen1`);
-            await fsExtra.ensureDir(`${rootDir}/components/emptyFolder`);
-            await fsExtra.writeFile(`${rootDir}/manifest`, '');
-            await fsExtra.writeFile(`${rootDir}/source/main.brs`, '');
-            await fsExtra.writeFile(`${rootDir}/source/lib.brs`, '');
-            await fsExtra.writeFile(`${rootDir}/components/component1.xml`, '');
-            await fsExtra.writeFile(`${rootDir}/components/component1.brs`, '');
-            await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.xml`, '');
-            await fsExtra.writeFile(`${rootDir}/components/screen1/screen1.brs`, '');
+            //srcSync
+            fsExtra.ensureDirSync(`${rootDir}/source`);
+            fsExtra.ensureDirSync(`${rootDir}/components/screen1`);
+            fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
+            fsExtra.writeFileSync(`${rootDir}/manifest`, '');
+            fsExtra.writeFileSync(`${rootDir}/source/main.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/source/lib.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/component1.xml`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/component1.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/screen1/screen1.xml`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/screen1/screen1.brs`, '');
 
             //otherProjectSrc
-            await fsExtra.ensureDir(`${otherProjectDir}/source`);
-            await fsExtra.writeFile(`${otherProjectDir}/manifest`, '');
-            await fsExtra.writeFile(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
-            await fsExtra.ensureDir(`${otherProjectDir}/components/component1/subComponent`);
-            await fsExtra.writeFile(`${otherProjectDir}/components/component1/subComponent/screen.brs`, '');
+            fsExtra.ensureDirSync(`${otherProjectDir}/source`);
+            fsExtra.writeFileSync(`${otherProjectDir}/manifest`, '');
+            fsExtra.writeFileSync(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
+            fsExtra.ensureDirSync(`${otherProjectDir}/components/component1/subComponent`);
+            fsExtra.writeFileSync(`${otherProjectDir}/components/component1/subComponent/screen.brs`, '');
         });
+
         after(async () => {
             await fsExtra.remove(tempPath);
         });
@@ -1387,6 +1388,7 @@ describe('index', function () {
                     dest: n(`source/thirdPartyLib.brs`)
                 }]);
             });
+
             it('copies absolute path files to specified dest', async () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/source/thirdPartyLib.brs`,
@@ -1587,6 +1589,54 @@ describe('index', function () {
                     path.join('..', 'README.md')
                 ], outDir);
             });
+        });
+
+        it('supports overriding paths', async () => {
+            let paths = await rokuDeploy.getFilePaths([{
+                src: n(`${rootDir}/components/component1.brs`),
+                dest: 'comp1.brs'
+            }, {
+                src: n(`${rootDir}/components/screen1/screen1.brs`),
+                dest: 'comp1.brs'
+            }], rootDir);
+            expect(paths).to.be.lengthOf(1);
+            expect(n(paths[0].src)).to.equal(n(`${rootDir}/components/screen1/screen1.brs`));
+        });
+
+        it('supports overriding paths from outside the root dir', async () => {
+            let thisRootDir = n(`${cwd}/tempTestOverrides/src`);
+            try {
+
+                fsExtra.ensureDirSync(n(`${thisRootDir}/source`));
+                fsExtra.ensureDirSync(n(`${thisRootDir}/components`));
+                fsExtra.ensureDirSync(n(`${thisRootDir}/../.tmp`));
+
+                fsExtra.writeFileSync(n(`${thisRootDir}/source/main.brs`), '');
+                fsExtra.writeFileSync(n(`${thisRootDir}/components/MainScene.brs`), '');
+                fsExtra.writeFileSync(n(`${thisRootDir}/components/MainScene.xml`), '');
+                fsExtra.writeFileSync(n(`${thisRootDir}/../.tmp/MainScene.brs`), '');
+
+                let files = [
+                    '**/*.xml',
+                    '**/*.brs',
+                    {
+                        src: '../.tmp/MainScene.brs',
+                        dest: 'components/MainScene.brs'
+                    }
+                ];
+                let paths = await rokuDeploy.getFilePaths(files, thisRootDir);
+
+                //the MainScene.brs file from source should NOT be included
+                let mainSceneEntries = paths.filter(x => n(x.dest) === n('components/MainScene.brs'));
+                expect(
+                    mainSceneEntries,
+                    `Should only be one files entry for 'components/MainScene.brs'`
+                ).to.be.lengthOf(1);
+                expect(n(mainSceneEntries[0].src)).to.eql(n(`${thisRootDir}/../.tmp/MainScene.brs`));
+            } finally {
+                //clean up
+                await fsExtra.remove(n(`${thisRootDir}/../`));
+            }
         });
     });
 

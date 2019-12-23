@@ -194,6 +194,20 @@ export class RokuDeploy {
             }
         }
 
+        //only keep the last entry of each `dest` path
+        let destPaths = {} as { [key: string]: boolean };
+        for (let i = result.length - 1; i >= 0; i--) {
+            let entry = result[i];
+
+            //if we have already seen this dest path, this is a duplicate...throw it out
+            if (destPaths[entry.dest]) {
+                result.splice(i, 1);
+            } else {
+                //this is the first time we've seen this entry, keep it and move on
+                destPaths[entry.dest] = true;
+            }
+        }
+
         return result;
     }
 
