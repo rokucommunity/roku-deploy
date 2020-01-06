@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-beta.6] - 2020-01-06
+### Fixed
+ - bug that was not discarding duplicate file entries targeting the same `dest` path.
+
+
+
 ## [3.0.0-beta.5] - 2019-12-20
 ### Added
  - all changes from 2.6.1
