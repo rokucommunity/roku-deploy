@@ -169,6 +169,16 @@ describe('index', function () {
     });
 
     describe('copyToStaging', () => {
+        it('throws exceptions on missing stagingPath', async () => {
+            await expectThrowsAsync(() =>
+                (rokuDeploy as any).copyToStaging([])
+            );
+        });
+        it('throws exceptions on missing rootDir', async () => {
+            await expectThrowsAsync(() =>
+                (rokuDeploy as any).copyToStaging([], 'asdf')
+            );
+        });
         it('computes absolute path for all operations', async () => {
             const ensureDirPaths = [];
             sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((p) => {
