@@ -168,6 +168,53 @@ describe('index', function () {
         });
     });
 
+    describe.only('copyToStaging', () => {
+        it('computes absolute path for all operations', async () => {
+            const ensureDirPaths = [];
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((p) => {
+                ensureDirPaths.push(p);
+                return Promise.resolve;
+            });
+            const copyPaths = [] as Array<{ src: string; dest: string; }>;
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src, dest });
+                return Promise.resolve();
+            });
+
+            let rootDir = n(`${tmpPath}/ProjectA/src`);
+            let stagingPath = n(`${tmpPath}/ProjectA/.staging`);
+
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([
+                    {
+                        src: n(`${rootDir}/source/main.brs`),
+                        dest: '/source/main.brs'
+                    }, {
+                        src: n(`${rootDir}/components/a/b/c/comp1.xml`),
+                        dest: '/components/a/b/c/comp1.xml'
+                    }
+                ])
+            );
+
+            await (rokuDeploy as any).copyToStaging([], stagingPath, rootDir);
+
+            expect(ensureDirPaths).to.eql([
+                n(`${stagingPath}/source`),
+                n(`${stagingPath}/components/a/b/c`),
+            ]);
+
+            expect(copyPaths).to.eql([
+                {
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`${stagingPath}/source/main.brs`)
+                }, {
+                    src: n(`${rootDir}/components/a/b/c/comp1.xml`),
+                    dest: n(`${stagingPath}/components/a/b/c/comp1.xml`)
+                }
+            ]);
+        });
+    });
+
     describe('createPackage', function () {
         it('works with custom stagingFolderPath', async () => {
             let opts = {

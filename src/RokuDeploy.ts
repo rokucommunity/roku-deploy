@@ -356,16 +356,21 @@ export class RokuDeploy {
      * @param stagingPath
      */
     private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
+        if (!stagingPath) { throw new Error('stagingPath is required'); }
+        if (!rootDir) { throw new Error('rootDir is required'); }
+
         let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files 
         await Promise.all(fileObjects.map(async (fileObject) => {
+            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
+
             //make sure the containing folder exists
-            await this.fsExtra.ensureDir(path.dirname(fileObject.dest));
+            await this.fsExtra.ensureDir(path.dirname(destFilePath));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
             await util.tryRepeatAsync(async () => {
                 //copy the src item using the filesystem
-                await this.fsExtra.copy(fileObject.src, util.standardizePath(`${stagingPath}/${fileObject.dest}`), {
+                await this.fsExtra.copy(fileObject.src, destFilePath, {
                     //copy the actual files that symlinks point to, not the symlinks themselves
                     dereference: true
                 });
