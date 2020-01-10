@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-beta.7] - 2020-01-10
+### Fixed
+ - bug during file copy that was not prepending `stagingFolderPath` to certain file operations.
+
+
+
 ## [3.0.0-beta.6] - 2020-01-06
 ### Fixed
  - bug that was not discarding duplicate file entries targeting the same `dest` path.
@@ -168,6 +174,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.0.0-beta.7]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.6...v3.0.0-beta.7
+[3.0.0-beta.6]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.5...v3.0.0-beta.6
+[3.0.0-beta.5]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.4...v3.0.0-beta.5
 [3.0.0-beta.4]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.3...v3.0.0-beta.4
 [3.0.0-beta.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.2...v3.0.0-beta.3
 [3.0.0-beta.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.1...v3.0.0-beta.2
