@@ -168,7 +168,7 @@ describe('index', function () {
         });
     });
 
-    describe.only('copyToStaging', () => {
+    describe('copyToStaging', () => {
         it('computes absolute path for all operations', async () => {
             const ensureDirPaths = [];
             sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((p) => {
