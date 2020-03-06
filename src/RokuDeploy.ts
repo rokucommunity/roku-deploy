@@ -239,10 +239,11 @@ export class RokuDeploy {
 
     /**
      * Given a full path to a file, determine its dest path
-     * @param srcPathAbsolute the path to the file. This MUST be a file path and is not validated to verify. 
+     * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
      * @param files the files array
      * @param rootDir the absolute path to the root dir
      * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
+     * @returns the RELATIVE path to the dest location for the file.
      */
     public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false): string | undefined {
         //container for the files for this entry
