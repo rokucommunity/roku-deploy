@@ -514,6 +514,18 @@ describe('index', function () {
             });
         });
 
+        it('handles successful deploy with remoteDebug', () => {
+            options.failOnCompileError = true;
+            options.remoteDebug = true;
+            mockDoPostRequest();
+
+            return rokuDeploy.publish(options).then((result) => {
+                expect(result.message).to.equal('Successful deploy');
+            }, (err) => {
+                assert.fail('Should not have rejected the promise');
+            });
+        });
+
         it('Does not reject when response contains compile error wording but config is set to ignore compile warnings', () => {
             options.failOnCompileError = false;
 
