@@ -455,6 +455,10 @@ export class RokuDeploy {
             archive: readStream
         };
 
+        if (options.remoteDebug) {
+          requestOptions.formData.remotedebug = '1';
+        }
+
         let results = await this.doPostRequest(requestOptions);
         if (options.failOnCompileError) {
             if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
@@ -944,14 +948,20 @@ export interface RokuDeployOptions {
     host?: string;
 
     /**
-     * The port that should be used when installing the package. Defaults to 80. 
+     * The port that should be used when installing the package. Defaults to 80.
      * This is mainly useful for things like emulators that use alternate ports,
-     * or when publishing through some type of port forwarding configuration. 
+     * or when publishing through some type of port forwarding configuration.
      */
     packagePort?: number;
 
     /**
-     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060. 
+     * When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. Defaults to false.
+     * More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
+     */
+    remoteDebug?: boolean;
+
+    /**
+     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
      */
