@@ -1,0 +1,37 @@
+name: main
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    env:
+      COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos-10.15, windows-2019]
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-node@master
+        with:
+          node-version: "10.19.0"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run tslint
+      - run: npm run test
+      - run: npm run publish-coverage
+  npm-release:
+    #only run this task if a tag starting with 'v' was used to trigger this (i.e. a tagged release)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-test
+    runs-on: ubuntu-18.04
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-node@master
+        with:
+          node-version: "10.19.0"
+      - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ./.npmrc
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish
