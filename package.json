@@ -66,14 +66,14 @@
     "deferred": "^0.7.11",
     "mocha": "^6.2.1",
     "node-run-cmd": "^1.0.1",
-    "nyc": "^14.1.1",
+    "nyc": "^15.0.0",
     "rimraf": "^2.6.2",
     "sinon": "^7.2.3",
     "source-map-support": "^0.5.13",
     "testdouble": "^3.5.2",
     "ts-mocha": "^6.0.0",
     "ts-node": "^8.4.1",
-    "tslint": "^5.9.1",
+    "tslint": "^6.1.0",
     "typescript": "^3.7.2"
   },
   "dependencies": {
