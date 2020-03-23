@@ -1,11 +1,15 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as Q from 'q';
-import * as globAll from 'glob-all';
 import * as request from 'request';
 import * as archiver from 'archiver';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
+import * as minimatch from 'minimatch';
+import * as glob from 'glob';
+import { promisify } from 'util';
+const globAsync = promisify(require('glob'));
+
+import { util } from './util';
 
 export class RokuDeploy {
     //store the import on the class to make testing easier
@@ -22,123 +26,65 @@ export class RokuDeploy {
         options.rootDir = <string>options.rootDir;
         options.outDir = <string>options.outDir;
 
-        const files = this.normalizeFilesOption(options.files);
-
-        //make all path references absolute
-        this.makeFilesAbsolute(files, options.rootDir);
-
-        let stagingFolderPath = this.getStagingFolderPath(options);
+        const files = this.normalizeFilesArray(options.files);
 
         //clean the staging directory
-        await this.fsExtra.remove(stagingFolderPath);
+        await this.fsExtra.remove(options.stagingFolderPath);
 
         //make sure the staging folder exists
-        await this.fsExtra.ensureDir(stagingFolderPath);
-        await this.copyToStaging(files, stagingFolderPath, options.rootDir);
-        return stagingFolderPath;
+        await this.fsExtra.ensureDir(options.stagingFolderPath);
+        await this.copyToStaging(files, options.stagingFolderPath, options.rootDir);
+        return options.stagingFolderPath;
     }
 
     /**
-     * Make all file references absolute
-     * @param files
-     * @param rootDir
-     */
-    public makeFilesAbsolute(files: { src: string[]; dest: string }[], rootDir: string) {
-        //append the rootDir to every relative glob and string file entry
-        for (let fileEntry of files) {
-            for (let i = 0; i < fileEntry.src.length; i++) {
-                let src = fileEntry.src[i];
-                let isNegated = src.indexOf('!') === 0;
-                if (isNegated) {
-                    src = src.substring(1);
-                }
-                if (path.isAbsolute(src) === false) {
-                    let absoluteSource = path.join(rootDir, src);
-                    if (isNegated) {
-                        absoluteSource = '!' + absoluteSource;
-                    }
-                    fileEntry.src[i] = absoluteSource;
-                }
-            }
-        }
-        return files;
-    }
-
-    /**
-     * Determine if a given string ends in a file system slash (\ for windows and / for everything else)
-     * @param dirPath
-     */
-    public endsWithSlash(dirPath: string) {
-        if ('string' === typeof dirPath && dirPath.length > 0 &&
-            (dirPath.lastIndexOf('/') === dirPath.length - 1 || dirPath.lastIndexOf('\\') === dirPath.length - 1)
-        ) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Given an array of files, normalize them into a standard {src;dest} object.
-     * This will make plain folder names into fully qualified paths, add globs to plain folders, etc.
+     * Given an array of `FilesType`, normalize each of them into a standard {src;dest} object.
+     * Each entry in the array or inner `src` array will be extracted out into its own object.
      * This makes it easier to reason about later on in the process.
      * @param files
      */
-    public normalizeFilesOption(files: FilesType[]) {
-        const result: { src: string[]; dest: string }[] = [];
-        let topLevelGlobs = <string[]>[];
-        //standardize the files object
-        for (let fileEntry of (files as any[])) {
+    public normalizeFilesArray(files: FileEntry[]) {
+        const result: Array<string | StandardizedFileEntry> = [];
 
-            //handle single string top-level globs
-            if (typeof fileEntry === 'string') {
-
-                topLevelGlobs.push(fileEntry);
+        for (let i = 0; i < files.length; i++) {
+            let entry = files[i];
+            //skip falsey and blank entries
+            if (!entry) {
                 continue;
-                //handle src;dest; object with single string for src
-            } else if (typeof fileEntry.src === 'string') {
-                fileEntry.src = [fileEntry.src];
-            }
 
-            fileEntry.dest = fileEntry.dest ? fileEntry.dest : '';
+                //string entries
+            } else if (typeof entry === 'string') {
+                result.push(entry);
 
-            //hard-fail if dest is anything other than a string at this point
-            if ('string' !== typeof fileEntry.dest) {
-                throw new Error('dest must be a string');
-            }
-
-            //standardize the dest path separator
-            fileEntry.dest = path.normalize(fileEntry.dest).trim();
-            if (fileEntry.dest === '' || fileEntry.dest === '.' || fileEntry.dest === '.\\' || fileEntry.dest === './') {
-                fileEntry.dest = '';
-            }
-            //force all slashes to the current platform's version
-            fileEntry.dest = fileEntry.dest.replace('\\', path.sep).replace('/', path.sep);
-
-            if (typeof fileEntry !== 'string' && (!fileEntry || fileEntry.src === null || fileEntry.src === undefined || fileEntry.dest === null || fileEntry.dest === undefined)) {
-                throw new Error('Entry must be a string or a {src;dest;} object');
-            }
-
-            //if there is a wildcard in any src, ensure a slash in dest
-            {
-                let srcContainsWildcard = (fileEntry.src as Array<string>).findIndex((src) => {
-                    return src.indexOf('*') > -1;
-                }) > -1;
-
-                if (fileEntry.dest.length > 0 && !this.endsWithSlash(fileEntry.dest) && srcContainsWildcard) {
-                    fileEntry.dest += path.sep;
+                //objects with src: (string | string[])
+            } else if ('src' in entry) {
+                //validate dest
+                if (entry.dest !== undefined && entry.dest !== null && typeof entry.dest !== 'string') {
+                    throw new Error(`Invalid type for "dest" at index ${i} of files array`);
                 }
+
+                //objects with src: string
+                if (typeof entry.src === 'string') {
+                    result.push({
+                        src: util.standardizePath(entry.src),
+                        dest: util.standardizePath(entry.dest)
+                    });
+
+                    //objects with src:string[]
+                } else if ('src' in entry && Array.isArray(entry.src)) {
+                    //create a distinct entry for each item in the src array
+                    for (let srcEntry of entry.src) {
+                        result.push({
+                            src: util.standardizePath(srcEntry),
+                            dest: util.standardizePath(entry.dest)
+                        });
+                    }
+                } else {
+                    throw new Error(`Invalid type for "src" at index ${i} of files array`);
+                }
+            } else {
+                throw new Error(`Invalid entry at index ${i} in files array`);
             }
-
-            result.push(fileEntry);
-        }
-
-        //if there are any top level globs, add that entry to the beginning
-        if (topLevelGlobs.length > 0) {
-            result.splice(0, 0, {
-                src: topLevelGlobs,
-                dest: ''
-            });
         }
 
         return result;
@@ -151,19 +97,17 @@ export class RokuDeploy {
     public async zipPackage(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let stagingFolderPath = this.getStagingFolderPath(options);
-
         //make sure the output folder exists
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
 
         //create a zip of the staging folder
-        await this.zipFolder(stagingFolderPath, zipFilePath);
+        await this.zipFolder(options.stagingFolderPath, zipFilePath);
 
         //delete the staging folder unless told to retain it.
         if (options.retainStagingFolder !== true) {
-            await this.fsExtra.remove(stagingFolderPath);
+            await this.fsExtra.remove(options.stagingFolderPath);
         }
     }
 
@@ -176,8 +120,7 @@ export class RokuDeploy {
 
         await this.prepublishToStaging(options);
 
-        let stagingFolderPath = this.getStagingFolderPath(options);
-        let manifestPath = path.join(stagingFolderPath, 'manifest');
+        let manifestPath = util.standardizePath(`${options.stagingFolderPath}/manifest`);
         let parsedManifest = await this.parseManifest(manifestPath);
 
         if (options.incrementBuildNumber) {
@@ -189,7 +132,7 @@ export class RokuDeploy {
         if (beforeZipCallback) {
             let info: BeforeZipCallbackInfo = {
                 manifestData: parsedManifest,
-                stagingFolderPath: stagingFolderPath
+                stagingFolderPath: options.stagingFolderPath
             };
 
             await Promise.resolve(beforeZipCallback(info));
@@ -212,144 +155,200 @@ export class RokuDeploy {
 
     /**
      * Get all file paths for the specified options
+     * @param files
+     * @param stagingFolderPath - the absolute path to the staging folder
+     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
      */
-    public async getFilePaths(files: FilesType[], stagingPath: string, rootDir: string) {
-        stagingPath = path.normalize(stagingPath);
-        const normalizedFiles = this.normalizeFilesOption(files);
-
-        rootDir = this.normalizeRootDir(rootDir);
-
-        //run glob lookups for every glob string provided
-        let filePathObjects = await Promise.all(
-            normalizedFiles.map(async (file) => {
-                let pathRemoveFromDest: string;
-                //if we have a single string, and it's a directory, append the wildcard glob on it
-                if (file.src.length === 1) {
-                    let fileAsDirPath: string;
-                    //try the path as is
-                    if (await this.isDirectory(file.src[0])) {
-                        fileAsDirPath = file.src[0];
-                    }
-                    /* istanbul ignore next */
-                    //assume path is relative, append root dir and try that way
-                    if (!fileAsDirPath && await this.isDirectory(path.join(rootDir, file.src[0]))) {
-                        fileAsDirPath = path.normalize(path.join(rootDir, file.src[0]));
-                    }
-                    if (fileAsDirPath) {
-                        pathRemoveFromDest = fileAsDirPath;
-
-                        //add the wildcard glob
-                        file.src[0] = path.join(fileAsDirPath, '**', '*');
-                    }
-                }
-                let originalSrc = file.src;
-
-                let filePathArray = await Q.nfcall(globAll, file.src, { cwd: rootDir });
-                let output = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
-
-                for (let filePath of filePathArray) {
-                    let dest = file.dest;
-
-                    //if we created this globbed result, maintain the relative position of the files
-                    if (pathRemoveFromDest) {
-                        let normalizedFilePath = path.normalize(filePath);
-                        //remove the specified source path
-                        dest = normalizedFilePath.replace(pathRemoveFromDest, '');
-                        //remove the filename if it's a file
-                        if (await this.isDirectory(filePath) === false) {
-                            dest = path.dirname(dest);
-                        }
-                        //prepend the specified dest
-                        dest = path.join(file.dest, dest, path.basename(normalizedFilePath));
-                        //blank out originalSrc since we already handled the dest
-                        originalSrc = [];
-                    }
-
-                    //create a src;dest; object for every file or directory that was found
-                    output.push({
-                        src: filePath,
-                        dest: dest,
-                        srcOriginal: originalSrc.length === 1 ? originalSrc[0] : undefined
-                    });
-                }
-                return output;
-            })
-        );
-
-        let fileObjects = <{ src: string; dest: string; srcOriginal?: string; }[]>[];
-        //create a single array of all paths
-        for (let filePathObject of filePathObjects) {
-            fileObjects = fileObjects.concat(filePathObject);
+    public async getFilePaths(files: FileEntry[], rootDir: string) {
+        if (path.isAbsolute(rootDir) === false) {
+            throw new Error('rootDir must be absolute');
         }
+        const normalizedFiles = this.normalizeFilesArray(files);
 
-        //make all file paths absolute
-        for (let fileObject of fileObjects) {
-            //only normalize non-absolute paths
-            if (path.isAbsolute(fileObject.src) === false) {
-                fileObject.src = path.resolve(
-                    path.join(rootDir, fileObject.src)
-                );
+        let result = [] as StandardizedFileEntry[];
+
+        for (let entry of normalizedFiles) {
+            let src = typeof entry === 'string' ? entry : entry.src;
+
+            //if starts with !, this is a negated glob. 
+            let isNegated = src.indexOf('!') === 0;
+
+            //remove the ! so the glob will match properly
+            if (isNegated) {
+                src = src.substring(1);
             }
-            //normalize the path
-            fileObject.src = path.normalize(fileObject.src);
+
+            let entryResults = await this.getFilePathsForEntry(
+                typeof entry === 'string' ? src : { ...entry, src: src },
+                rootDir
+            );
+
+            //if negated, remove all of the negated matches from the results
+            if (isNegated) {
+                let paths = entryResults.map(x => x.src);
+                result = result.filter(x => paths.indexOf(x.src) === -1);
+
+                //add all of the entries to the results
+            } else {
+                result.push(...entryResults);
+            }
         }
 
-        let result: { src: string; dest: string; }[] = [];
-        //copy each file, retaining their folder structure relative to the rootDir
-        await Promise.all(
-            fileObjects.map(async (fileObject) => {
-                let src = path.normalize(fileObject.src);
-                let dest = fileObject.dest;
-                let sourceIsDirectory = await this.isDirectory(src);
+        //only keep the last entry of each `dest` path
+        let destPaths = {} as { [key: string]: boolean };
+        for (let i = result.length - 1; i >= 0; i--) {
+            let entry = result[i];
 
-                let relativeSrc: string;
-                //if we have an original src, and it contains the ** glob, use the relative position starting at **
-                let globDoubleStarIndex = fileObject.srcOriginal ? fileObject.srcOriginal.indexOf('**') : -1;
+            //if we have already seen this dest path, this is a duplicate...throw it out
+            if (destPaths[entry.dest]) {
+                result.splice(i, 1);
+            } else {
+                //this is the first time we've seen this entry, keep it and move on
+                destPaths[entry.dest] = true;
+            }
+        }
 
-                if (fileObject.srcOriginal && globDoubleStarIndex > -1 && sourceIsDirectory === false) {
-                    let pathToDoubleStar = fileObject.srcOriginal.substring(0, globDoubleStarIndex);
-                    relativeSrc = src.replace(pathToDoubleStar, '');
-                    dest = path.join(dest, relativeSrc);
-                } else {
-                    let rootDirWithTrailingSlash = path.normalize(rootDir + path.sep);
-                    relativeSrc = src.replace(rootDirWithTrailingSlash, '');
-                }
-
-                //if item is a directory
-                if (sourceIsDirectory) {
-                    //source is a directory (which is only possible when glob resolves it as such)
-                    //do nothing, because we don't want to copy empty directories to output
-                } else {
-                    let destinationPath: string;
-
-                    //if the relativeSrc is stil absolute, then this file exists outside of the rootDir. Copy to dest, and only retain filename from src
-                    if (path.isAbsolute(relativeSrc)) {
-                        destinationPath = path.join(stagingPath, dest, path.basename(relativeSrc));
-                    } else {
-                        //the relativeSrc is actually relative
-
-                        //if the dest ends in a slash, use the filename from src, but the folder structure from dest
-                        if (dest.endsWith(path.sep)) {
-                            destinationPath = path.join(stagingPath, dest, path.basename(src));
-
-                            //dest is empty, so use the relative path
-                        } else if (dest === '') {
-                            destinationPath = path.join(stagingPath, relativeSrc);
-
-                            //use all of dest
-                        } else {
-                            destinationPath = path.join(stagingPath, dest);
-                        }
-                    }
-                    fileObject.dest = destinationPath;
-
-                    delete fileObject.srcOriginal;
-                    //add the file object to the results
-                    result.push(fileObject);
-                }
-            })
-        );
         return result;
+    }
+
+    private async getFilePathsForEntry(entry: StandardizedFileEntry | string, rootDir: string) {
+        //container for the files for this entry
+        let result = [] as StandardizedFileEntry[];
+
+        let pattern = typeof entry === 'string' ? entry : entry.src;
+        let files = await globAsync(pattern, { cwd: rootDir, absolute: true });
+
+        //reduce garbage collection churn by using the same filesEntry array for each file below
+        let fileEntries = [entry];
+
+        for (let filePathAbsolute of files) {
+            //only include files (i.e. skip directories)
+            if (await util.isFile(filePathAbsolute)) {
+                //throw an exception when a top-level string references a file outside of the rootDir
+                if (typeof entry === 'string' && util.isParentOfPath(rootDir, filePathAbsolute) === false) {
+                    throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+                }
+                result.push({
+                    src: util.standardizePath(filePathAbsolute),
+                    dest: this.getDestPath(filePathAbsolute, fileEntries, rootDir, true)
+                });
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Given a full path to a file, determine its dest path
+     * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+     * @param files the files array
+     * @param rootDir the absolute path to the root dir
+     * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
+     * @returns the RELATIVE path to the dest location for the file.
+     */
+    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false): string | undefined {
+        //container for the files for this entry
+        const standardizedFiles = this.normalizeFilesArray(files);
+        let dest: string;
+
+        //walk through the entire files array and find the last dest entry that matches
+        for (let entry of standardizedFiles) {
+            let srcGlobPattern = typeof entry === 'string' ? entry : entry.src;
+            const isNegated = srcGlobPattern.startsWith('!');
+            if (isNegated) {
+                srcGlobPattern = srcGlobPattern.substring(1);
+            }
+            let isMatch: boolean;
+
+            //if skipMatch is true, assume the file is a match and don't run the match function 
+            if (skipMatch === true) {
+                isMatch = true;
+            } else {
+                //make the glob path absolute
+                srcGlobPattern = path.resolve(util.toForwardSlashes(rootDir), srcGlobPattern);
+
+                isMatch = minimatch(util.toForwardSlashes(srcPathAbsolute), srcGlobPattern);
+            }
+
+            //if not a match, move to the next pattern
+            if (!isMatch) {
+                continue;
+            }
+            //if this was a negated pattern, discard dest (i.e. exclude the file) and move to next pattern 
+            if (isNegated) {
+                dest = undefined;
+                continue;
+            }
+
+            //root-level files array strings are treated like file filters. These must be globs/paths relative to `rootDir`
+            if (typeof entry === 'string') {
+                //if the path is not found within the rootDir, this is not a match
+                if (util.isParentOfPath(rootDir, srcPathAbsolute) === false) {
+                    continue;
+                }
+                //normalize the path
+                srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, rootDir, '');
+                dest = util.standardizePath(`${srcPathRelative}`);
+                continue;
+            }
+
+            //if this is an explicit file reference
+            if (glob.hasMagic(entry.src) === false) {
+                let isSrcPathAbsolute = path.isAbsolute(entry.src);
+                let entrySrcPathAbsolute = isSrcPathAbsolute ?
+                    entry.src :
+                    util.standardizePath(`${rootDir}/${entry.src}`);
+
+                let isSrcChildOfRootDir = util.isParentOfPath(rootDir, entrySrcPathAbsolute);
+
+                let fileNameAndExtension = path.basename(entrySrcPathAbsolute);
+
+                //no dest
+                if (!entry.dest) {
+                    //no dest, absolute path or file outside of rootDir
+                    if (isSrcPathAbsolute || isSrcChildOfRootDir === false) {
+                        //copy file to root of staging folder
+                        dest = fileNameAndExtension;
+
+                        //no dest, relative path, lives INSIDE rootDir
+                    } else {
+                        //copy relative file structure to root of staging folder
+                        let srcPathRelative = util.stringReplaceInsensitive(entrySrcPathAbsolute, rootDir, '');
+                        dest = srcPathRelative;
+                    }
+
+                    //assume entry.dest is the relative path to the folder AND file if applicable
+                } else {
+                    dest = entry.dest;
+                }
+                continue;
+            }
+
+            //if src contains double wildcard
+            if (entry.src.indexOf('**') > -1) {
+                //run the glob lookup
+                srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+
+                //matches should retain structure relative to star star
+                let absolutePathToStarStar = path.resolve(rootDir, entry.src.split('**')[0]);
+                let srcPathRelative = util.stringReplaceInsensitive(srcPathAbsolute, absolutePathToStarStar, '');
+
+                dest = entry.dest ? entry.dest : '';
+                dest = util.standardizePath(`${dest}/${srcPathRelative}`);
+                continue;
+            }
+
+            //src is some other type of glob 
+            {
+                let fileNameAndExtension = path.basename(srcPathAbsolute);
+                dest = entry.dest ? entry.dest : '';
+                dest = util.standardizePath(`${dest}/${fileNameAndExtension}`);
+                continue;
+            }
+        }
+        //remove any leading slash
+        dest = typeof dest === 'string' ? dest.replace(/^[\/\\]*/, '') : undefined;
+        return dest;
     }
 
     /**
@@ -357,33 +356,27 @@ export class RokuDeploy {
      * @param fileGlobs
      * @param stagingPath
      */
-    private async copyToStaging(files: FilesType[], stagingPath: string, rootDir: string) {
-        let fileObjects = await this.getFilePaths(files, stagingPath, rootDir);
-        for (let fileObject of fileObjects) {
+    private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
+        if (!stagingPath) { throw new Error('stagingPath is required'); }
+        if (!rootDir) { throw new Error('rootDir is required'); }
+
+        let fileObjects = await this.getFilePaths(files, rootDir);
+        //copy all of the files 
+        await Promise.all(fileObjects.map(async (fileObject) => {
+            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
+
             //make sure the containing folder exists
-            await this.fsExtra.ensureDir(path.dirname(fileObject.dest));
+            await this.fsExtra.ensureDir(path.dirname(destFilePath));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
-            //Just try a few fimes until it resolves itself.
-
-            for (let i = 0; i < 10; i++) {
-                try {
-                    //copy the src item (file or directory full of files)
-                    await this.fsExtra.copy(fileObject.src, fileObject.dest, {
-                        //copy the actual files that symlinks point to, not the symlinks themselves
-                        dereference: true
-                    });
-                    //copy succeeded,
-                    i = 10; //break out of the loop and still achieve coverage for i++
-                } catch (e) {
-                    //wait a small amount of time and try again
-                    /* istanbul ignore next */
-                    await new Promise((resolve) => {
-                        setTimeout(resolve, 50);
-                    });
-                }
-            }
-        }
+            await util.tryRepeatAsync(async () => {
+                //copy the src item using the filesystem
+                await this.fsExtra.copy(fileObject.src, destFilePath, {
+                    //copy the actual files that symlinks point to, not the symlinks themselves
+                    dereference: true
+                });
+            }, 10);
+        }));
     }
 
     private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
@@ -398,20 +391,6 @@ export class RokuDeploy {
             }
         };
         return baseRequestOptions;
-    }
-
-    /**
-     * Determine if the given path is a directory
-     * @param path
-     */
-    public async isDirectory(pathToDirectoryOrFile: string) {
-        try {
-            let stat = await Q.nfcall(this.fsExtra.lstat, pathToDirectoryOrFile);
-            return stat.isDirectory();
-        } catch (e) {
-            // lstatSync throws an error if path doesn't exist
-            return false;
-        }
     }
 
     /**
@@ -547,8 +526,7 @@ export class RokuDeploy {
         if (!options.signingPassword) {
             throw new errors.MissingRequiredOptionError('Must supply signingPassword');
         }
-        let stagingFolderpath = this.getStagingFolderPath(options);
-        let manifestPath = path.join(stagingFolderpath, 'manifest');
+        let manifestPath = path.join(options.stagingFolderPath, 'manifest');
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
@@ -694,7 +672,7 @@ export class RokuDeploy {
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
         if (originalOptionValueRetainStagingFolder !== true) {
-            await this.fsExtra.remove(this.getStagingFolderPath(options));
+            await this.fsExtra.remove(options.stagingFolderPath);
         }
         return localPkgFilePath;
     }
@@ -733,22 +711,24 @@ export class RokuDeploy {
         let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
 
         //fully resolve the folder paths
-        finalOptions.rootDir = path.resolve(finalOptions.rootDir);
-        finalOptions.outDir = path.resolve(finalOptions.outDir);
+        finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
+        finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
+
+        //stagingFolderPath
+        {
+            if (finalOptions.stagingFolderPath) {
+                finalOptions.stagingFolderPath = path.resolve(process.cwd(), options.stagingFolderPath);
+            } else {
+                finalOptions.stagingFolderPath = path.resolve(
+                    process.cwd(),
+                    util.standardizePath(
+                        `${finalOptions.outDir}/.roku-deploy-staging`
+                    )
+                );
+            }
+        }
 
         return finalOptions;
-    }
-
-    public getStagingFolderPath(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
-
-        if (options.stagingFolderPath) {
-            return path.resolve(options.stagingFolderPath);
-        } else {
-            let stagingFolderPath = path.join(options.outDir, '.roku-deploy-staging');
-            stagingFolderPath = path.resolve(stagingFolderPath);
-            return stagingFolderPath;
-        }
     }
 
     /**
@@ -926,7 +906,7 @@ export interface RokuDeployOptions {
         ],
      */
     // tslint:enable:jsdoc-format
-    files?: FilesType[];
+    files?: FileEntry[];
 
     /**
      * Set this to true to prevent the staging folder from being deleted after creating the package
@@ -1027,4 +1007,15 @@ export interface BeforeZipCallbackInfo {
     stagingFolderPath: string;
 }
 
-export type FilesType = (string | string[] | { src: string | string[]; dest?: string });
+export interface StandardizedFileEntry {
+    /**
+     * The full path to the source file
+     */
+    src: string;
+    /**
+     * The path relative to the root of the pkg to where the file should be placed 
+     */
+    dest: string;
+}
+
+export type FileEntry = (string | { src: string | string[]; dest?: string });

@@ -23,7 +23,7 @@ Publish Roku projects to a Roku device by using Node.js.
 
 sample rokudeploy.json
 
-```json
+```jsonc
 {
     "host": "192.168.1.101",
     "password": "securePassword"
@@ -77,21 +77,148 @@ You can provide a callback in any of the higher level methods, which allows you 
 - **stagingFolderPath:** string
     Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
 
-        let options = {
-            host: 'ip-of-roku',
-            password: 'password for roku dev admin portal'
-            //other options if necessary
-        };
+    ```javascript
+    let options = {
+        host: 'ip-of-roku',
+        password: 'password for roku dev admin portal'
+        //other options if necessary
+    };
 
-        rokuDeploy.deploy(options, (info) => {
-            //modify staging dir before it's zipped
-	    }).then(function(){
-            //it worked
-        }, function(){
-            //it failed
-        });
+    rokuDeploy.deploy(options, (info) => {
+        //modify staging dir before it's zipped. 
+        //At this point, all files have been copied to the staging directory. 
+        manipulateFilesInStagingFolder(info.stagingFolderPath)
+        //this function can also return a promise, 
+        //which will be awaited before roku-deploy starts deploying. 
+    }).then(function(){
+        //it worked
+    }, function(){
+        //it failed
+    });
+    ```
 
-## Options
+## Files Array
+
+The files array is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include _filters_, meaning that if a file matches the pattern, it is included. 
+
+For most standard projects, the default files array should work just fine:
+
+```jsonc
+{
+    "files": [
+        "source/**/*",
+        "components/**/*",
+        "images/**/*",
+        "manifest"
+    ]
+}
+```
+
+This will copy all files from the standard roku folders directly into the package while maintaining each file's relative file path within `rootDir`. 
+
+If you want to include additonal files, you will need to provide the entire array. For example, if you have a folder with other assets, you could do the following:
+
+```jsonc
+{
+    "files": [
+        "source/**/*",
+        "components/**/*",
+        "images/**/*",
+        "manifest"
+        //your folder with other assets
+        "assets/**/*", 
+    ]
+}
+```
+
+### Excluding Files
+You can also prefix your file patterns with "`!`" which will _exclude_ files from the output. This is useful in cases where you want everything in a folder EXCEPT certain files. The files array is processed top to bottom. Here's an example:
+
+```jsonc
+{
+    "files": [
+        "source/**/*",
+        "!source/some/unwanted/file.brs"
+    ]
+}
+```
+
+#### Top-level String Rules
+ - All patterns will be resolved relative to `rootDir`, with their relative positions within `rootDir` maintained.
+
+ - No pattern may reference a file outside of `rootDir`. (You can use `{src;dest}` objects to accomplish) For example:  
+     ```jsonc
+     {
+         "rootDir": "C:/projects/CatVideoPlayer",
+         "files": [
+             "source/main.brs",
+
+             //NOT allowed because it navigates outside the rootDir
+             "../common/promise.brs"
+         ]
+     }
+     ```
+
+ - Any valid glob pattern is supported. See [glob on npm](https://www.npmjs.com/package/glob) for more information.
+
+ - Empty folders are not copied
+ 
+ - Paths to folders will be ignored. If you want to copy a folder and its contents, use the glob syntax (i.e. `some_folder/**/*`)
+
+### Advanced Usage
+For more advanced use cases, you may provide an object which contains the source pattern and output path. This allows you to get very specific about what files to copy, and where they are placed in the output folder. This option also supports copying files from outside the project. 
+
+The object structure is as follows: 
+
+```typescript
+{
+    /**
+     * a glob pattern string or file path, or an array of glob pattern strings and/or file paths.
+     * These can be relative paths or absolute paths. 
+     * All non-absolute paths are resolved relative to the rootDir
+     */
+    src: Array<string|string[]>;
+    /**
+     * The relative path to the location in the output folder where the files should be placed, relative to the root of the output folder
+     */
+    dest: string|undefined
+}
+```
+#### { src; dest } Object Rules
+ - if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:   
+ `{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
+
+ - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:  
+ `{ src: "lib/*.brs", dest: "source/lib"}`
+
+ - if `src` is a glob pattern that includes `**`, then all files found in `src` after the `**` will retain their relative paths in `src` when copied to `dest`. For example:  
+ `{ src: "lib/**.brs", dest: "source/lib"}`
+
+ - if `src` is a path to a folder, it will be ignored. If you want to copy a folder and its contents, use the glob syntax. The following example will copy all files from the `lib/vendor` folder recursively: 
+`{ src: "lib/vendor/**/*", dest: "vendor" }`
+
+ - if `dest` is not specified, the root of the output folder is assumed
+
+ ### Collision Handling
+`roku-deploy` processes file entries in order, so if you want to override a file, just make sure the one you want to keep is later in the files array
+
+For example, if you have a base project, and then a child project that wants to override specific files, you could do the following: 
+```jsonc
+{
+    "files": [
+        {
+            //copy all files from the base project
+            "src": "../BaseProject/**/*"
+        },
+        //override "../BaseProject/themes/theme.brs" with "${rootDir}/themes/theme.brs"
+        "themes/theme.brs"
+    ]
+}
+```
+
+
+
+## roku-deploy Options
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
 
 - **host:** string (*required*)  
@@ -133,7 +260,7 @@ Here are the available options. The defaults are shown to the right of the optio
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location 
     (i.e. copy from `"ProjectRoot\configs\dev.config.json"` to `"roku-deploy.zip\config.json"`). Here's a sample:  
-    ```json
+    ```jsonc
     //deploy configs/dev.config.json as config.json
     {
         "src": "configs/dev.config.json",
@@ -141,7 +268,7 @@ Here are the available options. The defaults are shown to the right of the optio
     }
     ```
 
-    ```json
+    ```jsonc
     //you can omit the filename in dest if you want the file to keep its name. Just end dest with a trailing slash.
     {
         "src": "languages/english/language.xml",

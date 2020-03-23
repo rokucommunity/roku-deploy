@@ -18,7 +18,9 @@ deploy:
   api_key: $NPM_TOKEN
   skip_cleanup: true
   on:
-    branch: master
+    branch: 
+      - master
+      - v3
     tags: true
     # only deploy from the linux build
     condition: $TRAVIS_OS_NAME = linux

@@ -1,16 +1,18 @@
 {
   "name": "roku-deploy",
-  "version": "2.7.0",
+  "version": "3.0.0-beta.8",
   "description": "Package and publish a Roku application using Node.js",
   "main": "dist/index.js",
   "scripts": {
     "build": "rimraf out && tsc",
     "preversion": "npm run build && npm run tslint && npm run test",
     "prepublishOnly": "npm run build",
-    "tslint": "tslint './src/**/*.ts' --outputAbsolutePaths",
-    "test": "nyc mocha src/RokuDeploy.spec.ts --full-trace",
+    "tslint": "tslint \"./src/**/*.ts\" --outputAbsolutePaths --project tsconfig.json",
+    "test": "nyc mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
+    "test:nocover": "ts-mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
     "test:device": "nyc mocha src/device.spec.ts --full-trace",
     "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
+    "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
     "publish-coverage-results": "nyc report --reporter=text-lcov | coveralls"
   },
   "typings": "dist/index.d.ts",
@@ -26,7 +28,8 @@
   "nyc": {
     "include": [
       "src/index.ts",
-      "src/RokuDeploy.ts"
+      "src/RokuDeploy.ts",
+      "src/util.ts"
     ],
     "extension": [
       ".ts"
@@ -49,7 +52,8 @@
   },
   "devDependencies": {
     "@types/archiver": "^2.1.2",
-    "@types/chai": "^4.1.2",
+    "@types/chai": "^4.2.3",
+    "@types/denodeify": "^1.2.31",
     "@types/fs-extra": "^5.0.1",
     "@types/mocha": "^5.2.5",
     "@types/node": "^11.9.0",
@@ -60,24 +64,25 @@
     "chai-files": "^1.4.0",
     "coveralls": "^3.0.0",
     "deferred": "^0.7.11",
-    "mocha": "^5.2.0",
+    "mocha": "^6.2.1",
     "node-run-cmd": "^1.0.1",
     "nyc": "^14.1.1",
     "rimraf": "^2.6.2",
     "sinon": "^7.2.3",
-    "source-map-support": "^0.5.3",
+    "source-map-support": "^0.5.13",
     "testdouble": "^3.5.2",
-    "ts-node": "^8.0.2",
+    "ts-mocha": "^6.0.0",
+    "ts-node": "^8.4.1",
     "tslint": "^5.9.1",
-    "typescript": "^3.3.3"
+    "typescript": "^3.7.2"
   },
   "dependencies": {
     "archiver": "^3.0.0",
     "dateformat": "^3.0.3",
     "fs-extra": "^7.0.1",
-    "glob-all": "^3.1.0",
+    "glob": "^7.1.6",
+    "minimatch": "^3.0.4",
     "path": "^0.12.7",
-    "q": "^1.5.1",
     "request": "^2.88.0"
   }
 }

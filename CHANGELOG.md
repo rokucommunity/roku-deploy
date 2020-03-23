@@ -5,11 +5,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [3.0.0] - 2020-03-23
+## Added
+ - all changes from v3.0.0-beta1-v3.0.0-beta.8
+
+
+
+## [3.0.0-beta.8] - 2020-03-06
+### Added
+ - all changes from 2.7.0
+
+
+
 ## [2.7.0] - 2020-03-06
 ### Added
  - support for `remoteDebug` property which enables the experimental remote debug protocol on newer versions of Roku hardware. See [this](https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md) for more information.
 
 
+## [3.0.0-beta.7] - 2020-01-10
+### Fixed
+ - bug during file copy that was not prepending `stagingFolderPath` to certain file operations.
+
+
+
+## [3.0.0-beta.6] - 2020-01-06
+### Fixed
+ - bug that was not discarding duplicate file entries targeting the same `dest` path.
+
+
+
+## [3.0.0-beta.5] - 2019-12-20
+### Added
+ - all changes from 2.6.1
+
+
+
+## [3.0.0-beta.4] - 2019-11-12
+### Added
+ - all changes from 2.6.0
+
+
+
+## [3.0.0-beta.3] - 2019-11-12
+### Added
+ - `RokuDeploy.getDestPath` function which returns the dest path for a full file path. Useful for figuring out where a file will be placed in the pkg. 
+### Changed
+ - made `RokuDeploy.normalizeFilesArray` public
+ - disallow using explicit folder paths in files array. You must use globs for folders.
+
+
+
+## [3.0.0-beta.2] - 2019-10-23
+### Changed
+ - signature of `getFilePaths()` to no longer accept `stagingFolderPath`
+ - `getFilePaths()` now returns `dest` file paths relative to pkg instead of absolute file paths. These paths do _not_ include a leading slash
+
+
+
+## [3.0.0-beta.1] - 2019-10-16
+### Added
+ - information in the readme about the `files` array
+ - support for file overrides in the `files` array. This supports including the same file from A and B, and letting the final file override previous files. 
+### Changed
+ - the files array is now a bit more strict, and has a more consistent approach.
 ## [2.6.1] - 2019-12-20
 ### Fixed
  - Throw better error message during publish when missing the zip file.
@@ -43,7 +102,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.4.0] - 2019-08-26
 ### Added
  - `deleteInstalledChannel` method that will delete the installed channel on the remote Roku
-
 ### Changed
  - `deploy` now deletes any installed channel before publishing the new channel
 
@@ -133,6 +191,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.0.0-beta.7]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.6...v3.0.0-beta.7
+[3.0.0-beta.6]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.5...v3.0.0-beta.6
+[3.0.0-beta.5]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.4...v3.0.0-beta.5
+[3.0.0-beta.4]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.3...v3.0.0-beta.4
+[3.0.0-beta.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.2...v3.0.0-beta.3
+[3.0.0-beta.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.1...v3.0.0-beta.2
+[3.0.0-beta.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v3.0.0-beta.1
 [2.7.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.6.1...v2.7.0
 [2.6.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.6.0...v2.6.1
 [2.6.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.5.0...v2.6.0
