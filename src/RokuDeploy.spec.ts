@@ -1075,8 +1075,8 @@ describe('index', function () {
 
         it('normalizes directory separators paths', () => {
             expect(rd.normalizeFilesArray([{
-                src: `long\\source/path`,
-                dest: `long/dest\\path`
+                src: `long/source/path`,
+                dest: `long/dest/path`
             }])).to.eql([{
                 src: n('long/source/path'),
                 dest: n('long/dest/path')
@@ -1294,6 +1294,38 @@ describe('index', function () {
         }
 
         describe('top-level-patterns', () => {
+            it('works for root-level double star', async () => {
+                expect(await getFilePaths([
+                    '**/*'
+                ])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`components/component1.brs`)
+                }, {
+                    dest: n(`components/component1.xml`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/component1.xml`)
+                },
+                {
+                    dest: n(`components/screen1/screen1.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.brs`)
+                },
+                {
+                    dest: n(`components/screen1/screen1.xml`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.xml`)
+                },
+                {
+                    dest: n(`manifest`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/manifest`)
+                },
+                {
+                    dest: n(`source/lib.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/lib.brs`)
+                },
+                {
+                    dest: n(`source/main.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/main.brs`)
+                }]);
+            });
+
             it('works for multile entries', async () => {
                 expect(await getFilePaths([
                     'source/**/*',
@@ -1443,6 +1475,40 @@ describe('index', function () {
         });
 
         describe('{src;dest} objects', () => {
+            it('works for root-level double star', async () => {
+                expect(await getFilePaths([{
+                    src: '**/*',
+                    dest: ''
+                }
+                ])).to.eql([{
+                    src: n(`${rootDir}/components/component1.brs`),
+                    dest: n(`components/component1.brs`)
+                }, {
+                    dest: n(`components/component1.xml`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/component1.xml`)
+                },
+                {
+                    dest: n(`components/screen1/screen1.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.brs`)
+                },
+                {
+                    dest: n(`components/screen1/screen1.xml`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.xml`)
+                },
+                {
+                    dest: n(`manifest`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/manifest`)
+                },
+                {
+                    dest: n(`source/lib.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/lib.brs`)
+                },
+                {
+                    dest: n(`source/main.brs`),
+                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/main.brs`)
+                }]);
+            });
+
             it('uses the root of staging folder for dest when not specified with star star', async () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/**/*`
