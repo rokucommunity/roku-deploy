@@ -1301,28 +1301,28 @@ describe('index', function () {
                     src: n(`${rootDir}/components/component1.brs`),
                     dest: n(`components/component1.brs`)
                 }, {
-                    dest: n(`components/component1.xml`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/component1.xml`)
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`components/component1.xml`)
                 },
                 {
-                    dest: n(`components/screen1/screen1.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.brs`)
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`components/screen1/screen1.brs`)
                 },
                 {
-                    dest: n(`components/screen1/screen1.xml`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.xml`)
+                    src: n(`${rootDir}/components/screen1/screen1.xml`),
+                    dest: n(`components/screen1/screen1.xml`)
                 },
                 {
-                    dest: n(`manifest`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/manifest`)
+                    src: n(`${rootDir}/manifest`),
+                    dest: n(`manifest`)
                 },
                 {
-                    dest: n(`source/lib.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/lib.brs`)
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`source/lib.brs`)
                 },
                 {
-                    dest: n(`source/main.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/main.brs`)
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
@@ -1484,28 +1484,28 @@ describe('index', function () {
                     src: n(`${rootDir}/components/component1.brs`),
                     dest: n(`components/component1.brs`)
                 }, {
-                    dest: n(`components/component1.xml`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/component1.xml`)
+                    src: n(`${rootDir}/components/component1.xml`),
+                    dest: n(`components/component1.xml`)
                 },
                 {
-                    dest: n(`components/screen1/screen1.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.brs`)
+                    src: n(`${rootDir}/components/screen1/screen1.brs`),
+                    dest: n(`components/screen1/screen1.brs`)
                 },
                 {
-                    dest: n(`components/screen1/screen1.xml`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/components/screen1/screen1.xml`)
+                    src: n(`${rootDir}/components/screen1/screen1.xml`),
+                    dest: n(`components/screen1/screen1.xml`)
                 },
                 {
-                    dest: n(`manifest`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/manifest`)
+                    src: n(`${rootDir}/manifest`),
+                    dest: n(`manifest`)
                 },
                 {
-                    dest: n(`source/lib.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/lib.brs`)
+                    src: n(`${rootDir}/source/lib.brs`),
+                    dest: n(`source/lib.brs`)
                 },
                 {
-                    dest: n(`source/main.brs`),
-                    src: n(`C:/projects/roku/roku-deploy/getFilePaths_temp/src/source/main.brs`)
+                    src: n(`${rootDir}/source/main.brs`),
+                    dest: n(`source/main.brs`)
                 }]);
             });
 
