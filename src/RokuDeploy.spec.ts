@@ -15,7 +15,7 @@ import { util } from './util';
 
 chai.use(chaiFiles);
 
-let n = util.standardizePath;
+let n = util.standardizePath.bind(util);
 
 const expect = chai.expect;
 const file = chaiFiles.file;
@@ -1823,6 +1823,31 @@ describe('index', function () {
                     rootDir
                 )
             ).to.be.undefined;
+        });
+
+        it('works for brighterscript files', () => {
+            let destPath = rokuDeploy.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                n(`${cwd}/src`)
+            );
+            expect(n(destPath)).to.equal(n('source/main.bs'));
+        });
+
+        it('throws exception when rootDir is not absolute', async () => {
+            await expectThrowsAsync(async () => {
+                rokuDeploy.getDestPath(
+                    util.standardizePath(`${cwd}/src/source/main.bs`),
+                    [
+                        'manifest',
+                        'source/**/*.bs'
+                    ],
+                    `./src`
+                );
+            });
         });
 
         it('excludes a file found outside the root dir', async () => {

@@ -246,6 +246,9 @@ export class RokuDeploy {
      * @returns the RELATIVE path to the dest location for the file.
      */
     public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false): string | undefined {
+        if (path.isAbsolute(rootDir) === false) {
+            throw new Error('rootDir must be an absolute path');
+        }
         //container for the files for this entry
         const standardizedFiles = this.normalizeFilesArray(files);
         let dest: string;
@@ -435,7 +438,7 @@ export class RokuDeploy {
         };
 
         if (options.remoteDebug) {
-          requestOptions.formData.remotedebug = '1';
+            requestOptions.formData.remotedebug = '1';
         }
 
         let results = await this.doPostRequest(requestOptions);
