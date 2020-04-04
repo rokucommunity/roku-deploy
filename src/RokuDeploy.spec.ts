@@ -2058,6 +2058,10 @@ describe('index', () => {
     });
 
     describe('getOptions', () => {
+        it('does not error when no parameter provided', () => {
+            expect(rokuDeploy.getOptions(undefined)).to.exist;
+        });
+
         describe('packagePort', () => {
             it('defaults to 80', () => {
                 expect(rokuDeploy.getOptions({}).packagePort).to.equal(80);

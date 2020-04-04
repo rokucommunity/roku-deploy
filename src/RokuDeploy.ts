@@ -712,7 +712,7 @@ export class RokuDeploy {
         };
 
         //override the defaults with any found or provided options
-        let finalOptions = { ...defaultOptions, ...fileOptions, ...options ?? {} };
+        let finalOptions = { ...defaultOptions, ...fileOptions, ...options };
 
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
