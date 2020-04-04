@@ -6,8 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.1] - 2020-04-03
+### Changed
+ - throw exception in `getDestPath` when rootDir is not absolute.
+
+
+
 ## [3.0.0] - 2020-03-23
-## Added
+### Added
  - all changes from v3.0.0-beta1-v3.0.0-beta.8
 
 
@@ -191,6 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.0.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0...v3.0.1
+[3.0.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v2.7.0...v3.0.0
 [3.0.0-beta.7]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.6...v3.0.0-beta.7
 [3.0.0-beta.6]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.5...v3.0.0-beta.6
 [3.0.0-beta.5]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.0.0-beta.4...v3.0.0-beta.5
