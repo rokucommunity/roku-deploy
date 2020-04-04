@@ -23,7 +23,7 @@ const dir = chaiFiles.dir;
 let cwd = process.cwd();
 const tmpPath = n(`${cwd}/.tmp`);
 
-describe('index', function () {
+describe('index', () => {
     let rokuDeploy: RokuDeploy;
     //make an <any> ref to rokuDeploy to make some things easier
     let rd: any;
@@ -57,35 +57,35 @@ describe('index', function () {
         sinon.restore();
     });
 
-    describe('getOutputPkgFilePath', function () {
-        it('should return correct path if given basename', async () => {
+    describe('getOutputPkgFilePath', () => {
+        it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
             let outputPath = rokuDeploy.getOutputPkgFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.pkg'));
         });
 
-        it('should return correct path if given outFile option ending in .zip', async () => {
+        it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
             let outputPath = rokuDeploy.getOutputPkgFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.pkg'));
         });
     });
 
-    describe('getOutputZipFilePath', function () {
-        it('should return correct path if given basename', async () => {
+    describe('getOutputZipFilePath', () => {
+        it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
             let outputPath = rokuDeploy.getOutputZipFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.zip'));
         });
 
-        it('should return correct path if given outFile option ending in .zip', async () => {
+        it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
             let outputPath = rokuDeploy.getOutputZipFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.zip'));
         });
     });
 
-    describe('doPostRequest', function () {
+    describe('doPostRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
@@ -114,7 +114,7 @@ describe('index', function () {
         });
     });
 
-    describe('doGetRequest', function () {
+    describe('doGetRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
@@ -143,7 +143,7 @@ describe('index', function () {
         });
     });
 
-    describe('getDevId', function () {
+    describe('getDevId', () => {
         it('should return the current Dev ID if successful', async () => {
             let body = `{
                             var devDiv = document.createElement('div');
@@ -170,13 +170,11 @@ describe('index', function () {
 
     describe('copyToStaging', () => {
         it('throws exceptions on missing stagingPath', async () => {
-            await expectThrowsAsync(() =>
-                (rokuDeploy as any).copyToStaging([])
+            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([])
             );
         });
         it('throws exceptions on missing rootDir', async () => {
-            await expectThrowsAsync(() =>
-                (rokuDeploy as any).copyToStaging([], 'asdf')
+            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([], 'asdf')
             );
         });
         it('computes absolute path for all operations', async () => {
@@ -185,9 +183,9 @@ describe('index', function () {
                 ensureDirPaths.push(p);
                 return Promise.resolve;
             });
-            const copyPaths = [] as Array<{ src: string; dest: string; }>;
-            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((src, dest) => {
-                copyPaths.push({ src, dest });
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src, dest: dest });
                 return Promise.resolve();
             });
 
@@ -210,7 +208,7 @@ describe('index', function () {
 
             expect(ensureDirPaths).to.eql([
                 n(`${stagingPath}/source`),
-                n(`${stagingPath}/components/a/b/c`),
+                n(`${stagingPath}/components/a/b/c`)
             ]);
 
             expect(copyPaths).to.eql([
@@ -225,7 +223,7 @@ describe('index', function () {
         });
     });
 
-    describe('createPackage', function () {
+    describe('createPackage', () => {
         it('works with custom stagingFolderPath', async () => {
             let opts = {
                 ...options,
@@ -249,7 +247,7 @@ describe('index', function () {
             assert.fail('Exception should have been thrown');
         });
 
-        it('should create package in proper directory', async function () {
+        it('should create package in proper directory', async () => {
             await rokuDeploy.createPackage({
                 ...options,
                 files: [
@@ -260,16 +258,12 @@ describe('index', function () {
         });
 
         it('should only include the specified files', async () => {
-            try {
-                options.files = ['manifest'];
-                await rokuDeploy.createPackage(options);
-                let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
-                await fsExtra.ensureDir('.tmp');
-                zip.extractAllTo('.tmp/output', true);
-                expect(file('./.tmp/output/manifest')).to.exist;
-            } catch (e) {
-                throw e;
-            }
+            options.files = ['manifest'];
+            await rokuDeploy.createPackage(options);
+            let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
+            await fsExtra.ensureDir('.tmp');
+            zip.extractAllTo('.tmp/output', true);
+            expect(file('./.tmp/output/manifest')).to.exist;
         });
 
         it('generates full package with defaults', async () => {
@@ -359,10 +353,10 @@ describe('index', function () {
         });
     });
 
-    it('runs via the command line using the rokudeploy.json file', function (done) {
+    it('runs via the command line using the rokudeploy.json file', function test(done) {
         this.timeout(20000);
         nrc.run('node dist/index.js', {
-            onData: function (data) {
+            onData: (data) => {
             }
         }).then(() => {
             assert.ok('deploy succeeded');
@@ -399,7 +393,7 @@ describe('index', function () {
 
         it('uses default port', async () => {
             const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake(async (opts: any) => {
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
                 expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
                 d.resolve();
             });
@@ -409,7 +403,7 @@ describe('index', function () {
 
         it('uses overridden port', async () => {
             const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake(async (opts: any) => {
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
                 expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
                 d.resolve();
             });
@@ -423,17 +417,25 @@ describe('index', function () {
         beforeEach(() => {
             options.host = '0.0.0.0';
             //rename the rokudeploy.json file so publish doesn't pick it up
-            try { fsExtra.renameSync('rokudeploy.json', 'temp.rokudeploy.json'); } catch (e) { }
+            try {
+                fsExtra.renameSync('rokudeploy.json', 'temp.rokudeploy.json');
+            } catch (e) { }
 
             //make a dummy output file...we don't care what's in it
             options.outFile = `temp${fileCounter++}.zip`;
-            try { fsExtra.mkdirSync(options.outDir); } catch (e) { }
-            try { fsExtra.appendFileSync(`${options.outDir}/${options.outFile}`, 'asdf'); } catch (e) { }
+            try {
+                fsExtra.mkdirSync(options.outDir);
+            } catch (e) { }
+            try {
+                fsExtra.appendFileSync(`${options.outDir}/${options.outFile}`, 'asdf');
+            } catch (e) { }
         });
 
         afterEach(() => {
             //rename the rokudeploy.json file so publish doesn't pick it up
-            try { fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json'); } catch (e) { }
+            try {
+                fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json');
+            } catch (e) { }
         });
 
         it('fails when the zip file is missing', async () => {
@@ -509,7 +511,7 @@ describe('index', function () {
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
-            }, (err) => {
+            }, () => {
                 assert.fail('Should not have rejected the promise');
             });
         });
@@ -521,7 +523,7 @@ describe('index', function () {
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
-            }, (err) => {
+            }, () => {
                 assert.fail('Should not have rejected the promise');
             });
         });
@@ -534,7 +536,7 @@ describe('index', function () {
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.results.body).to.equal(body);
-            }, (err) => {
+            }, () => {
                 assert.fail('Should have resolved promise');
             });
         });
@@ -917,7 +919,7 @@ describe('index', function () {
                     'source',
                     'components/**/*',
                     '!components/scenes/**/*'
-                ],
+                ]
             });
             expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
             expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
@@ -972,9 +974,13 @@ describe('index', function () {
             afterEach(cleanUp);
 
             async function cleanUp() {
-                try { await fsExtra.remove(sourcePath); } catch (e) { }
+                try {
+                    await fsExtra.remove(sourcePath);
+                } catch (e) { }
                 //delete the symlink if it exists
-                try { await fsExtra.remove(symlinkPath); } catch (e) { }
+                try {
+                    await fsExtra.remove(symlinkPath);
+                } catch (e) { }
             }
 
             /**
@@ -984,13 +990,19 @@ describe('index', function () {
                 let originalFilePath = path.join(cwd, 'README.md');
                 let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
                 //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+                try {
+                    fsExtra.removeSync(testSymlinkFile);
+                } catch (e) { }
                 //create the symlink file
-                try { fsExtra.symlinkSync(originalFilePath, testSymlinkFile); } catch (e) { }
+                try {
+                    fsExtra.symlinkSync(originalFilePath, testSymlinkFile);
+                } catch (e) { }
                 let isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
 
                 //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
+                try {
+                    fsExtra.removeSync(testSymlinkFile);
+                } catch (e) { }
                 return isPermitted;
             }
 
@@ -1023,7 +1035,7 @@ describe('index', function () {
                 //getFilePaths detects the file
                 expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
                     src: n(`${opts.rootDir}/renamed_test.md`),
-                    dest: n(`renamed_test.md`),
+                    dest: n(`renamed_test.md`)
                 }]);
 
                 await rokuDeploy.prepublishToStaging(opts);
@@ -1094,7 +1106,7 @@ describe('index', function () {
 
         it('works for negated strings', () => {
             expect(rd.normalizeFilesArray([
-                '!.git',
+                '!.git'
             ])).to.eql([
                 '!.git'
             ]);
@@ -1229,17 +1241,17 @@ describe('index', function () {
 
             inputManifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
             inputManifestContents = inputManifestContents.trim();
-            inputParsedManifest = await rokuDeploy.parseManifestFromString(inputManifestContents);
+            inputParsedManifest = rokuDeploy.parseManifestFromString(inputManifestContents);
         });
 
-        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', async () => {
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', () => {
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
             let outputNormalized = outputStringifiedManifest.replace(/\r\n/g, '\n');
             let inputNormalized = inputManifestContents.replace(/\r\n/g, '\n');
             expect(outputNormalized).to.equal(inputNormalized);
         });
 
-        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', async () => {
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', () => {
             delete inputParsedManifest.keyIndexes;
             delete inputParsedManifest.lineCount;
             let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
@@ -1694,7 +1706,7 @@ describe('index', function () {
             //top-level string paths pointing to files outside the root should thrown an exception
             await expectThrowsAsync(async () => {
                 paths = await rokuDeploy.getFilePaths([
-                    n(`${cwd}/README.md`),
+                    n(`${cwd}/README.md`)
                 ], outDir);
             });
         });
@@ -1837,8 +1849,8 @@ describe('index', function () {
             expect(n(destPath)).to.equal(n('source/main.bs'));
         });
 
-        it('throws exception when rootDir is not absolute', async () => {
-            await expectThrowsAsync(async () => {
+        it('throws exception when rootDir is not absolute', () => {
+            try {
                 rokuDeploy.getDestPath(
                     util.standardizePath(`${cwd}/src/source/main.bs`),
                     [
@@ -1847,7 +1859,10 @@ describe('index', function () {
                     ],
                     `./src`
                 );
-            });
+                expect(false, 'should have thrown an exception').to.be.true;
+            } catch (e) {
+                expect(true).to.be.true;
+            }
         });
 
         it('excludes a file found outside the root dir', async () => {
@@ -1858,7 +1873,7 @@ describe('index', function () {
                 rokuDeploy.getDestPath(
                     n(`${rootDir}/../source/main.brs`),
                     [
-                        '../source/**/*',
+                        '../source/**/*'
                     ],
                     rootDir
                 )
@@ -1921,7 +1936,7 @@ describe('index', function () {
             onHandler = (event, callback) => {
                 if (event === 'response') {
                     callback({
-                        statusCode: 200,
+                        statusCode: 200
                     });
                 }
             };
@@ -1974,13 +1989,13 @@ describe('index', function () {
             let count = 0;
 
             //mock writeFile so we can throw a few errors during the test
-            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake(async (...args) => {
-                count = count + 1;
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+                count += 1;
                 //fail a few times
                 if (count < 5) {
                     throw new Error('fake error thrown as part of the unit test');
                 } else {
-                    return await copy.apply(rokuDeploy.fsExtra, args);
+                    return copy.apply(rokuDeploy.fsExtra, args);
                 }
             });
 
@@ -1989,7 +2004,7 @@ describe('index', function () {
             //override the retry milliseconds to make test run faster
             let orig = util.tryRepeatAsync.bind(util);
             sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
-                return await orig(args[0], args[1], 0);
+                return orig(args[0], args[1], 0);
             });
 
             await rokuDeploy.prepublishToStaging({
@@ -2007,20 +2022,20 @@ describe('index', function () {
             let count = 0;
 
             //mock writeFile so we can throw a few errors during the test
-            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake(async (...args) => {
-                count = count + 1;
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+                count += 1;
                 //fail a few times
                 if (count < 15) {
                     throw new Error('fake error thrown as part of the unit test');
                 } else {
-                    return await copy.apply(rokuDeploy.fsExtra, args);
+                    return copy.apply(rokuDeploy.fsExtra, args);
                 }
             });
 
             //override the timeout for tryRepeatAsync so this test runs faster
             let orig = util.tryRepeatAsync.bind(util);
             sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
-                return await orig(args[0], args[1], 0);
+                return orig(args[0], args[1], 0);
             });
 
             let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
@@ -2126,7 +2141,9 @@ describe('index', function () {
         try {
             await fn();
         } catch (e) {
-            f = () => { throw e; };
+            f = () => {
+                throw e;
+            };
         } finally {
             assert.throws(f);
         }

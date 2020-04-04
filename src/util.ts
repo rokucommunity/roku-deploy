@@ -5,8 +5,8 @@ import * as fs from 'fs';
 export class Util {
     /**
      * Determine if `childPath` is contained within the `parentPath`
-     * @param parentPath 
-     * @param childPath 
+     * @param parentPath
+     * @param childPath
      */
     public isParentOfPath(parentPath: string, childPath: string) {
         parentPath = util.standardizePath(parentPath);
@@ -16,7 +16,7 @@ export class Util {
     }
     /**
      * Determines if the given path is a file
-     * @param filePathAbsolute 
+     * @param filePathAbsolute
      */
     public async isFile(filePathAbsolute: string) {
         try {
@@ -32,7 +32,7 @@ export class Util {
 
     /**
      * Normalize path and replace all directory separators with current OS separators
-     * @param thePath 
+     * @param thePath
      */
     public standardizePath(thePath: string) {
         if (!thePath) {
@@ -56,9 +56,9 @@ export class Util {
 
     /**
      * Do a case-insensitive string replacement
-     * @param haystack 
-     * @param needle 
-     * @param replace 
+     * @param haystack
+     * @param needle
+     * @param replace
      */
     public stringReplaceInsensitive(haystack: string, needle: string, replace: string) {
         let idx = haystack.toLowerCase().indexOf(needle.toLowerCase());
@@ -71,9 +71,9 @@ export class Util {
 
     /**
      * Keep calling the callback until it does NOT throw an exception, or until the max number of tries has been reached.
-     * @param callback 
-     * @param maxTries 
-     * @param sleepMilliseconds 
+     * @param callback
+     * @param maxTries
+     * @param sleepMilliseconds
      */
     /* istanbul ignore next */ //typescript generates some weird while statement that can't get fully covered for some reason
     public async tryRepeatAsync<T>(callback, maxTries = 10, sleepMilliseconds = 50): Promise<T> {

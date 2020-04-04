@@ -10,4 +10,4 @@ testProject
 rokudeploy.json
 *.pkg
 tsconfig.json
-tslint.json
+.eslintrc.js

@@ -7,7 +7,7 @@ import * as errors from './Errors';
 import * as minimatch from 'minimatch';
 import * as glob from 'glob';
 import { promisify } from 'util';
-const globAsync = promisify(require('glob'));
+const globAsync = promisify(glob);
 
 import { util } from './util';
 
@@ -22,9 +22,6 @@ export class RokuDeploy {
      */
     public async prepublishToStaging(options: RokuDeployOptions) {
         options = this.getOptions(options);
-        //cast some of the options as not null so we don't have to cast them below
-        options.rootDir = <string>options.rootDir;
-        options.outDir = <string>options.outDir;
 
         const files = this.normalizeFilesArray(options.files);
 
@@ -125,7 +122,7 @@ export class RokuDeploy {
 
         if (options.incrementBuildNumber) {
             let timestamp = dateformat(new Date(), 'yymmddHHMM');
-            parsedManifest.build_version = timestamp;
+            parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
             await this.fsExtra.writeFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
@@ -170,8 +167,8 @@ export class RokuDeploy {
         for (let entry of normalizedFiles) {
             let src = typeof entry === 'string' ? entry : entry.src;
 
-            //if starts with !, this is a negated glob. 
-            let isNegated = src.indexOf('!') === 0;
+            //if starts with !, this is a negated glob.
+            let isNegated = src.startsWith('!');
 
             //remove the ! so the glob will match properly
             if (isNegated) {
@@ -186,7 +183,7 @@ export class RokuDeploy {
             //if negated, remove all of the negated matches from the results
             if (isNegated) {
                 let paths = entryResults.map(x => x.src);
-                result = result.filter(x => paths.indexOf(x.src) === -1);
+                result = result.filter(x => !paths.includes(x.src));
 
                 //add all of the entries to the results
             } else {
@@ -262,7 +259,7 @@ export class RokuDeploy {
             }
             let isMatch: boolean;
 
-            //if skipMatch is true, assume the file is a match and don't run the match function 
+            //if skipMatch is true, assume the file is a match and don't run the match function
             if (skipMatch === true) {
                 isMatch = true;
             } else {
@@ -276,7 +273,7 @@ export class RokuDeploy {
             if (!isMatch) {
                 continue;
             }
-            //if this was a negated pattern, discard dest (i.e. exclude the file) and move to next pattern 
+            //if this was a negated pattern, discard dest (i.e. exclude the file) and move to next pattern
             if (isNegated) {
                 dest = undefined;
                 continue;
@@ -298,9 +295,7 @@ export class RokuDeploy {
             //if this is an explicit file reference
             if (glob.hasMagic(entry.src) === false) {
                 let isSrcPathAbsolute = path.isAbsolute(entry.src);
-                let entrySrcPathAbsolute = isSrcPathAbsolute ?
-                    entry.src :
-                    util.standardizePath(`${rootDir}/${entry.src}`);
+                let entrySrcPathAbsolute = isSrcPathAbsolute ? entry.src : util.standardizePath(`${rootDir}/${entry.src}`);
 
                 let isSrcChildOfRootDir = util.isParentOfPath(rootDir, entrySrcPathAbsolute);
 
@@ -328,7 +323,7 @@ export class RokuDeploy {
             }
 
             //if src contains double wildcard
-            if (entry.src.indexOf('**') > -1) {
+            if (entry.src.includes('**')) {
                 //run the glob lookup
                 srcPathAbsolute = util.standardizePath(srcPathAbsolute);
 
@@ -341,7 +336,7 @@ export class RokuDeploy {
                 continue;
             }
 
-            //src is some other type of glob 
+            //src is some other type of glob
             {
                 let fileNameAndExtension = path.basename(srcPathAbsolute);
                 dest = entry.dest ? entry.dest : '';
@@ -360,11 +355,15 @@ export class RokuDeploy {
      * @param stagingPath
      */
     private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
-        if (!stagingPath) { throw new Error('stagingPath is required'); }
-        if (!rootDir) { throw new Error('rootDir is required'); }
+        if (!stagingPath) {
+            throw new Error('stagingPath is required');
+        }
+        if (!rootDir) {
+            throw new Error('rootDir is required');
+        }
 
         let fileObjects = await this.getFilePaths(files, rootDir);
-        //copy all of the files 
+        //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
 
@@ -405,7 +404,7 @@ export class RokuDeploy {
     public async pressHomeButton(host, port?: number) {
         port = port ? port : this.getOptions().remotePort;
         // press the home button to return to the main screen
-        return await this.doPostRequest({
+        return this.doPostRequest({
             url: `http://${host}:${port}/keypress/Home`
         });
     }
@@ -414,7 +413,7 @@ export class RokuDeploy {
      * Publish a pre-existing packaged zip file to a remote Roku.
      * @param options
      */
-    public async publish(options: RokuDeployOptions): Promise<{ message: string, results: any }> {
+    public async publish(options: RokuDeployOptions): Promise<{ message: string; results: any }> {
         options = this.getOptions(options);
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
@@ -537,9 +536,9 @@ export class RokuDeploy {
 
         requestOptions.formData = {
             mysubmit: 'Package',
-            pkg_time: (new Date()).getTime(),
+            pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
             passwd: options.signingPassword,
-            app_name: appName,
+            app_name: appName //eslint-disable-line camelcase
         };
 
         let results = await this.doPostRequest(requestOptions);
@@ -711,24 +710,22 @@ export class RokuDeploy {
         };
 
         //override the defaults with any found or provided options
-        let finalOptions = Object.assign({}, defaultOptions, fileOptions, options);
+        let finalOptions = { ...defaultOptions, ...fileOptions, ...options };
 
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
 
         //stagingFolderPath
-        {
-            if (finalOptions.stagingFolderPath) {
-                finalOptions.stagingFolderPath = path.resolve(process.cwd(), options.stagingFolderPath);
-            } else {
-                finalOptions.stagingFolderPath = path.resolve(
-                    process.cwd(),
-                    util.standardizePath(
-                        `${finalOptions.outDir}/.roku-deploy-staging`
-                    )
-                );
-            }
+        if (finalOptions.stagingFolderPath) {
+            finalOptions.stagingFolderPath = path.resolve(process.cwd(), options.stagingFolderPath);
+        } else {
+            finalOptions.stagingFolderPath = path.resolve(
+                process.cwd(),
+                util.standardizePath(
+                    `${finalOptions.outDir}/.roku-deploy-staging`
+                )
+            );
         }
 
         return finalOptions;
@@ -741,8 +738,8 @@ export class RokuDeploy {
     public getOutputZipFilePath(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let zipFileName = <string>options.outFile;
-        if (zipFileName.indexOf('.zip') < 0) {
+        let zipFileName = options.outFile;
+        if (!zipFileName.toLowerCase().endsWith('.zip')) {
             zipFileName += '.zip';
         }
         let outFolderPath = path.resolve(options.outDir);
@@ -758,11 +755,11 @@ export class RokuDeploy {
     public getOutputPkgFilePath(options?: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let pkgFileName = <string>options.outFile;
-        if (pkgFileName.indexOf('.zip') < 0) {
-            pkgFileName += '.pkg';
-        } else {
+        let pkgFileName = options.outFile;
+        if (pkgFileName.toLowerCase().endsWith('.zip')) {
             pkgFileName = pkgFileName.replace('.zip', '.pkg');
+        } else {
+            pkgFileName += '.pkg';
         }
         let outFolderPath = path.resolve(options.outDir);
 
@@ -798,7 +795,7 @@ export class RokuDeploy {
         let manifestData: ManifestData = {};
         manifestData.keyIndexes = {};
         manifestData.lineCount = manifestLines.length;
-        manifestLines.map((line, index) => {
+        manifestLines.forEach((line, index) => {
             let match = /(\w+)=(.+)/.exec(line);
             if (match) {
                 let key = match[1];
@@ -896,7 +893,6 @@ export interface RokuDeployOptions {
      */
     rootDir?: string;
 
-    // tslint:disable:jsdoc-format
     /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
      * where the source files are and where they should be placed
@@ -908,7 +904,6 @@ export interface RokuDeployOptions {
             'manifest'
         ],
      */
-    // tslint:enable:jsdoc-format
     files?: FileEntry[];
 
     /**
@@ -1016,7 +1011,7 @@ export interface StandardizedFileEntry {
      */
     src: string;
     /**
-     * The path relative to the root of the pkg to where the file should be placed 
+     * The path relative to the root of the pkg to where the file should be placed
      */
     dest: string;
 }

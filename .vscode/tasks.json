@@ -41,7 +41,7 @@
             },
             "script": "build",
             "problemMatcher": [
-                "$tslint5",
+                "$eslint-compact",
                 "$tsc"
             ]
         }

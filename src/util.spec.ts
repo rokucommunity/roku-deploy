@@ -64,7 +64,7 @@ describe('util', () => {
     describe('tryRepeatAsync', () => {
         it('calls callback', async () => {
             let count = 0;
-            await util.tryRepeatAsync(async () => {
+            await util.tryRepeatAsync(() => {
                 count++;
                 if (count < 3) {
                     throw new Error('test tryRepeatAsync');
@@ -76,7 +76,7 @@ describe('util', () => {
         it('raises exception after max tries has been reached', async () => {
             let error;
             try {
-                await util.tryRepeatAsync(async () => {
+                await util.tryRepeatAsync(() => {
                     throw new Error('test tryRepeatAsync');
                 }, 3, 1);
             } catch (e) {
