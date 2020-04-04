@@ -1625,17 +1625,18 @@ describe('index', () => {
             });
         });
 
-        it('fails when given non-absolute rootDir', async () => {
-            await expectThrowsAsync(async () => {
-                await getFilePaths([
-                    'source/main.brs'
-                ], '../rootDir');
-            });
+        it('converts relative rootDir path to absolute', async () => {
+            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
+            await getFilePaths([
+                'source/main.brs'
+            ], './rootDir');
+            expect(stub.callCount).to.be.greaterThan(0);
+            expect(stub.getCall(0).args[0].rootDir).to.eql('./rootDir');
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(n(`${cwd}/rootDir`));
         });
 
         it('works when using a different current working directory than rootDir', async () => {
             let rootProjectDir = path.resolve(options.rootDir);
-            let outDir = path.resolve(options.outDir);
 
             //sanity check, make sure it works without fiddling with cwd intact
             let paths = (await rokuDeploy.getFilePaths([
@@ -1850,19 +1851,19 @@ describe('index', () => {
         });
 
         it('throws exception when rootDir is not absolute', () => {
-            try {
-                rokuDeploy.getDestPath(
-                    util.standardizePath(`${cwd}/src/source/main.bs`),
-                    [
-                        'manifest',
-                        'source/**/*.bs'
-                    ],
-                    `./src`
-                );
-                expect(false, 'should have thrown an exception').to.be.true;
-            } catch (e) {
-                expect(true).to.be.true;
-            }
+            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
+            let destPath = rokuDeploy.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                `./src`
+            );
+            expect(stub.callCount).to.be.greaterThan(0);
+            expect(stub.getCall(0).args[0].rootDir).to.eql('./src');
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(n(`${cwd}/src`));
+            expect(n(destPath)).to.equal(n('source/main.bs'));
         });
 
         it('excludes a file found outside the root dir', async () => {

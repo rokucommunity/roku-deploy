@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.1] - 2020-04-03
 ### Changed
- - throw exception in `getDestPath` when rootDir is not absolute.
+ - coerce `rootDir` to an absolute path in `rokuDeploy.getDestPath` and `rokuDeploy.getFilePaths`.
 
 
 
