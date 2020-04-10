@@ -15,8 +15,6 @@ import { util, standardizePath as s } from './util';
 
 chai.use(chaiFiles);
 
-let n = util.standardizePath.bind(util);
-
 const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
@@ -1006,9 +1004,11 @@ describe('index', () => {
                 return isPermitted;
             }
 
-            let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
+            let symlinkIt: any = getIsSymlinksPermitted() ? it : it.skip;
+            symlinkIt.skip = it.skip;
+            symlinkIt.only = getIsSymlinksPermitted() ? it.only : it.skip;
 
-            symlinkIt('are dereferenced properly', async () => {
+            symlinkIt.skip('direct symlinked files are dereferenced properly', async () => {
                 //make sure the output dir exists
                 await fsExtra.ensureDir(path.dirname(symlinkPath));
                 //create the actual file
@@ -1034,15 +1034,58 @@ describe('index', () => {
                 let stagingFolderPath = rokuDeploy.getOptions(opts).stagingFolderPath;
                 //getFilePaths detects the file
                 expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
-                    src: n(`${opts.rootDir}/renamed_test.md`),
-                    dest: n(`renamed_test.md`)
+                    src: s`${opts.rootDir}/renamed_test.md`,
+                    dest: s`renamed_test.md`
                 }]);
 
                 await rokuDeploy.prepublishToStaging(opts);
-                let stagedFilePath = n(`${stagingFolderPath}/renamed_test.md`);
+                let stagedFilePath = s`${stagingFolderPath}/renamed_test.md`;
                 expect(file(stagedFilePath)).to.exist;
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
+            });
+
+            symlinkIt('copies files nested within a symlinked folder', async () => {
+                fsExtra.ensureDirSync(s`${tmpPath}/baseProject/source/lib/promise`);
+                fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/lib.brs`, `'lib.brs`);
+                fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
+
+                fsExtra.ensureDirSync(s`${tmpPath}/mainProject/source`);
+                fsExtra.writeFileSync(s`${tmpPath}/mainProject/source/main.brs`, `'main.brs`);
+
+                //symlink the baseProject lib folder into the mainProject
+                fsExtra.symlinkSync(s`${tmpPath}/baseProject/source/lib`, s`${tmpPath}/mainProject/source/lib`);
+
+                //the symlinked file should exist in the main project
+                expect(fsExtra.pathExistsSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`)).to.be.true;
+
+                let opts = {
+                    ...options,
+                    rootDir: s`${tmpPath}/mainProject`,
+                    files: [
+                        'manifest',
+                        'source/**/*'
+                    ]
+                };
+
+                let stagingPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                //getFilePaths detects the file
+                expect(
+                    (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
+                ).to.eql([{
+                    src: s`${tmpPath}/mainProject/source/lib/lib.brs`,
+                    dest: s`source/lib/lib.brs`
+                }, {
+                    src: s`${tmpPath}/mainProject/source/lib/promise/promise.brs`,
+                    dest: s`source/lib/promise/promise.brs`
+                }, {
+                    src: s`${tmpPath}/mainProject/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+
+                await rokuDeploy.prepublishToStaging(opts);
+
+                expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
             });
         });
     });

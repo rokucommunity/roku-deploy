@@ -214,7 +214,11 @@ export class RokuDeploy {
         let result = [] as StandardizedFileEntry[];
 
         let pattern = typeof entry === 'string' ? entry : entry.src;
-        let files = await globAsync(pattern, { cwd: rootDir, absolute: true });
+        let files = await globAsync(pattern, {
+            cwd: rootDir,
+            absolute: true,
+            follow: true
+        });
 
         //reduce garbage collection churn by using the same filesEntry array for each file below
         let fileEntries = [entry];
