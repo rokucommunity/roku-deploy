@@ -11,7 +11,7 @@ let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FileEntry } from './RokuDeploy';
 import * as errors from './Errors';
-import { util } from './util';
+import { util, standardizePath as s } from './util';
 
 chai.use(chaiFiles);
 
@@ -21,7 +21,7 @@ const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
 let cwd = process.cwd();
-const tmpPath = n(`${cwd}/.tmp`);
+const tmpPath = s`${cwd}/.tmp`;
 
 describe('index', () => {
     let rokuDeploy: RokuDeploy;
@@ -189,16 +189,16 @@ describe('index', () => {
                 return Promise.resolve();
             });
 
-            let rootDir = n(`${tmpPath}/ProjectA/src`);
-            let stagingPath = n(`${tmpPath}/ProjectA/.staging`);
+            let rootDir = s`${tmpPath}/ProjectA/src`;
+            let stagingPath = s`${tmpPath}/ProjectA/.staging`;
 
             sinon.stub(rokuDeploy, 'getFilePaths').returns(
                 Promise.resolve([
                     {
-                        src: n(`${rootDir}/source/main.brs`),
+                        src: s`${rootDir}/source/main.brs`,
                         dest: '/source/main.brs'
                     }, {
-                        src: n(`${rootDir}/components/a/b/c/comp1.xml`),
+                        src: s`${rootDir}/components/a/b/c/comp1.xml`,
                         dest: '/components/a/b/c/comp1.xml'
                     }
                 ])
@@ -207,17 +207,17 @@ describe('index', () => {
             await (rokuDeploy as any).copyToStaging([], stagingPath, rootDir);
 
             expect(ensureDirPaths).to.eql([
-                n(`${stagingPath}/source`),
-                n(`${stagingPath}/components/a/b/c`)
+                s`${stagingPath}/source`,
+                s`${stagingPath}/components/a/b/c`
             ]);
 
             expect(copyPaths).to.eql([
                 {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`${stagingPath}/source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingPath}/source/main.brs`
                 }, {
-                    src: n(`${rootDir}/components/a/b/c/comp1.xml`),
-                    dest: n(`${stagingPath}/components/a/b/c/comp1.xml`)
+                    src: s`${rootDir}/components/a/b/c/comp1.xml`,
+                    dest: s`${stagingPath}/components/a/b/c/comp1.xml`
                 }
             ]);
         });
@@ -966,20 +966,20 @@ describe('index', () => {
         });
 
         describe('symlinks', () => {
-            let sourcePath = n(`${cwd}/test.md`);
-            let rootDir = n(`${cwd}/.tmp/testProject`);
-            let symlinkPath = n(`${rootDir}/renamed_test.md`);
+            let sourcePath = s`${cwd}/test.md`;
+            let rootDir = s`${cwd}/.tmp/testProject`;
+            let symlinkPath = s`${rootDir}/renamed_test.md`;
 
             beforeEach(cleanUp);
             afterEach(cleanUp);
 
-            async function cleanUp() {
+            function cleanUp() {
                 try {
-                    await fsExtra.remove(sourcePath);
+                    fsExtra.removeSync(sourcePath);
                 } catch (e) { }
                 //delete the symlink if it exists
                 try {
-                    await fsExtra.remove(symlinkPath);
+                    fsExtra.removeSync(symlinkPath);
                 } catch (e) { }
             }
 
@@ -1090,8 +1090,8 @@ describe('index', () => {
                 src: `long/source/path`,
                 dest: `long/dest/path`
             }])).to.eql([{
-                src: n('long/source/path'),
-                dest: n('long/dest/path')
+                src: s`long/source/path`,
+                dest: s`long/dest/path`
             }]);
         });
         it('works for simple strings', () => {
@@ -1147,7 +1147,7 @@ describe('index', () => {
                 src: 'manifest',
                 dest: undefined
             }, {
-                src: n('source/main.brs'),
+                src: s`source/main.brs`,
                 dest: undefined
             }]);
         });
@@ -1159,8 +1159,8 @@ describe('index', () => {
                     dest: 'source/config.brs'
                 }
             ])).to.eql([{
-                src: n('source/config.dev.brs'),
-                dest: n('source/config.brs')
+                src: s`source/config.dev.brs`,
+                dest: s`source/config.brs`
             }]);
         });
 
@@ -1267,10 +1267,10 @@ describe('index', () => {
     });
 
     describe('getFilePaths', () => {
-        let tempPath = n(`${cwd}/getFilePaths_temp`);
-        let rootDir = n(`${tempPath}/src`);
-        let stagingPathAbsolute = n(`${tmpPath}/staging`);
-        let otherProjectDir = n(`${tempPath}/otherProjectSrc`);
+        let tempPath = s`${cwd}/getFilePaths_temp`;
+        let rootDir = s`${tempPath}/src`;
+        let stagingPathAbsolute = s`${tmpPath}/staging`;
+        let otherProjectDir = s`${tempPath}/otherProjectSrc`;
 
         //create baseline project structure
         before(() => {
@@ -1310,31 +1310,31 @@ describe('index', () => {
                 expect(await getFilePaths([
                     '**/*'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`components/component1.xml`)
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
                 },
                 {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 },
                 {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 },
                 {
-                    src: n(`${rootDir}/manifest`),
-                    dest: n(`manifest`)
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
                 },
                 {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 },
                 {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1344,26 +1344,26 @@ describe('index', () => {
                     'components/**/*',
                     'manifest'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`components/component1.xml`)
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 }, {
-                    src: n(`${rootDir}/manifest`),
-                    dest: n(`manifest`)
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
                 }, {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1371,11 +1371,11 @@ describe('index', () => {
                 expect(await getFilePaths([
                     'source/*.brs'
                 ])).to.eql([{
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1383,17 +1383,17 @@ describe('index', () => {
                 expect(await getFilePaths([
                     '**/*.brs'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }, {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1401,11 +1401,11 @@ describe('index', () => {
                 expect(await getFilePaths([
                     'components/**/*.brs'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }]);
             });
 
@@ -1426,14 +1426,14 @@ describe('index', () => {
                     //re-include a specific xml file
                     'components/screen1/screen1.xml'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 }]);
             });
 
@@ -1442,8 +1442,8 @@ describe('index', () => {
                     'components/**/*',
                     '!components/screen1/**/*'
                 ])).map(x => x.dest)).to.eql([
-                    n(`components/component1.brs`),
-                    n(`components/component1.xml`)
+                    s`components/component1.brs`,
+                    s`components/component1.xml`
                 ]);
             });
 
@@ -1454,26 +1454,26 @@ describe('index', () => {
                     'components/**/*',
                     '!components/scenes/**/*'
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`components/component1.xml`)
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 }, {
-                    src: n(`${rootDir}/manifest`),
-                    dest: n(`manifest`)
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
                 }, {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 }, {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1493,31 +1493,31 @@ describe('index', () => {
                     dest: ''
                 }
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`components/component1.xml`)
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
                 },
                 {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 },
                 {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 },
                 {
-                    src: n(`${rootDir}/manifest`),
-                    dest: n(`manifest`)
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
                 },
                 {
-                    src: n(`${rootDir}/source/lib.brs`),
-                    dest: n(`source/lib.brs`)
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
                 },
                 {
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1525,14 +1525,14 @@ describe('index', () => {
                 expect(await getFilePaths([{
                     src: `${otherProjectDir}/**/*`
                 }])).to.eql([{
-                    src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
-                    dest: n(`components/component1/subComponent/screen.brs`)
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`components/component1/subComponent/screen.brs`
                 }, {
-                    src: n(`${otherProjectDir}/manifest`),
-                    dest: n(`manifest`)
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`manifest`
                 }, {
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`source/thirdPartyLib.brs`)
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`source/thirdPartyLib.brs`
                 }]);
             });
 
@@ -1541,8 +1541,8 @@ describe('index', () => {
                     src: `${otherProjectDir}/source/thirdPartyLib.brs`,
                     dest: 'lib/thirdPartyLib.brs'
                 }])).to.eql([{
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`lib/thirdPartyLib.brs`)
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`lib/thirdPartyLib.brs`
                 }]);
             });
 
@@ -1551,8 +1551,8 @@ describe('index', () => {
                     src: `${otherProjectDir}/../src/source/main.brs`,
                     dest: 'source/main.brs'
                 }])).to.eql([{
-                    src: n(`${rootDir}/source/main.brs`),
-                    dest: n(`source/main.brs`)
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
             });
 
@@ -1561,24 +1561,24 @@ describe('index', () => {
                     src: `../otherProjectSrc/**/*`,
                     dest: 'outFolder/'
                 }])).to.eql([{
-                    src: n(`${otherProjectDir}/components/component1/subComponent/screen.brs`),
-                    dest: n(`outFolder/components/component1/subComponent/screen.brs`)
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`outFolder/components/component1/subComponent/screen.brs`
                 }, {
-                    src: n(`${otherProjectDir}/manifest`),
-                    dest: n(`outFolder/manifest`)
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`outFolder/manifest`
                 }, {
-                    src: n(`${otherProjectDir}/source/thirdPartyLib.brs`),
-                    dest: n(`outFolder/source/thirdPartyLib.brs`)
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`outFolder/source/thirdPartyLib.brs`
                 }]);
             });
 
             it('works for other globs', async () => {
                 expect(await getFilePaths([{
                     src: `components/screen1/*creen1.brs`,
-                    dest: n('/source')
+                    dest: s`/source`
                 }])).to.eql([{
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`source/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`source/screen1.brs`
                 }]);
             });
 
@@ -1586,8 +1586,8 @@ describe('index', () => {
                 expect(await getFilePaths([{
                     src: `components/screen1/*creen1.brs`
                 }])).to.eql([{
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`screen1.brs`
                 }]);
             });
 
@@ -1596,11 +1596,11 @@ describe('index', () => {
                     //straight wildcard matches folder names too
                     src: `components/*`
                 }])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/component1.xml`),
-                    dest: n(`component1.xml`)
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`component1.xml`
                 }]);
             });
 
@@ -1613,14 +1613,14 @@ describe('index', () => {
                     //re-include a specific xml file
                     { src: 'components/screen1/screen1.xml', dest: 'components/screen1/screen1.xml' }
                 ])).to.eql([{
-                    src: n(`${rootDir}/components/component1.brs`),
-                    dest: n(`components/component1.brs`)
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.brs`),
-                    dest: n(`components/screen1/screen1.brs`)
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
                 }, {
-                    src: n(`${rootDir}/components/screen1/screen1.xml`),
-                    dest: n(`components/screen1/screen1.xml`)
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
                 }]);
             });
         });
@@ -1632,7 +1632,7 @@ describe('index', () => {
             ], './rootDir');
             expect(stub.callCount).to.be.greaterThan(0);
             expect(stub.getCall(0).args[0].rootDir).to.eql('./rootDir');
-            expect(stub.getCall(0).returnValue.rootDir).to.eql(n(`${cwd}/rootDir`));
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/rootDir`);
         });
 
         it('works when using a different current working directory than rootDir', async () => {
@@ -1645,11 +1645,11 @@ describe('index', () => {
             ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
-                src: n(`${rootProjectDir}/images/splash_hd.jpg`),
-                dest: n(`images/splash_hd.jpg`)
+                src: s`${rootProjectDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
             }, {
-                src: n(`${rootProjectDir}/manifest`),
-                dest: n(`manifest`)
+                src: s`${rootProjectDir}/manifest`,
+                dest: s`manifest`
             }]);
 
             //change the working directory and verify everything still works
@@ -1663,11 +1663,11 @@ describe('index', () => {
             ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
-                src: n(`${rootProjectDir}/images/splash_hd.jpg`),
-                dest: n(`images/splash_hd.jpg`)
+                src: s`${rootProjectDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
             }, {
-                src: n(`${rootProjectDir}/manifest`),
-                dest: n(`manifest`)
+                src: s`${rootProjectDir}/manifest`,
+                dest: s`manifest`
             }]);
         });
 
@@ -1676,10 +1676,10 @@ describe('index', () => {
 
             //dest not specified
             expect(await rokuDeploy.getFilePaths([{
-                src: n(`${cwd}/README.md`)
+                src: s`${cwd}/README.md`
             }], options.rootDir)).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n(`README.md`)
+                src: s`${cwd}/README.md`,
+                dest: s`README.md`
             }]);
 
             //dest specified
@@ -1687,27 +1687,27 @@ describe('index', () => {
                 src: path.join(cwd, 'README.md'),
                 dest: 'docs/README.md'
             }], options.rootDir)).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n(`docs/README.md`)
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
 
             let outDir = path.resolve(options.outDir);
             let paths: any[];
 
             paths = await rokuDeploy.getFilePaths([{
-                src: n(`${cwd}/README.md`),
-                dest: n('docs/README.md')
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }], outDir);
 
             expect(paths).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n('docs/README.md')
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
 
             //top-level string paths pointing to files outside the root should thrown an exception
             await expectThrowsAsync(async () => {
                 paths = await rokuDeploy.getFilePaths([
-                    n(`${cwd}/README.md`)
+                    s`${cwd}/README.md`
                 ], outDir);
             });
         });
@@ -1719,16 +1719,16 @@ describe('index', () => {
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'README.md')
             }], rootProjectDir)).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n(`README.md`)
+                src: s`${cwd}/README.md`,
+                dest: s`README.md`
             }]);
 
             expect(await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'README.md'),
                 dest: 'docs/README.md'
             }], rootProjectDir)).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n(`docs/README.md`)
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
 
             //should throw exception because we can't have top-level string paths pointed to files outside the root
@@ -1741,28 +1741,28 @@ describe('index', () => {
 
         it('supports overriding paths', async () => {
             let paths = await rokuDeploy.getFilePaths([{
-                src: n(`${rootDir}/components/component1.brs`),
+                src: s`${rootDir}/components/component1.brs`,
                 dest: 'comp1.brs'
             }, {
-                src: n(`${rootDir}/components/screen1/screen1.brs`),
+                src: s`${rootDir}/components/screen1/screen1.brs`,
                 dest: 'comp1.brs'
             }], rootDir);
             expect(paths).to.be.lengthOf(1);
-            expect(n(paths[0].src)).to.equal(n(`${rootDir}/components/screen1/screen1.brs`));
+            expect(s`${paths[0].src}`).to.equal(s`${rootDir}/components/screen1/screen1.brs`);
         });
 
         it('supports overriding paths from outside the root dir', async () => {
-            let thisRootDir = n(`${cwd}/tempTestOverrides/src`);
+            let thisRootDir = s`${cwd}/tempTestOverrides/src`;
             try {
 
-                fsExtra.ensureDirSync(n(`${thisRootDir}/source`));
-                fsExtra.ensureDirSync(n(`${thisRootDir}/components`));
-                fsExtra.ensureDirSync(n(`${thisRootDir}/../.tmp`));
+                fsExtra.ensureDirSync(s`${thisRootDir}/source`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/components`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/../.tmp`);
 
-                fsExtra.writeFileSync(n(`${thisRootDir}/source/main.brs`), '');
-                fsExtra.writeFileSync(n(`${thisRootDir}/components/MainScene.brs`), '');
-                fsExtra.writeFileSync(n(`${thisRootDir}/components/MainScene.xml`), '');
-                fsExtra.writeFileSync(n(`${thisRootDir}/../.tmp/MainScene.brs`), '');
+                fsExtra.writeFileSync(s`${thisRootDir}/source/main.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.xml`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/../.tmp/MainScene.brs`, '');
 
                 let files = [
                     '**/*.xml',
@@ -1775,15 +1775,15 @@ describe('index', () => {
                 let paths = await rokuDeploy.getFilePaths(files, thisRootDir);
 
                 //the MainScene.brs file from source should NOT be included
-                let mainSceneEntries = paths.filter(x => n(x.dest) === n('components/MainScene.brs'));
+                let mainSceneEntries = paths.filter(x => s`${x.dest}` === s`components/MainScene.brs`);
                 expect(
                     mainSceneEntries,
                     `Should only be one files entry for 'components/MainScene.brs'`
                 ).to.be.lengthOf(1);
-                expect(n(mainSceneEntries[0].src)).to.eql(n(`${thisRootDir}/../.tmp/MainScene.brs`));
+                expect(s`${mainSceneEntries[0].src}`).to.eql(s`${thisRootDir}/../.tmp/MainScene.brs`);
             } finally {
                 //clean up
-                await fsExtra.remove(n(`${thisRootDir}/../`));
+                await fsExtra.remove(s`${thisRootDir}/../`);
             }
         });
     });
@@ -1793,17 +1793,17 @@ describe('index', () => {
         it('finds dest path for top-level path', () => {
             expect(
                 rokuDeploy.getDestPath(
-                    n(`${rootDir}/components/comp1/comp1.brs`),
+                    s`${rootDir}/components/comp1/comp1.brs`,
                     ['components/**/*'],
                     rootDir
                 )
-            ).to.equal(n('components/comp1/comp1.brs'));
+            ).to.equal(s`components/comp1/comp1.brs`);
         });
 
         it('does not find dest path for non-matched top-level path', () => {
             expect(
                 rokuDeploy.getDestPath(
-                    n(`${rootDir}/source/main.brs`),
+                    s`${rootDir}/source/main.brs`,
                     ['components/**/*'],
                     rootDir
                 )
@@ -1813,7 +1813,7 @@ describe('index', () => {
         it('excludes a file that is negated', () => {
             expect(
                 rokuDeploy.getDestPath(
-                    n(`${rootDir}/source/main.brs`),
+                    s`${rootDir}/source/main.brs`,
                     [
                         'source/**/*',
                         '!source/main.brs'
@@ -1826,7 +1826,7 @@ describe('index', () => {
         it('excludes a file that is negated in src;dest;', () => {
             expect(
                 rokuDeploy.getDestPath(
-                    n(`${rootDir}/source/main.brs`),
+                    s`${rootDir}/source/main.brs`,
                     [
                         'source/**/*',
                         {
@@ -1845,9 +1845,9 @@ describe('index', () => {
                     'manifest',
                     'source/**/*.bs'
                 ],
-                n(`${cwd}/src`)
+                s`${cwd}/src`
             );
-            expect(n(destPath)).to.equal(n('source/main.bs'));
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
         });
 
         it('throws exception when rootDir is not absolute', () => {
@@ -1862,8 +1862,8 @@ describe('index', () => {
             );
             expect(stub.callCount).to.be.greaterThan(0);
             expect(stub.getCall(0).args[0].rootDir).to.eql('./src');
-            expect(stub.getCall(0).returnValue.rootDir).to.eql(n(`${cwd}/src`));
-            expect(n(destPath)).to.equal(n('source/main.bs'));
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/src`);
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
         });
 
         it('excludes a file found outside the root dir', async () => {
@@ -1872,7 +1872,7 @@ describe('index', () => {
 
             expect(
                 rokuDeploy.getDestPath(
-                    n(`${rootDir}/../source/main.brs`),
+                    s`${rootDir}/../source/main.brs`,
                     [
                         '../source/**/*'
                     ],
@@ -1882,12 +1882,12 @@ describe('index', () => {
 
             let paths = await rokuDeploy.getFilePaths([{
                 src: path.join('..', 'README.md'),
-                dest: n('docs/README.md')
+                dest: s`docs/README.md`
             }], outDir);
 
             expect(paths).to.eql([{
-                src: n(`${cwd}/README.md`),
-                dest: n('docs/README.md')
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
         });
     });
@@ -2014,7 +2014,7 @@ describe('index', () => {
                     'source/main.brs'
                 ]
             });
-            expect(file(n(`${stagingFolderPath}/source/main.brs`))).to.exist;
+            expect(file(s`${stagingFolderPath}/source/main.brs`)).to.exist;
             expect(count).to.be.greaterThan(4);
         });
 

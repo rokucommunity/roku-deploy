@@ -100,3 +100,18 @@ export class Util {
 }
 
 export let util = new Util();
+
+
+/**
+ * A tagged template literal function for standardizing the path.
+ */
+export function standardizePath(stringParts, ...expressions: any[]) {
+    let result = [];
+    for (let i = 0; i < stringParts.length; i++) {
+        result.push(stringParts[i], expressions[i]);
+    }
+    return util.standardizePath(
+        result.join('')
+    );
+}
+
