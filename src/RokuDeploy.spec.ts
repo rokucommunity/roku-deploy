@@ -995,7 +995,12 @@ describe('index', () => {
                 try {
                     fsExtra.symlinkSync(originalFilePath, testSymlinkFile);
                 } catch (e) { }
-                let isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
+                let isPermitted = false;
+                try {
+                    isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
+                } catch (e) {
+
+                }
 
                 //delete the symlink test file
                 try {
@@ -1004,11 +1009,9 @@ describe('index', () => {
                 return isPermitted;
             }
 
-            let symlinkIt: any = getIsSymlinksPermitted() ? it : it.skip;
-            symlinkIt.skip = it.skip;
-            symlinkIt.only = getIsSymlinksPermitted() ? it.only : it.skip;
+            let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
 
-            symlinkIt.skip('direct symlinked files are dereferenced properly', async () => {
+            symlinkIt('direct symlinked files are dereferenced properly', async () => {
                 //make sure the output dir exists
                 await fsExtra.ensureDir(path.dirname(symlinkPath));
                 //create the actual file
