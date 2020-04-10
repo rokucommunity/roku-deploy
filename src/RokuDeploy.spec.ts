@@ -981,35 +981,48 @@ describe('index', () => {
                 } catch (e) { }
             }
 
+            let _isSymlinkingPermitted: boolean;
+
             /**
              * Determine if we have permission to create symlinks
              */
             function getIsSymlinksPermitted() {
-                let originalFilePath = path.join(cwd, 'README.md');
-                let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
-                //delete the symlink test file
-                try {
-                    fsExtra.removeSync(testSymlinkFile);
-                } catch (e) { }
-                //create the symlink file
-                try {
-                    fsExtra.symlinkSync(originalFilePath, testSymlinkFile);
-                } catch (e) { }
-                let isPermitted = false;
-                try {
-                    isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
-                } catch (e) {
+                if (_isSymlinkingPermitted === undefined) {
+                    let originalFilePath = path.join(cwd, 'README.md');
+                    let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
+                    //delete the symlink test file
+                    try {
+                        fsExtra.removeSync(testSymlinkFile);
+                    } catch (e) { }
+                    //create the symlink file
+                    try {
+                        fsExtra.symlinkSync(originalFilePath, testSymlinkFile);
+                    } catch (e) { }
+                    let isPermitted = false;
+                    try {
+                        isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
+                    } catch (e) {
 
+                    }
+
+                    //delete the symlink test file
+                    try {
+                        fsExtra.removeSync(testSymlinkFile);
+                    } catch (e) { }
+                    _isSymlinkingPermitted = isPermitted;
                 }
-
-                //delete the symlink test file
-                try {
-                    fsExtra.removeSync(testSymlinkFile);
-                } catch (e) { }
-                return isPermitted;
+                return _isSymlinkingPermitted;
             }
 
-            let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
+            function symlinkIt(name, callback) {
+                if (getIsSymlinksPermitted()) {
+                    console.log(`symlinks are permitted for test "${name}"`);
+                    it(name, callback);
+                } else {
+                    console.log(`symlinks are not permitted for test "${name}"`);
+                    it.skip(name, callback);
+                }
+            }
 
             symlinkIt('direct symlinked files are dereferenced properly', async () => {
                 //make sure the output dir exists
