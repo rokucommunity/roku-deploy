@@ -988,28 +988,44 @@ describe('index', () => {
              */
             function getIsSymlinksPermitted() {
                 if (_isSymlinkingPermitted === undefined) {
-                    let originalFilePath = path.join(cwd, 'README.md');
-                    let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
-                    //delete the symlink test file
-                    try {
-                        fsExtra.removeSync(testSymlinkFile);
-                    } catch (e) { }
-                    //create the symlink file
-                    try {
-                        fsExtra.symlinkSync(originalFilePath, testSymlinkFile);
-                    } catch (e) { }
-                    let isPermitted = false;
-                    try {
-                        isPermitted = fsExtra.pathExistsSync(testSymlinkFile);
-                    } catch (e) {
+                    fsExtra.ensureDirSync(`${tmpPath}/a/b/c`);
+                    fsExtra.ensureDirSync(`${tmpPath}/project`);
+                    fsExtra.writeFileSync(`${tmpPath}/a/alpha.txt`, 'alpha.txt');
+                    fsExtra.writeFileSync(`${tmpPath}/a/b/c/charlie.txt`, 'charlie.txt');
 
+                    let checks = [
+                        //make a file symlink
+                        () => {
+                            fsExtra.symlinkSync(`${tmpPath}/a/alpha.txt`, `${tmpPath}/project/alpha.txt`);
+                        },
+                        //access the file symlink
+                        () => {
+                            if (fsExtra.readFileSync(`${tmpPath}/project/alpha.txt`).toString() !== 'alpha.txt') {
+                                throw new Error('data does not match');
+                            }
+                        },
+                        //create a folder symlink that also includes subfolders
+                        () => {
+                            fsExtra.symlinkSync(`${tmpPath}/a`, `${tmpPath}/project/a`);
+                        },
+                        //access a file in a subfolder of the folder symlink
+                        () => {
+                            if (fsExtra.readFileSync(`${tmpPath}/project/a/b/c/charlie.txt`).toString() !== 'charlie.txt') {
+                                throw new Error('data does not match');
+                            }
+                        }
+                    ];
+
+                    //execute each of the checks. if one fails, symlinking is not permitted in this environment
+                    for (let check of checks) {
+                        try {
+                            check();
+                        } catch (e) {
+                            _isSymlinkingPermitted = false;
+                            return false;
+                        }
                     }
-
-                    //delete the symlink test file
-                    try {
-                        fsExtra.removeSync(testSymlinkFile);
-                    } catch (e) { }
-                    _isSymlinkingPermitted = isPermitted;
+                    _isSymlinkingPermitted = true;
                 }
                 return _isSymlinkingPermitted;
             }
@@ -1061,7 +1077,7 @@ describe('index', () => {
                 expect(fileContents.toString()).to.equal('hello symlink');
             });
 
-            symlinkIt('copies files nested within a symlinked folder', async () => {
+            symlinkIt('copies5tder', async () => {
                 fsExtra.ensureDirSync(s`${tmpPath}/baseProject/source/lib/promise`);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/lib.brs`, `'lib.brs`);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
