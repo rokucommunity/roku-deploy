@@ -994,47 +994,22 @@ describe('index', () => {
                     fsExtra.writeFileSync(`${tmpPath}/a/alpha.txt`, 'alpha.txt');
                     fsExtra.writeFileSync(`${tmpPath}/a/b/c/charlie.txt`, 'charlie.txt');
 
-                    let checks = [
+                    try {
                         //make a file symlink
-                        () => {
-                            fsExtra.symlinkSync(`${tmpPath}/a/alpha.txt`, `${tmpPath}/project/alpha.txt`);
-                        },
-                        //access the file symlink
-                        () => {
-                            if (fsExtra.readFileSync(`${tmpPath}/project/alpha.txt`).toString() !== 'alpha.txt') {
-                                throw new Error('data does not match');
-                            }
-                        },
+                        fsExtra.symlinkSync(`${tmpPath}/a/alpha.txt`, `${tmpPath}/project/alpha.txt`);
                         //create a folder symlink that also includes subfolders
-                        () => {
-                            fsExtra.symlinkSync(`${tmpPath}/a`, `${tmpPath}/project/a`);
-                        },
-                        //access a file in a subfolder of the folder symlink
-                        () => {
-                            if (fsExtra.readFileSync(`${tmpPath}/project/a/b/c/charlie.txt`).toString() !== 'charlie.txt') {
-                                throw new Error('data does not match');
-                            }
-                        },
+                        fsExtra.symlinkSync(`${tmpPath}/a`, `${tmpPath}/project/a`);
                         //use glob to scan the directory recursively
-                        () => {
-                            glob.sync('**/*', {
-                                cwd: s`${tmpPath}/project`,
-                                absolute: true,
-                                follow: true
-                            });
-                        }
-                    ];
-
-                    //execute each of the checks. if one fails, symlinking is not permitted in this environment
-                    for (let check of checks) {
-                        try {
-                            check();
-                        } catch (e) {
-                            _isSymlinkingPermitted = false;
-                            return false;
-                        }
+                        glob.sync('**/*', {
+                            cwd: s`${tmpPath}/project`,
+                            absolute: true,
+                            follow: true
+                        });
+                        _isSymlinkingPermitted = true;
+                    } catch (e) {
+                        _isSymlinkingPermitted = false;
+                        return false;
                     }
-                    _isSymlinkingPermitted = true;
                 }
                 return _isSymlinkingPermitted;
             }
