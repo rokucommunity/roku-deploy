@@ -7,6 +7,7 @@ import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
 import * as deferred from 'deferred';
+import * as glob from 'glob';
 let sinon = sinonImport.createSandbox();
 
 import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FileEntry } from './RokuDeploy';
@@ -1013,6 +1014,14 @@ describe('index', () => {
                             if (fsExtra.readFileSync(`${tmpPath}/project/a/b/c/charlie.txt`).toString() !== 'charlie.txt') {
                                 throw new Error('data does not match');
                             }
+                        },
+                        //use glob to scan the directory recursively
+                        () => {
+                            glob.sync('**/*', {
+                                cwd: s`${tmpPath}/project`,
+                                absolute: true,
+                                follow: true
+                            });
                         }
                     ];
 
@@ -1078,25 +1087,17 @@ describe('index', () => {
             });
 
             symlinkIt('copies files from subdirs of symlinked folders', async () => {
-                let i = 0;
-                console.log(i++);
                 fsExtra.ensureDirSync(s`${tmpPath}/baseProject/source/lib/promise`);
-                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/lib.brs`, `'lib.brs`);
-                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
 
-                console.log(i++);
                 fsExtra.ensureDirSync(s`${tmpPath}/mainProject/source`);
-                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/mainProject/source/main.brs`, `'main.brs`);
 
                 //symlink the baseProject lib folder into the mainProject
-                console.log(i++);
                 fsExtra.symlinkSync(s`${tmpPath}/baseProject/source/lib`, s`${tmpPath}/mainProject/source/lib`);
 
                 //the symlinked file should exist in the main project
-                console.log(i++);
                 expect(fsExtra.pathExistsSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`)).to.be.true;
 
                 let opts = {
@@ -1108,10 +1109,8 @@ describe('index', () => {
                     ]
                 };
 
-                console.log(i++);
                 let stagingPath = rokuDeploy.getOptions(opts).stagingFolderPath;
                 //getFilePaths detects the file
-                console.log(i++);
                 expect(
                     (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
                 ).to.eql([{
@@ -1125,10 +1124,7 @@ describe('index', () => {
                     dest: s`source/main.brs`
                 }]);
 
-                console.log(i++);
                 await rokuDeploy.prepublishToStaging(opts);
-
-                console.log(i++);
                 expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
             });
         });
