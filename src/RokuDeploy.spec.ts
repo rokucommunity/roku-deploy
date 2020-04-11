@@ -1077,18 +1077,26 @@ describe('index', () => {
                 expect(fileContents.toString()).to.equal('hello symlink');
             });
 
-            symlinkIt('copies5tder', async () => {
+            symlinkIt('copies files from subdirs of symlinked folders', async () => {
+                let i = 0;
+                console.log(i++);
                 fsExtra.ensureDirSync(s`${tmpPath}/baseProject/source/lib/promise`);
+                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/lib.brs`, `'lib.brs`);
+                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
 
+                console.log(i++);
                 fsExtra.ensureDirSync(s`${tmpPath}/mainProject/source`);
+                console.log(i++);
                 fsExtra.writeFileSync(s`${tmpPath}/mainProject/source/main.brs`, `'main.brs`);
 
                 //symlink the baseProject lib folder into the mainProject
+                console.log(i++);
                 fsExtra.symlinkSync(s`${tmpPath}/baseProject/source/lib`, s`${tmpPath}/mainProject/source/lib`);
 
                 //the symlinked file should exist in the main project
+                console.log(i++);
                 expect(fsExtra.pathExistsSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`)).to.be.true;
 
                 let opts = {
@@ -1100,8 +1108,10 @@ describe('index', () => {
                     ]
                 };
 
+                console.log(i++);
                 let stagingPath = rokuDeploy.getOptions(opts).stagingFolderPath;
                 //getFilePaths detects the file
+                console.log(i++);
                 expect(
                     (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
                 ).to.eql([{
@@ -1115,8 +1125,10 @@ describe('index', () => {
                     dest: s`source/main.brs`
                 }]);
 
+                console.log(i++);
                 await rokuDeploy.prepublishToStaging(opts);
 
+                console.log(i++);
                 expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
             });
         });
