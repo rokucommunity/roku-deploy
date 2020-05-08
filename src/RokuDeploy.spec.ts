@@ -437,6 +437,31 @@ describe('index', () => {
             } catch (e) { }
         });
 
+        it('does not delete the archive by default', async () => {
+            let zipPath = `${options.outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.publish(options);
+            //the file should still exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+        });
+
+        it('deletes the archive when configured', async () => {
+            let zipPath = `${options.outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false });
+            //the file should not exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
+            //the out folder should also be deleted since it's empty
+        });
+
         it('fails when the zip file is missing', async () => {
             options.outFile = 'fileThatDoesNotExist.zip';
             try {

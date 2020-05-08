@@ -428,35 +428,42 @@ export class RokuDeploy {
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
-        if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
-            throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
-        }
-        let readStream = this.fsExtra.createReadStream(zipFilePath);
-        //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
-        await new Promise((resolve) => {
-            readStream.on('open', resolve);
-        });
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
-        requestOptions.formData = {
-            mysubmit: 'Replace',
-            archive: readStream
-        };
+        try {
+            if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
+                throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
+            }
+            let readStream = this.fsExtra.createReadStream(zipFilePath);
+            //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
+            await new Promise((resolve) => {
+                readStream.on('open', resolve);
+            });
+            let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
+            requestOptions.formData = {
+                mysubmit: 'Replace',
+                archive: readStream
+            };
 
-        if (options.remoteDebug) {
-            requestOptions.formData.remotedebug = '1';
-        }
+            if (options.remoteDebug) {
+                requestOptions.formData.remotedebug = '1';
+            }
 
-        let results = await this.doPostRequest(requestOptions);
-        if (options.failOnCompileError) {
-            if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                throw new errors.CompileError('Compile error', results);
+            let results = await this.doPostRequest(requestOptions);
+            if (options.failOnCompileError) {
+                if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                    throw new errors.CompileError('Compile error', results);
+                }
+            }
+
+            if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                return { message: 'Identical to previous version -- not replacing', results: results };
+            }
+            return { message: 'Successful deploy', results: results };
+        } finally {
+            //delete the zip file only if configured to do so
+            if (options.retainDeploymentArchive === false) {
+                await this.fsExtra.remove(zipFilePath);
             }
         }
-
-        if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-            return { message: 'Identical to previous version -- not replacing', results: results };
-        }
-        return { message: 'Successful deploy', results: results };
     }
 
     /**
@@ -701,6 +708,7 @@ export class RokuDeploy {
             outDir: './out',
             outFile: 'roku-deploy',
             retainStagingFolder: false,
+            retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
             packagePort: 80,
@@ -915,6 +923,12 @@ export interface RokuDeployOptions {
      * @default false
      */
     retainStagingFolder?: boolean;
+
+    /**
+     * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
+     * @default true
+     */
+    retainDeploymentArchive?: boolean;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging

@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+### Unreleased
+### Added
+ - config setting `retainDeploymentArchive` which specifies if the zip should be deleted after a publish.
+
+
+
 ## [3.0.2] - 2020-04-10
 ### Fixed
  - issue where `prepublishToStaging` wasn't recognizing nested files inside a symlinked folder. 
