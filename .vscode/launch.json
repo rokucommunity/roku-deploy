@@ -1,14 +1,10 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.1.0",
     "configurations": [
 		{
             "name": "Debug RokuDeploy.spec.ts Tests",
             "type": "node",
             "request": "launch",
-            "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts", "./src/util.spec.ts"],
             "cwd": "${workspaceRoot}",
@@ -18,7 +14,6 @@
             "name": "Debug device.spec.ts Tests",
             "type": "node",
             "request": "launch",
-            "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/device.spec.ts"],
             "cwd": "${workspaceRoot}",
@@ -28,7 +23,6 @@
             "name": "Debug All Tests",
             "type": "node",
             "request": "launch",
-            "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/**/*.spec.ts"],
             "cwd": "${workspaceRoot}",
@@ -38,7 +32,6 @@
             "name": "Debug Specific Tests",
             "type": "node",
             "request": "launch",
-            "preLaunchTask": "build",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "args": ["-r", "ts-node/register", "-r", "source-map-support/register", "./src/RokuDeploy.spec.ts", "--grep", "descriptionOfTestYouWantToRun"],
             "cwd": "${workspaceRoot}",
