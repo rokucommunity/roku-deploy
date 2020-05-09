@@ -3,6 +3,7 @@ import { RokuDeploy } from './RokuDeploy';
 //export everything from the RokuDeploy file
 export * from './RokuDeploy';
 export * from './util';
+export * from './RokuDeployOptions';
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 let rokuDeploy = new RokuDeploy();
