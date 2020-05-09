@@ -715,12 +715,7 @@ export class RokuDeploy {
             packagePort: 80,
             remotePort: 8060,
             rootDir: './',
-            files: [
-                'source/**/*.*',
-                'components/**/*.*',
-                'images/**/*.*',
-                'manifest'
-            ],
+            files: [...DefaultFiles],
             username: 'rokudev'
         };
 
@@ -912,4 +907,9 @@ export interface StandardizedFileEntry {
     dest: string;
 }
 
-export type FileEntry = (string | { src: string | string[]; dest?: string });
+export const DefaultFiles = [
+    'source/**/*.*',
+    'components/**/*.*',
+    'images/**/*.*',
+    'manifest'
+];

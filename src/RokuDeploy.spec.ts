@@ -10,9 +10,10 @@ import * as deferred from 'deferred';
 import * as glob from 'glob';
 let sinon = sinonImport.createSandbox();
 
-import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo, ManifestData, FileEntry } from './RokuDeploy';
+import { RokuDeploy, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
+import { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 
 chai.use(chaiFiles);
 
