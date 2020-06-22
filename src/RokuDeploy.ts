@@ -6,6 +6,7 @@ import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as minimatch from 'minimatch';
 import * as glob from 'glob';
+import * as xml2js from 'xml2js';
 import { promisify } from 'util';
 const globAsync = promisify(glob);
 
@@ -775,18 +776,26 @@ export class RokuDeploy {
         return outPkgFilePath;
     }
 
-    public async getDevId(options?: RokuDeployOptions) {
+    public async getDeviceInfo(options?: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', options);
+        const requestOptions = {
+            url: `http://${options.host}:${options.remotePort}/query/device-info`
+        };
         let results = await this.doGetRequest(requestOptions);
-
-        let devIdSearchMatches = /Your Dev ID:[^>]+>([^<]+)</.exec(results.body);
-        if (devIdSearchMatches) {
-            return devIdSearchMatches[1].trim();
+        try {
+            const parsedContent = await xml2js.parseStringPromise(results.body, {
+                explicitArray: false
+            });
+            return parsedContent['device-info'];
+        } catch (e) {
+            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', results);
         }
+    }
 
-        throw new errors.UnparsableDeviceResponseError('Could not retrieve Dev ID', results);
+    public async getDevId(options?: RokuDeployOptions) {
+        const deviceInfo = await this.getDeviceInfo(options);
+        return deviceInfo['keyed-developer-id'];
     }
 
     public async parseManifest(manifestPath: string): Promise<ManifestData> {

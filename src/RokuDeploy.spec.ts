@@ -143,28 +143,103 @@ describe('index', () => {
         });
     });
 
-    describe('getDevId', () => {
-        it('should return the current Dev ID if successful', async () => {
-            let body = `{
-                            var devDiv = document.createElement('div');
-                            devDiv.className="roku-font-5";
-                            devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
-                            node.appendChild(devDiv);
-                        }`;
+    describe('getDeviceInfo', () => {
+        it('should return device info matching what was returned by ECP', async () => {
+            const expectedSerialNumber = 'expectedSerialNumber';
+            const expectedDeviceId = 'expectedDeviceId';
+            const expectedDeveloperId = 'expectedDeveloperId'
+            const body = `<device-info>
+                <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
+                <serial-number>${expectedSerialNumber}</serial-number>
+                <device-id>${expectedDeviceId}</device-id>
+                <advertising-id>2cv488ca-d6ec-5222-9304-1925e72d0122</advertising-id>
+                <vendor-name>Roku</vendor-name>
+                <model-name>Roku Ultra</model-name>
+                <model-number>4660X</model-number>
+                <model-region>US</model-region>
+                <is-tv>false</is-tv>
+                <is-stick>false</is-stick>
+                <supports-ethernet>true</supports-ethernet>
+                <wifi-mac>d8:31:34:33:6d:6e</wifi-mac>
+                <wifi-driver>realtek</wifi-driver>
+                <has-wifi-extender>false</has-wifi-extender>
+                <has-wifi-5G-support>true</has-wifi-5G-support>
+                <can-use-wifi-extender>true</can-use-wifi-extender>
+                <ethernet-mac>e8:31:34:36:2d:2e</ethernet-mac>
+                <network-type>ethernet</network-type>
+                <friendly-device-name>Brian's Roku Ultra</friendly-device-name>
+                <friendly-model-name>Roku Ultra</friendly-model-name>
+                <default-device-name>Roku Ultra - YB0072009656</default-device-name>
+                <user-device-name>Brian's Roku Ultra</user-device-name>
+                <user-device-location>Hot Tub</user-device-location>
+                <build-number>469.30E04170A</build-number>
+                <software-version>9.3.0</software-version>
+                <software-build>4170</software-build>
+                <secure-device>true</secure-device>
+                <language>en</language>
+                <country>US</country>
+                <locale>en_US</locale>
+                <time-zone-auto>true</time-zone-auto>
+                <time-zone>US/Eastern</time-zone>
+                <time-zone-name>United States/Eastern</time-zone-name>
+                <time-zone-tz>America/New_York</time-zone-tz>
+                <time-zone-offset>-240</time-zone-offset>
+                <clock-format>12-hour</clock-format>
+                <uptime>19799</uptime>
+                <power-mode>PowerOn</power-mode>
+                <supports-suspend>false</supports-suspend>
+                <supports-find-remote>true</supports-find-remote>
+                <find-remote-is-possible>true</find-remote-is-possible>
+                <supports-audio-guide>true</supports-audio-guide>
+                <supports-rva>true</supports-rva>
+                <developer-enabled>true</developer-enabled>
+                <keyed-developer-id>${expectedDeveloperId}</keyed-developer-id>
+                <search-enabled>true</search-enabled>
+                <search-channels-enabled>true</search-channels-enabled>
+                <voice-search-enabled>true</voice-search-enabled>
+                <notifications-enabled>true</notifications-enabled>
+                <notifications-first-use>false</notifications-first-use>
+                <supports-private-listening>true</supports-private-listening>
+                <headphones-connected>false</headphones-connected>
+                <supports-ecs-textedit>true</supports-ecs-textedit>
+                <supports-ecs-microphone>true</supports-ecs-microphone>
+                <supports-wake-on-wlan>false</supports-wake-on-wlan>
+                <has-play-on-roku>true</has-play-on-roku>
+                <has-mobile-screensaver>true</has-mobile-screensaver>
+                <support-url>roku.com/support</support-url>
+                <grandcentral-version>3.1.39</grandcentral-version>
+                <trc-version>3.0</trc-version>
+                <trc-channel-version>2.9.42</trc-channel-version>
+                <davinci-version>2.8.20</davinci-version>
+            </device-info>`;
             mockDoGetRequest(body);
-            let devId = await rokuDeploy.getDevId(options);
-            expect(devId).to.equal('c6fdc2019903ac3332f624b0b2c2fe2c733c3e74');
+            const deviceInfo = await rokuDeploy.getDeviceInfo(options);
+            expect(deviceInfo['serial-number']).to.equal(expectedSerialNumber);
+            expect(deviceInfo['device-id']).to.equal(expectedDeviceId);
+            expect(deviceInfo['keyed-developer-id']).to.equal(expectedDeveloperId);
         });
 
         it('should throw our error on failure', async () => {
             mockDoGetRequest();
             try {
-                await rokuDeploy.getDevId(options);
+                await rokuDeploy.getDeviceInfo(options);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
             }
             assert.fail('Exception should have been thrown');
+        });
+    });
+
+
+    describe('getDevId', () => {
+        it('should return the current Dev ID if successful', async () => {
+            const body = `<device-info>
+                <keyed-developer-id>${options.devId}</keyed-developer-id>
+            </device-info>`;
+            mockDoGetRequest(body);
+            let devId = await rokuDeploy.getDevId(options);
+            expect(devId).to.equal(options.devId);
         });
     });
 
@@ -644,12 +719,9 @@ describe('index', () => {
 
     describe('rekeyDevice', () => {
         beforeEach(() => {
-            let body = `      {
-                var devDiv = document.createElement('div');
-                devDiv.className="roku-font-5";
-                devDiv.innerHTML = "<label>Your Dev ID: &nbsp;</label> c6fdc2019903ac3332f624b0b2c2fe2c733c3e74</label><hr />";
-                node.appendChild(devDiv);
-            }`;
+            const body = `<device-info>
+                <keyed-developer-id>${options.devId}</keyed-developer-id>
+            </device-info>`;
             mockDoGetRequest(body);
         });
 
@@ -678,8 +750,15 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
+            await rokuDeploy.rekeyDevice(options);
+        });
 
-            options.devId = 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74';
+        it('should not return an error if dev ID is not set', async () => {
+            let body = `  <div style="display:none">
+                <font color="red">Success.</font>
+            </div>`;
+            mockDoPostRequest(body);
+            options.devId = undefined;
             await rokuDeploy.rekeyDevice(options);
         });
 
