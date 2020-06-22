@@ -1,9 +1,13 @@
 .vscode
+.git
+.nyc_output
+coverage
+dist/*.spec.*
 src
 testProject
 .gitignore
-.npmrc
+.travis.yml
 rokudeploy.json
+*.pkg
 tsconfig.json
-dist/*.map
-dist/*.spec.*
+.eslintrc.js

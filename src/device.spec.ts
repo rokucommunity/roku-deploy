@@ -12,7 +12,7 @@ const expect = chai.expect;
 const file = chaiFiles.file;
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
-describe('device', function () {
+describe('device', function device() {
     let options: rokuDeploy.RokuDeployOptions;
     let originalCwd = process.cwd();
 
@@ -40,13 +40,13 @@ describe('device', function () {
 
     this.timeout(20000);
 
-    describe('deploy', function () {
-        it('works', async function () {
+    describe('deploy', () => {
+        it('works', async () => {
             let response = await rokuDeploy.deploy(options);
             assert.equal(response.message, 'Successful deploy');
         });
 
-        it('Presents nice message for 401 unauthorized status code', async function () {
+        it('Presents nice message for 401 unauthorized status code', async () => {
             options.password = 'NOT_THE_PASSWORD';
             try {
                 let response = await rokuDeploy.deploy(options);
@@ -59,7 +59,7 @@ describe('device', function () {
     });
 
     describe('deployAndSignPackage', () => {
-        it('works', async function () {
+        it('works', async () => {
             expect(file(await rokuDeploy.deployAndSignPackage(options))).to.exist;
         });
     });

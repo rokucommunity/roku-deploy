@@ -2,12 +2,26 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "npm",
+            "type": "shell",
+            "label": "test:nocover",
+            "command": "npm",
             "group": {
                 "kind": "test",
                 "isDefault": true
             },
-            "script": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "args": [
+                "run",
+                "test:nocover",
+                "--silent"
+            ],
             "problemMatcher": []
         },
         {
@@ -17,9 +31,17 @@
                 "kind": "build",
                 "isDefault": true
             },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
             "script": "build",
             "problemMatcher": [
-                "$tslint5",
+                "$eslint-compact",
                 "$tsc"
             ]
         }

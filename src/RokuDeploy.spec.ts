@@ -6,19 +6,24 @@ import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
 import * as sinonImport from 'sinon';
-import * as ini from 'ini';
+import * as deferred from 'deferred';
+import * as glob from 'glob';
 let sinon = sinonImport.createSandbox();
 
-import { RokuDeploy, RokuDeployOptions, BeforeZipCallbackInfo } from './RokuDeploy';
+import { RokuDeploy, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
 import * as errors from './Errors';
+import { util, standardizePath as s } from './util';
+import { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 
 chai.use(chaiFiles);
 
 const expect = chai.expect;
 const file = chaiFiles.file;
 const dir = chaiFiles.dir;
+let cwd = process.cwd();
+const tmpPath = s`${cwd}/.tmp`;
 
-describe('index', function () {
+describe('index', () => {
     let rokuDeploy: RokuDeploy;
     //make an <any> ref to rokuDeploy to make some things easier
     let rd: any;
@@ -26,7 +31,6 @@ describe('index', function () {
         rokuDeploy = new RokuDeploy();
         rd = rokuDeploy;
     });
-    let cwd = process.cwd();
 
     let options: RokuDeployOptions;
     let originalCwd = process.cwd();
@@ -53,42 +57,35 @@ describe('index', function () {
         sinon.restore();
     });
 
-    describe('getStagingFolderPath', function () {
-        it('returns correct path', async () => {
-            let outputPath = rokuDeploy.getStagingFolderPath(options);
-            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), '.roku-deploy-staging'));
-        });
-    });
-
-    describe('getOutputPkgFilePath', function () {
-        it('should return correct path if given basename', async () => {
+    describe('getOutputPkgFilePath', () => {
+        it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
             let outputPath = rokuDeploy.getOutputPkgFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.pkg'));
         });
 
-        it('should return correct path if given outFile option ending in .zip', async () => {
+        it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
             let outputPath = rokuDeploy.getOutputPkgFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.pkg'));
         });
     });
 
-    describe('getOutputZipFilePath', function () {
-        it('should return correct path if given basename', async () => {
+    describe('getOutputZipFilePath', () => {
+        it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
             let outputPath = rokuDeploy.getOutputZipFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.zip'));
         });
 
-        it('should return correct path if given outFile option ending in .zip', async () => {
+        it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
             let outputPath = rokuDeploy.getOutputZipFilePath(options);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.zip'));
         });
     });
 
-    describe('doPostRequest', function () {
+    describe('doPostRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
@@ -117,7 +114,7 @@ describe('index', function () {
         });
     });
 
-    describe('doGetRequest', function () {
+    describe('doGetRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
             sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
@@ -146,7 +143,7 @@ describe('index', function () {
         });
     });
 
-    describe('getDevId', function () {
+    describe('getDevId', () => {
         it('should return the current Dev ID if successful', async () => {
             let body = `{
                             var devDiv = document.createElement('div');
@@ -171,7 +168,74 @@ describe('index', function () {
         });
     });
 
-    describe('createPackage', function () {
+    describe('copyToStaging', () => {
+        it('throws exceptions on missing stagingPath', async () => {
+            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([])
+            );
+        });
+        it('throws exceptions on missing rootDir', async () => {
+            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([], 'asdf')
+            );
+        });
+        it('computes absolute path for all operations', async () => {
+            const ensureDirPaths = [];
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((p) => {
+                ensureDirPaths.push(p);
+                return Promise.resolve;
+            });
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src, dest: dest });
+                return Promise.resolve();
+            });
+
+            let rootDir = s`${tmpPath}/ProjectA/src`;
+            let stagingPath = s`${tmpPath}/ProjectA/.staging`;
+
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([
+                    {
+                        src: s`${rootDir}/source/main.brs`,
+                        dest: '/source/main.brs'
+                    }, {
+                        src: s`${rootDir}/components/a/b/c/comp1.xml`,
+                        dest: '/components/a/b/c/comp1.xml'
+                    }
+                ])
+            );
+
+            await (rokuDeploy as any).copyToStaging([], stagingPath, rootDir);
+
+            expect(ensureDirPaths).to.eql([
+                s`${stagingPath}/source`,
+                s`${stagingPath}/components/a/b/c`
+            ]);
+
+            expect(copyPaths).to.eql([
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingPath}/source/main.brs`
+                }, {
+                    src: s`${rootDir}/components/a/b/c/comp1.xml`,
+                    dest: s`${stagingPath}/components/a/b/c/comp1.xml`
+                }
+            ]);
+        });
+    });
+
+    describe('createPackage', () => {
+        it('works with custom stagingFolderPath', async () => {
+            let opts = {
+                ...options,
+                files: [
+                    'manifest'
+                ],
+                stagingFolderPath: '.tmp/dist'
+            };
+            await rokuDeploy.createPackage(opts);
+            expect(file(rokuDeploy.getOutputZipFilePath(opts))).to.exist;
+        });
+
         it('should throw error when no files were found to copy', async () => {
             try {
                 options.files = [];
@@ -183,28 +247,38 @@ describe('index', function () {
             assert.fail('Exception should have been thrown');
         });
 
-        it('should create package in proper directory', async function () {
-            await rokuDeploy.createPackage(options);
+        it('should create package in proper directory', async () => {
+            await rokuDeploy.createPackage({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            });
             expect(file(rokuDeploy.getOutputZipFilePath(options))).to.exist;
         });
 
         it('should only include the specified files', async () => {
-            try {
-                options.files = ['manifest'];
-                await rokuDeploy.createPackage(options);
-                let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
-                await fsExtra.ensureDir('.tmp');
-                zip.extractAllTo('.tmp/output', true);
-                expect(file('./.tmp/output/manifest')).to.exist;
-            } catch (e) {
-                throw e;
-            }
-        });
-
-        it('generates full package with defaults', async () => {
+            options.files = ['manifest'];
             await rokuDeploy.createPackage(options);
             let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
             await fsExtra.ensureDir('.tmp');
+            zip.extractAllTo('.tmp/output', true);
+            expect(file('./.tmp/output/manifest')).to.exist;
+        });
+
+        it('generates full package with defaults', async () => {
+            await rokuDeploy.createPackage({
+                ...options,
+                //target a subset of the files to make the test faster
+                files: [
+                    'components/components/Loader/Loader.brs',
+                    'images/splash_hd.jpg',
+                    'source/main.brs',
+                    'manifest'
+                ]
+            });
+            let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
+            fsExtra.ensureDirSync('.tmp');
             zip.extractAllTo('.tmp/output', true);
             expect(dir('./.tmp/output/components')).to.exist;
             expect(dir('./.tmp/output/images')).to.exist;
@@ -212,7 +286,12 @@ describe('index', function () {
         });
 
         it('should retain the staging directory when told to', async () => {
-            let stagingFolderPath = await rokuDeploy.prepublishToStaging(options);
+            let stagingFolderPath = await rokuDeploy.prepublishToStaging({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            });
             expect(dir(stagingFolderPath)).to.exist;
             options.retainStagingFolder = true;
             await rokuDeploy.zipPackage(options);
@@ -232,25 +311,52 @@ describe('index', function () {
             }
         });
 
+        it('should wait for promise returned by pre-zip callback', async () => {
+            let count = 0;
+            await rokuDeploy.createPackage({
+                ...options,
+                files: ['manifest']
+            }, (info) => {
+                return Promise.resolve().then(() => {
+                    count++;
+                }).then(() => {
+                    count++;
+                });
+            });
+            expect(count).to.equal(2);
+        });
+
         it('should increment the build number if requested', async () => {
             options.incrementBuildNumber = true;
-            await rokuDeploy.createPackage(options, (info) => {
-                expect(info.manifestData.build_version).to.not.equal('0');
+            //make the zipping immediately resolve
+            sinon.stub(rokuDeploy, 'zipPackage').returns(Promise.resolve());
+            let beforeZipInfo: BeforeZipCallbackInfo;
+            await rokuDeploy.createPackage({
+                ...options,
+                files: ['manifest']
+            }, (info) => {
+                beforeZipInfo = info;
             });
+            expect(beforeZipInfo.manifestData.build_version).to.not.equal('0');
         });
 
         it('should not increment the build number if not requested', async () => {
             options.incrementBuildNumber = false;
-            await rokuDeploy.createPackage(options, (info) => {
+            await rokuDeploy.createPackage({
+                ...options,
+                files: [
+                    'manifest'
+                ]
+            }, (info) => {
                 expect(info.manifestData.build_version).to.equal('0');
             });
         });
     });
 
-    it('runs via the command line using the rokudeploy.json file', function (done) {
+    it('runs via the command line using the rokudeploy.json file', function test(done) {
         this.timeout(20000);
         nrc.run('node dist/index.js', {
-            onData: function (data) {
+            onData: (data) => {
             }
         }).then(() => {
             assert.ok('deploy succeeded');
@@ -261,7 +367,17 @@ describe('index', function () {
         });
     });
 
-    describe('press home button', () => {
+    describe('generateBaseRequestOptions', () => {
+        it('uses default port', () => {
+            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+        });
+
+        it('uses overridden port', () => {
+            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4', packagePort: 999 }).url).to.equal('http://1.2.3.4:999/a_b_c');
+        });
+    });
+
+    describe('pressHomeButton', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
             sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
@@ -274,6 +390,26 @@ describe('index', function () {
                 expect(true).to.be.true;
             });
         });
+
+        it('uses default port', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4');
+            await d.promise;
+        });
+
+        it('uses overridden port', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4', 987);
+            await d.promise;
+        });
     });
 
     let fileCounter = 1;
@@ -281,17 +417,61 @@ describe('index', function () {
         beforeEach(() => {
             options.host = '0.0.0.0';
             //rename the rokudeploy.json file so publish doesn't pick it up
-            try { fsExtra.renameSync('rokudeploy.json', 'temp.rokudeploy.json'); } catch (e) { }
+            try {
+                fsExtra.renameSync('rokudeploy.json', 'temp.rokudeploy.json');
+            } catch (e) { }
 
             //make a dummy output file...we don't care what's in it
             options.outFile = `temp${fileCounter++}.zip`;
-            try { fsExtra.mkdirSync(options.outDir); } catch (e) { }
-            try { fsExtra.appendFileSync(`${options.outDir}/${options.outFile}`, 'asdf'); } catch (e) { }
+            try {
+                fsExtra.mkdirSync(options.outDir);
+            } catch (e) { }
+            try {
+                fsExtra.appendFileSync(`${options.outDir}/${options.outFile}`, 'asdf');
+            } catch (e) { }
         });
 
         afterEach(() => {
             //rename the rokudeploy.json file so publish doesn't pick it up
-            try { fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json'); } catch (e) { }
+            try {
+                fsExtra.renameSync('temp.rokudeploy.json', 'rokudeploy.json');
+            } catch (e) { }
+        });
+
+        it('does not delete the archive by default', async () => {
+            let zipPath = `${options.outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.publish(options);
+            //the file should still exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+        });
+
+        it('deletes the archive when configured', async () => {
+            let zipPath = `${options.outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false });
+            //the file should not exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
+            //the out folder should also be deleted since it's empty
+        });
+
+        it('fails when the zip file is missing', async () => {
+            options.outFile = 'fileThatDoesNotExist.zip';
+            try {
+                await rokuDeploy.publish(options);
+                throw new Error('publish should have thrown an exception');
+            } catch (e) {
+                let zipFilePath = rokuDeploy.getOutputZipFilePath(options);
+                expect(e.message).to.equal(`Cannot publish because file does not exist at '${zipFilePath}'`);
+            }
         });
 
         it('fails when no host is provided', () => {
@@ -356,7 +536,19 @@ describe('index', function () {
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
-            }, (err) => {
+            }, () => {
+                assert.fail('Should not have rejected the promise');
+            });
+        });
+
+        it('handles successful deploy with remoteDebug', () => {
+            options.failOnCompileError = true;
+            options.remoteDebug = true;
+            mockDoPostRequest();
+
+            return rokuDeploy.publish(options).then((result) => {
+                expect(result.message).to.equal('Successful deploy');
+            }, () => {
                 assert.fail('Should not have rejected the promise');
             });
         });
@@ -369,7 +561,7 @@ describe('index', function () {
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.results.body).to.equal(body);
-            }, (err) => {
+            }, () => {
                 assert.fail('Should have resolved promise');
             });
         });
@@ -481,16 +673,6 @@ describe('index', function () {
             await rokuDeploy.rekeyDevice(options);
         });
 
-        it('should work with absolute path', async () => {
-            let body = `  <div style="display:none">
-                <font color="red">Success.</font>
-            </div>`;
-            mockDoPostRequest(body);
-
-            options.rekeySignedPackage = path.join(path.resolve(options.rootDir, '../testSignedPackage.pkg'));
-            await rokuDeploy.rekeyDevice(options);
-        });
-
         it('should not return an error if dev ID is set and matches output', async () => {
             let body = `  <div style="display:none">
                 <font color="red">Success.</font>
@@ -567,7 +749,7 @@ describe('index', function () {
 
     describe('signExistingPackage', () => {
         beforeEach(() => {
-            let stagingFolderPath = rokuDeploy.getStagingFolderPath();
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
             fsExtra.ensureDirSync(stagingFolderPath);
 
             let src = path.join(options.rootDir, 'manifest');
@@ -653,8 +835,21 @@ describe('index', function () {
 
     describe('prepublishToStaging', () => {
         it('should use outDir for staging folder', async () => {
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging({
+                files: [
+                    'manifest'
+                ]
+            });
             expect(dir('out/.roku-deploy-staging')).to.exist;
+        });
+
+        it('should support overriding the staging folder', async () => {
+            await rokuDeploy.prepublishToStaging({
+                ...options,
+                files: ['manifest'],
+                stagingFolderPath: '.tmp/custom-out-dir'
+            });
+            expect(dir('.tmp/custom-out-dir')).to.exist;
         });
 
         it('handles old glob-style', async () => {
@@ -671,7 +866,7 @@ describe('index', function () {
             options.files = [
                 'manifest',
                 {
-                    src: 'source',
+                    src: 'source/**/*',
                     dest: 'source'
                 }
             ];
@@ -742,14 +937,15 @@ describe('index', function () {
         });
 
         it('handles multi-globs', async () => {
-            options.files = [
-                'manifest',
-                { src: 'source', dest: 'dest' },
-                'components/**/*',
-                '!components/scenes/**/*'
-            ];
             options.retainStagingFolder = true;
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging({
+                ...options, files: [
+                    'manifest',
+                    'source',
+                    'components/**/*',
+                    '!components/scenes/**/*'
+                ]
+            });
             expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
             expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
         });
@@ -768,28 +964,16 @@ describe('index', function () {
             }
         });
 
-        it('retains subfolder structure', async () => {
+        it('retains subfolder structure when referencing a folder', async () => {
             options.files = [
                 'manifest',
                 {
-                    src: 'flavors/shared/resources',
+                    src: 'flavors/shared/resources/**/*',
                     dest: 'resources'
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
             expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
-        });
-
-        it('honors the trailing slash in dest', async () => {
-            options.files = [
-                'manifest',
-                {
-                    src: 'source/main.brs',
-                    dest: 'source1/'
-                }
-            ];
-            await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/source1/main.brs')).to.exist;
         });
 
         it('handles multi-globs subfolder structure', async () => {
@@ -807,40 +991,68 @@ describe('index', function () {
         });
 
         describe('symlinks', () => {
-            let sourcePath = path.join(cwd, 'testSymlinks.md');
-            let symlinkPath = path.join(cwd, 'testProject', 'testSymlinks.md');
+            let sourcePath = s`${cwd}/test.md`;
+            let rootDir = s`${cwd}/.tmp/testProject`;
+            let symlinkPath = s`${rootDir}/renamed_test.md`;
 
             beforeEach(cleanUp);
             afterEach(cleanUp);
 
-            async function cleanUp() {
-                try { await fsExtra.remove(sourcePath); } catch (e) { }
+            function cleanUp() {
+                try {
+                    fsExtra.removeSync(sourcePath);
+                } catch (e) { }
                 //delete the symlink if it exists
-                try { await fsExtra.remove(symlinkPath); } catch (e) { }
+                try {
+                    fsExtra.removeSync(symlinkPath);
+                } catch (e) { }
             }
+
+            let _isSymlinkingPermitted: boolean;
 
             /**
              * Determine if we have permission to create symlinks
              */
             function getIsSymlinksPermitted() {
-                let testSymlinkFile = path.join(cwd, 'symlinkIsAvailable.txt');
-                //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
-                let isPermitted = false;
-                //create the symlink file
-                try {
-                    fsExtra.symlinkSync(path.join(cwd, 'readme.md'), testSymlinkFile);
-                    isPermitted = true;
-                } catch {
+                if (_isSymlinkingPermitted === undefined) {
+                    fsExtra.ensureDirSync(`${tmpPath}/a/b/c`);
+                    fsExtra.ensureDirSync(`${tmpPath}/project`);
+                    fsExtra.writeFileSync(`${tmpPath}/a/alpha.txt`, 'alpha.txt');
+                    fsExtra.writeFileSync(`${tmpPath}/a/b/c/charlie.txt`, 'charlie.txt');
+
+                    try {
+                        //make a file symlink
+                        fsExtra.symlinkSync(`${tmpPath}/a/alpha.txt`, `${tmpPath}/project/alpha.txt`);
+                        //create a folder symlink that also includes subfolders
+                        fsExtra.symlinkSync(`${tmpPath}/a`, `${tmpPath}/project/a`);
+                        //use glob to scan the directory recursively
+                        glob.sync('**/*', {
+                            cwd: s`${tmpPath}/project`,
+                            absolute: true,
+                            follow: true
+                        });
+                        _isSymlinkingPermitted = true;
+                    } catch (e) {
+                        _isSymlinkingPermitted = false;
+                        return false;
+                    }
                 }
-                //delete the symlink test file
-                try { fsExtra.removeSync(testSymlinkFile); } catch (e) { }
-                return isPermitted;
+                return _isSymlinkingPermitted;
             }
 
-            let symlinkIt = getIsSymlinksPermitted() ? it : it.skip;
+            function symlinkIt(name, callback) {
+                if (getIsSymlinksPermitted()) {
+                    console.log(`symlinks are permitted for test "${name}"`);
+                    it(name, callback);
+                } else {
+                    console.log(`symlinks are not permitted for test "${name}"`);
+                    it.skip(name, callback);
+                }
+            }
 
-            symlinkIt('are dereferenced properly', async () => {
+            symlinkIt('direct symlinked files are dereferenced properly', async () => {
+                //make sure the output dir exists
+                await fsExtra.ensureDir(path.dirname(symlinkPath));
                 //create the actual file
                 await fsExtra.writeFile(sourcePath, 'hello symlink');
 
@@ -852,109 +1064,199 @@ describe('index', function () {
 
                 //the symlink file should exist
                 expect(file(symlinkPath)).to.exist;
+                let opts = {
+                    ...options,
+                    rootDir: rootDir,
+                    files: [
+                        'manifest',
+                        'renamed_test.md'
+                    ]
+                };
 
-                options.files = [
-                    'manifest',
-                    'testSymlinks.md'
-                ];
-                await rokuDeploy.prepublishToStaging(options);
-                let stagedFilePath = path.join(options.outDir, '.roku-deploy-staging', 'testSymlinks.md');
+                let stagingFolderPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                //getFilePaths detects the file
+                expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
+                    src: s`${opts.rootDir}/renamed_test.md`,
+                    dest: s`renamed_test.md`
+                }]);
+
+                await rokuDeploy.prepublishToStaging(opts);
+                let stagedFilePath = s`${stagingFolderPath}/renamed_test.md`;
                 expect(file(stagedFilePath)).to.exist;
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
             });
-        });
-    });
 
-    describe('makeFilesAbsolute', () => {
-        it('handles negated entries', () => {
-            expect(
-                rokuDeploy.makeFilesAbsolute([{
-                    dest: '',
-                    src: [
-                        'components/**/*',
-                        '!components/scenes/**/*'
+            symlinkIt('copies files from subdirs of symlinked folders', async () => {
+                fsExtra.ensureDirSync(s`${tmpPath}/baseProject/source/lib/promise`);
+                fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/lib.brs`, `'lib.brs`);
+                fsExtra.writeFileSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
+
+                fsExtra.ensureDirSync(s`${tmpPath}/mainProject/source`);
+                fsExtra.writeFileSync(s`${tmpPath}/mainProject/source/main.brs`, `'main.brs`);
+
+                //symlink the baseProject lib folder into the mainProject
+                fsExtra.symlinkSync(s`${tmpPath}/baseProject/source/lib`, s`${tmpPath}/mainProject/source/lib`);
+
+                //the symlinked file should exist in the main project
+                expect(fsExtra.pathExistsSync(s`${tmpPath}/baseProject/source/lib/promise/promise.brs`)).to.be.true;
+
+                let opts = {
+                    ...options,
+                    rootDir: s`${tmpPath}/mainProject`,
+                    files: [
+                        'manifest',
+                        'source/**/*'
                     ]
-                }], 'C:/somepath/')
-            ).to.eql([{
-                dest: '',
-                src: [
-                    path.normalize('C:/somepath/components/**/*'),
-                    `!${path.normalize('C:/somepath/components/scenes/**/*')}`
-                ]
-            }]);
-        });
-    });
+                };
 
-    describe('normalizeFilesOption', () => {
-        it('appends trailing slash for dest directories', async () => {
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.normalizeFilesOption([{
-                    src: 'components',
-                    //bogus dest object
-                    dest: <any>true
+                let stagingPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                //getFilePaths detects the file
+                expect(
+                    (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
+                ).to.eql([{
+                    src: s`${tmpPath}/mainProject/source/lib/lib.brs`,
+                    dest: s`source/lib/lib.brs`
+                }, {
+                    src: s`${tmpPath}/mainProject/source/lib/promise/promise.brs`,
+                    dest: s`source/lib/promise/promise.brs`
+                }, {
+                    src: s`${tmpPath}/mainProject/source/main.brs`,
+                    dest: s`source/main.brs`
                 }]);
+
+                await rokuDeploy.prepublishToStaging(opts);
+                expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
             });
         });
+    });
 
-        it('defaults to current directory', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
-                'readme.md',
-            ])).to.eql([{
-                dest: '',
-                src: [
-                    'readme.md'
-                ]
-            }]);
+    describe('normalizeFilesArray', () => {
+        it('catches invalid dest entries', () => {
+            expect(() => {
+                rd.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>true
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rd.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>false
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rd.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>/asdf/gi
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rd.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>{}
+                }]);
+            }).to.throw();
+
+            expect(() => {
+                rd.normalizeFilesArray([{
+                    src: 'some/path',
+                    dest: <any>[]
+                }]);
+            }).to.throw();
         });
 
-        it('properly handles negated globs', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
+        it('normalizes directory separators paths', () => {
+            expect(rd.normalizeFilesArray([{
+                src: `long/source/path`,
+                dest: `long/dest/path`
+            }])).to.eql([{
+                src: s`long/source/path`,
+                dest: s`long/dest/path`
+            }]);
+        });
+        it('works for simple strings', () => {
+            expect(rd.normalizeFilesArray([
                 'manifest',
-                'components/**/*',
-                '!components/scenes/**/*'
-            ])).to.eql([{
-                dest: '',
-                src: [
-                    'manifest',
-                    'components/**/*',
-                    '!components/scenes/**/*'
-                ],
-            }]);
-        });
-
-        it('appends trailing slash to dest when globs are used', async () => {
-            let result = await rokuDeploy.normalizeFilesOption([{
-                src: 'components/**/*',
-                dest: 'components'
-            }]);
-
-            expect(result[0].dest).to.equal('components' + path.sep);
-        });
-
-        it('properly handles negated globs with {src}', async () => {
-            expect(await rokuDeploy.normalizeFilesOption([
+                'source/main.brs'
+            ])).to.eql([
                 'manifest',
+                'source/main.brs'
+            ]);
+        });
+
+        it('works for negated strings', () => {
+            expect(rd.normalizeFilesArray([
+                '!.git'
+            ])).to.eql([
+                '!.git'
+            ]);
+        });
+
+        it('skips falsey and bogus entries', () => {
+            expect(rd.normalizeFilesArray([
+                '',
+                'manifest',
+                <any>false,
+                undefined,
+                null
+            ])).to.eql([
+                'manifest'
+            ]);
+        });
+
+        it('works for {src:string} objects', () => {
+            expect(rd.normalizeFilesArray([
+                {
+                    src: 'manifest'
+                }
+            ])).to.eql([{
+                src: 'manifest',
+                dest: undefined
+            }]);
+        });
+
+        it('works for {src:string[]} objects', () => {
+            expect(rd.normalizeFilesArray([
                 {
                     src: [
-                        'components/**/*',
-                        '!components/scenes/**/*'
+                        'manifest',
+                        'source/main.brs'
                     ]
-                },
-                'someOtherFile.brs'
+                }
             ])).to.eql([{
-                src: [
-                    'manifest',
-                    'someOtherFile.brs'
-                ],
-                dest: '',
+                src: 'manifest',
+                dest: undefined
             }, {
-                src: [
-                    'components/**/*',
-                    '!components/scenes/**/*'
-                ],
-                dest: '',
+                src: s`source/main.brs`,
+                dest: undefined
             }]);
+        });
+
+        it('retains dest option', () => {
+            expect(rd.normalizeFilesArray([
+                {
+                    src: 'source/config.dev.brs',
+                    dest: 'source/config.brs'
+                }
+            ])).to.eql([{
+                src: s`source/config.dev.brs`,
+                dest: s`source/config.brs`
+            }]);
+        });
+
+        it('throws when encountering invalid entries', () => {
+            expect(() => rd.normalizeFilesArray(<any>[true])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[/asdf/])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[new Date()])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[1])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: true }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: /asdf/ }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: new Date() }])).to.throw();
+            expect(() => rd.normalizeFilesArray(<any>[{ src: 1 }])).to.throw();
         });
     });
 
@@ -967,12 +1269,21 @@ describe('index', function () {
         });
     });
 
+    describe('deleteInstalledChannel', () => {
+        it('attempts to delete any installed dev channel on the device', async () => {
+            mockDoPostRequest();
+
+            let result = await rokuDeploy.deleteInstalledChannel();
+            expect(result).not.to.be.undefined;
+        });
+    });
+
     describe('zipFolder', () => {
         //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
         it('rejects the promise when an error occurs', async () => {
             //zip path doesn't exist
             await assertThrowsAsync(async () => {
-                await rokuDeploy.zipFolder('source', 'some/zip/path/that/does/not/exist');
+                await rokuDeploy.zipFolder('source', '.tmp/some/zip/path/that/does/not/exist');
             });
         });
     });
@@ -989,6 +1300,7 @@ describe('index', function () {
             expect(parsedManifest.splash_screen_hd).to.equal('pkg:/images/splash_hd.jpg');
             expect(parsedManifest.ui_resolutions).to.equal('hd');
             expect(parsedManifest.bs_const).to.equal('IS_DEV_BUILD=false');
+            expect(parsedManifest.splash_color).to.equal('#000000');
         });
 
         it('Throws our error message for a missing file', async () => {
@@ -1004,14 +1316,30 @@ describe('index', function () {
     });
 
     describe('stringifyManifest', () => {
-        it('correctly converts back to a valid manifest with bs_const', async () => {
+        let inputManifestContents;
+        let inputParsedManifest: ManifestData;
+
+        beforeEach(async () => {
             let rootProjectDir = path.resolve(options.rootDir);
             let manifestPath = path.join(rootProjectDir, 'manifest');
 
-            let inputParsedManifest = await rokuDeploy.parseManifest(manifestPath);
-            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
-            let outputParsedManifest = ini.parse(outputStringifiedManifest);
+            inputManifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
+            inputManifestContents = inputManifestContents.trim();
+            inputParsedManifest = rokuDeploy.parseManifestFromString(inputManifestContents);
+        });
 
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', () => {
+            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
+            let outputNormalized = outputStringifiedManifest.replace(/\r\n/g, '\n');
+            let inputNormalized = inputManifestContents.replace(/\r\n/g, '\n');
+            expect(outputNormalized).to.equal(inputNormalized);
+        });
+
+        it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', () => {
+            delete inputParsedManifest.keyIndexes;
+            delete inputParsedManifest.lineCount;
+            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
+            let outputParsedManifest = rokuDeploy.parseManifestFromString(outputStringifiedManifest);
             expect(outputParsedManifest.title).to.equal(inputParsedManifest.title);
             expect(outputParsedManifest.major_version).to.equal(inputParsedManifest.major_version);
             expect(outputParsedManifest.minor_version).to.equal(inputParsedManifest.minor_version);
@@ -1019,58 +1347,393 @@ describe('index', function () {
             expect(outputParsedManifest.splash_screen_hd).to.equal(inputParsedManifest.splash_screen_hd);
             expect(outputParsedManifest.ui_resolutions).to.equal(inputParsedManifest.ui_resolutions);
             expect(outputParsedManifest.bs_const).to.equal(inputParsedManifest.bs_const);
-        });
-
-        it('correctly converts back to a valid manifest without bs_const', async () => {
-            let rootProjectDir = path.resolve(options.rootDir);
-            let manifestPath = path.join(rootProjectDir, 'manifest');
-
-            let inputParsedManifest = await rokuDeploy.parseManifest(manifestPath);
-            delete inputParsedManifest.bs_const;
-            let outputStringifiedManifest = rokuDeploy.stringifyManifest(inputParsedManifest);
-            let outputParsedManifest = ini.parse(outputStringifiedManifest);
-
-            expect(outputParsedManifest.title).to.equal(inputParsedManifest.title);
-            expect(outputParsedManifest.major_version).to.equal(inputParsedManifest.major_version);
-            expect(outputParsedManifest.minor_version).to.equal(inputParsedManifest.minor_version);
-            expect(outputParsedManifest.build_version).to.equal(inputParsedManifest.build_version);
-            expect(outputParsedManifest.splash_screen_hd).to.equal(inputParsedManifest.splash_screen_hd);
-            expect(outputParsedManifest.ui_resolutions).to.equal(inputParsedManifest.ui_resolutions);
-            expect(outputParsedManifest.bs_const).to.equal(inputParsedManifest.bs_const);
-        });
-    });
-
-    describe('endsWithSlash', () => {
-        it('detects slashes', () => {
-            expect(rokuDeploy.endsWithSlash('/')).to.be.true;
-            expect(rokuDeploy.endsWithSlash('\\')).to.be.true;
-        });
-
-        it('detects non slashes', () => {
-            expect(rokuDeploy.endsWithSlash('a')).to.be.false;
-            expect(rokuDeploy.endsWithSlash('')).to.be.false;
-            expect(rokuDeploy.endsWithSlash(' ')).to.be.false;
-            expect(rokuDeploy.endsWithSlash('.')).to.be.false;
         });
     });
 
     describe('getFilePaths', () => {
+        let tempPath = s`${cwd}/getFilePaths_temp`;
+        let rootDir = s`${tempPath}/src`;
+        let stagingPathAbsolute = s`${tmpPath}/staging`;
+        let otherProjectDir = s`${tempPath}/otherProjectSrc`;
+
+        //create baseline project structure
+        before(() => {
+            fsExtra.removeSync(tempPath);
+
+            //srcSync
+            fsExtra.ensureDirSync(`${rootDir}/source`);
+            fsExtra.ensureDirSync(`${rootDir}/components/screen1`);
+            fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
+            fsExtra.writeFileSync(`${rootDir}/manifest`, '');
+            fsExtra.writeFileSync(`${rootDir}/source/main.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/source/lib.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/component1.xml`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/component1.brs`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/screen1/screen1.xml`, '');
+            fsExtra.writeFileSync(`${rootDir}/components/screen1/screen1.brs`, '');
+
+            //otherProjectSrc
+            fsExtra.ensureDirSync(`${otherProjectDir}/source`);
+            fsExtra.writeFileSync(`${otherProjectDir}/manifest`, '');
+            fsExtra.writeFileSync(`${otherProjectDir}/source/thirdPartyLib.brs`, '');
+            fsExtra.ensureDirSync(`${otherProjectDir}/components/component1/subComponent`);
+            fsExtra.writeFileSync(`${otherProjectDir}/components/component1/subComponent/screen.brs`, '');
+        });
+
+        after(async () => {
+            await fsExtra.remove(tempPath);
+        });
+
+        async function getFilePaths(files: FileEntry[], rootDirOverride = rootDir) {
+            return (await rokuDeploy.getFilePaths(files, rootDirOverride))
+                .sort((a, b) => a.src.localeCompare(b.src));
+        }
+
+        describe('top-level-patterns', () => {
+            it('works for root-level double star', async () => {
+                expect(await getFilePaths([
+                    '**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                },
+                {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                },
+                {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                },
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('works for multile entries', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    'components/**/*',
+                    'manifest'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }, {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('copies top-level-string single-star globs', async () => {
+                expect(await getFilePaths([
+                    'source/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('works for double-star globs', async () => {
+                expect(await getFilePaths([
+                    '**/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('copies subdir-level relative double-star globs', async () => {
+                expect(await getFilePaths([
+                    'components/**/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }]);
+            });
+
+            it('throws exception when top-level strings reference files not under rootDir', async () => {
+                await expectThrowsAsync(async () => {
+                    await getFilePaths([
+                        `../otherProjectSrc/**/*`
+                    ]);
+                });
+            });
+
+            it('applies negated patterns', async () => {
+                expect(await getFilePaths([
+                    //include all components
+                    'components/**/*.brs',
+                    //exclude all xml files
+                    '!components/**/*.xml',
+                    //re-include a specific xml file
+                    'components/screen1/screen1.xml'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }]);
+            });
+
+            it('handles negated multi-globs', async () => {
+                expect((await getFilePaths([
+                    'components/**/*',
+                    '!components/screen1/**/*'
+                ])).map(x => x.dest)).to.eql([
+                    s`components/component1.brs`,
+                    s`components/component1.xml`
+                ]);
+            });
+
+            it('applies multi-glob paths relative to rootDir', async () => {
+                expect(await getFilePaths([
+                    'manifest',
+                    'source/**/*',
+                    'components/**/*',
+                    '!components/scenes/**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }, {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('ignores non-glob folder paths', async () => {
+                expect(await getFilePaths([
+                    //this is the folder called "components"
+                    'components'
+                ])).to.eql([]); //there should be no matches because rokudeploy ignores folders
+            });
+
+        });
+
+        describe('{src;dest} objects', () => {
+            it('works for root-level double star', async () => {
+                expect(await getFilePaths([{
+                    src: '**/*',
+                    dest: ''
+                }
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                },
+                {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                },
+                {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                },
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('uses the root of staging folder for dest when not specified with star star', async () => {
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/**/*`
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`components/component1/subComponent/screen.brs`
+                }, {
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`source/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('copies absolute path files to specified dest', async () => {
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: 'lib/thirdPartyLib.brs'
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`lib/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('copies relative path files to specified dest', async () => {
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/../src/source/main.brs`,
+                    dest: 'source/main.brs'
+                }])).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('maintains relative path after **', async () => {
+                expect(await getFilePaths([{
+                    src: `../otherProjectSrc/**/*`,
+                    dest: 'outFolder/'
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`outFolder/components/component1/subComponent/screen.brs`
+                }, {
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`outFolder/manifest`
+                }, {
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`outFolder/source/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('works for other globs', async () => {
+                expect(await getFilePaths([{
+                    src: `components/screen1/*creen1.brs`,
+                    dest: s`/source`
+                }])).to.eql([{
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`source/screen1.brs`
+                }]);
+            });
+
+            it('works for other globs without dest', async () => {
+                expect(await getFilePaths([{
+                    src: `components/screen1/*creen1.brs`
+                }])).to.eql([{
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`screen1.brs`
+                }]);
+            });
+
+            it('skips directory folder names for other globs without dest', async () => {
+                expect(await getFilePaths([{
+                    //straight wildcard matches folder names too
+                    src: `components/*`
+                }])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`component1.xml`
+                }]);
+            });
+
+            it('applies negated patterns', async () => {
+                expect(await getFilePaths([
+                    //include all components
+                    { src: 'components/**/*.brs', dest: 'components' },
+                    //exclude all xml files
+                    '!components/**/*.xml',
+                    //re-include a specific xml file
+                    { src: 'components/screen1/screen1.xml', dest: 'components/screen1/screen1.xml' }
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }]);
+            });
+        });
+
+        it('converts relative rootDir path to absolute', async () => {
+            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
+            await getFilePaths([
+                'source/main.brs'
+            ], './rootDir');
+            expect(stub.callCount).to.be.greaterThan(0);
+            expect(stub.getCall(0).args[0].rootDir).to.eql('./rootDir');
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/rootDir`);
+        });
+
         it('works when using a different current working directory than rootDir', async () => {
             let rootProjectDir = path.resolve(options.rootDir);
-            let outDir = path.resolve(options.outDir);
 
             //sanity check, make sure it works without fiddling with cwd intact
             let paths = (await rokuDeploy.getFilePaths([
                 'manifest',
                 'images/splash_hd.jpg'
-            ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+            ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
-                src: path.join(rootProjectDir, 'images', 'splash_hd.jpg'),
-                dest: path.join(outDir, 'images', 'splash_hd.jpg')
+                src: s`${rootProjectDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
             }, {
-                src: path.join(rootProjectDir, 'manifest'),
-                dest: path.join(outDir, 'manifest')
+                src: s`${rootProjectDir}/manifest`,
+                dest: s`manifest`
             }]);
 
             //change the working directory and verify everything still works
@@ -1081,62 +1744,234 @@ describe('index', function () {
             paths = (await rokuDeploy.getFilePaths([
                 'manifest',
                 'images/splash_hd.jpg'
-            ], outDir, rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
+            ], rootProjectDir)).sort((a, b) => a.src.localeCompare(b.src));
 
             expect(paths).to.eql([{
-                src: path.join(rootProjectDir, 'images', 'splash_hd.jpg'),
-                dest: path.join(outDir, 'images', 'splash_hd.jpg')
+                src: s`${rootProjectDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
             }, {
-                src: path.join(rootProjectDir, 'manifest'),
-                dest: path.join(outDir, 'manifest')
+                src: s`${rootProjectDir}/manifest`,
+                dest: s`manifest`
             }]);
         });
 
         it('supports absolute paths from outside of the rootDir', async () => {
-            let outDir = path.resolve(options.outDir);
-            let rootProjectDir = path.resolve(options.rootDir);
+            options = rokuDeploy.getOptions(options);
 
-            let paths = await rokuDeploy.getFilePaths([
-                path.join(cwd, 'readme.md')
-            ], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+            //dest not specified
+            expect(await rokuDeploy.getFilePaths([{
+                src: s`${cwd}/README.md`
+            }], options.rootDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`README.md`
             }]);
+
+            //dest specified
+            expect(await rokuDeploy.getFilePaths([{
+                src: path.join(cwd, 'README.md'),
+                dest: 'docs/README.md'
+            }], options.rootDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }]);
+
+            let outDir = path.resolve(options.outDir);
+            let paths: any[];
 
             paths = await rokuDeploy.getFilePaths([{
-                src: path.join(cwd, 'readme.md'),
-                dest: 'docs'
-            }], outDir, rootProjectDir);
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }], outDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
+
+            //top-level string paths pointing to files outside the root should thrown an exception
+            await expectThrowsAsync(async () => {
+                paths = await rokuDeploy.getFilePaths([
+                    s`${cwd}/README.md`
+                ], outDir);
+            });
         });
 
         it('supports relative paths that grab files from outside of the rootDir', async () => {
             let outDir = path.resolve(options.outDir);
             let rootProjectDir = path.resolve(options.rootDir);
 
-            let paths = await rokuDeploy.getFilePaths([
-                path.join('..', 'readme.md')
-            ], outDir, rootProjectDir);
-
-            expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'readme.md')
+            expect(await rokuDeploy.getFilePaths([{
+                src: path.join('..', 'README.md')
+            }], rootProjectDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`README.md`
             }]);
 
-            paths = await rokuDeploy.getFilePaths([{
-                src: path.join('..', 'readme.md'),
-                dest: 'docs'
-            }], outDir, rootProjectDir);
+            expect(await rokuDeploy.getFilePaths([{
+                src: path.join('..', 'README.md'),
+                dest: 'docs/README.md'
+            }], rootProjectDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }]);
+
+            //should throw exception because we can't have top-level string paths pointed to files outside the root
+            await expectThrowsAsync(async () => {
+                let paths = await rokuDeploy.getFilePaths([
+                    path.join('..', 'README.md')
+                ], outDir);
+            });
+        });
+
+        it('supports overriding paths', async () => {
+            let paths = await rokuDeploy.getFilePaths([{
+                src: s`${rootDir}/components/component1.brs`,
+                dest: 'comp1.brs'
+            }, {
+                src: s`${rootDir}/components/screen1/screen1.brs`,
+                dest: 'comp1.brs'
+            }], rootDir);
+            expect(paths).to.be.lengthOf(1);
+            expect(s`${paths[0].src}`).to.equal(s`${rootDir}/components/screen1/screen1.brs`);
+        });
+
+        it('supports overriding paths from outside the root dir', async () => {
+            let thisRootDir = s`${cwd}/tempTestOverrides/src`;
+            try {
+
+                fsExtra.ensureDirSync(s`${thisRootDir}/source`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/components`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/../.tmp`);
+
+                fsExtra.writeFileSync(s`${thisRootDir}/source/main.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.xml`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/../.tmp/MainScene.brs`, '');
+
+                let files = [
+                    '**/*.xml',
+                    '**/*.brs',
+                    {
+                        src: '../.tmp/MainScene.brs',
+                        dest: 'components/MainScene.brs'
+                    }
+                ];
+                let paths = await rokuDeploy.getFilePaths(files, thisRootDir);
+
+                //the MainScene.brs file from source should NOT be included
+                let mainSceneEntries = paths.filter(x => s`${x.dest}` === s`components/MainScene.brs`);
+                expect(
+                    mainSceneEntries,
+                    `Should only be one files entry for 'components/MainScene.brs'`
+                ).to.be.lengthOf(1);
+                expect(s`${mainSceneEntries[0].src}`).to.eql(s`${thisRootDir}/../.tmp/MainScene.brs`);
+            } finally {
+                //clean up
+                await fsExtra.remove(s`${thisRootDir}/../`);
+            }
+        });
+    });
+
+    describe('getDestPath', () => {
+        let rootDir = cwd;
+        it('finds dest path for top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('does not find dest path for non-matched top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated in src;dest;', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        {
+                            src: '!source/main.brs'
+                        }
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('works for brighterscript files', () => {
+            let destPath = rokuDeploy.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                s`${cwd}/src`
+            );
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
+        });
+
+        it('throws exception when rootDir is not absolute', () => {
+            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
+            let destPath = rokuDeploy.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                `./src`
+            );
+            expect(stub.callCount).to.be.greaterThan(0);
+            expect(stub.getCall(0).args[0].rootDir).to.eql('./src');
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/src`);
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
+        });
+
+        it('excludes a file found outside the root dir', async () => {
+            options = rokuDeploy.getOptions(options);
+            let outDir = path.resolve(options.outDir);
+
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/../source/main.brs`,
+                    [
+                        '../source/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+
+            let paths = await rokuDeploy.getFilePaths([{
+                src: path.join('..', 'README.md'),
+                dest: s`docs/README.md`
+            }], outDir);
 
             expect(paths).to.eql([{
-                src: path.join(cwd, 'readme.md'),
-                dest: path.join(outDir, 'docs', 'readme.md')
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
             }]);
         });
     });
@@ -1160,9 +1995,9 @@ describe('index', function () {
     describe('retrieveSignedPackage', () => {
         let onHandler: any;
         beforeEach(() => {
-            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((pth: string, callback: (err: Error) => void) => {
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
                 //do nothing, assume the dir gets created
-            });
+            }) as any);
 
             //fake out the write stream function
             sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
@@ -1186,7 +2021,7 @@ describe('index', function () {
             onHandler = (event, callback) => {
                 if (event === 'response') {
                     callback({
-                        statusCode: 200,
+                        statusCode: 200
                     });
                 }
             };
@@ -1230,6 +2065,102 @@ describe('index', function () {
                 return;
             }
             assert.fail('Should not have succeeded');
+        });
+    });
+
+    describe('prepublishToStaging', () => {
+        it('is resilient to file system errors', async () => {
+            let copy = rokuDeploy.fsExtra.copy;
+            let count = 0;
+
+            //mock writeFile so we can throw a few errors during the test
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+                count += 1;
+                //fail a few times
+                if (count < 5) {
+                    throw new Error('fake error thrown as part of the unit test');
+                } else {
+                    return copy.apply(rokuDeploy.fsExtra, args);
+                }
+            });
+
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
+
+            //override the retry milliseconds to make test run faster
+            let orig = util.tryRepeatAsync.bind(util);
+            sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
+                return orig(args[0], args[1], 0);
+            });
+
+            await rokuDeploy.prepublishToStaging({
+                stagingFolderPath: stagingFolderPath,
+                files: [
+                    'source/main.brs'
+                ]
+            });
+            expect(file(s`${stagingFolderPath}/source/main.brs`)).to.exist;
+            expect(count).to.be.greaterThan(4);
+        });
+
+        it('throws underlying error after the max fs error threshold is reached', async () => {
+            let copy = rokuDeploy.fsExtra.copy;
+            let count = 0;
+
+            //mock writeFile so we can throw a few errors during the test
+            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+                count += 1;
+                //fail a few times
+                if (count < 15) {
+                    throw new Error('fake error thrown as part of the unit test');
+                } else {
+                    return copy.apply(rokuDeploy.fsExtra, args);
+                }
+            });
+
+            //override the timeout for tryRepeatAsync so this test runs faster
+            let orig = util.tryRepeatAsync.bind(util);
+            sinon.stub(util, 'tryRepeatAsync').callsFake(async (...args) => {
+                return orig(args[0], args[1], 0);
+            });
+
+            let stagingFolderPath = rokuDeploy.getOptions().stagingFolderPath;
+
+            let error: Error;
+            try {
+                await rokuDeploy.prepublishToStaging({
+                    stagingFolderPath: stagingFolderPath,
+                    files: [
+                        'source/main.brs'
+                    ]
+                });
+            } catch (e) {
+                error = e;
+            }
+            expect(error, 'Should have thrown error').to.exist;
+            expect(error.message).to.equal('fake error thrown as part of the unit test');
+        });
+    });
+
+    describe('getOptions', () => {
+        it('does not error when no parameter provided', () => {
+            expect(rokuDeploy.getOptions(undefined)).to.exist;
+        });
+
+        describe('packagePort', () => {
+            it('defaults to 80', () => {
+                expect(rokuDeploy.getOptions({}).packagePort).to.equal(80);
+            });
+            it('can be overridden', () => {
+                expect(rokuDeploy.getOptions({ packagePort: 95 }).packagePort).to.equal(95);
+            });
+        });
+        describe('remotePort', () => {
+            it('defaults to 8060', () => {
+                expect(rokuDeploy.getOptions({}).remotePort).to.equal(8060);
+            });
+            it('can be overridden', () => {
+                expect(rokuDeploy.getOptions({ remotePort: 1234 }).remotePort).to.equal(1234);
+            });
         });
     });
 
@@ -1299,9 +2230,23 @@ describe('index', function () {
         try {
             await fn();
         } catch (e) {
-            f = () => { throw e; };
+            f = () => {
+                throw e;
+            };
         } finally {
             assert.throws(f);
         }
     }
 });
+
+async function expectThrowsAsync(callback: () => Promise<any>, message = 'Expected to throw but did not') {
+    let wasExceptionThrown = false;
+    try {
+        await callback();
+    } catch (e) {
+        wasExceptionThrown = true;
+    }
+    if (wasExceptionThrown === false) {
+        throw new Error(message);
+    }
+}
