@@ -147,7 +147,7 @@ describe('index', () => {
         it('should return device info matching what was returned by ECP', async () => {
             const expectedSerialNumber = 'expectedSerialNumber';
             const expectedDeviceId = 'expectedDeviceId';
-            const expectedDeveloperId = 'expectedDeveloperId'
+            const expectedDeveloperId = 'expectedDeveloperId';
             const body = `<device-info>
                 <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
                 <serial-number>${expectedSerialNumber}</serial-number>
