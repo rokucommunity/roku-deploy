@@ -234,7 +234,7 @@ describe('index', () => {
 
     describe('getDevId', () => {
         it('should return the current Dev ID if successful', async () => {
-            const expectedDevId = "expectedDevId";
+            const expectedDevId = 'expectedDevId';
             const body = `<device-info>
                 <keyed-developer-id>${expectedDevId}</keyed-developer-id>
             </device-info>`;
