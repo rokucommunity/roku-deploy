@@ -234,12 +234,14 @@ describe('index', () => {
 
     describe('getDevId', () => {
         it('should return the current Dev ID if successful', async () => {
+            const expectedDevId = "expectedDevId";
             const body = `<device-info>
-                <keyed-developer-id>${options.devId}</keyed-developer-id>
+                <keyed-developer-id>${expectedDevId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
+            options.devId = expectedDevId;
             let devId = await rokuDeploy.getDevId(options);
-            expect(devId).to.equal(options.devId);
+            expect(devId).to.equal(expectedDevId);
         });
     });
 
