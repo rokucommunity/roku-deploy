@@ -26,6 +26,7 @@ let publish = RokuDeploy.prototype.publish.bind(rokuDeploy);
 let rekeyDevice = RokuDeploy.prototype.rekeyDevice.bind(rokuDeploy);
 let retrieveSignedPackage = RokuDeploy.prototype.retrieveSignedPackage.bind(rokuDeploy);
 let signExistingPackage = RokuDeploy.prototype.signExistingPackage.bind(rokuDeploy);
+let stringifyManifest = RokuDeploy.prototype.stringifyManifest.bind(rokuDeploy);
 let zipFolder = RokuDeploy.prototype.zipFolder.bind(rokuDeploy);
 let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
 
@@ -48,6 +49,7 @@ export {
     rekeyDevice,
     retrieveSignedPackage,
     signExistingPackage,
+    stringifyManifest,
     zipFolder,
     zipPackage
 };
