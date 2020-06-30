@@ -2154,12 +2154,97 @@ describe('index', () => {
                 expect(rokuDeploy.getOptions({ packagePort: 95 }).packagePort).to.equal(95);
             });
         });
+
         describe('remotePort', () => {
             it('defaults to 8060', () => {
                 expect(rokuDeploy.getOptions({}).remotePort).to.equal(8060);
             });
             it('can be overridden', () => {
                 expect(rokuDeploy.getOptions({ remotePort: 1234 }).remotePort).to.equal(1234);
+            });
+        });
+
+        describe('config file', () => {
+            const rokudeployPath = 'rokudeploy.json';
+            const tempRokudeployPath = 'temp.rokudeploy.json';
+            const bsconfigPath = 'bsconfig.json';
+
+            beforeEach(() => {
+                try {
+                    fsExtra.renameSync(rokudeployPath, tempRokudeployPath);
+                } catch (e) { }
+            });
+
+            afterEach(() => {
+                try {
+                    fsExtra.removeSync(rokudeployPath);
+                    fsExtra.removeSync(bsconfigPath);
+                    fsExtra.renameSync(tempRokudeployPath, rokudeployPath);
+                } catch (e) { }
+            });
+
+            it('if no config file is available it should use the default values', () => {
+                expect(rokuDeploy.getOptions({}).outFile).to.equal('roku-deploy');
+            });
+
+            it('if rokudeploy.json config file is available it should use those values instead of the default', () => {
+                const expectedOutFile = 'expectedOutFile';
+                fsExtra.writeJsonSync(rokudeployPath, {
+                    outFile: expectedOutFile
+                });
+                expect(rokuDeploy.getOptions({}).outFile).to.equal(expectedOutFile);
+            });
+
+            it('if bsconfig.json config file is available it should use those values instead of the default', () => {
+                const expectedOutFile = 'expectedOutFile';
+                fsExtra.writeJsonSync(bsconfigPath, {
+                    outFile: expectedOutFile
+                });
+                expect(rokuDeploy.getOptions({}).outFile).to.equal(expectedOutFile);
+            });
+
+            it('if rokudeploy.json config file is available and bsconfig.json is also available it should use rokudeploy.json instead of bsconfig.json', () => {
+                fsExtra.writeJsonSync(bsconfigPath, {
+                    outFile: 'bsconfigOutFile'
+                });
+                const expectedOutFile = 'rokudeployOutFile';
+                fsExtra.writeJsonSync(rokudeployPath, {
+                    outFile: expectedOutFile
+                });
+                expect(rokuDeploy.getOptions({}).outFile).to.equal(expectedOutFile);
+            });
+
+            it('if run time options are provided they should override any existing config file options', () => {
+                fsExtra.writeJsonSync(bsconfigPath, {
+                    outFile: 'bsconfigOutFile'
+                });
+                fsExtra.writeJsonSync(rokudeployPath, {
+                    outFile: 'rokudeployOutFile'
+                });
+                const options = {
+                    outFile: 'runTimeOutFile'
+                };
+                expect(rokuDeploy.getOptions(options).outFile).to.equal(options.outFile);
+            });
+
+            it('if run time config is provided it should override any existing config file options', () => {
+                fsExtra.writeJsonSync(rokudeployPath, {
+                    outFile: 'rokudeployOutFile'
+                });
+                fsExtra.writeJsonSync(bsconfigPath, {
+                    outFile: 'bsconfigOutFile'
+                });
+
+                const projectPath = 'brsconfig.json';
+                const expectedOutFile = 'projectConfigOutFile';
+                fsExtra.writeJsonSync(projectPath, {
+                    outFile: expectedOutFile
+                });
+                const options = {
+                    project: projectPath
+                };
+                expect(rokuDeploy.getOptions(options).outFile).to.equal(expectedOutFile);
+                fsExtra.removeSync(projectPath);
             });
         });
     });

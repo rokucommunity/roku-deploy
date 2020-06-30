@@ -699,10 +699,17 @@ export class RokuDeploy {
      */
     public getOptions(options: RokuDeployOptions = {}) {
         let fileOptions: RokuDeployOptions = {};
-        //load a rokudeploy.json file if it exists
-        if (this.fsExtra.existsSync('rokudeploy.json')) {
-            let configFileText = this.fsExtra.readFileSync('rokudeploy.json').toString();
-            fileOptions = JSON.parse(configFileText);
+        const fileNames = ['rokudeploy.json', 'bsconfig.json'];
+        if (options.project) {
+            fileNames.unshift(options.project);
+        }
+
+        for (const fileName of fileNames) {
+            if (this.fsExtra.existsSync(fileName)) {
+                let configFileText = this.fsExtra.readFileSync(fileName).toString();
+                fileOptions = JSON.parse(configFileText);
+                break;
+            }
         }
 
         let defaultOptions = <RokuDeployOptions>{
