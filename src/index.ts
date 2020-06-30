@@ -12,6 +12,7 @@ let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
+let getDeviceInfo = RokuDeploy.prototype.getDeviceInfo.bind(rokuDeploy);
 let getDestPath = RokuDeploy.prototype.getDestPath.bind(rokuDeploy);
 let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
@@ -26,6 +27,7 @@ let publish = RokuDeploy.prototype.publish.bind(rokuDeploy);
 let rekeyDevice = RokuDeploy.prototype.rekeyDevice.bind(rokuDeploy);
 let retrieveSignedPackage = RokuDeploy.prototype.retrieveSignedPackage.bind(rokuDeploy);
 let signExistingPackage = RokuDeploy.prototype.signExistingPackage.bind(rokuDeploy);
+let stringifyManifest = RokuDeploy.prototype.stringifyManifest.bind(rokuDeploy);
 let zipFolder = RokuDeploy.prototype.zipFolder.bind(rokuDeploy);
 let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
 
@@ -36,6 +38,7 @@ export {
     deployAndSignPackage,
     getDestPath,
     getFilePaths,
+    getDeviceInfo,
     getOptions,
     getOutputPkgFilePath,
     getOutputZipFilePath,
@@ -48,6 +51,7 @@ export {
     rekeyDevice,
     retrieveSignedPackage,
     signExistingPackage,
+    stringifyManifest,
     zipFolder,
     zipPackage
 };

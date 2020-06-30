@@ -2,7 +2,7 @@
     "password": "password",
     "host": "192.168.1.103",
     "rootDir": "testProject",
-    "devID": "c6fdc2019903ac3332f624b0b2c2fe2c733c3e74",
+    "devId": "c6fdc2019903ac3332f624b0b2c2fe2c733c3e74",
     "rekeySignedPackage": "../testSignedPackage.pkg",
     "signingPassword": "drRCEVWP/++K5TYnTtuAfQ=="
 }
