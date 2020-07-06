@@ -97,6 +97,14 @@ You can provide a callback in any of the higher level methods, which allows you 
     });
     ```
 
+## bsconfig.json
+Another common config file is [bsconfig.json](https://github.com/rokucommunity/brighterscript#bsconfigjson-options), used by the [BrighterScript](https://github.com/rokucommunity/brighterscript) project and the [BrightScript extension for VSCode](https://github.com/rokucommunity/vscode-brightscript-language). Since many of the config settings are shared between `roku-deploy.json` and `bsconfig.json`, `roku-deploy` supports reading from that file as well. Here is the loading order:
+ - if `roku-deploy.json` is found, those settings are used.
+ - if `roku-deploy.json` is not found, look for `bsconfig.json` and use those settings. 
+
+Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json` and `bsconfig.json`.
+
+
 ## Files Array
 
 The files array is how you specify what files are included in your project. Any strings found in the files array must be relative to `rootDir`, and are used as include _filters_, meaning that if a file matches the pattern, it is included. 
