@@ -20,6 +20,7 @@
         "dateformat": "^3.0.3",
         "fs-extra": "^7.0.1",
         "glob": "^7.1.6",
+        "jsonc-parser": "^2.3.0",
         "minimatch": "^3.0.4",
         "path": "^0.12.7",
         "request": "^2.88.0",

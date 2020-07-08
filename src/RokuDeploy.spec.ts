@@ -2223,6 +2223,56 @@ describe('index', () => {
     });
 
     describe('getOptions', () => {
+        it('supports jsonc for roku-deploy.json', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return (filePath as string).endsWith('rokudeploy.json');
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                //leading comment
+                {
+                    //inner comment
+                    "rootDir": "src" //trailing comment
+                }
+                //trailing comment
+            `);
+            let options = rokuDeploy.getOptions(undefined);
+            expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
+        });
+
+        it('supports jsonc for bsconfig.json', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return (filePath as string).endsWith('bsconfig.json');
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                //leading comment
+                {
+                    //inner comment
+                    "rootDir": "src" //trailing comment
+                }
+                //trailing comment
+            `);
+            let options = rokuDeploy.getOptions(undefined);
+            expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
+        });
+
+        it('catches invalid json with jsonc parser', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return (filePath as string).endsWith('bsconfig.json');
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "rootDir": "src"
+            `);
+            let ex;
+            try {
+                let options = rokuDeploy.getOptions(undefined);
+            } catch (e) {
+                ex = e;
+            }
+            expect(ex).to.exist;
+            expect(ex.message.startsWith('Error parsing')).to.be.true;
+        });
+
         it('does not error when no parameter provided', () => {
             expect(rokuDeploy.getOptions(undefined)).to.exist;
         });

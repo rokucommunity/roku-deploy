@@ -19,7 +19,7 @@ Publish Roku projects to a Roku device by using Node.js.
     source/  
     manifest
 
-2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible.
+2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible. (**note**: `rokudeploy.json` is jsonc, which means it supports comments).
 
 sample rokudeploy.json
 

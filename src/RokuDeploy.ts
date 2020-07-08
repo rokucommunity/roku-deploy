@@ -8,6 +8,7 @@ import * as minimatch from 'minimatch';
 import * as glob from 'glob';
 import * as xml2js from 'xml2js';
 import { promisify } from 'util';
+import { parse as parseJsonc, ParseError, printParseErrorCode } from 'jsonc-parser';
 const globAsync = promisify(glob);
 
 import { util } from './util';
@@ -708,7 +709,19 @@ export class RokuDeploy {
         for (const fileName of fileNames) {
             if (this.fsExtra.existsSync(fileName)) {
                 let configFileText = this.fsExtra.readFileSync(fileName).toString();
-                fileOptions = JSON.parse(configFileText);
+                let parseErrors = [] as ParseError[];
+                fileOptions = parseJsonc(configFileText, parseErrors);
+                if (parseErrors.length > 0) {
+                    throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
+                        parseErrors.map(x => {
+                            return {
+                                message: printParseErrorCode(x.error),
+                                offset: x.offset,
+                                length: x.length
+                            };
+                        })
+                    ));
+                }
                 break;
             }
         }
