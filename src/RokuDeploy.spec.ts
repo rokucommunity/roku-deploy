@@ -2223,6 +2223,45 @@ describe('index', () => {
     });
 
     describe('getOptions', () => {
+        it('calling with no parameters works', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return false;
+            });
+            let options = rokuDeploy.getOptions(undefined);
+            expect(options.stagingFolderPath).to.exist;
+        });
+
+        it('calling with empty param object', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return false;
+            });
+            let options = rokuDeploy.getOptions({});
+            expect(options.stagingFolderPath).to.exist;
+        });
+
+        it('works when passing in stagingFolderPath', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return false;
+            });
+            let options = rokuDeploy.getOptions({
+                stagingFolderPath: './staging-dir'
+            });
+            expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
+        });
+
+        it('works when loading stagingFolderPath from rokudeploy.json', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return true;
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "stagingFolderPath": "./staging-dir"
+                }
+            `);
+            let options = rokuDeploy.getOptions();
+            expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
+        });
+
         it('supports jsonc for roku-deploy.json', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return (filePath as string).endsWith('rokudeploy.json');

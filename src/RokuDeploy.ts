@@ -749,7 +749,7 @@ export class RokuDeploy {
 
         //stagingFolderPath
         if (finalOptions.stagingFolderPath) {
-            finalOptions.stagingFolderPath = path.resolve(process.cwd(), options.stagingFolderPath);
+            finalOptions.stagingFolderPath = path.resolve(process.cwd(), finalOptions.stagingFolderPath);
         } else {
             finalOptions.stagingFolderPath = path.resolve(
                 process.cwd(),
