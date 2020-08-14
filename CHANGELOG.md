@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [Unreleased] - 2020-08-14
+## [3.2.3] - 2020-08-14
 ### Changed
  - throw exception during `copyToStaging` when rootDir does not exist
  - throw exception during `zipPackage` when `${stagingFolder}/manifest` does not exist
@@ -274,4 +274,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.2.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.1.1...v3.2.0
 [3.2.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.0...v3.2.1
 [3.2.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.1...v3.2.2
-[3.2.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.1...v3.2.2
+[3.2.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.2...v3.2.3
