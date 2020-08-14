@@ -308,6 +308,34 @@ describe('index', () => {
         });
     });
 
+    describe('zipPackage', () => {
+        it('should throw error when manifest is missing', async () => {
+            let err: Error;
+            try {
+                options.stagingFolderPath = s`${tmpPath}/path/to/nowhere`;
+                fsExtra.ensureDirSync(options.stagingFolderPath);
+                await rokuDeploy.zipPackage(options);
+            } catch (e) {
+                err = e;
+            }
+            expect(err).to.exist;
+            expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
+        });
+
+        it('should throw error when manifest is missing and stagingDir does not exist', async () => {
+            let err: Error;
+            try {
+                options.stagingFolderPath = s`${tmpPath}/path/to/nowhere`;
+                await rokuDeploy.zipPackage(options);
+            } catch (e) {
+                err = e;
+            }
+            expect(err).to.exist;
+            expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
+        });
+
+    });
+
     describe('createPackage', () => {
         it('works with custom stagingFolderPath', async () => {
             let opts = {
@@ -322,14 +350,10 @@ describe('index', () => {
         });
 
         it('should throw error when no files were found to copy', async () => {
-            try {
+            await assertThrowsAsync(async () => {
                 options.files = [];
                 await rokuDeploy.createPackage(options);
-            } catch (e) {
-                assert.ok('Exception was thrown as expected');
-                return;
-            }
-            assert.fail('Exception should have been thrown');
+            });
         });
 
         it('should create package in proper directory', async () => {

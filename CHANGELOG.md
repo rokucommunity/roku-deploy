@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2020-08-14
 ### Changed
  - throw exception during `copyToStaging` when rootDir does not exist
-
+ - throw exception during `zipPackage` when `${stagingFolder}/manifest` does not exist
 
 
 ## [3.2.2] - 2020-07-14

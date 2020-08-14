@@ -97,6 +97,32 @@ export class Util {
             setTimeout(resolve, milliseconds);
         });
     }
+
+    /**
+     * Determine if a file exists (case insensitive)
+     */
+    public async fileExistsCaseInsensitive(filePath: string) {
+        filePath = this.standardizePath(filePath);
+        const lowerFilePath = filePath.toLowerCase();
+
+        const parentDirPath = path.dirname(filePath);
+
+        //file can't exist if its parent dir doesn't exist
+        if (await fsExtra.pathExists(parentDirPath) === false) {
+            return false;
+        }
+
+        //get a list of every file in the parent directory for this file
+        const filesInDir = await fsExtra.readdir(parentDirPath);
+        //look at each file path until we find the one we're searching for
+        for (let dirFile of filesInDir) {
+            const dirFilePath = this.standardizePath(`${parentDirPath}/${dirFile}`);
+            if (dirFilePath.toLowerCase() === lowerFilePath) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 export let util = new Util();

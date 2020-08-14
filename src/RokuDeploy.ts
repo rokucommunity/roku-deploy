@@ -102,6 +102,11 @@ export class RokuDeploy {
 
         let zipFilePath = this.getOutputZipFilePath(options);
 
+        //ensure the manifest file exists in the staging folder
+        if (!await util.fileExistsCaseInsensitive(`${options.stagingFolderPath}/manifest`)) {
+            throw new Error(`Cannot zip package: missing manifest file in "${options.stagingFolderPath}"`);
+        }
+
         //create a zip of the staging folder
         await this.zipFolder(options.stagingFolderPath, zipFilePath);
 
