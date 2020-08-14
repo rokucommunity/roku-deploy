@@ -246,12 +246,19 @@ describe('index', () => {
     });
 
     describe('copyToStaging', () => {
+        it('throws exceptions when rootDir does not exist', async () => {
+            await expectThrowsAsync(
+                () => (rokuDeploy as any).copyToStaging([], 'staging', 'folder_does_not_exist')
+            );
+        });
         it('throws exceptions on missing stagingPath', async () => {
-            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([])
+            await expectThrowsAsync(
+                () => (rokuDeploy as any).copyToStaging([])
             );
         });
         it('throws exceptions on missing rootDir', async () => {
-            await expectThrowsAsync(() => (rokuDeploy as any).copyToStaging([], 'asdf')
+            await expectThrowsAsync(
+                () => (rokuDeploy as any).copyToStaging([], 'asdf')
             );
         });
         it('computes absolute path for all operations', async () => {
@@ -267,6 +274,7 @@ describe('index', () => {
             });
 
             let rootDir = s`${tmpPath}/ProjectA/src`;
+            fsExtra.ensureDirSync(rootDir);
             let stagingPath = s`${tmpPath}/ProjectA/.staging`;
 
             sinon.stub(rokuDeploy, 'getFilePaths').returns(

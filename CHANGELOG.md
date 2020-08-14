@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [Unreleased] - 2020-08-14
+### Changed
+ - throw exception during `copyToStaging` when rootDir does not exist
+
+
+
 ## [3.2.2] - 2020-07-14
 ### Fixed
  - bug when loading `stagingFolderPath` from `rokudeploy.json` or `bsconfig.json` that would cause an exception.
@@ -235,6 +241,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for negated globs
 
 
+[3.2.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.1...v3.2.2
 [3.2.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.1...v3.2.2
 [3.2.1]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.0...v3.2.1
 [3.2.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.1.1...v3.2.0

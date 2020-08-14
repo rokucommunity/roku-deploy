@@ -370,6 +370,9 @@ export class RokuDeploy {
         if (!rootDir) {
             throw new Error('rootDir is required');
         }
+        if (!await this.fsExtra.pathExists(rootDir)) {
+            throw new Error(`rootDir does not exist at "${rootDir}"`);
+        }
 
         let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files
