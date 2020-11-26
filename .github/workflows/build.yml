@@ -2,7 +2,7 @@ name: build
 on: [push, pull_request]
 
 jobs:
-  build-and-test:
+  ci:
     runs-on: ${{ matrix.os }}
     env:
       #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
@@ -23,7 +23,7 @@ jobs:
   npm-release:
     #only run this task if a tag starting with 'v' was used to trigger this (i.e. a tagged release)
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-and-test
+    needs: ci
     runs-on: ubuntu-18.04
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -35,4 +35,28 @@ jobs:
       - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ./.npmrc
       - run: npm ci
       - run: npm run build
+      #create npm package
+      - run: npm pack
+
+      #create GitHub release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: false
+          prerelease: false #contains(github.ref, '-beta.') == true
+
+      #upload package to GitHub release
+      - name: Upload GitHub Release Assets
+        uses: alexellis/upload-assets@0.2.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          asset_paths: '["./*.tgz"]'
+
+      #upload to npm
       - run: npm publish
