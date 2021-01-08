@@ -423,7 +423,7 @@ export class RokuDeploy {
         // press the home button to return to the main screen
         return this.doPostRequest({
             url: `http://${host}:${port}/keypress/Home`
-        });
+        }, false);
     }
 
     /**
@@ -610,7 +610,7 @@ export class RokuDeploy {
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: any) {
+    private async doPostRequest(params: any, verify = true) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             this.request.post(params, (err, resp, body) => {
                 if (err) {
@@ -619,7 +619,9 @@ export class RokuDeploy {
                 return resolve({ response: resp, body: body });
             });
         });
-        this.checkRequest(results);
+        if (verify) {
+            this.checkRequest(results);
+        }
         return results;
     }
 

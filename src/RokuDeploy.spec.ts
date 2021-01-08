@@ -93,7 +93,7 @@ describe('index', () => {
                 return {} as any;
             });
 
-            let results = await (rokuDeploy as any).doPostRequest({});
+            let results = await (rokuDeploy as any).doPostRequest({}, true);
             expect(results.body).to.equal(body);
         });
 
@@ -105,12 +105,39 @@ describe('index', () => {
             });
 
             try {
-                await (rokuDeploy as any).doPostRequest({});
+                await (rokuDeploy as any).doPostRequest({}, true);
             } catch (e) {
                 expect(e).to.equal(error);
                 return;
             }
             assert.fail('Exception should have been thrown');
+        });
+
+        it('should throw an error for a wrong response code if verify is true', async () => {
+            let body = 'responseBody';
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, { statusCode: 500 }, body);
+                return {} as any;
+            });
+
+            try {
+                await (rokuDeploy as any).doPostRequest({}, true);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('should not throw an error for a response code if verify is false', async () => {
+            let body = 'responseBody';
+            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, { statusCode: 500 }, body);
+                return {} as any;
+            });
+
+            let results = await (rokuDeploy as any).doPostRequest({}, false);
+            expect(results.body).to.equal(body);
         });
     });
 
