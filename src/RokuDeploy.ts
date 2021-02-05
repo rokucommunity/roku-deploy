@@ -403,6 +403,7 @@ export class RokuDeploy {
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
+            timeout: options.timeout,
             auth: {
                 user: options.username,
                 pass: options.password,
@@ -417,12 +418,16 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      * @param host - the host
      * @param port - the port that should be used for the request. defaults to 8060
+     * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
-    public async pressHomeButton(host, port?: number) {
-        port = port ? port : this.getOptions().remotePort;
+    public async pressHomeButton(host, port?: number, timeout?: number) {
+        let options = this.getOptions()
+        port = port ? port : options.remotePort;
+        timeout = timeout ? timeout : options.timeout;
         // press the home button to return to the main screen
         return this.doPostRequest({
-            url: `http://${host}:${port}/keypress/Home`
+            url: `http://${host}:${port}/keypress/Home`,
+            timeout: timeout
         }, false);
     }
 
@@ -745,6 +750,7 @@ export class RokuDeploy {
             failOnCompileError: true,
             packagePort: 80,
             remotePort: 8060,
+            timeout: 150000,
             rootDir: './',
             files: [...DefaultFiles],
             username: 'rokudev'
@@ -810,7 +816,8 @@ export class RokuDeploy {
         options = this.getOptions(options);
 
         const requestOptions = {
-            url: `http://${options.host}:${options.remotePort}/query/device-info`
+            url: `http://${options.host}:${options.remotePort}/query/device-info`,
+            timeout: options.timeout
         };
         let results = await this.doGetRequest(requestOptions);
         try {
