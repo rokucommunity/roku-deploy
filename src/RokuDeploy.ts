@@ -421,7 +421,7 @@ export class RokuDeploy {
      * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
     public async pressHomeButton(host, port?: number, timeout?: number) {
-        let options = this.getOptions()
+        let options = this.getOptions();
         port = port ? port : options.remotePort;
         timeout = timeout ? timeout : options.timeout;
         // press the home button to return to the main screen
