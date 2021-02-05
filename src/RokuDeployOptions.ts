@@ -81,6 +81,13 @@ export interface RokuDeployOptions {
     remotePort?: number;
 
     /**
+     * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
+     * This is mainly useful for preventing hang ups if the Roku loses power or restarts due to a firmware bug.
+     * This is applied per network request to the device and does not apply to the total time it takes to completely execute a call to roku-deploy.
+     */
+    timeout?: number;
+
+    /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
      * @default 'rokudev'

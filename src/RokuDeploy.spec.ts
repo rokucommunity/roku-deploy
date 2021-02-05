@@ -546,6 +546,28 @@ describe('index', () => {
             await rokuDeploy.pressHomeButton('1.2.3.4', 987);
             await d.promise;
         });
+
+        it('uses default timeout', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
+                expect(opts.timeout).to.equal(150000);
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4');
+            await d.promise;
+        });
+
+        it('uses overridden timeout', async () => {
+            const d = deferred();
+            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
+                expect(opts.timeout).to.equal(1000);
+                d.resolve();
+            });
+            await rokuDeploy.pressHomeButton('1.2.3.4', 987, 1000);
+            await d.promise;
+        });
     });
 
     let fileCounter = 1;
