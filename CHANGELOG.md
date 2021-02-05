@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.3.0] - 2021-02-05
+### Added
+ - support for `timeout` option to fail deploys after a certain amount of time
+
+
+
 ## [3.2.4] - 2021-01-08
 ### Fixed
  - don't fail deployment when home press command returns 202 http status code
@@ -28,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
  - `rokudeploy.json` now supports jsonc (json with comments)
 ### Fixed
- - loading `bsconfig.json` file with comments would fail the entire roku-deploy process. 
+ - loading `bsconfig.json` file with comments would fail the entire roku-deploy process.
 
 
 
@@ -52,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.2] - 2020-04-10
 ### Fixed
- - issue where `prepublishToStaging` wasn't recognizing nested files inside a symlinked folder. 
+ - issue where `prepublishToStaging` wasn't recognizing nested files inside a symlinked folder.
 
 
 
@@ -105,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0-beta.3] - 2019-11-12
 ### Added
- - `RokuDeploy.getDestPath` function which returns the dest path for a full file path. Useful for figuring out where a file will be placed in the pkg. 
+ - `RokuDeploy.getDestPath` function which returns the dest path for a full file path. Useful for figuring out where a file will be placed in the pkg.
 ### Changed
  - made `RokuDeploy.normalizeFilesArray` public
  - disallow using explicit folder paths in files array. You must use globs for folders.
@@ -122,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.0.0-beta.1] - 2019-10-16
 ### Added
  - information in the readme about the `files` array
- - support for file overrides in the `files` array. This supports including the same file from A and B, and letting the final file override previous files. 
+ - support for file overrides in the `files` array. This supports including the same file from A and B, and letting the final file override previous files.
 ### Changed
  - the files array is now a bit more strict, and has a more consistent approach.
 ## [2.6.1] - 2019-12-20
@@ -139,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.6.0-beta.0] - 2019-11-18
 ### Added
- - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards. 
+ - `remotePort` and `packagePort` for customizing the ports used for network-related roku requests. Mainly useful for emulators or communicating with Rokus behind port-forwards.
 
 
 
@@ -192,7 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.1.0-beta1] - 2019-02-15
 ### Added
  - Support for signed package creation
- - ability to register a callback function before the package is zipped. 
+ - ability to register a callback function before the package is zipped.
  - `incrementBuildNumber` option
 ### Changed
  - Stop calling home button on deploy
@@ -282,3 +288,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.2.2]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.1...v3.2.2
 [3.2.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.2...v3.2.3
 [3.2.4]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.3...v3.2.4
+[3.3.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.4...v3.3.0
