@@ -18,6 +18,7 @@ export class RokuDeploy {
     //store the import on the class to make testing easier
     public request = request;
     public fsExtra = _fsExtra;
+    public verboseLogging = false;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -652,13 +653,52 @@ export class RokuDeploy {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
+        this.verboseLog(results.body);
+
         if (results.response.statusCode === 401) {
             throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
         }
 
-        if (results.response.statusCode !== 200) {
-            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.statusCode);
+        let rokuMessages = this.getRokuMessagesFromResponseBody(results.body);
+
+        if (rokuMessages.errors.length > 0) {
+            throw new errors.FailedDeviceResponseError(rokuMessages.errors[0], rokuMessages);
         }
+
+        if (results.response.statusCode !== 200) {
+            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.statusCode, results);
+        }
+    }
+
+    public getRokuMessagesFromResponseBody(body: string): { errors: Array<string>; infos: Array<string>; successes: Array<string> } {
+        let errors = [];
+        let infos = [];
+        let successes = [];
+        let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
+        let match;
+
+        // eslint-disable-next-line no-cond-assign
+        while (match = errorRegex.exec(body)) {
+            let [fullMatch, messageType, message] = match;
+            switch (messageType) {
+                case 'error':
+                    errors.push(message);
+                    break;
+
+                case 'info':
+                    infos.push(message);
+                    break;
+
+                case 'success':
+                    successes.push(message);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        return { errors: errors, infos: infos, successes: successes };
     }
 
     /**
@@ -720,6 +760,8 @@ export class RokuDeploy {
         if (options.project) {
             fileNames.unshift(options.project);
         }
+
+        this.verboseLogging = options?.verboseLogging === true ? true : false;
 
         for (const fileName of fileNames) {
             if (this.fsExtra.existsSync(fileName)) {
@@ -891,7 +933,7 @@ export class RokuDeploy {
      * @param zipFilePath
      */
     public zipFolder(srcFolder: string, zipFilePath: string) {
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             let output = this.fsExtra.createWriteStream(zipFilePath);
             let archive = archiver('zip');
 
@@ -925,6 +967,12 @@ export class RokuDeploy {
             //finalize the archive
             archive.finalize();
         });
+    }
+
+    private verboseLog(item) {
+        if (this.verboseLogging) {
+            console.log('Roku-Deploy Verbose:', item);
+        }
     }
 }
 

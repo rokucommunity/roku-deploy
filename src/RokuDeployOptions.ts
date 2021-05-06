@@ -131,6 +131,11 @@ export interface RokuDeployOptions {
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;
+
+    /**
+     * Set to true to help with debugging issues in roku-deploy
+     */
+    verboseLogging?: boolean;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });
