@@ -1,3 +1,5 @@
+import { LogLevel } from './Logger';
+
 export interface RokuDeployOptions {
     /**
      * Path to a bsconfig.json project file
@@ -133,9 +135,10 @@ export interface RokuDeployOptions {
     failOnCompileError?: boolean;
 
     /**
-     * Set to true to help with debugging issues in roku-deploy
+     * The log level.
+     * @default LogLevel.log
      */
-    verboseLogging?: boolean;
+    logLevel?: LogLevel;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });

@@ -13,12 +13,18 @@ const globAsync = promisify(glob);
 
 import { util } from './util';
 import { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
+import { Logger, LogLevel } from './Logger';
 
 export class RokuDeploy {
+
+    constructor() {
+        this.logger = new Logger();
+    }
+
+    private logger: Logger;
     //store the import on the class to make testing easier
     public request = request;
     public fsExtra = _fsExtra;
-    public verboseLogging = false;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -653,7 +659,7 @@ export class RokuDeploy {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
-        this.verboseLog(results.body);
+        this.logger.debug(results.body);
 
         if (results.response.statusCode === 401) {
             throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
@@ -679,8 +685,8 @@ export class RokuDeploy {
 
         // eslint-disable-next-line no-cond-assign
         while (match = errorRegex.exec(body)) {
-            let [fullMatch, messageType, message] = match;
-            switch (messageType) {
+            let [, messageType, message] = match;
+            switch (messageType.toLowerCase()) {
                 case 'error':
                     errors.push(message);
                     break;
@@ -761,8 +767,6 @@ export class RokuDeploy {
             fileNames.unshift(options.project);
         }
 
-        this.verboseLogging = options?.verboseLogging === true ? true : false;
-
         for (const fileName of fileNames) {
             if (this.fsExtra.existsSync(fileName)) {
                 let configFileText = this.fsExtra.readFileSync(fileName).toString();
@@ -795,11 +799,13 @@ export class RokuDeploy {
             timeout: 150000,
             rootDir: './',
             files: [...DefaultFiles],
-            username: 'rokudev'
+            username: 'rokudev',
+            logLevel: LogLevel.log
         };
 
         //override the defaults with any found or provided options
         let finalOptions = { ...defaultOptions, ...fileOptions, ...options };
+        this.logger.logLevel = finalOptions.logLevel;
 
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
@@ -967,12 +973,6 @@ export class RokuDeploy {
             //finalize the archive
             archive.finalize();
         });
-    }
-
-    private verboseLog(item) {
-        if (this.verboseLogging) {
-            console.log('Roku-Deploy Verbose:', item);
-        }
     }
 }
 
