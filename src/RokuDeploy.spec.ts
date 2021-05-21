@@ -5,11 +5,10 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as AdmZip from 'adm-zip';
 import * as nrc from 'node-run-cmd';
-import * as sinonImport from 'sinon';
+import { createSandbox } from 'sinon';
+let sinon = createSandbox();
 import * as deferred from 'deferred';
 import * as glob from 'glob';
-let sinon = sinonImport.createSandbox();
-
 import { RokuDeploy, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
@@ -171,13 +170,24 @@ describe('index', () => {
     });
 
     describe('getRokuMessagesFromResponseBody', () => {
+        it('exits on unknown message type', () => {
+            const result = rokuDeploy['getRokuMessagesFromResponseBody'](`
+                Shell.create('Roku.Message').trigger('Set message type', 'unknown').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+            `);
+            expect(result).to.eql({
+                errors: [],
+                infos: [],
+                successes: []
+            });
+        });
+
         it('pull errors from the response body', () => {
             let body = getFakeResponseBody(`
                 Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
             `);
 
-            let results = rokuDeploy.getRokuMessagesFromResponseBody(body);
-            expect(results).to.deep.equal({
+            let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
+            expect(results).to.eql({
                 errors: ['Failure: Form Error: "archive" Field Not Found'],
                 infos: [],
                 successes: []
@@ -189,8 +199,8 @@ describe('index', () => {
             Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
             `);
 
-            let results = rokuDeploy.getRokuMessagesFromResponseBody(body);
-            expect(results).to.deep.equal({
+            let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
+            expect(results).to.eql({
                 errors: [],
                 infos: [],
                 successes: ['Screenshot ok']
@@ -205,8 +215,8 @@ describe('index', () => {
             Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
             `);
 
-            let results = rokuDeploy.getRokuMessagesFromResponseBody(body);
-            expect(results).to.deep.equal({
+            let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
+            expect(results).to.eql({
                 errors: ['Failure: Form Error: "archive" Field Not Found', 'Failure: Form Error: "archive" Field Not Found'],
                 infos: ['Some random info message'],
                 successes: ['Screenshot ok']
@@ -2344,6 +2354,24 @@ describe('index', () => {
             }
             expect(error, 'Should have thrown error').to.exist;
             expect(error.message).to.equal('fake error thrown as part of the unit test');
+        });
+    });
+
+    describe('checkRequest', () => {
+        it('throws FailedDeviceResponseError when necessary', () => {
+            sinon.stub(rokuDeploy as any, 'getRokuMessagesFromResponseBody').returns({
+                errors: ['a bad thing happened']
+            } as any);
+            let ex;
+            try {
+                rokuDeploy['checkRequest']({
+                    response: {},
+                    body: 'something bad!'
+                });
+            } catch (e) {
+                ex = e;
+            }
+            expect(ex).to.be.instanceof(errors.FailedDeviceResponseError);
         });
     });
 

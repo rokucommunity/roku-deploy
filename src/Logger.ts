@@ -4,15 +4,6 @@ import { EventEmitter } from 'eventemitter3';
 import { Stopwatch } from './Stopwatch';
 
 export class Logger {
-
-    public static subscribe(callback) {
-        this.emitter.on('log', callback);
-        return () => {
-            this.emitter.off('log', callback);
-        };
-    }
-    private static emitter = new EventEmitter();
-
     /**
      * A string with whitespace used for indenting all messages
      */
@@ -43,18 +34,10 @@ export class Logger {
             method = console.trace;
         }
         let finalArgs = [];
-        //evaluate any functions to get their values.
-        //This allows more complicated values to only be evaluated if this log level is active
         for (let arg of args) {
-            if (arg instanceof Function) {
-                arg = arg();
-            }
             finalArgs.push(arg);
         }
         method.call(console, this.getTimestamp(), this.indent, ...finalArgs);
-        if (Logger.emitter.listenerCount('log') > 0) {
-            Logger.emitter.emit('log', finalArgs.join(' '));
-        }
     }
 
     /**
@@ -135,7 +118,7 @@ export class Logger {
             //return a function to call when the timer is complete
             let done = () => {
                 this.indent = this.indent.substring(2);
-                this[logLevelString](...messages, `finished. (${chalk.blue(stopwatch.getDurationText())})`);
+                this[logLevelString](...messages ?? [], `finished. (${chalk.blue(stopwatch.getDurationText())})`);
             };
 
             //if this is a promise, wait for it to resolve and then return the original result
@@ -154,11 +137,12 @@ export class Logger {
     }
 }
 
-function noop() {
+export function noop() {
 
 }
 
 export enum LogLevel {
+    off = 0,
     error = 1,
     warn = 2,
     log = 3,

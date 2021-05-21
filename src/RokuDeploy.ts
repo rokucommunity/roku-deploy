@@ -676,7 +676,7 @@ export class RokuDeploy {
         }
     }
 
-    public getRokuMessagesFromResponseBody(body: string): { errors: Array<string>; infos: Array<string>; successes: Array<string> } {
+    private getRokuMessagesFromResponseBody(body: string): { errors: Array<string>; infos: Array<string>; successes: Array<string> } {
         let errors = [];
         let infos = [];
         let successes = [];

@@ -1,4 +1,4 @@
-import parseMilliseconds from 'parse-ms';
+import * as parseMilliseconds from 'parse-ms';
 import { performance } from 'perf_hooks';
 
 export class Stopwatch {
@@ -20,7 +20,7 @@ export class Stopwatch {
     }
 
     reset() {
-        this.totalMilliseconds = undefined;
+        this.totalMilliseconds = 0;
         this.startTime = undefined;
     }
 

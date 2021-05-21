@@ -8,10 +8,10 @@
         "preversion": "npm run build && npm run lint && npm run test",
         "prepublishOnly": "npm run build",
         "lint": "eslint \"./src/**/*.ts\"",
-        "test": "nyc mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
-        "test:nocover": "ts-mocha src/RokuDeploy.spec.ts src/util.spec.ts --full-trace",
+        "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\" --full-trace",
+        "test:nocover": "ts-mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\" --full-trace",
         "test:device": "nyc mocha src/device.spec.ts --full-trace",
-        "test:all": "nyc mocha src/**/*.spec.ts --full-trace",
+        "test:all": "nyc mocha \"src/**/*.spec.ts\" --full-trace",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
         "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
     },
@@ -24,7 +24,7 @@
         "jsonc-parser": "^2.3.0",
         "minimatch": "^3.0.4",
         "moment": "^2.29.1",
-        "parse-ms": "^3.0.0",
+        "parse-ms": "^2.1.0",
         "path": "^0.12.7",
         "request": "^2.88.0",
         "xml2js": "^0.4.23"
@@ -70,9 +70,9 @@
     "license": "ISC",
     "nyc": {
         "include": [
-            "src/index.ts",
-            "src/RokuDeploy.ts",
-            "src/util.ts"
+            "src/**/*.ts",
+            "!src/Errors.ts",
+            "!src/**/*.spec.ts"
         ],
         "extension": [
             ".ts"
