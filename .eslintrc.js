@@ -154,6 +154,7 @@ module.exports = {
         {
             files: ['*.spec.ts'],
             rules: {
+                'dot-notation': 'off',
                 '@typescript-eslint/no-unsafe-call': 'off',
                 '@typescript-eslint/no-unsafe-member-access': 'off',
                 '@typescript-eslint/no-unsafe-return': 'off',

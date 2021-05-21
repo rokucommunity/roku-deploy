@@ -1,3 +1,5 @@
+import { LogLevel } from './Logger';
+
 export interface RokuDeployOptions {
     /**
      * Path to a bsconfig.json project file
@@ -131,6 +133,12 @@ export interface RokuDeployOptions {
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;
+
+    /**
+     * The log level.
+     * @default LogLevel.log
+     */
+    logLevel?: LogLevel;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });
