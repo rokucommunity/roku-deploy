@@ -16,7 +16,6 @@
         "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
     },
     "dependencies": {
-        "archiver": "^3.0.0",
         "dateformat": "^3.0.3",
         "eventemitter3": "^4.0.7",
         "fs-extra": "^7.0.1",
