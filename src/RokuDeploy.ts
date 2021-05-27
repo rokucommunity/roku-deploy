@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
 import * as request from 'request';
-import * as archiver from 'archiver';
+import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as minimatch from 'minimatch';
@@ -938,41 +938,34 @@ export class RokuDeploy {
      * @param srcFolder
      * @param zipFilePath
      */
-    public zipFolder(srcFolder: string, zipFilePath: string) {
-        return new Promise<void>((resolve, reject) => {
-            let output = this.fsExtra.createWriteStream(zipFilePath);
-            let archive = archiver('zip');
+    public async zipFolder(srcFolder: string, zipFilePath: string, preFileZipCallback?: (file: StandardizedFileEntry, data: Buffer) => Buffer) {
+        const files = await this.getFilePaths(['**/*'], srcFolder);
 
-            output.on('close', () => {
-                resolve();
-            });
-
-            output.on('error', (err) => {
-                reject(err);
-            });
-
-            /* istanbul ignore next */
-            archive.on('warning', (err) => {
-                if (err.code === 'ENOENT') {
-                    console.warn(err);
-                } else {
-                    reject(err);
+        const zip = new JSZip();
+        // Allows us to wait until all are done before we build the zip
+        const promises = [];
+        for (const file of files) {
+            const promise = this.fsExtra.readFile(file.src).then((data) => {
+                if (preFileZipCallback) {
+                    data = preFileZipCallback(file, data);
                 }
+
+                const ext = path.extname(file.dest);
+                let compression = 'DEFLATE';
+
+                if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
+                    compression = 'STORE';
+                }
+                zip.file(file.dest, data, {
+                    compression: compression
+                });
             });
-
-            /* istanbul ignore next */
-            archive.on('error', (err) => {
-                reject(err);
-            });
-
-            archive.pipe(output);
-
-            //add every file in the source folder
-            archive.directory(srcFolder, false);
-
-            //finalize the archive
-            archive.finalize();
-        });
+            promises.push(promise);
+        }
+        await Promise.all(promises);
+        // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
+        const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
+        return this.fsExtra.writeFile(zipFilePath, content);
     }
 }
 
