@@ -165,5 +165,6 @@ module.exports = {
                 'no-shadow': 'off'
             }
         }
-    ]
+    ],
+    ignorePatterns: ['types']
 };

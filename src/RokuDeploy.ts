@@ -950,7 +950,7 @@ export class RokuDeploy {
                     data = preFileZipCallback(file, data);
                 }
 
-                const ext = path.extname(file.dest);
+                const ext = path.extname(file.dest).toLowerCase();
                 let compression = 'DEFLATE';
 
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
