@@ -3,7 +3,7 @@ import * as chai from 'chai';
 import * as chaiFiles from 'chai-files';
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
-import * as AdmZip from 'adm-zip';
+import * as JSZip from 'jszip';
 import * as nrc from 'node-run-cmd';
 import { createSandbox } from 'sinon';
 let sinon = createSandbox();
@@ -43,10 +43,10 @@ describe('index', () => {
         //restore the original working directory
         process.chdir(originalCwd);
 
-        //delete the output file and other interum files
+        //delete the output file and other interim files
         let filePaths = [
             path.resolve(options.outDir),
-            '.tmp'
+            tmpPath
         ];
         for (let filePath of filePaths) {
             try {
@@ -448,31 +448,42 @@ describe('index', () => {
         });
 
         it('should only include the specified files', async () => {
-            options.files = ['manifest'];
+            const files = ['manifest'];
+            options.files = files;
             await rokuDeploy.createPackage(options);
-            let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
-            await fsExtra.ensureDir('.tmp');
-            zip.extractAllTo('.tmp/output', true);
-            expect(file('./.tmp/output/manifest')).to.exist;
+            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
+            const zip = await JSZip.loadAsync(data);
+
+            for (const file of files) {
+                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const sourcePath = path.join(options.rootDir, file);
+                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
+                expect(zipFileContents).to.equal(incomingContents);
+            }
         });
 
         it('generates full package with defaults', async () => {
+            const files = [
+                'components/components/Loader/Loader.brs',
+                'images/splash_hd.jpg',
+                'source/main.brs',
+                'manifest'
+            ];
             await rokuDeploy.createPackage({
                 ...options,
                 //target a subset of the files to make the test faster
-                files: [
-                    'components/components/Loader/Loader.brs',
-                    'images/splash_hd.jpg',
-                    'source/main.brs',
-                    'manifest'
-                ]
+                files: files
             });
-            let zip = new AdmZip(rokuDeploy.getOutputZipFilePath(options));
-            fsExtra.ensureDirSync('.tmp');
-            zip.extractAllTo('.tmp/output', true);
-            expect(dir('./.tmp/output/components')).to.exist;
-            expect(dir('./.tmp/output/images')).to.exist;
-            expect(dir('./.tmp/output/source')).to.exist;
+
+            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
+            const zip = await JSZip.loadAsync(data);
+
+            for (const file of files) {
+                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const sourcePath = path.join(options.rootDir, file);
+                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
+                expect(zipFileContents).to.equal(incomingContents);
+            }
         });
 
         it('should retain the staging directory when told to', async () => {
@@ -1501,6 +1512,44 @@ describe('index', () => {
             await assertThrowsAsync(async () => {
                 await rokuDeploy.zipFolder('source', '.tmp/some/zip/path/that/does/not/exist');
             });
+        });
+
+        it('allows modification of file contents with callback', async () => {
+            const stageFolder = path.join(tmpPath, 'testProject');
+            fsExtra.ensureDirSync(stageFolder);
+            const files = [
+                'components/components/Loader/Loader.brs',
+                'images/splash_hd.jpg',
+                'source/main.brs',
+                'manifest'
+            ];
+            for (const file of files) {
+                fsExtra.copySync(path.join(options.rootDir, file), path.join(stageFolder, file));
+            }
+
+            const outputZipPath = path.join(tmpPath, 'output.zip');
+            const addedManifestLine = 'bs_libs_required=roku_ads_lib';
+            await rokuDeploy.zipFolder(stageFolder, outputZipPath, (file, data) => {
+                if (file.dest === 'manifest') {
+                    let manifestContents = data.toString();
+                    manifestContents += addedManifestLine;
+                    data = Buffer.from(manifestContents, 'utf8');
+                }
+                return data;
+            });
+
+            const data = fsExtra.readFileSync(outputZipPath);
+            const zip = await JSZip.loadAsync(data);
+            for (const file of files) {
+                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const sourcePath = path.join(options.rootDir, file);
+                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
+                if (file === 'manifest') {
+                    expect(zipFileContents).to.contain(addedManifestLine);
+                } else {
+                    expect(zipFileContents).to.equal(incomingContents);
+                }
+            }
         });
     });
 

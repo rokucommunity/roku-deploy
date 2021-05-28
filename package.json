@@ -16,12 +16,12 @@
         "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
     },
     "dependencies": {
-        "archiver": "^3.0.0",
         "dateformat": "^3.0.3",
         "eventemitter3": "^4.0.7",
         "fs-extra": "^7.0.1",
         "glob": "^7.1.6",
         "jsonc-parser": "^2.3.0",
+        "jszip": "^3.6.0",
         "minimatch": "^3.0.4",
         "moment": "^2.29.1",
         "parse-ms": "^2.1.0",
@@ -41,7 +41,6 @@
         "@types/xml2js": "^0.4.5",
         "@typescript-eslint/eslint-plugin": "^2.26.0",
         "@typescript-eslint/parser": "^2.26.0",
-        "adm-zip": "^0.4.11",
         "chai": "^4.2.0",
         "chai-files": "^1.4.0",
         "coveralls": "^3.0.0",

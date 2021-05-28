@@ -11,9 +11,11 @@
     "strictNullChecks": false,
     "lib": [
       "es2015"
-    ]
+    ],
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
   "include": [
-    "src/**/*.ts"
-, "device.spec.ts"  ]
+    "src/**/*.ts",
+    "device.spec.ts"
+  ]
 }
