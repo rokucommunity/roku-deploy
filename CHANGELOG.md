@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.4.0] - 2021-05-28
+### Added
+ - `preFileZipCallback` parameter to `RokuDeploy.zipFolder` to allow per-file modifications before adding the file to the zip
+### Changed
+ - switch internal zip library to [jszip](https://www.npmjs.com/package/jszip) which seems to yield 75% faster zip times.
+
+
+
 ## [3.3.0] - 2021-02-05
 ### Added
  - support for `timeout` option to fail deploys after a certain amount of time
@@ -289,3 +297,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.2.3]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.2...v3.2.3
 [3.2.4]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.3...v3.2.4
 [3.3.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.2.4...v3.3.0
+[3.4.0]:  https://github.com/RokuCommunity/roku-deploy/compare/v3.3.0...v3.4.0
