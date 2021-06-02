@@ -455,7 +455,7 @@ describe('index', () => {
             const zip = await JSZip.loadAsync(data);
 
             for (const file of files) {
-                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const zipFileContents = await zip.file(file.toString()).async('string');
                 const sourcePath = path.join(options.rootDir, file);
                 const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
                 expect(zipFileContents).to.equal(incomingContents);
@@ -479,7 +479,7 @@ describe('index', () => {
             const zip = await JSZip.loadAsync(data);
 
             for (const file of files) {
-                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const zipFileContents = await zip.file(file.toString()).async('string');
                 const sourcePath = path.join(options.rootDir, file);
                 const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
                 expect(zipFileContents).to.equal(incomingContents);
@@ -1541,7 +1541,7 @@ describe('index', () => {
             const data = fsExtra.readFileSync(outputZipPath);
             const zip = await JSZip.loadAsync(data);
             for (const file of files) {
-                const zipFileContents = await zip.file(s`${file.toString()}`).async('string');
+                const zipFileContents = await zip.file(file.toString()).async('string');
                 const sourcePath = path.join(options.rootDir, file);
                 const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
                 if (file === 'manifest') {
