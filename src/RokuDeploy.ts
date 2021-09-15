@@ -714,7 +714,11 @@ export class RokuDeploy {
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options);
         await this.createPackage(options, beforeZipCallback);
-        await this.deleteInstalledChannel(options);
+        try {
+            await this.deleteInstalledChannel(options);
+        } catch (e) {
+            // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
+        }
         let result = await this.publish(options);
         return result;
     }

@@ -1494,6 +1494,15 @@ describe('index', () => {
             let result = await rokuDeploy.deploy();
             expect(result).not.to.be.undefined;
         });
+        it('continues with deploy if deleteInstalledChannel fails', async () => {
+            sinon.stub(rokuDeploy, 'deleteInstalledChannel').callsFake(() => {
+                throw new Error('Crash baby crash');
+            });
+            mockDoPostRequest();
+            let result = await rokuDeploy.deploy();
+            expect(result).not.to.be.undefined;
+        });
+
     });
 
     describe('deleteInstalledChannel', () => {
