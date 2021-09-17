@@ -1494,6 +1494,20 @@ describe('index', () => {
             let result = await rokuDeploy.deploy();
             expect(result).not.to.be.undefined;
         });
+
+        it('continues with deploy if deleteInstalledChannel fails', async () => {
+            sinon.stub(rokuDeploy, 'deleteInstalledChannel').returns(
+                Promise.reject(
+                    new Error('failed')
+                )
+            );
+            mockDoPostRequest();
+            let result = await rokuDeploy.deploy({
+                //something in the previous test is locking the default output zip file. We should fix that at some point...
+                outDir: s`${tmpPath}/test1`
+            });
+            expect(result).not.to.be.undefined;
+        });
     });
 
     describe('deleteInstalledChannel', () => {
