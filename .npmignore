@@ -11,3 +11,4 @@ rokudeploy.json
 *.pkg
 tsconfig.json
 .eslintrc.js
+*.tgz
