@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.4.2](https://github.com/RokuCommunity/roku-deploy/compare/v3.4.1...v3.4.2) - 2021-09-17
+### Fixed
+ - Prevent deploy crashes when target Roku doesn't have an installed channel ([#65](https://github.com/rokucommunity/roku-deploy/pull/65))
+ - reduce npm package size by ignoring .tgz files during publishing (#d6d7c57)(https://github.com/rokucommunity/roku-deploy/commit/d6d7c5743383363d7e8db13c60b03d1df5d5563b)
+
+
+
 ## [3.4.1](https://github.com/RokuCommunity/roku-deploy/compare/v3.4.0...v3.4.1) - 2021-06-01
 ### Fixed
  - incorrect path separator issue on windows.
