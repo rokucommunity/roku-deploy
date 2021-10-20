@@ -319,7 +319,7 @@ Here are the available options. The defaults are shown to the right of the optio
 - **remotePort?:** string = 8060
     The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward. 
 - **remoteDebug?:** boolean = false
-     When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol.
+     When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. This should always be `false` unless you're creating a plugin for an editor such as VSCode, Atom, Sublime, etc.
      More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
    
 
