@@ -325,5 +325,9 @@ Here are the available options. The defaults are shown to the right of the optio
 
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
 
+
+## Troubleshooting
+ - if you see a `ESOCKETTIMEDOUT` error during deployment, this can be caused by an antivirus blocking network traffic, so consider adding a special exclusion for your Roku device.
+
 ## Changelog
 Click [here](CHANGELOG.md) to view the changelog
