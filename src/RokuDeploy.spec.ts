@@ -1821,6 +1821,20 @@ describe('index', () => {
                 ]);
             });
 
+            it('allows negating paths outside rootDir without requiring src;dest; syntax', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+                fsExtra.outputFileSync(`${rootDir}/../externalLib/source/lib.brs`, '');
+                const filePaths = await getFilePaths([
+                    'source/**/*',
+                    `!../externalLib/**/*`
+                ], rootDir);
+                expect(
+                    filePaths.map(x => s`${x.src}`).sort()
+                ).to.eql([
+                    s`${rootDir}/source/main.brs`
+                ]);
+            });
+
             it('applies multi-glob paths relative to rootDir', async () => {
                 expect(await getFilePaths([
                     'manifest',

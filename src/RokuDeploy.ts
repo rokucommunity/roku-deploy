@@ -192,6 +192,12 @@ export class RokuDeploy {
             //remove the ! so the glob will match properly
             if (isNegated) {
                 src = src.substring(1);
+                //create the entry as a src;dest; so it doesn't throw that "Cannot reference a file outside of rootDir..." error in `getFilePathsForEntry`.
+                entry = {
+                    src: src,
+                    // Negated globs don't need a `dest` path but add the key to satisfy the typescript check
+                    dest: undefined
+                };
             }
 
             let entryResults = await this.getFilePathsForEntry(
