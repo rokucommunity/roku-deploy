@@ -390,7 +390,7 @@ describe('index', () => {
                 fsExtra.ensureDirSync(options.stagingFolderPath);
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
-                err = e;
+                err = (e as Error);
             }
             expect(err?.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
         });
@@ -401,7 +401,7 @@ describe('index', () => {
                 options.stagingFolderPath = s`${tempDir}/path/to/nowhere`;
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
-                err = e;
+                err = (e as Error);
             }
             expect(err).to.exist;
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
