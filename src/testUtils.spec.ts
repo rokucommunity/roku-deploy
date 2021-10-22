@@ -3,7 +3,7 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import { standardizePath as s } from './util';
 
-export const cwd = process.cwd();
+export const cwd = s`${__dirname}/..`;
 export const tempDir = s`${cwd}/.tmp`;
 export const rootDir = s`${tempDir}/rootDir`;
 export const outDir = s`${tempDir}/outDir`;

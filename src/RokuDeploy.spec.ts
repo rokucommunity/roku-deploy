@@ -880,7 +880,7 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            options.rekeySignedPackage = '../testSignedPackage.pkg';
+            options.rekeySignedPackage = s`${cwd}/testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
