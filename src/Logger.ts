@@ -16,6 +16,7 @@ export class Logger {
     public get logLevel() {
         return this._logLevel;
     }
+
     public set logLevel(value: LogLevel) {
         //cast the string version to the numberic version
         if (typeof (value) === 'string') {
@@ -23,6 +24,7 @@ export class Logger {
         }
         this._logLevel = value ?? LogLevel.log;
     }
+
     private _logLevel = LogLevel.log;
 
     private getTimestamp() {
@@ -66,6 +68,7 @@ export class Logger {
             this.writeToLog(console.log, ...messages);
         }
     }
+
     /**
      * Log an info message to the console
      */

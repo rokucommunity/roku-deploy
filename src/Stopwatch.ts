@@ -8,6 +8,7 @@ export class Stopwatch {
      * The number of milliseconds when the stopwatch was started.
      */
     private startTime: number;
+
     start() {
         this.startTime = performance.now();
     }

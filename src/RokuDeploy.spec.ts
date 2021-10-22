@@ -9,15 +9,16 @@ import { createSandbox } from 'sinon';
 let sinon = createSandbox();
 import * as deferred from 'deferred';
 import * as glob from 'glob';
-import { RokuDeploy, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import type { BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
-import { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 
 chai.use(chaiFiles);
 
 const expect = chai.expect;
-const file = chaiFiles.file;
+const chaiFile = chaiFiles.file;
 const dir = chaiFiles.dir;
 let cwd = process.cwd();
 const tmpPath = s`${cwd}/.tmp`;
@@ -45,12 +46,14 @@ describe('index', () => {
 
         //delete the output file and other interim files
         let filePaths = [
-            path.resolve(options.outDir),
+            path.resolve(options.outDir ?? ''),
             tmpPath
         ];
         for (let filePath of filePaths) {
             try {
-                fsExtra.removeSync(filePath);
+                if (filePath) {
+                    fsExtra.removeSync(filePath);
+                }
             } catch (e) { }
         }
         sinon.restore();
@@ -427,7 +430,7 @@ describe('index', () => {
                 stagingFolderPath: '.tmp/dist'
             };
             await rokuDeploy.createPackage(opts);
-            expect(file(rokuDeploy.getOutputZipFilePath(opts))).to.exist;
+            expect(chaiFile(rokuDeploy.getOutputZipFilePath(opts))).to.exist;
         });
 
         it('should throw error when no files were found to copy', async () => {
@@ -444,7 +447,7 @@ describe('index', () => {
                     'manifest'
                 ]
             });
-            expect(file(rokuDeploy.getOutputZipFilePath(options))).to.exist;
+            expect(chaiFile(rokuDeploy.getOutputZipFilePath(options))).to.exist;
         });
 
         it('should only include the specified files', async () => {
@@ -698,7 +701,7 @@ describe('index', () => {
         });
 
         it('fails when no host is provided', () => {
-            expect(file('rokudeploy.json')).not.to.exist;
+            expect(chaiFile('rokudeploy.json')).not.to.exist;
             return rokuDeploy.publish({ host: undefined }).then(() => {
                 assert.fail('Should not have succeeded');
             }, () => {
@@ -1085,8 +1088,8 @@ describe('index', () => {
                 'source/main.brs'
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/manifest')).to.exist;
-            expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/manifest')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/source/main.brs')).to.exist;
         });
 
         it('handles copying a simple directory by name using src;dest;', async () => {
@@ -1098,7 +1101,7 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/source/main.brs')).to.exist;
         });
 
         it('handles new src;dest style', async () => {
@@ -1117,8 +1120,8 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/manifest')).to.exist;
-            expect(file('out/.roku-deploy-staging/source/main.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/manifest')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/source/main.brs')).to.exist;
         });
 
         it('handles renaming files', async () => {
@@ -1133,7 +1136,7 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/source/renamed.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/source/renamed.brs')).to.exist;
         });
 
         it('handles absolute src paths', async () => {
@@ -1149,7 +1152,7 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/manifest')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/manifest')).to.exist;
         });
 
         it('handles excluded folders in glob pattern', async () => {
@@ -1159,8 +1162,8 @@ describe('index', () => {
             ];
             options.retainStagingFolder = true;
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
-            expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
         });
 
         it('handles multi-globs', async () => {
@@ -1173,8 +1176,8 @@ describe('index', () => {
                     '!components/scenes/**/*'
                 ]
             });
-            expect(file('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
-            expect(file('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/components/components/Loader/Loader.brs')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/components/scenes/Home/Home.brs')).not.to.exist;
         });
 
         it('throws on invalid entries', async () => {
@@ -1200,7 +1203,7 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
         });
 
         it('handles multi-globs subfolder structure', async () => {
@@ -1213,8 +1216,8 @@ describe('index', () => {
                 }
             ];
             await rokuDeploy.prepublishToStaging(options);
-            expect(file('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
-            expect(file('out/.roku-deploy-staging/resources/image.jpg')).not.to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/resources/images/fhd/image.jpg')).to.exist;
+            expect(chaiFile('out/.roku-deploy-staging/resources/image.jpg')).not.to.exist;
         });
 
         describe('symlinks', () => {
@@ -1284,13 +1287,13 @@ describe('index', () => {
                 await fsExtra.writeFile(sourcePath, 'hello symlink');
 
                 //the source file should exist
-                expect(file(sourcePath)).to.exist;
+                expect(chaiFile(sourcePath)).to.exist;
 
                 //create the symlink in testProject
                 await fsExtra.symlink(sourcePath, symlinkPath);
 
                 //the symlink file should exist
-                expect(file(symlinkPath)).to.exist;
+                expect(chaiFile(symlinkPath)).to.exist;
                 let opts = {
                     ...options,
                     rootDir: rootDir,
@@ -1309,7 +1312,7 @@ describe('index', () => {
 
                 await rokuDeploy.prepublishToStaging(opts);
                 let stagedFilePath = s`${stagingFolderPath}/renamed_test.md`;
-                expect(file(stagedFilePath)).to.exist;
+                expect(chaiFile(stagedFilePath)).to.exist;
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
             });
@@ -2377,7 +2380,7 @@ describe('index', () => {
                     'source/main.brs'
                 ]
             });
-            expect(file(s`${stagingFolderPath}/source/main.brs`)).to.exist;
+            expect(chaiFile(s`${stagingFolderPath}/source/main.brs`)).to.exist;
             expect(count).to.be.greaterThan(4);
         });
 
@@ -2443,7 +2446,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.stagingFolderPath).to.exist;
         });
 
@@ -2451,7 +2454,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions({});
+            options = rokuDeploy.getOptions({});
             expect(options.stagingFolderPath).to.exist;
         });
 
@@ -2459,7 +2462,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions({
+            options = rokuDeploy.getOptions({
                 stagingFolderPath: './staging-dir'
             });
             expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
@@ -2474,7 +2477,7 @@ describe('index', () => {
                     "stagingFolderPath": "./staging-dir"
                 }
             `);
-            let options = rokuDeploy.getOptions();
+            options = rokuDeploy.getOptions();
             expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
         });
 
@@ -2490,7 +2493,7 @@ describe('index', () => {
                 }
                 //trailing comment
             `);
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
         });
 
@@ -2506,7 +2509,7 @@ describe('index', () => {
                 }
                 //trailing comment
             `);
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
         });
 
@@ -2520,7 +2523,7 @@ describe('index', () => {
             `);
             let ex;
             try {
-                let options = rokuDeploy.getOptions(undefined);
+                rokuDeploy.getOptions(undefined);
             } catch (e) {
                 ex = e;
             }
@@ -2607,7 +2610,7 @@ describe('index', () => {
                 fsExtra.writeJsonSync(rokudeployPath, {
                     outFile: 'rokudeployOutFile'
                 });
-                const options = {
+                options = {
                     outFile: 'runTimeOutFile'
                 };
                 expect(rokuDeploy.getOptions(options).outFile).to.equal(options.outFile);
@@ -2626,7 +2629,7 @@ describe('index', () => {
                 fsExtra.writeJsonSync(projectPath, {
                     outFile: expectedOutFile
                 });
-                const options = {
+                options = {
                     project: projectPath
                 };
                 expect(rokuDeploy.getOptions(options).outFile).to.equal(expectedOutFile);

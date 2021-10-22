@@ -56,7 +56,7 @@ describe('Stopwatch', () => {
     });
 
     it('works for single run', async () => {
-        let stopwatch = new Stopwatch();
+        stopwatch = new Stopwatch();
         stopwatch.start();
         await new Promise((resolve) => {
             setTimeout(resolve, 2);
@@ -66,7 +66,7 @@ describe('Stopwatch', () => {
     });
 
     it('works for multiple start/stop', async () => {
-        let stopwatch = new Stopwatch();
+        stopwatch = new Stopwatch();
         stopwatch.start();
         stopwatch.stop();
         stopwatch.totalMilliseconds = 3;
@@ -79,7 +79,7 @@ describe('Stopwatch', () => {
     });
 
     it('pretty prints', () => {
-        let stopwatch = new Stopwatch();
+        stopwatch = new Stopwatch();
         stopwatch.totalMilliseconds = 45;
         expect(stopwatch.getDurationText()).to.equal('45.0ms');
         stopwatch.totalMilliseconds = 2000 + 45;
