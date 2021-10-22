@@ -1,15 +1,8 @@
 import * as assert from 'assert';
-import * as chai from 'chai';
-import * as chaiFiles from 'chai-files';
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
-
 import * as rokuDeploy from './index';
-
-chai.use(chaiFiles);
-
-const expect = chai.expect;
-const file = chaiFiles.file;
+import { expectPathExists, expectThrowsAsync, rootDir } from './testUtils.spec';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
@@ -19,7 +12,14 @@ describe('device', function device() {
     beforeEach(() => {
         options = rokuDeploy.getOptions();
         options.rootDir = './testProject';
-
+        fsExtra.outputFileSync(`${rootDir}/roku-deploy.json`, `{
+            "password": "password",
+            "host": "192.168.1.103",
+            "rootDir": "testProject",
+            "devId": "c6fdc2019903ac3332f624b0b2c2fe2c733c3e74",
+            "rekeySignedPackage": "../testSignedPackage.pkg",
+            "signingPassword": "drRCEVWP/++K5TYnTtuAfQ=="
+        }`);
     });
 
     afterEach(() => {
@@ -48,19 +48,18 @@ describe('device', function device() {
 
         it('Presents nice message for 401 unauthorized status code', async () => {
             options.password = 'NOT_THE_PASSWORD';
-            try {
-                let response = await rokuDeploy.deploy(options);
-            } catch (e) {
-                assert.equal(e.message, 'Unauthorized. Please verify username and password for target Roku.');
-                return;
-            }
-            assert.fail('Should have rejected');
+            await expectThrowsAsync(
+                rokuDeploy.deploy(options),
+                'Unauthorized. Please verify username and password for target Roku.'
+            );
         });
     });
 
     describe('deployAndSignPackage', () => {
         it('works', async () => {
-            expect(file(await rokuDeploy.deployAndSignPackage(options))).to.exist;
+            expectPathExists(
+                await rokuDeploy.deployAndSignPackage(options)
+            );
         });
     });
 });

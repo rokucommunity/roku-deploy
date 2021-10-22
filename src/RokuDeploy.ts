@@ -234,10 +234,8 @@ export class RokuDeploy {
             absolute: true,
             follow: true
         });
-
         //reduce garbage collection churn by using the same filesEntry array for each file below
         let fileEntries = [entry];
-
         for (let filePathAbsolute of files) {
             //only include files (i.e. skip directories)
             if (await util.isFile(filePathAbsolute)) {
@@ -451,11 +449,12 @@ export class RokuDeploy {
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
+        let readStream: _fsExtra.ReadStream;
         try {
             if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
                 throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
-            let readStream = this.fsExtra.createReadStream(zipFilePath);
+            readStream = this.fsExtra.createReadStream(zipFilePath);
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
@@ -485,6 +484,12 @@ export class RokuDeploy {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
                 await this.fsExtra.remove(zipFilePath);
+            }
+            //try to close the read stream to prevent files becoming locked
+            try {
+                readStream?.close();
+            } catch (e) {
+                this.logger.info('Error closing read stream', e);
             }
         }
     }
@@ -528,13 +533,22 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options);
-        requestOptions.formData = {
-            mysubmit: 'Rekey',
-            passwd: options.signingPassword,
-            archive: this.fsExtra.createReadStream(rekeySignedPackagePath)
-        };
+        let archiveStream: _fsExtra.ReadStream;
+
+        try {
+            archiveStream = this.fsExtra.createReadStream(rekeySignedPackagePath);
+            requestOptions.formData = {
+                mysubmit: 'Rekey',
+                passwd: options.signingPassword,
+                archive: archiveStream
+            };
+        } finally {
+            //ensure the stream is closed
+            try {
+                archiveStream?.close();
+            } catch { }
+        }
 
         let results = await this.doPostRequest(requestOptions);
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
