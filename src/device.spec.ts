@@ -51,7 +51,7 @@ describe('device', function device() {
             try {
                 let response = await rokuDeploy.deploy(options);
             } catch (e) {
-                assert.equal(e.message, 'Unauthorized. Please verify username and password for target Roku.');
+                assert.equal((e as Error).message, 'Unauthorized. Please verify username and password for target Roku.');
                 return;
             }
             assert.fail('Should have rejected');
