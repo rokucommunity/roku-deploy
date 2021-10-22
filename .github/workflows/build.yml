@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
         with:
-          node-version: "10.19.0"
+          node-version: "12.22.7"
+      - run: cd src && cd .. #trying to fix "ENOENT: no such file or directory, uv_cwd" error
       - run: npm ci
       - run: npm run build
       - run: npm run lint

@@ -6,10 +6,11 @@ import * as JSZip from 'jszip';
 import * as nrc from 'node-run-cmd';
 import * as deferred from 'deferred';
 import * as glob from 'glob';
-import { RokuDeploy, BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import type { BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
-import { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 const sinon = createSandbox();
@@ -1918,7 +1919,6 @@ describe('index', () => {
             });
 
             it('maintains relative path after **', async () => {
-                const otherProjectDir = `${rootDir}/../otherProject`;
                 writeFiles(otherProjectDir, [
                     'components/component1/subComponent/screen.brs',
                     'manifest',
@@ -2066,7 +2066,6 @@ describe('index', () => {
                 dest: s`docs/README.md`
             }]);
 
-            let outDir = path.resolve(options.outDir);
             let paths: any[];
 
             paths = await rokuDeploy.getFilePaths([{
@@ -2439,7 +2438,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.stagingFolderPath).to.exist;
         });
 
@@ -2447,7 +2446,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions({});
+            options = rokuDeploy.getOptions({});
             expect(options.stagingFolderPath).to.exist;
         });
 
@@ -2455,7 +2454,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
-            let options = rokuDeploy.getOptions({
+            options = rokuDeploy.getOptions({
                 stagingFolderPath: './staging-dir'
             });
             expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
@@ -2470,7 +2469,7 @@ describe('index', () => {
                     "stagingFolderPath": "./staging-dir"
                 }
             `);
-            let options = rokuDeploy.getOptions();
+            options = rokuDeploy.getOptions();
             expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
         });
 
@@ -2486,7 +2485,7 @@ describe('index', () => {
                 }
                 //trailing comment
             `);
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
         });
 
@@ -2502,7 +2501,7 @@ describe('index', () => {
                 }
                 //trailing comment
             `);
-            let options = rokuDeploy.getOptions(undefined);
+            options = rokuDeploy.getOptions(undefined);
             expect(options.rootDir).to.equal(path.join(process.cwd(), 'src'));
         });
 
@@ -2516,7 +2515,7 @@ describe('index', () => {
             `);
             let ex;
             try {
-                let options = rokuDeploy.getOptions(undefined);
+                rokuDeploy.getOptions(undefined);
             } catch (e) {
                 ex = e;
             }
@@ -2588,7 +2587,7 @@ describe('index', () => {
                 fsExtra.writeJsonSync(s`${rootDir}/bsconfig`, { outFile: 'rokudeploy-outfile' });
 
                 fsExtra.writeJsonSync(s`${rootDir}/brsconfig.json`, { outFile: 'project-config-outfile' });
-                const options = {
+                options = {
                     project: 'brsconfig.json'
                 };
                 expect(rokuDeploy.getOptions(options).outFile).to.equal('project-config-outfile');

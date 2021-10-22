@@ -8,11 +8,12 @@ import * as minimatch from 'minimatch';
 import * as glob from 'glob';
 import * as xml2js from 'xml2js';
 import { promisify } from 'util';
-import { parse as parseJsonc, ParseError, printParseErrorCode } from 'jsonc-parser';
+import type { ParseError } from 'jsonc-parser';
+import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 const globAsync = promisify(glob);
 
 import { util } from './util';
-import { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
+import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 
 export class RokuDeploy {
@@ -23,7 +24,9 @@ export class RokuDeploy {
 
     private logger: Logger;
     //store the import on the class to make testing easier
+
     public request = request;
+
     public fsExtra = _fsExtra;
 
     /**
@@ -208,7 +211,7 @@ export class RokuDeploy {
         }
 
         //only keep the last entry of each `dest` path
-        let destPaths = {} as { [key: string]: boolean };
+        let destPaths = {} as Record<string, boolean>;
         for (let i = result.length - 1; i >= 0; i--) {
             let entry = result[i];
 
@@ -691,7 +694,7 @@ export class RokuDeploy {
     }
 
     private getRokuMessagesFromResponseBody(body: string): { errors: Array<string>; infos: Array<string>; successes: Array<string> } {
-        let errors = [];
+        let errorMessages = [];
         let infos = [];
         let successes = [];
         let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
@@ -702,7 +705,7 @@ export class RokuDeploy {
             let [, messageType, message] = match;
             switch (messageType.toLowerCase()) {
                 case 'error':
-                    errors.push(message);
+                    errorMessages.push(message);
                     break;
 
                 case 'info':
@@ -718,7 +721,7 @@ export class RokuDeploy {
             }
         }
 
-        return { errors: errors, infos: infos, successes: successes };
+        return { errors: errorMessages, infos: infos, successes: successes };
     }
 
     /**
@@ -749,7 +752,7 @@ export class RokuDeploy {
             mysubmit: 'Delete',
             archive: ''
         };
-        return (await this.doPostRequest(deleteOptions));
+        return this.doPostRequest(deleteOptions);
     }
 
     /**
@@ -989,7 +992,7 @@ export class RokuDeploy {
 
 export interface ManifestData {
     [key: string]: any;
-    keyIndexes?: { [id: string]: number };
+    keyIndexes?: Record<string, number>;
     lineCount?: number;
 }
 
