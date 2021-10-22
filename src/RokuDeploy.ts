@@ -549,7 +549,7 @@ export class RokuDeploy {
         } finally {
             //ensure the stream is closed
             try {
-                archiveStream?.close();
+                archiveStream.close();
             } catch { }
         }
 

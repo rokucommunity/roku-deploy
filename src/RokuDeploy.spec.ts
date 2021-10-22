@@ -670,6 +670,31 @@ describe('index', () => {
             //the out folder should also be deleted since it's empty
         });
 
+        it('failure to close read stream does not crash', async () => {
+            const orig = rokuDeploy.fsExtra.createReadStream;
+            //wrap the stream.close call so we can throw
+            sinon.stub(rokuDeploy.fsExtra, 'createReadStream').callsFake((pathLike) => {
+                const stream = orig.call(rokuDeploy.fsExtra, pathLike);
+                const originalClose = stream.close;
+                stream.close = () => {
+                    originalClose.call(stream);
+                    throw new Error('Crash!');
+                };
+                return stream;
+            });
+
+            let zipPath = `${options.outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false });
+            //the file should not exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
+            //the out folder should also be deleted since it's empty
+        });
+
         it('fails when the zip file is missing', async () => {
             options.outFile = 'fileThatDoesNotExist.zip';
             await expectThrowsAsync(async () => {
@@ -1488,7 +1513,7 @@ describe('index', () => {
             expect(result).not.to.be.undefined;
         });
 
-        it.only('continues with deploy if deleteInstalledChannel fails', async () => {
+        it('continues with deploy if deleteInstalledChannel fails', async () => {
             sinon.stub(rokuDeploy, 'deleteInstalledChannel').returns(
                 Promise.reject(
                     new Error('failed')
@@ -1523,6 +1548,12 @@ describe('index', () => {
         });
 
         it('allows modification of file contents with callback', async () => {
+            writeFiles(rootDir, [
+                'components/components/Loader/Loader.brs',
+                'images/splash_hd.jpg',
+                'source/main.brs',
+                'manifest'
+            ]);
             const stageFolder = path.join(tempDir, 'testProject');
             fsExtra.ensureDirSync(stageFolder);
             const files = [
@@ -2808,5 +2839,3 @@ function getFakeResponseBody(messages: string): string {
         </body>
     </html>`;
 }
-
-

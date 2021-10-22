@@ -9,20 +9,20 @@ export const rootDir = s`${tempDir}/rootDir`;
 export const outDir = s`${tempDir}/outDir`;
 export const stagingDir = s`${outDir}/.roku-deploy-staging`;
 
-export function expectPathExists(path: string) {
+export function expectPathExists(thePath: string) {
     expect(
-        fsExtra.pathExistsSync(path),
-        `Expected "${path}" to exist`
+        fsExtra.pathExistsSync(thePath),
+        `Expected "${thePath}" to exist`
     ).to.be.true;
 }
-export function expectPathNotExists(path: string) {
+export function expectPathNotExists(thePath: string) {
     expect(
-        fsExtra.pathExistsSync(path),
-        `Expected "${path}" not to exist`
+        fsExtra.pathExistsSync(thePath),
+        `Expected "${thePath}" not to exist`
     ).to.be.false;
 }
 
-export function writeFiles(rootDir: string, files: Array<string | [string, string]>) {
+export function writeFiles(baseDir: string, files: Array<string | [string, string]>) {
     const filePaths = [];
     for (let entry of files) {
         if (typeof entry === 'string') {
@@ -30,7 +30,7 @@ export function writeFiles(rootDir: string, files: Array<string | [string, strin
         }
         let [filePath, contents] = entry as any;
         filePaths.push(filePath);
-        filePath = path.resolve(rootDir, filePath);
+        filePath = path.resolve(baseDir, filePath);
         fsExtra.outputFileSync(filePath, contents ?? '');
     }
     return filePaths;
@@ -49,7 +49,7 @@ export async function expectThrowsAsync(callback: Promise<any> | (() => Promise<
     } catch (e) {
         wasExceptionThrown = true;
         if (expectedMessage) {
-            expect((e as unknown as any).message).to.eql(expectedMessage);
+            expect((e as any).message).to.eql(expectedMessage);
         }
     }
     if (wasExceptionThrown === false) {
