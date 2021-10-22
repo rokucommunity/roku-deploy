@@ -397,7 +397,7 @@ describe('index', () => {
                 fsExtra.ensureDirSync(options.stagingFolderPath);
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
-                err = e;
+                err = (e as Error);
             }
             expect(err).to.exist;
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
@@ -409,7 +409,7 @@ describe('index', () => {
                 options.stagingFolderPath = s`${tmpPath}/path/to/nowhere`;
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
-                err = e;
+                err = (e as Error);
             }
             expect(err).to.exist;
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
@@ -693,7 +693,7 @@ describe('index', () => {
                 throw new Error('publish should have thrown an exception');
             } catch (e) {
                 let zipFilePath = rokuDeploy.getOutputZipFilePath(options);
-                expect(e.message).to.equal(`Cannot publish because file does not exist at '${zipFilePath}'`);
+                expect((e as Error).message).to.equal(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
         });
 
@@ -989,7 +989,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.signExistingPackage(options);
             } catch (e) {
-                expect(e.message).to.equal('Must supply signingPassword');
+                expect((e as Error).message).to.equal('Must supply signingPassword');
                 return;
             }
             assert.fail('Exception should have been thrown');
@@ -1032,7 +1032,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.signExistingPackage(options);
             } catch (e) {
-                expect(e.message).to.equal('Invalid Password.');
+                expect((e as Error).message).to.equal('Invalid Password.');
                 return;
             }
             assert.fail('Exception should have been thrown');
@@ -1053,7 +1053,7 @@ describe('index', () => {
                 mockDoPostRequest();
                 await rokuDeploy.signExistingPackage(options);
             } catch (e) {
-                expect(e.message).to.equal('Unknown error signing package');
+                expect((e as Error).message).to.equal('Unknown error signing package');
                 return;
             }
             assert.fail('Exception should have been thrown');
@@ -1587,7 +1587,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.parseManifest(invalidManifestPath);
             } catch (e) {
-                expect(e.message).to.equal(invalidManifestPath + ' does not exist');
+                expect((e as Error).message).to.equal(invalidManifestPath + ' does not exist');
                 return;
             }
             assert.fail('Exception should have been thrown');
@@ -2321,7 +2321,7 @@ describe('index', () => {
                     outFile: 'roku-deploy-test'
                 });
             } catch (e) {
-                expect(e.message).to.equal('Some error');
+                expect((e as Error).message).to.equal('Some error');
                 return;
             }
             assert.fail('Should not have succeeded');
@@ -2340,7 +2340,7 @@ describe('index', () => {
                     outFile: 'roku-deploy-test'
                 });
             } catch (e) {
-                expect(e.message.indexOf('Invalid response code')).to.equal(0);
+                expect((e as Error).message.indexOf('Invalid response code')).to.equal(0);
                 return;
             }
             assert.fail('Should not have succeeded');
@@ -2413,7 +2413,7 @@ describe('index', () => {
                     ]
                 });
             } catch (e) {
-                error = e;
+                error = (e as Error);
             }
             expect(error, 'Should have thrown error').to.exist;
             expect(error.message).to.equal('fake error thrown as part of the unit test');
