@@ -27,8 +27,7 @@ describe('index', () => {
             devId: 'abcde',
             stagingFolderPath: stagingDir,
             signingPassword: '12345',
-            host: 'localhost',
-            rekeySignedPackage: '../testSignedPackage.pkg'
+            host: 'localhost'
         });
         options.rootDir = rootDir;
         fsExtra.emptyDirSync(tempDir);
@@ -871,7 +870,7 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            options.rekeySignedPackage = s`${cwd}/testSignedPackage.pkg`;
+            options.rekeySignedPackage = `../../testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
@@ -881,7 +880,7 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
 
-            options.rekeySignedPackage = s`${rootDir}/../testSignedPackage.pkg`;
+            options.rekeySignedPackage = s`${cwd}/testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
