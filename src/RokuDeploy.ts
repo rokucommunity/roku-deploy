@@ -621,18 +621,25 @@ export class RokuDeploy {
         let pkgFilePath = this.getOutputPkgFilePath(options);
 
         await this.fsExtra.ensureDir(path.dirname(pkgFilePath));
-
-        return new Promise<string>((resolve, reject) => {
-            this.request.get(requestOptions)
-                .on('error', (err) => reject(err))
-                .on('response', (response) => {
-                    if (response.statusCode !== 200) {
-                        reject(new Error('Invalid response code: ' + response.statusCode));
-                    }
-                    resolve(pkgFilePath);
-                })
-                .pipe(this.fsExtra.createWriteStream(pkgFilePath));
-        });
+        let writeStream: _fsExtra.WriteStream;
+        try {
+            return await new Promise<string>((resolve, reject) => {
+                writeStream = this.fsExtra.createWriteStream(pkgFilePath);
+                this.request.get(requestOptions)
+                    .on('error', (err) => reject(err))
+                    .on('response', (response) => {
+                        if (response.statusCode !== 200) {
+                            reject(new Error('Invalid response code: ' + response.statusCode));
+                        }
+                        resolve(pkgFilePath);
+                    })
+                    .pipe(writeStream);
+            });
+        } finally {
+            try {
+                writeStream.close();
+            } catch { }
+        }
     }
 
     /**
