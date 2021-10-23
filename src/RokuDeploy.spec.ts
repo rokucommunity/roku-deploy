@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as JSZip from 'jszip';
-import * as nrc from 'node-run-cmd';
+import * as child_process from 'child_process';
 import * as deferred from 'deferred';
 import * as glob from 'glob';
 import type { BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
@@ -552,18 +552,9 @@ describe('index', () => {
         });
     });
 
-    it('runs via the command line using the rokudeploy.json file', function test(done) {
+    it('runs via the command line using the rokudeploy.json file', function test() {
         this.timeout(20000);
-        nrc.run('node dist/index.js', {
-            onData: (data) => {
-            }
-        }).then(() => {
-            assert.ok('deploy succeeded');
-            done();
-        }, () => {
-            assert.fail('deploy failed');
-            done();
-        });
+        child_process.execSync(`node dist/index.js`);
     });
 
     describe('generateBaseRequestOptions', () => {
