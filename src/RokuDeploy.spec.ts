@@ -1130,10 +1130,12 @@ describe('index', () => {
         });
 
         it('handles absolute src paths', async () => {
-            let absoluteManifestPath = path.resolve('./testProject/manifest');
+            writeFiles(rootDir, [
+                'manifest'
+            ]);
             options.files = [
                 {
-                    src: absoluteManifestPath,
+                    src: `${rootDir}/manifest`,
                     dest: ''
                 },
                 {
