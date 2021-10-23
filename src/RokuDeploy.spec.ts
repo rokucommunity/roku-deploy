@@ -27,7 +27,8 @@ describe('index', () => {
             devId: 'abcde',
             stagingFolderPath: stagingDir,
             signingPassword: '12345',
-            host: 'localhost'
+            host: 'localhost',
+            rekeySignedPackage: `../../testSignedPackage.pkg`
         });
         options.rootDir = rootDir;
         fsExtra.emptyDirSync(tempDir);
