@@ -87,7 +87,7 @@ describe('index', () => {
                 return {} as any;
             });
 
-            let results = await (rokuDeploy as any).doPostRequest({}, true);
+            let results = await rokuDeploy['doPostRequest']({}, true);
             expect(results.body).to.equal(body);
         });
 
@@ -99,7 +99,7 @@ describe('index', () => {
             });
 
             try {
-                await (rokuDeploy as any).doPostRequest({}, true);
+                await rokuDeploy['doPostRequest']({}, true);
             } catch (e) {
                 expect(e).to.equal(error);
                 return;
@@ -115,7 +115,7 @@ describe('index', () => {
             });
 
             try {
-                await (rokuDeploy as any).doPostRequest({}, true);
+                await rokuDeploy['doPostRequest']({}, true);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
                 return;
@@ -130,7 +130,7 @@ describe('index', () => {
                 return {} as any;
             });
 
-            let results = await (rokuDeploy as any).doPostRequest({}, false);
+            let results = await rokuDeploy['doPostRequest']({}, false);
             expect(results.body).to.equal(body);
         });
     });
@@ -143,7 +143,7 @@ describe('index', () => {
                 return {} as any;
             });
 
-            let results = await (rokuDeploy as any).doGetRequest({});
+            let results = await rokuDeploy['doGetRequest']({});
             expect(results.body).to.equal(body);
         });
 
@@ -155,7 +155,7 @@ describe('index', () => {
             });
 
             try {
-                await (rokuDeploy as any).doGetRequest({});
+                await rokuDeploy['doGetRequest']({});
             } catch (e) {
                 expect(e).to.equal(error);
                 return;
@@ -324,19 +324,19 @@ describe('index', () => {
     describe('copyToStaging', () => {
         it('throws exceptions when rootDir does not exist', async () => {
             await expectThrowsAsync(
-                (rokuDeploy as any).copyToStaging([], 'staging', 'folder_does_not_exist')
+                rokuDeploy['copyToStaging']([], 'staging', 'folder_does_not_exist')
             );
         });
 
         it('throws exceptions on missing stagingPath', async () => {
             await expectThrowsAsync(
-                (rokuDeploy as any).copyToStaging([])
+                rokuDeploy['copyToStaging']([], undefined, undefined)
             );
         });
 
         it('throws exceptions on missing rootDir', async () => {
             await expectThrowsAsync(
-                (rokuDeploy as any).copyToStaging([], 'asdf')
+                rokuDeploy['copyToStaging']([], 'asdf', undefined)
             );
         });
 
@@ -364,7 +364,7 @@ describe('index', () => {
                 ])
             );
 
-            await (rokuDeploy as any).copyToStaging([], stagingDir, rootDir);
+            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
 
             expect(ensureDirPaths).to.eql([
                 s`${stagingDir}/source`,
@@ -559,11 +559,11 @@ describe('index', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect((rokuDeploy as any).generateBaseRequestOptions('a_b_c', { host: '1.2.3.4', packagePort: 999 }).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999 }).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
@@ -2667,7 +2667,7 @@ describe('index', () => {
     function mockDoGetRequest(body = '', statusCode = 200) {
         sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
-            (rokuDeploy as any).checkRequest(results);
+            rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);
         });
     }
@@ -2675,7 +2675,7 @@ describe('index', () => {
     function mockDoPostRequest(body = '', statusCode = 200) {
         sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
-            (rokuDeploy as any).checkRequest(results);
+            rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);
         });
     }
