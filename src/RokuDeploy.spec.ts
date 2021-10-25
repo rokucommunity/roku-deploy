@@ -1822,15 +1822,16 @@ describe('index', () => {
             });
 
             it('allows negating paths outside rootDir without requiring src;dest; syntax', async () => {
-                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
                 fsExtra.outputFileSync(`${rootDir}/../externalLib/source/lib.brs`, '');
                 const filePaths = await getFilePaths([
                     'source/**/*',
-                    `!../externalLib/**/*`
+                    { src: '../externalLib/**/*', dest: 'source' },
+                    '!../externalLib/source/**/*'
                 ], rootDir);
                 expect(
                     filePaths.map(x => s`${x.src}`).sort()
                 ).to.eql([
+                    s`${rootDir}/source/lib.brs`,
                     s`${rootDir}/source/main.brs`
                 ]);
             });
@@ -2232,6 +2233,18 @@ describe('index', () => {
                     [
                         'source/**/*',
                         '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes file from non-rootdir top-level pattern', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/../externalDir/source/main.brs`,
+                    [
+                        '!../externalDir/**/*'
                     ],
                     rootDir
                 )
