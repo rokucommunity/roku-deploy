@@ -14,6 +14,7 @@ export class Util {
         const relative = path.relative(parentPath, childPath);
         return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
     }
+
     /**
      * Determines if the given path is a file
      * @param filePathAbsolute
