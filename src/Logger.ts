@@ -109,7 +109,7 @@ export class Logger {
             let logLevelString = LogLevel[logLevel];
 
             //write the initial log
-            this[logLevelString](...messages);
+            this[logLevelString](...messages ?? []);
             this.indent += '  ';
 
             stopwatch.start();
