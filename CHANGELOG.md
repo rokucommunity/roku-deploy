@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.5.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.4.2...v3.5.0) - 2021-10-27
+### Added
+ - ability to use negated non-rootDir top-level patterns in the `files` array ([#78](https://github.com/rokucommunity/roku-deploy/pull/78))
+
+
+
 ## [3.4.2](https://github.com/RokuCommunity/roku-deploy/compare/v3.4.1...v3.4.2) - 2021-09-17
 ### Fixed
  - Prevent deploy crashes when target Roku doesn't have an installed channel ([#65](https://github.com/rokucommunity/roku-deploy/pull/65))
