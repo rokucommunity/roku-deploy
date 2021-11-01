@@ -574,7 +574,7 @@ describe('index', () => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
-            return rokuDeploy.pressHomeButton({}).then(() => {
+            return rokuDeploy.pressHomeButton({} as string).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
                 expect(true).to.be.true;
