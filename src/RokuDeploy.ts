@@ -412,7 +412,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): request.OptionsWithUrl {
         options = this.getOptions(options);
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -422,7 +422,8 @@ export class RokuDeploy {
                 user: options.username,
                 pass: options.password,
                 sendImmediately: false
-            }
+            },
+            formData: formData
         };
         return baseRequestOptions;
     }
@@ -468,27 +469,37 @@ export class RokuDeploy {
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
             });
-            let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
-            requestOptions.formData = {
+
+            let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
                 mysubmit: 'Replace',
                 archive: readStream
-            };
+            });
 
+            //attach the remotedebug flag if configured
             if (options.remoteDebug) {
                 requestOptions.formData.remotedebug = '1';
             }
 
-            let results = await this.doPostRequest(requestOptions);
+            //now that the channel is deleted, try to "replace" it first since that usually works.
+            let response: HttpResponse;
+            try {
+                response = await this.doPostRequest(requestOptions);
+            } catch (replaceError) {
+                //"replace" failed, do an "install" instead
+                requestOptions.formData.mysubmit = 'Install';
+                response = await this.doPostRequest(requestOptions);
+            }
+
             if (options.failOnCompileError) {
-                if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                    throw new errors.CompileError('Compile error', results);
+                if (response.body.indexOf('Install Failure: Compilation Failed.') > -1) {
+                    throw new errors.CompileError('Compile error', response);
                 }
             }
 
-            if (results.body.indexOf('Identical to previous version -- not replacing.') > -1) {
-                return { message: 'Identical to previous version -- not replacing', results: results };
+            if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                return { message: 'Identical to previous version -- not replacing', results: response };
             }
-            return { message: 'Successful deploy', results: results };
+            return { message: 'Successful deploy', results: response };
         } finally {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
@@ -512,11 +523,10 @@ export class RokuDeploy {
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
-        requestOptions.formData = {
+        let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
             archive: '',
             mysubmit: 'Convert to squashfs'
-        };
+        });
 
         let results = await this.doPostRequest(requestOptions);
         if (results.body.indexOf('Conversion succeeded') === -1) {
@@ -542,20 +552,18 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options);
-        let archiveStream: _fsExtra.ReadStream;
+        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options, {
+            mysubmit: 'Rekey',
+            passwd: options.signingPassword,
+            archive: null as _fsExtra.ReadStream
+        });
 
         try {
-            archiveStream = this.fsExtra.createReadStream(rekeySignedPackagePath);
-            requestOptions.formData = {
-                mysubmit: 'Rekey',
-                passwd: options.signingPassword,
-                archive: archiveStream
-            };
+            requestOptions.formData.archive = this.fsExtra.createReadStream(rekeySignedPackagePath);
         } finally {
             //ensure the stream is closed
             try {
-                archiveStream.close();
+                requestOptions.formData.archive?.close();
             } catch { }
         }
 
@@ -591,14 +599,12 @@ export class RokuDeploy {
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', options);
-
-        requestOptions.formData = {
+        let requestOptions = this.generateBaseRequestOptions('plugin_package', options, {
             mysubmit: 'Package',
             pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
             passwd: options.signingPassword,
             app_name: appName //eslint-disable-line camelcase
-        };
+        });
 
         let results = await this.doPostRequest(requestOptions);
 
@@ -664,7 +670,7 @@ export class RokuDeploy {
         if (verify) {
             this.checkRequest(results);
         }
-        return results;
+        return results as HttpResponse;
     }
 
     /**
@@ -681,7 +687,7 @@ export class RokuDeploy {
             });
         });
         this.checkRequest(results);
-        return results;
+        return results as HttpResponse;
     }
 
     private checkRequest(results) {
@@ -1034,3 +1040,8 @@ export const DefaultFiles = [
     'images/**/*.*',
     'manifest'
 ];
+
+export interface HttpResponse {
+    response: any;
+    body: any;
+}

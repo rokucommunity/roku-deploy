@@ -824,7 +824,6 @@ describe('index', () => {
             }
             assert.fail('Should not have succeeded');
         });
-
     });
 
     describe('convertToSquashfs', () => {
@@ -864,6 +863,18 @@ describe('index', () => {
             </device-info>`;
             mockDoGetRequest(body);
             fsExtra.outputFileSync(`${rootDir}/${options.rekeySignedPackage}`, '');
+        });
+
+        it('does not crash when archive is undefined', async () => {
+            const expectedError = new Error('Custom error');
+            sinon.stub(fsExtra, 'createReadStream').throws(expectedError);
+            let actualError: Error;
+            try {
+                await rokuDeploy.rekeyDevice(options);
+            } catch (e) {
+                actualError = e as Error;
+            }
+            expect(actualError).to.equal(expectedError);
         });
 
         it('should work with relative path', async () => {
