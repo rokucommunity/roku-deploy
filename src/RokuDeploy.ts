@@ -480,7 +480,7 @@ export class RokuDeploy {
                 requestOptions.formData.remotedebug = '1';
             }
 
-            //now that the channel is deleted, try to "replace" it first since that usually works.
+            //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {
                 response = await this.doPostRequest(requestOptions);
