@@ -435,10 +435,12 @@ export class RokuDeploy {
      * @param port - the port that should be used for the request. defaults to 8060
      * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
-    public async pressHomeButton(host, port?: number, timeout?: number) {
+    public async pressHomeButton(host: string, port?: number, timeout?: number) {
         let options = this.getOptions();
         port = port ? port : options.remotePort;
         timeout = timeout ? timeout : options.timeout;
+        //convert hostname to ip address because ECP commands only work with IP addresses
+        host = await util.dnsLookup(host);
         // press the home button to return to the main screen
         return this.doPostRequest({
             url: `http://${host}:${port}/keypress/Home`,
