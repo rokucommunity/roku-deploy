@@ -558,8 +558,10 @@ export class RokuDeploy {
             archive: null as _fsExtra.ReadStream
         });
 
+        let results: HttpResponse;
         try {
             requestOptions.formData.archive = this.fsExtra.createReadStream(rekeySignedPackagePath);
+            results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
             try {
@@ -567,7 +569,6 @@ export class RokuDeploy {
             } catch { }
         }
 
-        let results = await this.doPostRequest(requestOptions);
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
             throw new errors.UnparsableDeviceResponseError('Unknown Rekey Failure');
