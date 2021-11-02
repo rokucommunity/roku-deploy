@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.5.2](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.1...v3.5.2) - 2021-11-02
+### Fixed
+ - bug introduced in v3.5.0 with `retrieveSignedPackage` that would produce an empty package. ([#82](https://github.com/rokucommunity/roku-deploy/pull/82))
+
+
+
 ## [3.5.1](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.0...v3.5.1) - 2021-11-02
 ### Fixed
  - bug introduced in v3.5.0 with `rekeyDevice` that would crash because the read stream was closed before the request got sent. ([#81](https://github.com/rokucommunity/roku-deploy/pull/81))
