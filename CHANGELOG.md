@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.5.1](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.0...v3.5.1) - 2021-11-02
+### Fixed
+ - bug introduced in v3.5.0 with `rekeyDevice` that would crash because the read stream was closed before the request got sent. ([#81](https://github.com/rokucommunity/roku-deploy/pull/81))
+
+
+
 ## [3.5.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.4.2...v3.5.0) - 2021-10-27
 ### Added
  - ability to use negated non-rootDir top-level patterns in the `files` array ([#78](https://github.com/rokucommunity/roku-deploy/pull/78))
