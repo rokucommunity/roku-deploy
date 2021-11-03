@@ -560,8 +560,10 @@ export class RokuDeploy {
             archive: null as _fsExtra.ReadStream
         });
 
+        let results: HttpResponse;
         try {
             requestOptions.formData.archive = this.fsExtra.createReadStream(rekeySignedPackagePath);
+            results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
             try {
@@ -569,7 +571,6 @@ export class RokuDeploy {
             } catch { }
         }
 
-        let results = await this.doPostRequest(requestOptions);
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
             throw new errors.UnparsableDeviceResponseError('Unknown Rekey Failure');
@@ -636,24 +637,24 @@ export class RokuDeploy {
 
         await this.fsExtra.ensureDir(path.dirname(pkgFilePath));
         let writeStream: _fsExtra.WriteStream;
-        try {
-            return await new Promise<string>((resolve, reject) => {
-                writeStream = this.fsExtra.createWriteStream(pkgFilePath);
-                this.request.get(requestOptions)
-                    .on('error', (err) => reject(err))
-                    .on('response', (response) => {
-                        if (response.statusCode !== 200) {
-                            reject(new Error('Invalid response code: ' + response.statusCode));
-                        }
+        return new Promise<string>((resolve, reject) => {
+            writeStream = this.fsExtra.createWriteStream(pkgFilePath);
+            this.request.get(requestOptions)
+                .on('error', (err) => {
+                    try {
+                        writeStream.close();
+                    } catch { }
+                    reject(err);
+                })
+                .on('response', (response) => {
+                    if (response.statusCode !== 200) {
+                        reject(new Error('Invalid response code: ' + response.statusCode));
+                    } else {
                         resolve(pkgFilePath);
-                    })
-                    .pipe(writeStream);
-            });
-        } finally {
-            try {
-                writeStream.close();
-            } catch { }
-        }
+                    }
+                })
+                .pipe(writeStream);
+        });
     }
 
     /**
