@@ -25,8 +25,6 @@ export class RokuDeploy {
     private logger: Logger;
     //store the import on the class to make testing easier
 
-    public request = request;
-
     public fsExtra = _fsExtra;
 
     /**
@@ -637,7 +635,7 @@ export class RokuDeploy {
         let writeStream: _fsExtra.WriteStream;
         return new Promise<string>((resolve, reject) => {
             writeStream = this.fsExtra.createWriteStream(pkgFilePath);
-            this.request.get(requestOptions)
+            request.get(requestOptions)
                 .on('error', (err) => {
                     try {
                         writeStream.close();
@@ -661,7 +659,7 @@ export class RokuDeploy {
      */
     private async doPostRequest(params: any, verify = true) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-            this.request.post(params, (err, resp, body) => {
+            request.post(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
                 }
@@ -680,7 +678,7 @@ export class RokuDeploy {
      */
     private async doGetRequest(params: any) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-            this.request.get(params, (err, resp, body) => {
+            request.get(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
                 }
