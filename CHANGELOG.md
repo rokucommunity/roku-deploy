@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.5.3](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.2...v3.5.3) - 2022-02-16
+### Fixed
+ - removed `request` property from `RokuDeploy` class that was only there for unit testing, and was causing typescript issues in downstream dependencies. ([#84](https://github.com/rokucommunity/roku-deploy/pull/84))
+
+
+
 ## [3.5.2](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.1...v3.5.2) - 2021-11-02
 ### Fixed
  - bug introduced in v3.5.0 with `retrieveSignedPackage` that would produce an empty package. ([#82](https://github.com/rokucommunity/roku-deploy/pull/82))
