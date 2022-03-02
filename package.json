@@ -74,8 +74,8 @@
         "type": "git",
         "url": "https://github.com/RokuCommunity/roku-deploy.git"
     },
-    "author": "",
-    "license": "ISC",
+    "author": "RokuCommunity",
+    "license": "MIT",
     "nyc": {
         "include": [
             "src/**/*.ts",
