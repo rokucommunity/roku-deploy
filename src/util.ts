@@ -158,36 +158,36 @@ export class Util {
 
         const matchesByIndex: Array<Array<string>> = [];
 
-        /**
-         * Filter all of the matches based on a minimatch pattern
-         * @param stopIndex the max index of `matchesByIndex` to filter until
-         * @param pattern - the pattern used to filter out entries from `matchesByIndex`. Usually preceeded by a `!`
-         */
-        function filterPreviousEntries(stopIndex: number, pattern: string) {
-            //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
-            let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
-            let filter = picomatch(negatedPatternAbsolute);
-            for (let i = 0; i <= stopIndex; i++) {
-                if (matchesByIndex[i]) {
-                    //filter all matches by the specified pattern
-                    matchesByIndex[i] = matchesByIndex[i].filter(x => {
-                        return filter(x);
-                    });
-                }
-            }
-        }
-
         for (let i = 0; i < globResults.length; i++) {
             const globResult = await globResults[i];
             //if the matches collection is missing, this is a filter
             if (typeof globResult === 'string') {
-                filterPreviousEntries(i - 1, globResult);
+                this.filterPaths(globResult, matchesByIndex, cwd, i - 1);
                 matchesByIndex.push(undefined);
             } else {
                 matchesByIndex.push(globResult);
             }
         }
         return matchesByIndex;
+    }
+
+    /**
+     * Filter all of the matches based on a minimatch pattern
+     * @param stopIndex the max index of `matchesByIndex` to filter until
+     * @param pattern - the pattern used to filter out entries from `matchesByIndex`. Usually preceeded by a `!`
+     */
+    public filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
+        //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
+        let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
+        let filter = picomatch(negatedPatternAbsolute);
+        for (let i = 0; i <= stopIndex; i++) {
+            if (filesByIndex[i]) {
+                //filter all matches by the specified pattern
+                filesByIndex[i] = filesByIndex[i].filter(x => {
+                    return filter(x);
+                });
+            }
+        }
     }
 }
 
