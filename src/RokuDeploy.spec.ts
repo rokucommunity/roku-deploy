@@ -4,9 +4,8 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
-import * as deferred from 'deferred';
 import * as glob from 'glob';
-import type { BeforeZipCallbackInfo, ManifestData } from './RokuDeploy';
+import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
@@ -583,45 +582,50 @@ describe('index', () => {
         });
 
         it('uses default port', async () => {
-            const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
-                d.resolve();
+            const promise = new Promise<void>((resolve) => {
+                sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
+                    resolve();
+                });
             });
             await rokuDeploy.pressHomeButton('1.2.3.4');
-            await d.promise;
+            await promise;
         });
 
         it('uses overridden port', async () => {
-            const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
-                d.resolve();
+            const promise = new Promise<void>((resolve) => {
+                sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
+                    resolve();
+                });
             });
             await rokuDeploy.pressHomeButton('1.2.3.4', 987);
-            await d.promise;
+            await promise;
         });
 
         it('uses default timeout', async () => {
-            const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
-                expect(opts.timeout).to.equal(150000);
-                d.resolve();
+            const promise = new Promise<void>((resolve) => {
+                sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
+                    expect(opts.timeout).to.equal(150000);
+                    resolve();
+                });
             });
             await rokuDeploy.pressHomeButton('1.2.3.4');
-            await d.promise;
+            await promise;
         });
 
         it('uses overridden timeout', async () => {
-            const d = deferred();
-            sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
-                expect(opts.timeout).to.equal(1000);
-                d.resolve();
+            const promise = new Promise<void>((resolve) => {
+
+                sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
+                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
+                    expect(opts.timeout).to.equal(1000);
+                    resolve();
+                });
             });
             await rokuDeploy.pressHomeButton('1.2.3.4', 987, 1000);
-            await d.promise;
+            await promise;
         });
     });
 
