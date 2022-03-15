@@ -4,12 +4,10 @@ import * as request from 'request';
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
-import * as glob from 'glob';
+import * as isGlob from 'is-glob';
 import * as xml2js from 'xml2js';
-import { promisify } from 'util';
 import type { ParseError } from 'jsonc-parser';
 import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
-const globAsync = promisify(glob);
 
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
@@ -242,7 +240,7 @@ export class RokuDeploy {
             }
 
             //non-glob-pattern explicit file reference
-        } else if (!glob.hasMagic(entry.src)) {
+        } else if (!isGlob(entry.src.replace(/\\/g, '/'), { strict: false })) {
             let isEntrySrcAbsolute = path.isAbsolute(entry.src);
             let entrySrcPathAbsolute = isEntrySrcAbsolute ? entry.src : util.standardizePath(`${rootDir}/${entry.src}`);
 
