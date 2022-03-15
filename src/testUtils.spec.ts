@@ -10,11 +10,11 @@ export const outDir = s`${tempDir}/outDir`;
 export const stagingDir = s`${outDir}/.roku-deploy-staging`;
 
 export function expectPathExists(thePath: string) {
-    expect(
-        fsExtra.pathExistsSync(thePath),
-        `Expected "${thePath}" to exist`
-    ).to.be.true;
+    if (!fsExtra.pathExistsSync(thePath)) {
+        throw new Error(`Expected "${thePath}" to exist`);
+    }
 }
+
 export function expectPathNotExists(thePath: string) {
     expect(
         fsExtra.pathExistsSync(thePath),
