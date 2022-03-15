@@ -2212,11 +2212,10 @@ describe('index', () => {
             }]);
         });
 
-        it('', async () => {
-            writeFiles(`${rootDir}/../`, [
-                'README.md'
+        it('should throw exception because we cannot have top-level string paths pointed to files outside the root', async () => {
+            writeFiles(rootDir, [
+                '../README.md'
             ]);
-            //should throw exception because we can't have top-level string paths pointed to files outside the root
             await expectThrowsAsync(
                 rokuDeploy.getFilePaths([
                     path.join('..', 'README.md')

@@ -237,6 +237,7 @@ export class RokuDeploy {
                 //files that are actually relative to rootDir
                 result = util.stringReplaceInsensitive(srcPath, rootDir, '');
             } else {
+                // result = util.stringReplaceInsensitive(srcPath, rootDir, '');
                 throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
             }
 
