@@ -1,16 +1,24 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
+import { promisify } from 'util';
+import { Glob } from 'glob';
+import * as glob from 'glob';
+import * as minimatch from 'minimatch';
+const globAsync = promisify(glob);
 
 export class Util {
     /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath
      * @param childPath
+     * @param standardizePaths if false, the paths are assumed to already be in the same format and are not re-standardized
      */
-    public isParentOfPath(parentPath: string, childPath: string) {
-        parentPath = util.standardizePath(parentPath);
-        childPath = util.standardizePath(childPath);
+    public isParentOfPath(parentPath: string, childPath: string, standardizePaths = true) {
+        if (standardizePaths) {
+            parentPath = util.standardizePath(parentPath);
+            childPath = util.standardizePath(childPath);
+        }
         const relative = path.relative(parentPath, childPath);
         return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
     }
@@ -123,6 +131,62 @@ export class Util {
             }
         }
         return false;
+    }
+
+    /**
+     * Run a series of glob patterns, returning the matches in buckets corresponding to their pattern index
+     */
+    public async globAllByIndex(patterns: string[], cwd: string) {
+        //force all path separators to unit style
+        cwd = cwd.replace(/\\/g, '/');
+        //create a new glob so we can reuse the caches between calls
+        const globCommon = new Glob('');
+
+        const globResults = patterns.map(async (pattern) => {
+            //skip negated patterns (we will use them to filter later on)
+            if (pattern.startsWith('!')) {
+                return pattern;
+            } else {
+                //run glob matcher
+                return globAsync(pattern, {
+                    cwd: cwd,
+                    absolute: true,
+                    follow: true,
+                    nodir: true,
+                    cache: globCommon.cache,
+                    statCache: globCommon.statCache,
+                    realpathCache: globCommon.realpathCache
+                });
+            }
+        });
+
+        const matchesByIndex: Array<Array<string>> = [];
+
+        //filter all of the matches based on a minimatch pattern
+        function filterPreviousEntries(stopIndex: number, negatedPattern: string) {
+            let filter = minimatch.filter(
+                //move the ! to the start of the string to negate the absolute path
+                '!' + path.posix.join(cwd, negatedPattern.replace(/^!/, ''))
+            );
+            for (let i = 0; i <= stopIndex; i++) {
+                if (matchesByIndex[i]) {
+                    //filter all matches by the specified pattern
+                    matchesByIndex[i] = matchesByIndex[i].filter(filter);
+                }
+            }
+        }
+
+        for (let i = 0; i < globResults.length; i++) {
+            const globResult = await globResults[i];
+            //if the matches collection is missing, this is a filter
+            if (typeof globResult === 'string') {
+                filterPreviousEntries(i - 1, globResult);
+                matchesByIndex.push(undefined);
+            } else {
+                matchesByIndex.push(globResult);
+            }
+        }
+        return matchesByIndex;
     }
 }
 

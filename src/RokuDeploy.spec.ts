@@ -1686,6 +1686,44 @@ describe('index', () => {
         }
 
         describe('top-level-patterns', () => {
+            it('excludes a file that is negated', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    '!source/main.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }]);
+            });
+
+            it('excludes file from non-rootdir top-level pattern', async () => {
+                writeFiles(rootDir, ['../externalDir/source/main.brs']);
+                expect(await getFilePaths([
+                    '../externalDir/**/*',
+                    '!../externalDir/**/*'
+                ])).to.eql([]);
+            });
+
+            it('throws when using top-level string referencing file outside the root dir', async () => {
+                writeFiles(rootDir, [`../source/main.brs`]);
+                await expectThrowsAsync(async () => {
+                    await getFilePaths([
+                        '../source/**/*'
+                    ]);
+                }, 'Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+            });
+
+            it('works for brighterscript files', async () => {
+                writeFiles(rootDir, ['src/source/main.bs']);
+                expect(await getFilePaths([
+                    'manifest',
+                    'source/**/*.bs'
+                ], s`${rootDir}/src`)).to.eql([{
+                    src: s`${rootDir}/src/source/main.bs`,
+                    dest: s`source/main.bs`
+                }]);
+            });
+
             it('works for root-level double star in top-level pattern', async () => {
                 expect(await getFilePaths([
                     '**/*'
@@ -1889,6 +1927,18 @@ describe('index', () => {
         });
 
         describe('{src;dest} objects', () => {
+            it('excludes a file that is negated in src;dest;', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    {
+                        src: '!source/main.brs'
+                    }
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }]);
+            });
+
             it('works for root-level double star in {src;dest} object', async () => {
                 expect(await getFilePaths([{
                     src: '**/*',
@@ -2160,7 +2210,12 @@ describe('index', () => {
                 src: s`${rootDir}/../README.md`,
                 dest: s`docs/README.md`
             }]);
+        });
 
+        it('', async () => {
+            writeFiles(`${rootDir}/../`, [
+                'README.md'
+            ]);
             //should throw exception because we can't have top-level string paths pointed to files outside the root
             await expectThrowsAsync(
                 rokuDeploy.getFilePaths([
@@ -2221,106 +2276,12 @@ describe('index', () => {
     describe('getDestPath', () => {
         it('finds dest path for top-level path', () => {
             expect(
-                rokuDeploy.getDestPath(
+                rokuDeploy['computeFileDestPath'](
                     s`${rootDir}/components/comp1/comp1.brs`,
-                    ['components/**/*'],
+                    'components/**/*',
                     rootDir
                 )
             ).to.equal(s`components/comp1/comp1.brs`);
-        });
-
-        it('does not find dest path for non-matched top-level path', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    ['components/**/*'],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes a file that is negated', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    [
-                        'source/**/*',
-                        '!source/main.brs'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes file from non-rootdir top-level pattern', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/../externalDir/source/main.brs`,
-                    [
-                        '!../externalDir/**/*'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes a file that is negated in src;dest;', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    [
-                        'source/**/*',
-                        {
-                            src: '!source/main.brs'
-                        }
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('works for brighterscript files', () => {
-            let destPath = rokuDeploy.getDestPath(
-                util.standardizePath(`${cwd}/src/source/main.bs`),
-                [
-                    'manifest',
-                    'source/**/*.bs'
-                ],
-                s`${cwd}/src`
-            );
-            expect(s`${destPath}`).to.equal(s`source/main.bs`);
-        });
-
-        it('throws exception when rootDir is not absolute', () => {
-            writeFiles(rootDir, [
-                'source/main.bs'
-            ]);
-
-            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
-            let destPath = rokuDeploy.getDestPath(
-                util.standardizePath(`${cwd}/src/source/main.bs`),
-                [
-                    'manifest',
-                    'source/**/*.bs'
-                ],
-                `./src`
-            );
-            expect(stub.callCount).to.be.greaterThan(0);
-            expect(stub.getCall(0).args[0].rootDir).to.eql('./src');
-            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/src`);
-            expect(s`${destPath}`).to.equal(s`source/main.bs`);
-        });
-
-        it('excludes a file found outside the root dir', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/../source/main.brs`,
-                    [
-                        '../source/**/*'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
         });
     });
 

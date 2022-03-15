@@ -1,7 +1,14 @@
-import { util } from './util';
+import { util, standardizePath as s } from './util';
 import { expect } from 'chai';
+import * as fsExtra from 'fs-extra';
+import { tempDir } from './testUtils.spec';
+import * as path from 'path';
 
 describe('util', () => {
+    beforeEach(() => {
+        fsExtra.emptyDirSync(tempDir);
+    });
+
     describe('isFile', () => {
         it('recognizes valid files', async () => {
             expect(await util.isFile(util.standardizePath(`${process.cwd()}/README.md`))).to.be.true;
@@ -83,6 +90,133 @@ describe('util', () => {
                 error = e;
             }
             expect(error).to.exist;
+        });
+    });
+
+    describe('globAllByIndex', () => {
+        function writeFiles(filePaths: string[], cwd = tempDir) {
+            for (const filePath of filePaths) {
+                fsExtra.outputFileSync(
+                    path.resolve(cwd, filePath),
+                    ''
+                );
+            }
+        }
+
+        async function doTest(patterns: string[], expectedPaths: string[][]) {
+            const results = await util.globAllByIndex(patterns, tempDir);
+            for (let i = 0; i < results.length; i++) {
+                results[i] = results[i]?.map(x => s(x))?.sort();
+            }
+            for (let i = 0; i < expectedPaths.length; i++) {
+                expectedPaths[i] = expectedPaths[i]?.map(x => {
+                    return s`${path.resolve(tempDir, x)}`;
+                })?.sort();
+            }
+            expect(results).to.eql(expectedPaths);
+        }
+
+        it('finds direct file paths', async () => {
+            writeFiles([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ]);
+            await doTest([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ], [
+                [
+                    'manifest'
+                ], [
+                    'source/main.brs'
+                ], [
+                    'components/Component1/lib.brs'
+                ]
+            ]);
+        });
+
+        it('matches the wildcard glob', async () => {
+            writeFiles([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ]);
+            await doTest([
+                '**/*'
+            ], [
+                [
+                    'manifest',
+                    'source/main.brs',
+                    'components/Component1/lib.brs'
+                ]
+            ]);
+        });
+
+        it('returns the same file path in multiple matches', async () => {
+            writeFiles([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ]);
+            await doTest([
+                'manifest',
+                'source/main.brs',
+                'manifest',
+                'source/main.brs'
+            ], [
+                [
+                    'manifest'
+                ], [
+                    'source/main.brs'
+                ], [
+                    'manifest'
+                ], [
+                    'source/main.brs'
+                ]
+            ]);
+        });
+
+        it('filters files', async () => {
+            writeFiles([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ]);
+            await doTest([
+                '**/*',
+                //filter out brs files
+                '!**/*.brs'
+            ], [
+                [
+                    'manifest'
+                ],
+                null
+            ]);
+        });
+
+        it('filters files and adds them back in later', async () => {
+            writeFiles([
+                'manifest',
+                'source/main.brs',
+                'components/Component1/lib.brs'
+            ]);
+            await doTest([
+                '**/*',
+                //filter out brs files
+                '!**/*.brs',
+                //re-add the main file
+                '**/main.brs'
+            ], [
+                [
+                    'manifest'
+                ],
+                undefined,
+                [
+                    'source/main.brs'
+                ]
+            ]);
         });
     });
 });
