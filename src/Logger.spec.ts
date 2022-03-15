@@ -1,20 +1,11 @@
 import { expect } from 'chai';
 import { Logger, LogLevel, noop } from './Logger';
-import * as moment from 'moment';
 import chalk from 'chalk';
 import { createSandbox } from 'sinon';
 const sinon = createSandbox();
 
 describe('Logger', () => {
     let logger: Logger;
-    const levels = [
-        'error',
-        'warn',
-        'log',
-        'info',
-        'debug',
-        'trace'
-    ];
 
     beforeEach(() => {
         logger = new Logger(LogLevel.trace);

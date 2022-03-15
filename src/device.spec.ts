@@ -1,6 +1,5 @@
 import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
-import * as path from 'path';
 import * as rokuDeploy from './index';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
@@ -8,7 +7,6 @@ import * as dedent from 'dedent';
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
     let options: rokuDeploy.RokuDeployOptions;
-    let originalCwd = process.cwd();
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
@@ -42,11 +40,11 @@ describe('device', function device() {
                     port = CreateObject("roMessagePort")
                     screen.SetMessagePort(port)
                     screen.Show()
-                
+
                     while(true)
                         msg = wait(0, port)
                     end while
-                    
+
                     if screen <> invalid then
                         screen.Close()
                         screen = invalid

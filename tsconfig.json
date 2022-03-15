@@ -8,6 +8,7 @@
     "outDir": "dist",
     "declaration": true,
     "strict": true,
+    "noUnusedLocals": true,
     "strictNullChecks": false,
     "lib": [
       "es2015"
@@ -20,5 +21,8 @@
   "include": [
     "src/**/*.ts",
     "device.spec.ts"
-  ]
+  ],
+  "ts-node": {
+    "transpileOnly": true
+  }
 }
