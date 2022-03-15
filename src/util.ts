@@ -57,16 +57,16 @@ export class Util {
 
     /**
      * Do a case-insensitive string replacement
-     * @param haystack
-     * @param needle
-     * @param replace
+     * @param subject the string that will have its contents replaced
+     * @param search the search text to find in `subject`
+     * @param replace the text to replace `search` with in `subject`
      */
-    public stringReplaceInsensitive(haystack: string, needle: string, replace: string) {
-        let idx = haystack.toLowerCase().indexOf(needle.toLowerCase());
+    public stringReplaceInsensitive(subject: string, search: string, replace: string) {
+        let idx = subject.toLowerCase().indexOf(search.toLowerCase());
         if (idx > -1) {
-            return haystack.substr(0, idx) + replace + haystack.substr(idx + needle.length);
+            return subject.substring(0, idx) + replace + subject.substr(idx + search.length);
         } else {
-            return haystack;
+            return subject;
         }
     }
 
