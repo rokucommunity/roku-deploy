@@ -5,10 +5,10 @@ import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as isGlob from 'is-glob';
+import * as picomatch from 'picomatch';
 import * as xml2js from 'xml2js';
 import type { ParseError } from 'jsonc-parser';
 import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
-
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
@@ -206,21 +206,75 @@ export class RokuDeploy {
     }
 
     /**
-     * Given a full path to a file, determine its dest path
+     * Given a full path to a file, determine its dest path.
      * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
      * @param files the files array
      * @param rootDir the absolute path to the root dir
      * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
-     * @returns the RELATIVE path to the dest location for the file.
+     * @returns the relative path to the dest location for the file.
      */
-    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false): string | undefined {
-        //TODO re-implement this using the new logic (should be more dependable and consistent
-        return undefined;
+    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
+        const paths = this.getDestPaths(srcPathAbsolute, files, rootDir);
+        //return the last path
+        return paths.pop();
+    }
+
+    /**
+     * Given a full path to a file, determine all of its dest paths
+     * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+     * @param files the files array
+     * @param rootDir the absolute path to the root dir
+     * @param cache a cache that can be used to handle file collisions (for example merging folder A and folder B, this would allow us to know to exclude folder A's version of a file)
+     * @returns the relative path to the dest location for the file.
+     */
+    public getDestPaths(srcPathAbsolute: string, files: FileEntry[], rootDir: string, cache: string[][] = undefined): string[] {
+        const entries = this.normalizeFilesArray(files);
+        //an existing cache containing the final matches at each `files` index
+        cache = cache ?? Array(files.length).fill(undefined);
+        if (cache.length !== files.length) {
+            throw new Error('Cache must be same size as files array');
+        }
+        //add the file into every matching cache bucket
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            if (typeof entry === 'string' && entry.startsWith('!')) {
+                //negative pattern
+            } else {
+                let pattern = typeof entry === 'string' ? entry : entry.src;
+                //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
+                let keepFile = picomatch('!' + path.posix.join(rootDir, pattern.replace(/^!/, '')).replace(/\\/g, '/'));
+                if (keepFile(srcPathAbsolute)) {
+                    const idx = cache[i].indexOf(srcPathAbsolute);
+                    if (idx === -1) {
+                        cache[i].push(srcPathAbsolute);
+                    }
+
+                    //dont' keep file
+                } else {
+                    const idx = cache[i].indexOf(srcPathAbsolute);
+                    if (idx > -1) {
+                        cache[i].splice(idx, 1);
+                    }
+                }
+            }
+        }
+
+        //now that we've updated the cache with this entry, figure out all the dest paths anywhere that it's still included
+        const result = [] as string[];
+        for (let i = 0; i < entries.length; i++) {
+            if (cache[i].includes(srcPathAbsolute)) {
+                const dest = this.computeFileDestPath(srcPathAbsolute, entries[i], rootDir);
+                if (dest) {
+                    result.push(dest);
+                }
+            }
+        }
+        return result;
     }
 
     /**
      * Compute the `dest` path. This accounts for magic globstars in the pattern,
-     * as well as relative paths based on the dest
+     * as well as relative paths based on the dest. This is only used internally.
      * @param src an absolute, normalized path for a file
      * @param dest the `dest` entry for this file. If omitted, files will derive their paths relative to rootDir.
      * @param pattern the glob pattern originally used to find this file
