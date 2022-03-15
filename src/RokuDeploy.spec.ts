@@ -1426,6 +1426,7 @@ describe('index', () => {
                 dest: s`long/dest/path`
             }]);
         });
+
         it('works for simple strings', () => {
             expect(rokuDeploy['normalizeFilesArray']([
                 'manifest',
@@ -1820,10 +1821,6 @@ describe('index', () => {
             });
 
             it('handles negated multi-globs', async () => {
-                writeFiles(rootDir, [
-                    `${rootDir}/components/component1.brs`,
-                    `${rootDir}/components/component1.xml`
-                ]);
                 expect((await getFilePaths([
                     'components/**/*',
                     '!components/screen1/**/*'
