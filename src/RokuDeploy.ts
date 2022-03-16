@@ -218,8 +218,6 @@ export class RokuDeploy {
         rootDir = rootDir.replace(/\\+/g, '/');
         const entries = this.normalizeFilesArray(files);
 
-        let cache: Array<string> = new Array(entries.length).fill(undefined);
-
         function makeGlobAbsolute(pattern: string) {
             return path.resolve(
                 path.posix.join(
