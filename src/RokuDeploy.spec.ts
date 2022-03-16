@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
-import type { BeforeZipCallbackInfo } from './RokuDeploy';
+import type { BeforeZipCallbackInfo, StandardizedFileEntry } from './interfaces';
 import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
@@ -13,6 +13,7 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import * as request from 'request';
+import { Cache } from './Cache';
 const sinon = createSandbox();
 
 describe('index', () => {
@@ -2272,15 +2273,96 @@ describe('index', () => {
         });
     });
 
-    describe('getDestPath', () => {
-        it('finds dest path for top-level path', () => {
-            expect(
-                rokuDeploy['computeFileDestPath'](
-                    s`${rootDir}/components/comp1/comp1.brs`,
-                    'components/**/*',
-                    rootDir
-                )
-            ).to.equal(s`components/comp1/comp1.brs`);
+    describe('getDestPaths', () => {
+        function createCache(entriesByIndex: Array<Array<StandardizedFileEntry>>) {
+            const result = [] as Array<Map<string, StandardizedFileEntry>>;
+            for (const entries of entriesByIndex) {
+                const map = new Map();
+                for (const entry of entries) {
+                    map.set(entry.dest.toLowerCase(), entry);
+                }
+                result.push(map);
+            }
+            return result;
+        }
+        it('finds simple dest', () => {
+            expect(rokuDeploy.getDestPaths(
+                s`${rootDir}/source/main.brs`,
+                ['source/**/*'],
+                rootDir
+            )).to.eql([
+                s`source/main.brs`
+            ]);
+        });
+
+        it('returns single path for include+include', () => {
+            expect(rokuDeploy.getDestPaths(
+                s`${rootDir}/source/main.brs`,
+                [
+                    'source/**/*',
+                    'source/*'
+                ],
+                rootDir
+            )).to.eql([
+                s`source/main.brs`
+            ]);
+        });
+
+        it('returns single path for include+exclude+include', () => {
+            expect(rokuDeploy.getDestPaths(
+                s`${rootDir}/source/main.brs`,
+                [
+                    'source/**/*',
+                    '!source/**/*',
+                    'source/*'
+                ],
+                rootDir
+            )).to.eql([
+                s`source/main.brs`
+            ]);
+        });
+
+        it('excludes file when overridden by higher priority item in cache', () => {
+            const patterns = [
+                { src: '../base/**/*', dest: undefined },
+                { src: '../flavor1/**/*', dest: undefined }
+            ];
+            expect(rokuDeploy.getDestPaths(
+                s`${rootDir}/../base/source/main.brs`,
+                patterns,
+                rootDir,
+                new Cache(patterns, [
+                    //base
+                    [
+                    ],
+                    //flavor1
+                    [
+                        { src: s`${rootDir}/../flavor1/source/main.brs`, dest: 'source/main.brs' }
+                    ]
+                ])
+            )).to.eql([]);
+        });
+
+        it('includes file when it is the higher priority item in cache', () => {
+            expect(rokuDeploy.getDestPaths(
+                s`${rootDir}/../flavor1/source/main.brs`,
+                [
+                    { src: '../base/**/*' },
+                    { src: '../flavor1/**/*' }
+                ],
+                rootDir,
+                createCache([
+                    //base
+                    [
+                    ],
+                    //flavor1
+                    [
+                        { src: s`${rootDir}/../flavor1/source/main.brs`, dest: 'source/main.brs' }
+                    ]
+                ])
+            )).to.eql([
+                s`source/main.brs`
+            ]);
         });
     });
 

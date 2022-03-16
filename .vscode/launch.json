@@ -13,6 +13,7 @@
                 "source-map-support/register",
                 "./src/RokuDeploy.spec.ts",
                 "./src/util.spec.ts",
+                "./src/Cache.spec.ts",
                 "--timeout",
                 "987654"
             ],

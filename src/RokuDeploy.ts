@@ -12,6 +12,8 @@ import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
+import type { BeforeZipCallbackInfo, HttpResponse, ManifestData, StandardizedFileEntry } from './interfaces';
+import { Cache } from './Cache';
 
 export class RokuDeploy {
 
@@ -166,8 +168,9 @@ export class RokuDeploy {
     * @param files
     * @param stagingFolderPath - the absolute path to the staging folder
     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
+    * @param cache if provided, this cache will be used to provide full visibility
     */
-    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
+    public async getFilePaths(files: FileEntry[], rootDir: string, cache?: Cache): Promise<StandardizedFileEntry[]> {
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
             rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
@@ -215,61 +218,73 @@ export class RokuDeploy {
      */
     public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
         const paths = this.getDestPaths(srcPathAbsolute, files, rootDir);
-        //return the last path
-        return paths.pop();
+        //return the first dest path
+        return paths[0];
     }
 
     /**
-     * Given a full path to a file, determine all of its dest paths
+     * Given a full path to a file, determine all of its dest paths. This is useful for external
+     * tools that need to compute a file's path on-demand rather than re-scanning the entire file system. (i.e. tools like BrighterScript)
      * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
      * @param files the files array
      * @param rootDir the absolute path to the root dir
-     * @param cache a cache that can be used to handle file collisions (for example merging folder A and folder B, this would allow us to know to exclude folder A's version of a file)
+     * @param cache a cache that can be used to handle file collisions (for example merging folder A and folder B, this would allow us to know to exclude folder A's version of a file).
+     *              All paths in the cache use the operating-system-specific path separators.
      * @returns the relative path to the dest location for the file.
      */
-    public getDestPaths(srcPathAbsolute: string, files: FileEntry[], rootDir: string, cache: string[][] = undefined): string[] {
+    public getDestPaths(srcPathAbsolute: string, files: FileEntry[], rootDir: string, cache: Cache = undefined): string[] {
+        srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+        rootDir = rootDir.replace(/\\+/g, '/');
         const entries = this.normalizeFilesArray(files);
-        //an existing cache containing the final matches at each `files` index
-        cache = cache ?? Array(files.length).fill(undefined);
-        if (cache.length !== files.length) {
-            throw new Error('Cache must be same size as files array');
+
+        if (cache) {
+            cache.validate(entries);
+        } else {
+            cache = cache ?? new Cache(entries);
         }
+
         //add the file into every matching cache bucket
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
-            if (typeof entry === 'string' && entry.startsWith('!')) {
-                //negative pattern
+            const pattern = (typeof entry === 'string' ? entry : entry.src);
+            const isNegated = pattern.startsWith('!');
+            let patternAbsolute = path.resolve(
+                path.posix.join(
+                    rootDir,
+                    //remove leading exclamation point if pattern is negated
+                    pattern.replace(/^!/, '')
+                    //coerce all slashes to forward
+                )
+            ).replace(/\\/g, '/');
+            if (isNegated) {
+                patternAbsolute = '!' + patternAbsolute;
+            }
+
+            const keepFile = picomatch(patternAbsolute);
+            if (keepFile(srcPathAbsolute)) {
+                const dest = this.computeFileDestPath(
+                    srcPathAbsolute,
+                    entries[i],
+                    util.standardizePath(rootDir)
+                );
+                cache.set(i, srcPathAbsolute, dest);
+
+                //dont' keep file
             } else {
-                let pattern = typeof entry === 'string' ? entry : entry.src;
-                //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
-                let keepFile = picomatch('!' + path.posix.join(rootDir, pattern.replace(/^!/, '')).replace(/\\/g, '/'));
-                if (keepFile(srcPathAbsolute)) {
-                    const idx = cache[i].indexOf(srcPathAbsolute);
-                    if (idx === -1) {
-                        cache[i].push(srcPathAbsolute);
-                    }
-
-                    //dont' keep file
-                } else {
-                    const idx = cache[i].indexOf(srcPathAbsolute);
-                    if (idx > -1) {
-                        cache[i].splice(idx, 1);
-                    }
-                }
+                cache.deleteBySrc(i, srcPathAbsolute);
             }
         }
 
-        //now that we've updated the cache with this entry, figure out all the dest paths anywhere that it's still included
-        const result = [] as string[];
+        //key is dest, value is src
+        const result = new Map<string, string>();
+
         for (let i = 0; i < entries.length; i++) {
-            if (cache[i].includes(srcPathAbsolute)) {
-                const dest = this.computeFileDestPath(srcPathAbsolute, entries[i], rootDir);
-                if (dest) {
-                    result.push(dest);
-                }
+            const cacheValue = cache.getBySrc(i, srcPathAbsolute);
+            if (cacheValue) {
+                result.set(cacheValue.dest.toLowerCase(), srcPathAbsolute);
             }
         }
-        return result;
+        return [...result.values()];
     }
 
     /**
@@ -980,39 +995,9 @@ export class RokuDeploy {
     }
 }
 
-export interface ManifestData {
-    [key: string]: any;
-    keyIndexes?: Record<string, number>;
-    lineCount?: number;
-}
-
-export interface BeforeZipCallbackInfo {
-    /**
-     * Contains an associative array of the parsed values in the manifest
-     */
-    manifestData: ManifestData;
-    stagingFolderPath: string;
-}
-
-export interface StandardizedFileEntry {
-    /**
-     * The full path to the source file
-     */
-    src: string;
-    /**
-     * The path relative to the root of the pkg to where the file should be placed
-     */
-    dest: string;
-}
-
 export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
     'manifest'
 ];
-
-export interface HttpResponse {
-    response: any;
-    body: any;
-}

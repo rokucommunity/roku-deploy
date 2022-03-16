@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as picomatch from 'picomatch';
 import fastGlob = require("fast-glob")
+import { Cache } from './Cache';
 
 export class Util {
     /**
@@ -135,10 +136,10 @@ export class Util {
      * Run a series of glob patterns, returning the matches in buckets corresponding to their pattern index.
      */
     public async globAllByIndex(patterns: string[], cwd: string) {
-        //force all path separators to unit style
+        //force all path separators to unix style
         cwd = cwd.replace(/\\/g, '/');
 
-        const globResults = patterns.map(async (pattern) => {
+        const globResults = patterns.map(async (pattern, patternIndex) => {
             //force all windows-style slashes to unix style
             pattern = pattern.replace(/\\/g, '/');
             //skip negated patterns (we will use them to filter later on)
@@ -160,7 +161,7 @@ export class Util {
 
         for (let i = 0; i < globResults.length; i++) {
             const globResult = await globResults[i];
-            //if the matches collection is missing, this is a filter
+            //if this is a string, then this is an exclude filter
             if (typeof globResult === 'string') {
                 this.filterPaths(globResult, matchesByIndex, cwd, i - 1);
                 matchesByIndex.push(undefined);

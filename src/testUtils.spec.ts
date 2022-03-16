@@ -36,6 +36,21 @@ export function writeFiles(baseDir: string, files: Array<string | [string, strin
     return filePaths;
 }
 
+export function expectThrows(callback: () => any, expectedMessage = undefined, failedTestMessage = 'Expected to throw but did not') {
+    let wasExceptionThrown = false;
+    try {
+        callback();
+    } catch (e) {
+        wasExceptionThrown = true;
+        if (expectedMessage) {
+            expect((e as any).message).to.eql(expectedMessage);
+        }
+    }
+    if (wasExceptionThrown === false) {
+        throw new Error(failedTestMessage);
+    }
+}
+
 export async function expectThrowsAsync(callback: Promise<any> | (() => Promise<any>), expectedMessage = undefined, failedTestMessage = 'Expected to throw but did not') {
     let wasExceptionThrown = false;
     let promise: Promise<any>;
