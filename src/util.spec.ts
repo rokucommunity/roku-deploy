@@ -23,7 +23,12 @@ describe('util', () => {
             expect(util.toForwardSlashes(undefined)).to.be.undefined;
             expect(util.toForwardSlashes(<any>false)).to.be.false;
         });
+
+        it('converts mixed slashes to forward', () => {
+            expect(util.toForwardSlashes('a\\b/c\\d/e')).to.eql('a/b/c/d/e');
+        });
     });
+
     describe('isChildOfPath', () => {
         it('works for child path', () => {
             let parentPath = `${process.cwd()}\\testProject`;
@@ -217,6 +222,13 @@ describe('util', () => {
                     'source/main.brs'
                 ]
             ]);
+        });
+    });
+
+    describe('filterPaths', () => {
+        it('does not crash with bad params', () => {
+            //shouldn't crash
+            util['filterPaths']('*', [], '', 2);
         });
     });
 });

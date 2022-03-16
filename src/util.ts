@@ -176,7 +176,7 @@ export class Util {
      * @param stopIndex the max index of `matchesByIndex` to filter until
      * @param pattern - the pattern used to filter out entries from `matchesByIndex`. Usually preceeded by a `!`
      */
-    public filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
+    private filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
         //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
         let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
         let filter = picomatch(negatedPatternAbsolute);

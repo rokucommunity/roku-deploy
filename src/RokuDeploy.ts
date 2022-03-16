@@ -206,66 +206,54 @@ export class RokuDeploy {
     }
 
     /**
-     * Given a full path to a file, determine its dest path.
-     * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+     * Given a full path to a file, determine its dest path
+     * @param srcPath the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
      * @param files the files array
      * @param rootDir the absolute path to the root dir
      * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
-     * @returns the relative path to the dest location for the file.
+     * @returns the RELATIVE path to the dest location for the file.
      */
     public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
-        const paths = this.getDestPaths(srcPathAbsolute, files, rootDir);
-        //return the last path
-        return paths.pop();
-    }
-
-    /**
-     * Given a full path to a file, determine all of its dest paths
-     * @param srcPathAbsolute the path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
-     * @param files the files array
-     * @param rootDir the absolute path to the root dir
-     * @param cache a cache that can be used to handle file collisions (for example merging folder A and folder B, this would allow us to know to exclude folder A's version of a file)
-     * @returns the relative path to the dest location for the file.
-     */
-    public getDestPaths(srcPathAbsolute: string, files: FileEntry[], rootDir: string, cache: string[][] = undefined): string[] {
+        srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+        rootDir = rootDir.replace(/\\+/g, '/');
         const entries = this.normalizeFilesArray(files);
-        //an existing cache containing the final matches at each `files` index
-        cache = cache ?? Array(files.length).fill(undefined);
-        if (cache.length !== files.length) {
-            throw new Error('Cache must be same size as files array');
+
+        let cache: Array<string> = new Array(entries.length).fill(undefined);
+
+        function makeGlobAbsolute(pattern: string) {
+            return path.resolve(
+                path.posix.join(
+                    rootDir,
+                    //remove leading exclamation point if pattern is negated
+                    pattern
+                    //coerce all slashes to forward
+                )
+            ).replace(/\\/g, '/');
         }
+
+        let result: string;
+
         //add the file into every matching cache bucket
-        for (let i = 0; i < entries.length; i++) {
-            const entry = entries[i];
-            if (typeof entry === 'string' && entry.startsWith('!')) {
-                //negative pattern
-            } else {
-                let pattern = typeof entry === 'string' ? entry : entry.src;
-                //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
-                let keepFile = picomatch('!' + path.posix.join(rootDir, pattern.replace(/^!/, '')).replace(/\\/g, '/'));
-                if (keepFile(srcPathAbsolute)) {
-                    const idx = cache[i].indexOf(srcPathAbsolute);
-                    if (idx === -1) {
-                        cache[i].push(srcPathAbsolute);
-                    }
-
-                    //dont' keep file
-                } else {
-                    const idx = cache[i].indexOf(srcPathAbsolute);
-                    if (idx > -1) {
-                        cache[i].splice(idx, 1);
-                    }
+        for (let entry of entries) {
+            const pattern = (typeof entry === 'string' ? entry : entry.src);
+            //filter previous paths
+            if (pattern.startsWith('!')) {
+                const keepFile = picomatch('!' + makeGlobAbsolute(pattern.replace(/^!/, '')));
+                if (!keepFile(srcPathAbsolute)) {
+                    result = undefined;
                 }
-            }
-        }
-
-        //now that we've updated the cache with this entry, figure out all the dest paths anywhere that it's still included
-        const result = [] as string[];
-        for (let i = 0; i < entries.length; i++) {
-            if (cache[i].includes(srcPathAbsolute)) {
-                const dest = this.computeFileDestPath(srcPathAbsolute, entries[i], rootDir);
-                if (dest) {
-                    result.push(dest);
+            } else {
+                const keepFile = picomatch(makeGlobAbsolute(pattern));
+                if (keepFile(srcPathAbsolute)) {
+                    try {
+                        result = this.computeFileDestPath(
+                            srcPathAbsolute,
+                            entry,
+                            util.standardizePath(rootDir)
+                        );
+                    } catch {
+                        //ignore errors...the file just has no dest path
+                    }
                 }
             }
         }
@@ -338,13 +326,11 @@ export class RokuDeploy {
             result = util.standardizePath(`${entry.dest ?? ''}/${fileNameAndExtension}`);
         }
 
-        if (result) {
-            result = util.standardizePath(
-                //remove leading slashes
-                result.replace(/^[\/\\]+/, '')
-            );
-            return result;
-        }
+        result = util.standardizePath(
+            //remove leading slashes
+            result.replace(/^[\/\\]+/, '')
+        );
+        return result;
     }
 
     /**

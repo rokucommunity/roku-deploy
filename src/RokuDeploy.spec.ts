@@ -2272,15 +2272,110 @@ describe('index', () => {
         });
     });
 
-    describe('getDestPath', () => {
-        it('finds dest path for top-level path', () => {
+    describe('computeFileDestPath', () => {
+        it('treats {src;dest} without dest as a top-level string', () => {
             expect(
-                rokuDeploy['computeFileDestPath'](
+                rokuDeploy['computeFileDestPath'](s`${rootDir}/source/main.brs`, { src: s`source/main.brs` } as any, rootDir)
+            ).to.eql(s`source/main.brs`);
+        });
+    });
+
+    describe('getDestPath', () => {
+        it('handles unrelated exclusions properly', () => {
+            expect(
+                rokuDeploy.getDestPath(
                     s`${rootDir}/components/comp1/comp1.brs`,
-                    'components/**/*',
+                    [
+                        '**/*',
+                        '!exclude.me'
+                    ],
                     rootDir
                 )
             ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('finds dest path for top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('does not find dest path for non-matched top-level path', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes file from non-rootdir top-level pattern', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/../externalDir/source/main.brs`,
+                    [
+                        '!../externalDir/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated in src;dest;', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        {
+                            src: '!source/main.brs'
+                        }
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('works for brighterscript files', () => {
+            let destPath = rokuDeploy.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                s`${cwd}/src`
+            );
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
+        });
+
+        it('excludes a file found outside the root dir', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${rootDir}/../source/main.brs`,
+                    [
+                        '../source/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
         });
     });
 
