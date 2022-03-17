@@ -1,16 +1,22 @@
+/* eslint-disable */
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as picomatch from 'picomatch';
+import fastGlob = require("fast-glob")
 
 export class Util {
     /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath
      * @param childPath
+     * @param standardizePaths if false, the paths are assumed to already be in the same format and are not re-standardized
      */
-    public isParentOfPath(parentPath: string, childPath: string) {
-        parentPath = util.standardizePath(parentPath);
-        childPath = util.standardizePath(childPath);
+    public isParentOfPath(parentPath: string, childPath: string, standardizePaths = true) {
+        if (standardizePaths) {
+            parentPath = util.standardizePath(parentPath);
+            childPath = util.standardizePath(childPath);
+        }
         const relative = path.relative(parentPath, childPath);
         return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
     }
@@ -123,6 +129,65 @@ export class Util {
             }
         }
         return false;
+    }
+
+    /**
+     * Run a series of glob patterns, returning the matches in buckets corresponding to their pattern index.
+     */
+    public async globAllByIndex(patterns: string[], cwd: string) {
+        //force all path separators to unit style
+        cwd = cwd.replace(/\\/g, '/');
+
+        const globResults = patterns.map(async (pattern) => {
+            //force all windows-style slashes to unix style
+            pattern = pattern.replace(/\\/g, '/');
+            //skip negated patterns (we will use them to filter later on)
+            if (pattern.startsWith('!')) {
+                return pattern;
+            } else {
+                //run glob matcher
+
+                return fastGlob([pattern], {
+                    cwd: cwd,
+                    absolute: true,
+                    followSymbolicLinks: true,
+                    onlyFiles: true,
+                });
+            }
+        });
+
+        const matchesByIndex: Array<Array<string>> = [];
+
+        for (let i = 0; i < globResults.length; i++) {
+            const globResult = await globResults[i];
+            //if the matches collection is missing, this is a filter
+            if (typeof globResult === 'string') {
+                this.filterPaths(globResult, matchesByIndex, cwd, i - 1);
+                matchesByIndex.push(undefined);
+            } else {
+                matchesByIndex.push(globResult);
+            }
+        }
+        return matchesByIndex;
+    }
+
+    /**
+     * Filter all of the matches based on a minimatch pattern
+     * @param stopIndex the max index of `matchesByIndex` to filter until
+     * @param pattern - the pattern used to filter out entries from `matchesByIndex`. Usually preceeded by a `!`
+     */
+    private filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
+        //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
+        let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
+        let filter = picomatch(negatedPatternAbsolute);
+        for (let i = 0; i <= stopIndex; i++) {
+            if (filesByIndex[i]) {
+                //filter all matches by the specified pattern
+                filesByIndex[i] = filesByIndex[i].filter(x => {
+                    return filter(x);
+                });
+            }
+        }
     }
 }
 
