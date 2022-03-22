@@ -7,6 +7,7 @@
         "build": "rimraf dist && tsc",
         "preversion": "npm run build && npm run lint && npm run test",
         "prepublishOnly": "npm run build",
+        "watch": "rimraf dist && tsc --watch",
         "lint": "eslint \"./src/**/*.ts\"",
         "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",

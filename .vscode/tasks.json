@@ -44,6 +44,15 @@
                 "$eslint-compact",
                 "$tsc"
             ]
+        }, {
+            "type": "npm",
+            "label": "watch",
+            "presentation": {
+                "group": "watch"
+            },
+            "script": "watch",
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true
         }
     ]
 }
