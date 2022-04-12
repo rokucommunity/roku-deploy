@@ -325,7 +325,7 @@ Here are the available options. The defaults are shown to the right of the optio
      When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. This should always be `false` unless you're creating a plugin for an editor such as VSCode, Atom, Sublime, etc.
      More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
 
-- **remotePort?:** boolean = true
+- **deleteInstalledChannel?:** boolean = true
     If true the previously installed dev channel will be deleted before installing the new one
 
 
