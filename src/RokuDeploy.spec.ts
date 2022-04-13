@@ -1537,6 +1537,26 @@ describe('index', () => {
             });
             expect(result).not.to.be.undefined;
         });
+
+        it('should delete installed channel if requested', async () => {
+            const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
+            options.deleteInstalledChannel = true;
+            mockDoPostRequest();
+
+            await rokuDeploy.deploy(options);
+
+            expect(spy.called).to.equal(true);
+        });
+
+        it('should not delete installed channel if not requested', async () => {
+            const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
+            options.deleteInstalledChannel = false;
+            mockDoPostRequest();
+
+            await rokuDeploy.deploy(options);
+
+            expect(spy.notCalled).to.equal(true);
+        });
     });
 
     describe('deleteInstalledChannel', () => {
@@ -2644,6 +2664,16 @@ describe('index', () => {
 
         it('does not error when no parameter provided', () => {
             expect(rokuDeploy.getOptions(undefined)).to.exist;
+        });
+
+        describe('deleteInstalledChannel', () => {
+            it('defaults to true', () => {
+                expect(rokuDeploy.getOptions({}).deleteInstalledChannel).to.equal(true);
+            });
+
+            it('can be overridden', () => {
+                expect(rokuDeploy.getOptions({ deleteInstalledChannel: false }).deleteInstalledChannel).to.equal(false);
+            });
         });
 
         describe('packagePort', () => {

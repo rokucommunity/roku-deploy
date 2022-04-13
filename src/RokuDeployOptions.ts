@@ -139,6 +139,11 @@ export interface RokuDeployOptions {
      * @default LogLevel.log
      */
     logLevel?: LogLevel;
+
+    /**
+     * If true, the previously installed dev channel will be deleted before installing the new one
+     */
+    deleteInstalledChannel?: boolean;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });

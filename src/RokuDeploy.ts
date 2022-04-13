@@ -705,10 +705,12 @@ export class RokuDeploy {
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options);
         await this.createPackage(options, beforeZipCallback);
-        try {
-            await this.deleteInstalledChannel(options);
-        } catch (e) {
-            // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
+        if (options.deleteInstalledChannel) {
+            try {
+                await this.deleteInstalledChannel(options);
+            } catch (e) {
+                // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
+            }
         }
         let result = await this.publish(options);
         return result;
@@ -789,6 +791,7 @@ export class RokuDeploy {
             retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
+            deleteInstalledChannel: true,
             packagePort: 80,
             remotePort: 8060,
             timeout: 150000,
