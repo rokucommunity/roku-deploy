@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.6.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.4...v3.6.0) - 2022-04-13
+### Added
+ - `deleteInstalledChannel` option to specify whether the previously installed dev channel will be deleted before installing the new one
+
+
+
 ## [3.5.4](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.3...v3.5.4) - 2022-03-17
 ### Changed
  - use `fast-glob` instead of `glob` for globbing. ([#86](https://github.com/rokucommunity/roku-deploy/pull/86))
