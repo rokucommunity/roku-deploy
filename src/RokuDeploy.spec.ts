@@ -1568,6 +1568,36 @@ describe('index', () => {
         });
     });
 
+    describe('takeScreenshot', () => {
+        it('take a screenshot from the device', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` });
+            expect(result).not.to.be.undefined;
+        });
+
+        it('take a screenshot from the device', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot(options);
+            expect(result).not.to.be.undefined;
+        });
+    });
+
     describe('zipFolder', () => {
         //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
         it('rejects the promise when an error occurs', async () => {
