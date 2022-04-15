@@ -13,7 +13,6 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import * as request from 'request';
-import type { URL } from 'url';
 
 const sinon = createSandbox();
 
@@ -29,9 +28,7 @@ describe('index', () => {
             devId: 'abcde',
             stagingFolderPath: stagingDir,
             signingPassword: '12345',
-            host: '192.168.8.174',
-            password: 'aaaa',
-            // host: 'localhost',
+            host: 'localhost',
             rekeySignedPackage: `../../testSignedPackage.pkg`
         });
         options.rootDir = rootDir;
@@ -1577,8 +1574,8 @@ describe('index', () => {
         let screenshotAddress: any;
         beforeEach(() => {
             //fake out the write stream function
-            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: string | Buffer | URL) => {
-                fsExtra.copyFileSync('./testScreenshotImage.jpg', filePath);
+            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: any) => {
+                fsExtra.outputFileSync(filePath, 'test');
                 screenshotAddress = filePath;
                 return null;
             });
@@ -1652,7 +1649,49 @@ describe('index', () => {
             await expectThrowsAsync(rokuDeploy.takeScreenshot(options));
         });
 
-        it('throws when asked to convert the image type returned by the device', async () => {
+        it('throws when asked to convert from png to something else', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` }));
+        });
+
+        it('throws when asked to convert from png to something else', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` }));
+        });
+
+        it('throws when asked to convert from png or jpg', async () => {
             let body = getFakeResponseBody(`
                 Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
 
@@ -1660,6 +1699,14 @@ describe('index', () => {
                 screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
                 node.appendChild(screenshoot);
             `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
 
             mockDoPostRequest(body);
             await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.gif` }));

@@ -725,18 +725,6 @@ export class RokuDeploy {
 
         let saveFilePath: string;
         const fileExtension = path.extname(options.screenshotPath);
-        // is this assumed to be a dir?
-        if (fileExtension === '') {
-            saveFilePath = path.join(options.screenshotPath, `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}.jpg`);
-
-            // is this a file path with jpg extension
-        } else if (/\.jp[e]?g/i.test(fileExtension)) {
-            saveFilePath = options.screenshotPath;
-
-            // everything else
-        } else {
-            throw new Error(`Can not, will not, convert image to ${fileExtension}`);
-        }
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
@@ -748,7 +736,22 @@ export class RokuDeploy {
         });
 
         // Pull the image url out of the response body
-        const imageUrlOnDevice = /["'](pkgs\/dev\.jpg\?.+?)['"]/gi.exec(createScreenshotResult.body)?.[1];
+        const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
+
+        // is this assumed to be a dir?
+        if (fileExtension === '') {
+            saveFilePath = path.join(options.screenshotPath, `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}${imageExt}`);
+
+        // Looks like this is a path with file name.
+        // Does it match the type returned by the device?
+        } else if (fileExtension === imageExt) {
+            saveFilePath = options.screenshotPath;
+
+            // everything else
+        } else {
+            throw new Error(`Can not, will not, convert image from ${imageExt} to ${fileExtension}`);
+        }
+
         if (imageUrlOnDevice) {
             await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
         } else {
