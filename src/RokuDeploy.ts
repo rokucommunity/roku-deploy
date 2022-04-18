@@ -721,7 +721,7 @@ export class RokuDeploy {
      */
     public async takeScreenshot(options: TakeScreenshotOptions) {
         options.outDir = options.outDir ?? this.screenshotDir;
-        options.outFileName = options.outFileName ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
+        options.outFile = options.outFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
 
         // Ask for the device to make an image
@@ -737,7 +737,7 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            saveFilePath = util.standardizePath(path.join(options.outDir, options.outFileName + imageExt));
+            saveFilePath = util.standardizePath(path.join(options.outDir, options.outFile + imageExt));
             await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
         } else {
             throw new Error('No screen shot url returned from device');
@@ -1052,13 +1052,13 @@ export interface TakeScreenshotOptions {
 
     /**
      * A full path to the folder where the screenshots should be saved.
-     * Will use the OS temp file system if not supplied
+     * Will use the OS temp directory by default
      */
     outDir?: string;
 
     /**
-     * The base filename the zip/pkg file should be given (excluding the extension)
+     * The base filename the image file should be given (excluding the extension)
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
-    outFileName?: string;
+    outFile?: string;
 }

@@ -1739,7 +1739,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFileName: 'my' });
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
@@ -1763,7 +1763,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFileName: 'my.jpg' });
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my.jpg' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
@@ -1810,7 +1810,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outFileName: 'myFile' });
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outFile: 'myFile' });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
