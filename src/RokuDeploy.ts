@@ -12,6 +12,9 @@ import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
+import * as tempDir from 'temp-dir';
+import * as dayjs from 'dayjs';
+
 
 export class RokuDeploy {
 
@@ -23,6 +26,8 @@ export class RokuDeploy {
     //store the import on the class to make testing easier
 
     public fsExtra = _fsExtra;
+
+    public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -586,27 +591,7 @@ export class RokuDeploy {
         let requestOptions = this.generateBaseRequestOptions(pkgPath, options);
 
         let pkgFilePath = this.getOutputPkgFilePath(options);
-
-        await this.fsExtra.ensureDir(path.dirname(pkgFilePath));
-        let writeStream: _fsExtra.WriteStream;
-        return new Promise<string>((resolve, reject) => {
-            writeStream = this.fsExtra.createWriteStream(pkgFilePath);
-            request.get(requestOptions)
-                .on('error', (err) => {
-                    try {
-                        writeStream.close();
-                    } catch { }
-                    reject(err);
-                })
-                .on('response', (response) => {
-                    if (response.statusCode !== 200) {
-                        reject(new Error('Invalid response code: ' + response.statusCode));
-                    } else {
-                        resolve(pkgFilePath);
-                    }
-                })
-                .pipe(writeStream);
-        });
+        return this.getToFile(requestOptions, pkgFilePath);
     }
 
     /**
@@ -729,6 +714,55 @@ export class RokuDeploy {
             archive: ''
         };
         return this.doPostRequest(deleteOptions);
+    }
+
+    /**
+     * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
+     */
+    public async takeScreenshot(options: TakeScreenshotOptions) {
+        options.outDir = options.outDir ?? this.screenshotDir;
+        options.outFile = options.outFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
+        let saveFilePath: string;
+
+        // Ask for the device to make an image
+        let createScreenshotResult = await this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_inspect', options),
+            formData: {
+                mysubmit: 'Screenshot',
+                archive: ''
+            }
+        });
+
+        // Pull the image url out of the response body
+        const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
+
+        if (imageUrlOnDevice) {
+            saveFilePath = util.standardizePath(path.join(options.outDir, options.outFile + imageExt));
+            await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
+        } else {
+            throw new Error('No screen shot url returned from device');
+        }
+        return saveFilePath;
+    }
+
+    private async getToFile(requestParams: any, filePath: string) {
+        await this.fsExtra.ensureDir(path.dirname(filePath));
+        let writeStream: _fsExtra.WriteStream;
+        return new Promise<string>((resolve, reject) => {
+            writeStream = this.fsExtra.createWriteStream(filePath);
+            request.get(requestParams).on('error', (err) => {
+                try {
+                    writeStream.close();
+                } catch { }
+                reject(err);
+            }).on('response', (response) => {
+                if (response.statusCode !== 200) {
+                    reject(new Error('Invalid response code: ' + response.statusCode));
+                } else {
+                    resolve(filePath);
+                }
+            }).pipe(writeStream);
+        });
     }
 
     /**
@@ -1002,4 +1036,29 @@ export const DefaultFiles = [
 export interface HttpResponse {
     response: any;
     body: any;
+}
+
+export interface TakeScreenshotOptions {
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host: string;
+
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password: string;
+
+    /**
+     * A full path to the folder where the screenshots should be saved.
+     * Will use the OS temp directory by default
+     */
+    outDir?: string;
+
+    /**
+     * The base filename the image file should be given (excluding the extension)
+     * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
+     */
+    outFile?: string;
 }

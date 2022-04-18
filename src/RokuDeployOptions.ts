@@ -56,9 +56,7 @@ export interface RokuDeployOptions {
 
     /**
      * The IP address or hostname of the target Roku device.
-     * @required
      * @example '192.168.1.21'
-     *
      */
     host?: string;
 
@@ -98,19 +96,16 @@ export interface RokuDeployOptions {
 
     /**
      * The password for logging in to the developer portal on the target Roku device
-     * @required
      */
     password?: string;
 
     /**
      * The password used for creating signed packages
-     * @required
      */
     signingPassword?: string;
 
     /**
      * Path to a copy of the signed package you want to use for rekeying
-     * @required
      */
     rekeySignedPackage?: string;
 

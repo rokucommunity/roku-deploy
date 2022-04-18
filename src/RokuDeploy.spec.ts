@@ -13,6 +13,7 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import * as request from 'request';
+
 const sinon = createSandbox();
 
 describe('index', () => {
@@ -1565,6 +1566,254 @@ describe('index', () => {
 
             let result = await rokuDeploy.deleteInstalledChannel(options);
             expect(result).not.to.be.undefined;
+        });
+    });
+
+    describe('takeScreenshot', () => {
+        let onHandler: any;
+        let screenshotAddress: any;
+        beforeEach(() => {
+            //fake out the write stream function
+            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: any) => {
+                fsExtra.outputFileSync(filePath, 'test');
+                screenshotAddress = filePath;
+                return null;
+            });
+
+            //intercept the http request
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        process.nextTick(() => {
+                            onHandler(event, callback);
+                        });
+                        return req;
+                    },
+                    pipe: () => { }
+                };
+                return req;
+            });
+        });
+
+        afterEach(() => {
+            if (screenshotAddress) {
+                fsExtra.removeSync(screenshotAddress);
+            }
+            onHandler = null;
+            screenshotAddress = null;
+        });
+
+        it('throws when there is no image returned', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '';
+                node.appendChild(screenshoot);
+            `);
+
+            mockDoPostRequest(body);
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+        });
+
+        it('throws when there is no response body', async () => {
+            // missing body
+            mockDoPostRequest(null);
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+        });
+
+        it('throws when there is an empty response body', async () => {
+            // empty body
+            mockDoPostRequest();
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+        });
+
+        it('throws when there is an error downloading the image from device', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 404
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+        });
+
+        it('handles the device returning a png', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            expect(result).not.to.be.undefined;
+            expect(path.extname(result)).to.equal('.png');
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('handles the device returning a jpg', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            expect(result).not.to.be.undefined;
+            expect(path.extname(result)).to.equal('.jpg');
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('take a screenshot from the device and saves to supplied dir', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: `${tempDir}/myScreenShots` });
+            expect(result).not.to.be.undefined;
+            expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result));
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('saves to specified file', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my' });
+            expect(result).not.to.be.undefined;
+            expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
+            expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
+        });
+
+        it('saves to specified file ignoring supplied file extension', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my.jpg' });
+            expect(result).not.to.be.undefined;
+            expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
+            expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
+        });
+
+        it('take a screenshot from the device and saves to temp', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            expect(result).not.to.be.undefined;
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('take a screenshot from the device and saves to temp but with the supplied file name', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outFile: 'myFile' });
+            expect(result).not.to.be.undefined;
+            expect(path.basename(result)).to.equal('myFile.jpg');
+            expect(fsExtra.existsSync(result));
         });
     });
 
