@@ -737,7 +737,7 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            saveFilePath = path.join(options.outDir, options.outFileName + imageExt);
+            saveFilePath = util.standardizePath(path.join(options.outDir, options.outFileName + imageExt));
             await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
         } else {
             throw new Error('No screen shot url returned from device');
