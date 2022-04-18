@@ -1613,19 +1613,19 @@ describe('index', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot(options));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot(options));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.takeScreenshot(options));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -1646,7 +1646,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot(options));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when asked to convert from png to something else', async () => {
@@ -1667,7 +1667,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` }));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password, screenshotPath: `${tempDir}/my.jpg` }));
         });
 
         it('throws when asked to convert from png to something else', async () => {
@@ -1688,7 +1688,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` }));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password, screenshotPath: `${tempDir}/my.jpg` }));
         });
 
         it('throws when asked to convert from png or jpg', async () => {
@@ -1709,7 +1709,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.gif` }));
+            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password, screenshotPath: `${tempDir}/my.gif` }));
         });
 
         it('take a screenshot from the device and saves to supplied file', async () => {
@@ -1730,7 +1730,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ ...options, screenshotPath: `${tempDir}/my.jpg` });
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, screenshotPath: `${tempDir}/my.jpg` });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -1753,7 +1753,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ ...options, screenshotPath: tempDir });
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, screenshotPath: tempDir });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -1776,7 +1776,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot(options);
+            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });

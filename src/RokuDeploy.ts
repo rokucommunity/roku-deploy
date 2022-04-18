@@ -719,9 +719,8 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async takeScreenshot(options?: RokuDeployOptions & { screenshotPath?: string }) {
+    public async takeScreenshot(options: { host: string; password: string; screenshotPath?: string }) {
         options.screenshotPath = options.screenshotPath ?? this.screenshotDir;
-        options = this.getOptions(options);
 
         let saveFilePath: string;
         const fileExtension = path.extname(options.screenshotPath);
