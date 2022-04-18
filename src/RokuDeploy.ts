@@ -719,11 +719,10 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async takeScreenshot(options: { host: string; password: string; screenshotPath?: string }) {
-        options.screenshotPath = options.screenshotPath ?? this.screenshotDir;
-
+    public async takeScreenshot(options: TakeScreenshotOptions) {
+        options.outDir = options.outDir ?? this.screenshotDir;
+        options.outFileName = options.outFileName ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
-        const fileExtension = path.extname(options.screenshotPath);
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
@@ -737,21 +736,8 @@ export class RokuDeploy {
         // Pull the image url out of the response body
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
-        // is this assumed to be a dir?
-        if (fileExtension === '') {
-            saveFilePath = path.join(options.screenshotPath, `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}${imageExt}`);
-
-        // Looks like this is a path with file name.
-        // Does it match the type returned by the device?
-        } else if (fileExtension === imageExt) {
-            saveFilePath = options.screenshotPath;
-
-            // everything else
-        } else {
-            throw new Error(`Can not, will not, convert image from ${imageExt} to ${fileExtension}`);
-        }
-
         if (imageUrlOnDevice) {
+            saveFilePath = path.join(options.outDir, options.outFileName + imageExt);
             await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
         } else {
             throw new Error('No screen shot url returned from device');
@@ -1050,4 +1036,29 @@ export const DefaultFiles = [
 export interface HttpResponse {
     response: any;
     body: any;
+}
+
+export interface TakeScreenshotOptions {
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host: string;
+
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password: string;
+
+    /**
+     * A full path to the folder where the screenshots should be saved.
+     * Will use the OS temp file system if not supplied
+     */
+    outDir?: string;
+
+    /**
+     * The base filename the zip/pkg file should be given (excluding the extension)
+     * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
+     */
+    outFileName?: string;
 }
