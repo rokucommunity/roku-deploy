@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.7.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.6.0...v3.7.0) - 2022-05-23
+### Added
+ - new `files` parameter to `zipFolder()` to allow including/excluding files when building the zip
+- export `rokuDeploy` const to improve the docs. Developers should switch to `import { rokuDeploy } from 'roku-deploy'` instead of `import * as rokuDeploy from 'roku-deploy'`.
+
+
+
 ## [3.6.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.5.4...v3.6.0) - 2022-04-13
 ### Added
  - `deleteInstalledChannel` option to specify whether the previously installed dev channel will be deleted before installing the new one
