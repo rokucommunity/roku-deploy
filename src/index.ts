@@ -6,7 +6,7 @@ export * from './util';
 export * from './RokuDeployOptions';
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
-let rokuDeploy = new RokuDeploy();
+export const rokuDeploy = new RokuDeploy();
 
 let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
