@@ -1869,6 +1869,35 @@ describe('index', () => {
                 }
             }
         });
+
+        it('filters the folders before making the zip', async () => {
+            const files = [
+                'components/MainScene.brs',
+                'components/MainScene.brs.map',
+                'images/splash_hd.jpg',
+                'source/main.brs',
+                'source/main.brs.map',
+                'manifest'
+            ];
+            writeFiles(stagingDir, files);
+
+            const outputZipPath = path.join(tempDir, 'output.zip');
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, ['**/*', '!**/*.map']);
+
+            const data = fsExtra.readFileSync(outputZipPath);
+            const zip = await JSZip.loadAsync(data);
+            //the .map files should be missing
+            expect(
+                Object.keys(zip.files).sort()
+            ).to.eql(
+                [
+                    'source/',
+                    'images/',
+                    'components/',
+                    ...files
+                ].sort().filter(x => !x.endsWith('.map'))
+            );
+        });
     });
 
     describe('parseManifest', () => {
