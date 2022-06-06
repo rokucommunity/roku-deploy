@@ -65,6 +65,65 @@ rokuDeploy.deployAndSignPackage({
 });
 ```
 
+
+### Copying the files to staging
+If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
+```typescript
+rokuDeploy.prepublishToStaging({
+    rootDir: "folder/with/your/source/code",
+    stagingFolderPath: 'path/to/staging/folder',
+    files: [
+        "source/**/*",
+        "components/**/*",
+        "images/**/*",
+        "manifest"
+    ],
+    //...other options if necessary
+}).then(function(){
+    //the files have been copied to staging
+}, function(error) {
+    //it failed
+    console.error(error);
+});
+```
+
+### Creating a zip from an already-populated staging folder
+Use this logic if you'd like to create a zip from your application folder.
+```typescript
+/create a signed package of your project
+rokuDeploy.zipPackage({
+    outDir: 'folder/to/put/zip',
+    stagingFolderPath: 'path/to/files/to/zip',
+    outFile: 'filename-of-your-app.zip'
+    //...other options if necessary
+}).then(function(){
+    //the zip has been created
+}, function(error) {
+    //it failed
+    console.error(error);
+});
+```
+
+
+### Deploying an existing zip
+If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
+```typescript
+/create a signed package of your project
+rokuDeploy.publish({
+    host: 'ip-of-roku',
+    password: 'password for roku dev admin portal',
+    outDir: 'folder/where/your/zip/resides/',
+    outFile: 'filename-of-your-app.zip'
+    //...other options if necessary
+}).then(function(){
+    //the app has been sideloaded
+}, function(error) {
+    //it failed
+    console.error(error);
+});
+```
+
+### running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
 
     {
