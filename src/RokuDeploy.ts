@@ -802,7 +802,11 @@ export class RokuDeploy {
             if (this.fsExtra.existsSync(fileName)) {
                 let configFileText = this.fsExtra.readFileSync(fileName).toString();
                 let parseErrors = [] as ParseError[];
-                fileOptions = parseJsonc(configFileText, parseErrors);
+                fileOptions = parseJsonc(configFileText, parseErrors, {
+                    allowEmptyContent: true,
+                    allowTrailingComma: true,
+                    disallowComments: false
+                });
                 if (parseErrors.length > 0) {
                     throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
                         parseErrors.map(x => {
