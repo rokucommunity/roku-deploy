@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.7.0](https://github.com/RokuCommunity/roku-deploy/compare/v3.6.0...v3.7.0) - 2022-05-23
 ### Added
  - new `files` parameter to `zipFolder()` to allow including/excluding files when building the zip
-- export `rokuDeploy` const to improve the docs. Developers should switch to `import { rokuDeploy } from 'roku-deploy'` instead of `import * as rokuDeploy from 'roku-deploy'`.
+ - new `rokuDeploy.takeScreenshot()` function ([#92](https://github.com/rokucommunity/roku-deploy/pull/92))
+ - export `rokuDeploy` const to improve the docs. Developers should switch to `import { rokuDeploy } from 'roku-deploy'` instead of `import * as rokuDeploy from 'roku-deploy'`.
 
 
 
