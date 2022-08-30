@@ -439,6 +439,12 @@ export class RokuDeploy {
                 requestOptions.formData.remotedebug = '1';
             }
 
+            //attach the remotedebug_connect_early if present
+            if (options.remoteDebugConnectEarly) {
+                // eslint-disable-next-line camelcase
+                requestOptions.formData.remotedebug_connect_early = '1';
+            }
+
             //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {

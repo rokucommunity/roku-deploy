@@ -797,10 +797,25 @@ describe('index', () => {
         it('handles successful deploy with remoteDebug', () => {
             options.failOnCompileError = true;
             options.remoteDebug = true;
-            mockDoPostRequest();
+            const stub = mockDoPostRequest();
 
             return rokuDeploy.publish(options).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
+                expect(stub.getCall(0).args[0].formData.remotedebug).to.eql('1');
+            }, () => {
+                assert.fail('Should not have rejected the promise');
+            });
+        });
+
+        it('handles successful deploy with remotedebug_connect_early', () => {
+            options.failOnCompileError = true;
+            options.remoteDebug = true;
+            options.remoteDebugConnectEarly = true;
+            const stub = mockDoPostRequest();
+
+            return rokuDeploy.publish(options).then((result) => {
+                expect(result.message).to.equal('Successful deploy');
+                expect(stub.getCall(0).args[0].formData.remotedebug_connect_early).to.eql('1');
             }, () => {
                 assert.fail('Should not have rejected the promise');
             });
@@ -3104,7 +3119,7 @@ describe('index', () => {
     }
 
     function mockDoPostRequest(body = '', statusCode = 200) {
-        sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+        return sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
             rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);

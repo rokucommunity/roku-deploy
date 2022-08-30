@@ -74,6 +74,12 @@ export interface RokuDeployOptions {
     remoteDebug?: boolean;
 
     /**
+     * When publishing a sideloaded channel, this flag can be used to tell the Roku device that, should any compile errors occur, a client device (such as vscode)
+     * will be trying to attach to the debug protocol control port to consume those compile errors. This must be used in conjuction with the `remoteDebug` option
+     */
+    remoteDebugConnectEarly?: boolean;
+
+    /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
