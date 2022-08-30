@@ -443,15 +443,23 @@ export class RokuDeploy {
             let response: HttpResponse;
             try {
                 response = await this.doPostRequest(requestOptions);
-            } catch (replaceError) {
-                //"replace" failed, do an "install" instead
-                requestOptions.formData.mysubmit = 'Install';
-                response = await this.doPostRequest(requestOptions);
+            } catch (replaceError: any) {
+                //fail if this is a compile error
+                if (this.isCompileError(replaceError.message)) {
+                    if (options.failOnCompileError) {
+                        throw new errors.CompileError('Compile error', replaceError, replaceError?.results);
+                    } else {
+                        throw new errors.UnknownDeviceResponseError(replaceError.message, response);
+                    }
+                } else {
+                    requestOptions.formData.mysubmit = 'Install';
+                    response = await this.doPostRequest(requestOptions);
+                }
             }
 
             if (options.failOnCompileError) {
-                if (response.body.indexOf('Install Failure: Compilation Failed.') > -1) {
-                    throw new errors.CompileError('Compile error', response);
+                if (this.isCompileError(response.body)) {
+                    throw new errors.CompileError('Compile error', response, this.getRokuMessagesFromResponseBody(response.body));
                 }
             }
 
@@ -471,6 +479,13 @@ export class RokuDeploy {
                 this.logger.info('Error closing read stream', e);
             }
         }
+    }
+
+    /**
+     * Does the response look like a compile error
+     */
+    private isCompileError(responseHtml: string) {
+        return responseHtml.includes('Install Failure: Compilation Failed.');
     }
 
     /**
@@ -635,7 +650,7 @@ export class RokuDeploy {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
-        this.logger.debug(results.body);
+        // this.logger.trace(results.body);
 
         if (results.response.statusCode === 401) {
             throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
@@ -652,27 +667,29 @@ export class RokuDeploy {
         }
     }
 
-    private getRokuMessagesFromResponseBody(body: string): { errors: Array<string>; infos: Array<string>; successes: Array<string> } {
-        let errorMessages = [];
-        let infos = [];
-        let successes = [];
+    private getRokuMessagesFromResponseBody(body: string): RokuMessages {
+        const result = {
+            errors: [] as string[],
+            infos: [] as string[],
+            successes: [] as string[]
+        };
         let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
-        let match;
+        let match: RegExpExecArray;
 
         // eslint-disable-next-line no-cond-assign
         while (match = errorRegex.exec(body)) {
             let [, messageType, message] = match;
             switch (messageType.toLowerCase()) {
                 case 'error':
-                    errorMessages.push(message);
+                    result.errors.push(message);
                     break;
 
                 case 'info':
-                    infos.push(message);
+                    result.infos.push(message);
                     break;
 
                 case 'success':
-                    successes.push(message);
+                    result.successes.push(message);
                     break;
 
                 default:
@@ -680,7 +697,7 @@ export class RokuDeploy {
             }
         }
 
-        return { errors: errorMessages, infos: infos, successes: successes };
+        return result;
     }
 
     /**
@@ -1030,6 +1047,12 @@ export interface StandardizedFileEntry {
      * The path relative to the root of the pkg to where the file should be placed
      */
     dest: string;
+}
+
+export interface RokuMessages {
+    errors: string[];
+    infos: string[];
+    successes: string[];
 }
 
 export const DefaultFiles = [

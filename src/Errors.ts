@@ -1,3 +1,5 @@
+import type { RokuMessages } from './RokuDeploy';
+
 export class InvalidDeviceResponseCodeError extends Error {
     constructor(message: string, public results?: any) {
         super(message);
@@ -34,7 +36,7 @@ export class UnknownDeviceResponseError extends Error {
 }
 
 export class CompileError extends Error {
-    constructor(message: string, public results: any) {
+    constructor(message: string, public results: any, public rokuMessages: RokuMessages) {
         super(message);
         Object.setPrototypeOf(this, CompileError.prototype);
     }
