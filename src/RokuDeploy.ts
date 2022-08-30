@@ -445,12 +445,8 @@ export class RokuDeploy {
                 response = await this.doPostRequest(requestOptions);
             } catch (replaceError: any) {
                 //fail if this is a compile error
-                if (this.isCompileError(replaceError.message)) {
-                    if (options.failOnCompileError) {
-                        throw new errors.CompileError('Compile error', replaceError, replaceError?.results);
-                    } else {
-                        throw new errors.UnknownDeviceResponseError(replaceError.message, response);
-                    }
+                if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
+                    throw new errors.CompileError('Compile error', replaceError, replaceError.results);
                 } else {
                     requestOptions.formData.mysubmit = 'Install';
                     response = await this.doPostRequest(requestOptions);
@@ -485,7 +481,7 @@ export class RokuDeploy {
      * Does the response look like a compile error
      */
     private isCompileError(responseHtml: string) {
-        return responseHtml.includes('Install Failure: Compilation Failed.');
+        return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
     }
 
     /**
@@ -649,8 +645,6 @@ export class RokuDeploy {
         if (!results || !results.response || typeof results.body !== 'string') {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
-
-        // this.logger.trace(results.body);
 
         if (results.response.statusCode === 401) {
             throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);

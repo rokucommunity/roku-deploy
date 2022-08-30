@@ -730,6 +730,34 @@ describe('index', () => {
             assert.fail('Should not have succeeded');
         });
 
+        it('rejects as CompileError when initial replace fails', () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest(`
+                Install Failure: Compilation Failed.
+                Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
+            `);
+
+            return rokuDeploy.publish(options).then(() => {
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            }, (err) => {
+                expect(err).to.be.instanceOf(errors.CompileError);
+            });
+        });
+
+        it('rejects as CompileError when initial replace fails', () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest(`
+                Install Failure: Compilation Failed.
+                Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
+            `);
+
+            return rokuDeploy.publish(options).then(() => {
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            }, (err) => {
+                expect(err).to.be.instanceOf(errors.CompileError);
+            });
+        });
+
         it('rejects when response contains compile error wording', () => {
             options.failOnCompileError = true;
             let body = 'Install Failure: Compilation Failed.';
