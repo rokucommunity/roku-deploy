@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.8.0](https://github.com/rokucommunity/roku-deploy/compare/v3.7.1...3.8.0) - 2022-08-30
+### Added
+ - add support for `remotedebug_connect_early` form field ([#97](https://github.com/rokucommunity/roku-deploy/pull/97))
+ - Better compile error handling ([#96](https://github.com/rokucommunity/roku-deploy/pull/96))
+
+
+
 ## [3.7.1](https://github.com/RokuCommunity/roku-deploy/compare/v3.7.0...v3.7.1) - 2022-06-08
 ### Fixed
  - make the json parser less sensitive to trailing commas ([#95](https://github.com/rokucommunity/roku-deploy/pull/95))
