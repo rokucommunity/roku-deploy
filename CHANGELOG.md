@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.8.1](https://github.com/rokucommunity/roku-deploy/compare/v3.8.0...3.8.1) - 2022-09-02
+### Changed
+ - Bump moment from 2.29.2 to 2.29.4 ([#98](https://github.com/rokucommunity/roku-deploy/pull/98))
+
+
+
 ## [3.8.0](https://github.com/rokucommunity/roku-deploy/compare/v3.7.1...3.8.0) - 2022-08-30
 ### Added
  - add support for `remotedebug_connect_early` form field ([#97](https://github.com/rokucommunity/roku-deploy/pull/97))
