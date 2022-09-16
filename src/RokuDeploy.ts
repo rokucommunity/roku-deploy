@@ -37,12 +37,12 @@ export class RokuDeploy {
         options = this.getOptions(options);
 
         //clean the staging directory
-        await this.fsExtra.remove(options.stagingFolderPath);
+        await this.fsExtra.remove(options.stagingDir);
 
         //make sure the staging folder exists
-        await this.fsExtra.ensureDir(options.stagingFolderPath);
-        await this.copyToStaging(options.files, options.stagingFolderPath, options.rootDir);
-        return options.stagingFolderPath;
+        await this.fsExtra.ensureDir(options.stagingDir);
+        await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
+        return options.stagingDir;
     }
 
     /**
@@ -111,16 +111,16 @@ export class RokuDeploy {
         let zipFilePath = this.getOutputZipFilePath(options);
 
         //ensure the manifest file exists in the staging folder
-        if (!await util.fileExistsCaseInsensitive(`${options.stagingFolderPath}/manifest`)) {
-            throw new Error(`Cannot zip package: missing manifest file in "${options.stagingFolderPath}"`);
+        if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
+            throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
         }
 
         //create a zip of the staging folder
-        await this.zipFolder(options.stagingFolderPath, zipFilePath);
+        await this.zipFolder(options.stagingDir, zipFilePath);
 
         //delete the staging folder unless told to retain it.
-        if (options.retainStagingFolder !== true) {
-            await this.fsExtra.remove(options.stagingFolderPath);
+        if (options.retainStagingDir !== true) {
+            await this.fsExtra.remove(options.stagingDir);
         }
     }
 
@@ -133,7 +133,7 @@ export class RokuDeploy {
 
         await this.prepublishToStaging(options);
 
-        let manifestPath = util.standardizePath(`${options.stagingFolderPath}/manifest`);
+        let manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
         let parsedManifest = await this.parseManifest(manifestPath);
 
         if (options.incrementBuildNumber) {
@@ -145,7 +145,8 @@ export class RokuDeploy {
         if (beforeZipCallback) {
             let info: BeforeZipCallbackInfo = {
                 manifestData: parsedManifest,
-                stagingFolderPath: options.stagingFolderPath
+                stagingFolderPath: options.stagingDir,
+                stagingDir: options.stagingDir
             };
 
             await Promise.resolve(beforeZipCallback(info));
@@ -169,7 +170,6 @@ export class RokuDeploy {
     /**
     * Get all file paths for the specified options
     * @param files
-    * @param stagingFolderPath - the absolute path to the staging folder
     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
     */
     public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
@@ -572,7 +572,7 @@ export class RokuDeploy {
         if (!options.signingPassword) {
             throw new errors.MissingRequiredOptionError('Must supply signingPassword');
         }
-        let manifestPath = path.join(options.stagingFolderPath, 'manifest');
+        let manifestPath = path.join(options.stagingDir, 'manifest');
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
@@ -787,9 +787,9 @@ export class RokuDeploy {
      * @param options
      */
     public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
-        let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
         options = this.getOptions(options);
-        options.retainStagingFolder = true;
+        let retainStagingDirInitialValue = options.retainStagingDir;
+        options.retainStagingDir = true;
         await this.deploy(options, beforeZipCallback);
 
         if (options.convertToSquashfs) {
@@ -798,8 +798,8 @@ export class RokuDeploy {
 
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
-        if (originalOptionValueRetainStagingFolder !== true) {
-            await this.fsExtra.remove(options.stagingFolderPath);
+        if (retainStagingDirInitialValue !== true) {
+            await this.fsExtra.remove(options.stagingDir);
         }
         return localPkgFilePath;
     }
@@ -842,7 +842,6 @@ export class RokuDeploy {
         let defaultOptions = <RokuDeployOptions>{
             outDir: './out',
             outFile: 'roku-deploy',
-            retainStagingFolder: false,
             retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
@@ -863,12 +862,17 @@ export class RokuDeploy {
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
+        finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
+        delete finalOptions.retainStagingFolder;
 
-        //stagingFolderPath
-        if (finalOptions.stagingFolderPath) {
-            finalOptions.stagingFolderPath = path.resolve(process.cwd(), finalOptions.stagingFolderPath);
+        let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
+        delete finalOptions.stagingFolderPath;
+
+        //stagingDir
+        if (stagingDir) {
+            finalOptions.stagingDir = path.resolve(process.cwd(), stagingDir);
         } else {
-            finalOptions.stagingFolderPath = path.resolve(
+            finalOptions.stagingDir = path.resolve(
                 process.cwd(),
                 util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
             );
@@ -1035,7 +1039,14 @@ export interface BeforeZipCallbackInfo {
      * Contains an associative array of the parsed values in the manifest
      */
     manifestData: ManifestData;
+    /**
+     * @deprecated since 3.8.2. use `stagingDir` instead
+     */
     stagingFolderPath: string;
+    /**
+     * The directory where the files were staged
+     */
+    stagingDir: string;
 }
 
 export interface StandardizedFileEntry {

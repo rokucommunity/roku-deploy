@@ -71,7 +71,7 @@ If you'd like to use roku-deploy to copy files to a staging folder, you can do t
 ```typescript
 rokuDeploy.prepublishToStaging({
     rootDir: "folder/with/your/source/code",
-    stagingFolderPath: 'path/to/staging/folder',
+    stagingDir: 'path/to/staging/folder',
     files: [
         "source/**/*",
         "components/**/*",
@@ -93,7 +93,7 @@ Use this logic if you'd like to create a zip from your application folder.
 /create a signed package of your project
 rokuDeploy.zipPackage({
     outDir: 'folder/to/put/zip',
-    stagingFolderPath: 'path/to/files/to/zip',
+    stagingDir: 'path/to/files/to/zip',
     outFile: 'filename-of-your-app.zip'
     //...other options if necessary
 }).then(function(){
@@ -135,7 +135,7 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
 You can provide a callback in any of the higher level methods, which allows you to modify the copied contents before the package is zipped. An info object is passed in with the following attributes
 - **manifestData:** [key: string]: string
     Contains all the parsed values from the manifest file
-- **stagingFolderPath:** string
+- **stagingDir:** string
     Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
 
     ```javascript
@@ -148,7 +148,7 @@ You can provide a callback in any of the higher level methods, which allows you 
     rokuDeploy.deploy(options, (info) => {
         //modify staging dir before it's zipped.
         //At this point, all files have been copied to the staging directory.
-        manipulateFilesInStagingFolder(info.stagingFolderPath)
+        manipulateFilesInStagingFolder(info.stagingDir)
         //this function can also return a promise,
         //which will be awaited before roku-deploy starts deploying.
     }).then(function(){
@@ -361,7 +361,7 @@ Here are the available options. The defaults are shown to the right of the optio
 - **retainStagingFolder?:** boolean = `false`
     Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
-- **stagingFolderPath?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
+- **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
    The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
 
 - **convertToSquashfs?:** boolean = `false`

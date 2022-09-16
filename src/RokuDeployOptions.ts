@@ -40,8 +40,15 @@ export interface RokuDeployOptions {
     /**
      * Set this to true to prevent the staging folder from being deleted after creating the package
      * @default false
+     * @deprecated use `retainStagingDir` instead
      */
     retainStagingFolder?: boolean;
+
+    /**
+     * Set this to true to prevent the staging folder from being deleted after creating the package
+     * @default false
+     */
+    retainStagingDir?: boolean;
 
     /**
      * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
@@ -51,8 +58,14 @@ export interface RokuDeployOptions {
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
+     * @deprecated since 3.8.2. use `stagingDir` instead
      */
     stagingFolderPath?: string;
+
+    /**
+     * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
+     */
+    stagingDir?: string;
 
     /**
      * The IP address or hostname of the target Roku device.
