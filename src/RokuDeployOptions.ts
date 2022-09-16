@@ -58,7 +58,7 @@ export interface RokuDeployOptions {
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
-     * @deprecated since 3.8.2. use `stagingDir` instead
+     * @deprecated since 3.9.0. use `stagingDir` instead
      */
     stagingFolderPath?: string;
 
