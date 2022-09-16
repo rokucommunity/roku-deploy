@@ -788,7 +788,7 @@ export class RokuDeploy {
      */
     public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
         options = this.getOptions(options);
-        let reainStagingDirInitialValue = options.retainStagingDir;
+        let retainStagingDirInitialValue = options.retainStagingDir;
         options.retainStagingDir = true;
         await this.deploy(options, beforeZipCallback);
 
@@ -798,7 +798,7 @@ export class RokuDeploy {
 
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
-        if (reainStagingDirInitialValue !== true) {
+        if (retainStagingDirInitialValue !== true) {
             await this.fsExtra.remove(options.stagingDir);
         }
         return localPkgFilePath;
