@@ -26,7 +26,7 @@ describe('index', () => {
             rootDir: rootDir,
             outDir: outDir,
             devId: 'abcde',
-            stagingFolderPath: stagingDir,
+            stagingDir: stagingDir,
             signingPassword: '12345',
             host: 'localhost',
             rekeySignedPackage: `../../testSignedPackage.pkg`
@@ -388,8 +388,8 @@ describe('index', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
             try {
-                options.stagingFolderPath = s`${tempDir}/path/to/nowhere`;
-                fsExtra.ensureDirSync(options.stagingFolderPath);
+                options.stagingDir = s`${tempDir}/path/to/nowhere`;
+                fsExtra.ensureDirSync(options.stagingDir);
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
                 err = (e as Error);
@@ -400,7 +400,7 @@ describe('index', () => {
         it('should throw error when manifest is missing and stagingDir does not exist', async () => {
             let err;
             try {
-                options.stagingFolderPath = s`${tempDir}/path/to/nowhere`;
+                options.stagingDir = s`${tempDir}/path/to/nowhere`;
                 await rokuDeploy.zipPackage(options);
             } catch (e) {
                 err = (e as Error);
@@ -412,13 +412,13 @@ describe('index', () => {
     });
 
     describe('createPackage', () => {
-        it('works with custom stagingFolderPath', async () => {
+        it('works with custom stagingDir', async () => {
             let opts = {
                 ...options,
                 files: [
                     'manifest'
                 ],
-                stagingFolderPath: '.tmp/dist'
+                stagingDir: '.tmp/dist'
             };
             await rokuDeploy.createPackage(opts);
             expectPathExists(rokuDeploy.getOutputZipFilePath(opts));
@@ -481,23 +481,23 @@ describe('index', () => {
         });
 
         it('should retain the staging directory when told to', async () => {
-            let stagingFolderPath = await rokuDeploy.prepublishToStaging({
+            let stagingDirValue = await rokuDeploy.prepublishToStaging({
                 ...options,
                 files: [
                     'manifest'
                 ]
             });
-            expectPathExists(stagingFolderPath);
-            options.retainStagingFolder = true;
+            expectPathExists(stagingDirValue);
+            options.retainStagingDir = true;
             await rokuDeploy.zipPackage(options);
-            expectPathExists(stagingFolderPath);
+            expectPathExists(stagingDirValue);
         });
 
         it('should call our callback with correct information', async () => {
             fsExtra.outputFileSync(`${rootDir}/manifest`, 'major_version=1');
 
             let spy = sinon.spy((info: BeforeZipCallbackInfo) => {
-                expectPathExists(info.stagingFolderPath);
+                expectPathExists(info.stagingDir);
                 expect(info.manifestData.major_version).to.equal('1');
             });
 
@@ -1111,7 +1111,7 @@ describe('index', () => {
             await rokuDeploy.prepublishToStaging({
                 ...options,
                 files: ['manifest'],
-                stagingFolderPath: `${tempDir}/custom-out-dir`
+                stagingDir: `${tempDir}/custom-out-dir`
             });
             expectPathExists(`${tempDir}/custom-out-dir`);
         });
@@ -1369,7 +1369,7 @@ describe('index', () => {
                     ]
                 };
 
-                let stagingFolderPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                let stagingDirValue = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
                 expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
                     src: s`${opts.rootDir}/renamed_test.md`,
@@ -1377,7 +1377,7 @@ describe('index', () => {
                 }]);
 
                 await rokuDeploy.prepublishToStaging(opts);
-                let stagedFilePath = s`${stagingFolderPath}/renamed_test.md`;
+                let stagedFilePath = s`${stagingDirValue}/renamed_test.md`;
                 expectPathExists(stagedFilePath);
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
@@ -1406,7 +1406,7 @@ describe('index', () => {
                     ]
                 };
 
-                let stagingPath = rokuDeploy.getOptions(opts).stagingFolderPath;
+                let stagingPath = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
                 expect(
                     (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
@@ -2865,7 +2865,7 @@ describe('index', () => {
             await expectThrowsAsync(
                 rokuDeploy.prepublishToStaging({
                     rootDir: rootDir,
-                    stagingFolderPath: stagingDir,
+                    stagingDir: stagingDir,
                     files: [
                         'source/main.brs'
                     ]
@@ -2894,12 +2894,42 @@ describe('index', () => {
     });
 
     describe('getOptions', () => {
+        it('supports deprecated stagingFolderPath option', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return false;
+            });
+            expect(
+                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingDir
+            ).to.eql(s`${cwd}/staging-folder-path`);
+            expect(
+                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path', stagingDir: 'staging-dir' }).stagingDir
+            ).to.eql(s`${cwd}/staging-dir`);
+            expect(
+                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingFolderPath
+            ).to.be.undefined;
+        });
+
+        it('supports deprecated retainStagingFolder option', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return false;
+            });
+            expect(
+                rokuDeploy.getOptions({ retainStagingFolder: true }).retainStagingDir
+            ).to.be.true;
+            expect(
+                rokuDeploy.getOptions({ retainStagingFolder: true, retainStagingDir: false }).retainStagingDir
+            ).to.be.false;
+            expect(
+                rokuDeploy.getOptions({ retainStagingFolder: true, retainStagingDir: false }).retainStagingFolder
+            ).to.be.undefined;
+        });
+
         it('calling with no parameters works', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
             options = rokuDeploy.getOptions(undefined);
-            expect(options.stagingFolderPath).to.exist;
+            expect(options.stagingDir).to.exist;
         });
 
         it('calling with empty param object', () => {
@@ -2907,30 +2937,30 @@ describe('index', () => {
                 return false;
             });
             options = rokuDeploy.getOptions({});
-            expect(options.stagingFolderPath).to.exist;
+            expect(options.stagingDir).to.exist;
         });
 
-        it('works when passing in stagingFolderPath', () => {
+        it('works when passing in stagingDir', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
             });
             options = rokuDeploy.getOptions({
-                stagingFolderPath: './staging-dir'
+                stagingDir: './staging-dir'
             });
-            expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
+            expect(options.stagingDir.endsWith('staging-dir')).to.be.true;
         });
 
-        it('works when loading stagingFolderPath from rokudeploy.json', () => {
+        it('works when loading stagingDir from rokudeploy.json', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return true;
             });
             sinon.stub(fsExtra, 'readFileSync').returns(`
                 {
-                    "stagingFolderPath": "./staging-dir"
+                    "stagingDir": "./staging-dir"
                 }
             `);
             options = rokuDeploy.getOptions();
-            expect(options.stagingFolderPath.endsWith('staging-dir')).to.be.true;
+            expect(options.stagingDir.endsWith('staging-dir')).to.be.true;
         });
 
         it('supports jsonc for roku-deploy.json', () => {
@@ -3080,7 +3110,7 @@ describe('index', () => {
 
             //this should not fail
             let pkgFilePath = await rokuDeploy.deployAndSignPackage({
-                retainStagingFolder: false
+                retainStagingDir: false
             });
 
             //the return value should equal what retrieveSignedPackage returned.
@@ -3089,14 +3119,14 @@ describe('index', () => {
             //fsExtra.remove should have been called
             expect(stub.getCalls()).to.be.lengthOf(1);
 
-            //call it again, but specify true for retainStagingFolder
+            //call it again, but specify true for retainStagingDir
             await rokuDeploy.deployAndSignPackage({
-                retainStagingFolder: true
+                retainStagingDir: true
             });
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(1);
 
-            //call it again, but don't specify retainStagingFolder at all (it should default to FALSE)
+            //call it again, but don't specify retainStagingDir at all (it should default to FALSE)
             await rokuDeploy.deployAndSignPackage({});
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(2);
