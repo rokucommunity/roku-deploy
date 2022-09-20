@@ -2906,7 +2906,7 @@ describe('index', () => {
             ).to.eql(s`${cwd}/staging-dir`);
             expect(
                 rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingFolderPath
-            ).to.eql(s`${cwd}/staging-dir`);
+            ).to.eql(s`${cwd}/staging-folder-path`);
         });
 
         it('supports deprecated retainStagingFolder option', () => {
