@@ -863,10 +863,10 @@ export class RokuDeploy {
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
         finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
-        delete finalOptions.retainStagingFolder;
+        //sync the new option with the old one (for back-compat)
+        finalOptions.retainStagingFolder = finalOptions.retainStagingDir;
 
         let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
-        delete finalOptions.stagingFolderPath;
 
         //stagingDir
         if (stagingDir) {
@@ -877,6 +877,8 @@ export class RokuDeploy {
                 util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
             );
         }
+        //sync the new option with the old one (for back-compat)
+        finalOptions.stagingFolderPath = finalOptions.stagingDir;
 
         return finalOptions;
     }
