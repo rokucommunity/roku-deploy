@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.9.2](https://github.com/rokucommunity/roku-deploy/compare/v3.9.1...3.9.2) - 2022-10-03
+### Fixed
+ - Replace minimatch with picomatch ([#101](https://github.com/rokucommunity/roku-deploy/pull/101))
+
+
+
 ## [3.9.1](https://github.com/rokucommunity/roku-deploy/compare/v3.9.0...3.9.1) - 2022-09-19
 ### Fixed
  - Sync retainStagingFolder, stagingFolderPath with options, fixing a critical backwards compatibility bug ([#100](https://github.com/rokucommunity/roku-deploy/pull/100))
