@@ -135,7 +135,7 @@ export class Util {
      * Run a series of glob patterns, returning the matches in buckets corresponding to their pattern index.
      */
     public async globAllByIndex(patterns: string[], cwd: string) {
-        //force all path separators to unit style
+        //force all path separators to unix style
         cwd = cwd.replace(/\\/g, '/');
 
         const globResults = patterns.map(async (pattern) => {
