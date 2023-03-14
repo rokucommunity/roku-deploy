@@ -2,7 +2,7 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as picomatch from 'picomatch';
+import * as micromatch from 'micromatch';
 import fastGlob = require("fast-glob")
 
 export class Util {
@@ -179,7 +179,7 @@ export class Util {
     private filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
         //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
         let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
-        let filter = picomatch(negatedPatternAbsolute);
+        let filter = micromatch.matcher(negatedPatternAbsolute);
         for (let i = 0; i <= stopIndex; i++) {
             if (filesByIndex[i]) {
                 //filter all matches by the specified pattern
