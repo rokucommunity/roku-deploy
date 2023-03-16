@@ -2,7 +2,7 @@
 
 Publish Roku projects to a Roku device by using Node.js.
 
-[![build status](https://img.shields.io/github/workflow/status/rokucommunity/roku-deploy/build.svg?logo=github)](https://github.com/rokucommunity/roku-deploy/actions?query=workflow%3Abuild)
+[![build status](https://img.shields.io/github/actions/workflow/status/rokucommunity/roku-deploy/build.yml?branch=master)](https://github.com/rokucommunity/roku-deploy/actions?query=branch%3Amaster+workflow%3Abuild)
 [![coverage status](https://img.shields.io/coveralls/github/rokucommunity/roku-deploy?logo=coveralls)](https://coveralls.io/github/rokucommunity/roku-deploy?branch=master)
 [![monthly downloads](https://img.shields.io/npm/dm/roku-deploy.svg?sanitize=true&logo=npm&logoColor=)](https://npmcharts.com/compare/roku-deploy?minimal=true)
 [![npm version](https://img.shields.io/npm/v/roku-deploy.svg?logo=npm)](https://www.npmjs.com/package/roku-deploy)
