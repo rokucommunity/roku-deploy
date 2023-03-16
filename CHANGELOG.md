@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.10.0](https://github.com/rokucommunity/roku-deploy/compare/v3.9.3...v3.10.0) - 2023-03-16
+### Changed
+ - Use micromatch instead of picomatch ([#109](https://github.com/rokucommunity/roku-deploy/pull/109))
+
+
+
 ## [3.9.3](https://github.com/rokucommunity/roku-deploy/compare/v3.9.2...3.9.3) - 2023-01-12
 ### Changed
  - Bump minimatch from 3.0.4 to 3.1.2 ([#107](https://github.com/rokucommunity/roku-deploy/pull/107))
