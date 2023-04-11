@@ -30,7 +30,7 @@
         "parse-ms": "^2.1.0",
         "request": "^2.88.0",
         "temp-dir": "^2.0.0",
-        "xml2js": "^0.4.23"
+        "xml2js": "^0.5.0"
     },
     "devDependencies": {
         "@types/chai": "^4.2.22",
