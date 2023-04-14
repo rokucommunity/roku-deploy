@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.10.1](https://github.com/rokucommunity/roku-deploy/compare/v3.10.0...v3.10.1) - 2023-04-14
+### Changed
+ - Bump xml2js from 0.4.23 to 0.5.0 ([#112](https://github.com/rokucommunity/roku-deploy/pull/112))
+ - Fix build status badge ([ad2c9ec](https://github.com/rokucommunity/roku-deploy/commit/ad2c9ec))
+
+
+
 ## [3.10.0](https://github.com/rokucommunity/roku-deploy/compare/v3.9.3...v3.10.0) - 2023-03-16
 ### Changed
  - Use micromatch instead of picomatch ([#109](https://github.com/rokucommunity/roku-deploy/pull/109))
