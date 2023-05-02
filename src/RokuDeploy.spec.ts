@@ -555,7 +555,9 @@ describe('index', () => {
 
     it('runs via the command line using the rokudeploy.json file', function test() {
         this.timeout(20000);
-        child_process.execSync(`node dist/index.js`);
+        //build the project
+        child_process.execSync(`npm run build`, { stdio: 'inherit' });
+        child_process.execSync(`node dist/index.js`, { stdio: 'inherit' });
     });
 
     describe('generateBaseRequestOptions', () => {
