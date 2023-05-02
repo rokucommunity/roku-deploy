@@ -29,7 +29,7 @@ describe('index', () => {
             stagingDir: stagingDir,
             signingPassword: '12345',
             host: 'localhost',
-            rekeySignedPackage: `../../testSignedPackage.pkg`
+            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`
         });
         options.rootDir = rootDir;
         fsExtra.emptyDirSync(tempDir);
@@ -911,7 +911,7 @@ describe('index', () => {
                 <keyed-developer-id>${options.devId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
-            fsExtra.outputFileSync(`${rootDir}/${options.rekeySignedPackage}`, '');
+            fsExtra.outputFileSync(path.resolve(rootDir, options.rekeySignedPackage), '');
         });
 
         it('does not crash when archive is undefined', async () => {
@@ -931,7 +931,7 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            options.rekeySignedPackage = `../../testSignedPackage.pkg`;
+            options.rekeySignedPackage = s`${tempDir}/testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
@@ -941,7 +941,7 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
 
-            options.rekeySignedPackage = s`${cwd}/testSignedPackage.pkg`;
+            options.rekeySignedPackage = s`${tempDir}/testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
