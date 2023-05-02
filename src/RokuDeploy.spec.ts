@@ -931,8 +931,13 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            options.rekeySignedPackage = s`${tempDir}/testSignedPackage.pkg`;
-            await rokuDeploy.rekeyDevice(options);
+            options.rekeySignedPackage = s`../notReal.pkg`;
+            try {
+                fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
+                await rokuDeploy.rekeyDevice(options);
+            } finally {
+                fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
+            }
         });
 
         it('should work with absolute path', async () => {
