@@ -81,6 +81,8 @@ describe('device', function device() {
 
     describe('deployAndSignPackage', () => {
         it('works', async () => {
+            await rokuDeploy.deleteInstalledChannel(options);
+            await rokuDeploy.rekeyDevice(options);
             expectPathExists(
                 await rokuDeploy.deployAndSignPackage(options)
             );
