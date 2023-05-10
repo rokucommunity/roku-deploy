@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as request from 'request';
+import * as request from 'postman-request';
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
@@ -14,7 +14,6 @@ import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
-
 
 export class RokuDeploy {
 
