@@ -382,7 +382,8 @@ export class RokuDeploy {
                 pass: options.password,
                 sendImmediately: false
             },
-            formData: formData
+            formData: formData,
+            agentOptions: { 'keepAlive': false }
         };
         return baseRequestOptions;
     }
