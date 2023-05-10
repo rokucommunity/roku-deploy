@@ -29,7 +29,7 @@ describe('index', () => {
             stagingDir: stagingDir,
             signingPassword: '12345',
             host: 'localhost',
-            rekeySignedPackage: `../../testSignedPackage.pkg`
+            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`
         });
         options.rootDir = rootDir;
         fsExtra.emptyDirSync(tempDir);
@@ -555,7 +555,9 @@ describe('index', () => {
 
     it('runs via the command line using the rokudeploy.json file', function test() {
         this.timeout(20000);
-        child_process.execSync(`node dist/index.js`);
+        //build the project
+        child_process.execSync(`npm run build`, { stdio: 'inherit' });
+        child_process.execSync(`node dist/index.js`, { stdio: 'inherit' });
     });
 
     describe('generateBaseRequestOptions', () => {
@@ -911,7 +913,7 @@ describe('index', () => {
                 <keyed-developer-id>${options.devId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
-            fsExtra.outputFileSync(`${rootDir}/${options.rekeySignedPackage}`, '');
+            fsExtra.outputFileSync(path.resolve(rootDir, options.rekeySignedPackage), '');
         });
 
         it('does not crash when archive is undefined', async () => {
@@ -931,8 +933,13 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            options.rekeySignedPackage = `../../testSignedPackage.pkg`;
-            await rokuDeploy.rekeyDevice(options);
+            options.rekeySignedPackage = s`../notReal.pkg`;
+            try {
+                fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
+                await rokuDeploy.rekeyDevice(options);
+            } finally {
+                fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
+            }
         });
 
         it('should work with absolute path', async () => {
@@ -941,7 +948,7 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
 
-            options.rekeySignedPackage = s`${cwd}/testSignedPackage.pkg`;
+            options.rekeySignedPackage = s`${tempDir}/testSignedPackage.pkg`;
             await rokuDeploy.rekeyDevice(options);
         });
 
