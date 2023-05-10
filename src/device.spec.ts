@@ -14,9 +14,9 @@ describe('device', function device() {
         process.chdir(rootDir);
         options = rokuDeploy.getOptions({
             outDir: outDir,
-            host: 'work-roku-ultra',
+            host: '192.168.1.32',
             retainDeploymentArchive: true,
-            password: '1111',
+            password: 'aaaa',
             devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
             rekeySignedPackage: `${cwd}/testSignedPackage.pkg`,
             signingPassword: 'drRCEVWP/++K5TYnTtuAfQ=='
