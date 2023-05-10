@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.10.2](https://github.com/rokucommunity/roku-deploy/compare/v3.10.1...3.10.2) - 2023-05-10
+### Changed
+ - remove `request` in favor of `postman-request` to fix security issues
+ - remove dev dependency `coveralls` in favor of `coveralls-next` to fix security issues
+### Fixed
+ - compatibility issues with Node.js v19 and above ([#115](https://github.com/rokucommunity/roku-deploy/pull/115))
+ - npm audit issues ([#116](https://github.com/rokucommunity/roku-deploy/pull/116))
+
+
+
 ## [3.10.1](https://github.com/rokucommunity/roku-deploy/compare/v3.10.0...v3.10.1) - 2023-04-14
 ### Changed
  - Bump xml2js from 0.4.23 to 0.5.0 ([#112](https://github.com/rokucommunity/roku-deploy/pull/112))
