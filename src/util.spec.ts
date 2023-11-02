@@ -3,10 +3,18 @@ import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import { tempDir } from './testUtils.spec';
 import * as path from 'path';
+import * as dns from 'dns';
+import { createSandbox } from 'sinon';
+const sinon = createSandbox();
 
 describe('util', () => {
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
+        sinon.restore();
+    });
+
+    afterEach(() => {
+        sinon.restore();
     });
 
     describe('isFile', () => {
@@ -229,6 +237,41 @@ describe('util', () => {
         it('does not crash with bad params', () => {
             //shouldn't crash
             util['filterPaths']('*', [], '', 2);
+        });
+    });
+
+    describe('dnsLookup', () => {
+        it('returns ip address for hostname', async () => {
+            sinon.stub(dns.promises, 'lookup').returns(Promise.resolve({
+                address: '1.2.3.4',
+                family: undefined
+            }));
+
+            expect(
+                await util.dnsLookup('some-host', true)
+            ).to.eql('1.2.3.4');
+        });
+
+        it('returns ip address for ip address', async () => {
+            sinon.stub(dns.promises, 'lookup').returns(Promise.resolve({
+                address: '1.2.3.4',
+                family: undefined
+            }));
+
+            expect(
+                await util.dnsLookup('some-host', true)
+            ).to.eql('1.2.3.4');
+        });
+
+        it('returns given value if the lookup failed', async () => {
+            sinon.stub(dns.promises, 'lookup').returns(Promise.resolve({
+                address: undefined,
+                family: undefined
+            }));
+
+            expect(
+                await util.dnsLookup('some-host', true)
+            ).to.eql('some-host');
         });
     });
 });

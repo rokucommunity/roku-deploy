@@ -1,6 +1,8 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as request from 'postman-request';
+import * as r from 'postman-request';
+import type * as requestType from 'request';
+const request = r as typeof requestType;
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
@@ -14,6 +16,7 @@ import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
+import type { DeviceInfoResult } from './DeviceInfo';
 
 export class RokuDeploy {
 
@@ -370,7 +373,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): request.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): requestType.OptionsWithUrl {
         options = this.getOptions(options);
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -634,7 +637,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: any) {
+    private async doGetRequest(params: requestType.OptionsWithUrl) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             request.get(params, (err, resp, body) => {
                 if (err) {
@@ -919,21 +922,96 @@ export class RokuDeploy {
         return outPkgFilePath;
     }
 
-    public async getDeviceInfo(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
+    /**
+     * Get the `device-info` response from a Roku device
+     * @param host the host or IP address of the Roku
+     * @param port the port to use for the ECP request (defaults to 8060)
+     */
+    public async getDeviceInfo(host: string, port?: number): Promise<DeviceInfoResult>;
+    /**
+     * Get the device-info response from a Roku device
+     * @deprecated use the (string, number) signature instead
+     * @param options standard RokuDeploy options
+     */
+    public async getDeviceInfo(options?: RokuDeployOptions): Promise<Record<string, any>>;
+    public async getDeviceInfo(...args: any[]) {
+        let host: string;
+        let port: number;
+        let timeout: number;
+        let sanitizeData: boolean;
 
-        const requestOptions = {
-            url: `http://${options.host}:${options.remotePort}/query/device-info`,
-            timeout: options.timeout
-        };
-        let results = await this.doGetRequest(requestOptions);
+        //new implementation
+        if (typeof args[0] === 'string') {
+            host = args[0];
+            port = args[1];
+            timeout = Number.MAX_SAFE_INTEGER;
+            sanitizeData = true;
+            //old implementation
+        } else {
+            const options = this.getOptions(args[0]);
+
+            host = options.host;
+            port = options.remotePort;
+            timeout = options.timeout;
+            sanitizeData = false;
+        }
+        port ??= 8060;
+
+        //if the host is a DNS name, look up the IP address
         try {
-            const parsedContent = await xml2js.parseStringPromise(results.body, {
+            host = await util.dnsLookup(host);
+        } catch (e) {
+            //try using the host as-is (it'll probably fail...)
+        }
+
+        const url = `http://${host}:${port}/query/device-info`;
+
+        let response = await this.doGetRequest({
+            url: url,
+            timeout: timeout,
+            headers: {
+                'User-Agent': 'https://github.com/RokuCommunity/roku-deploy'
+            }
+        });
+        try {
+            const parsedContent = await xml2js.parseStringPromise(response.body, {
                 explicitArray: false
             });
-            return parsedContent['device-info'];
+            // clone the data onto an object because xml2js somehow makes this object not an object???
+            const deviceInfo = {
+                ...parsedContent['device-info']
+            } as Record<string, any>;
+
+            if (!sanitizeData) {
+                //return the deprecated output format of just the raw parsed `device-info`
+                return deviceInfo;
+            } else {
+                // convert 'true' and 'false' string values to boolean
+                for (let key in deviceInfo) {
+                    if (deviceInfo[key] === 'true') {
+                        deviceInfo[key] = true;
+                    } else if (deviceInfo[key] === 'false') {
+                        deviceInfo[key] = false;
+                    }
+                }
+
+                // convert the following string values into numbers
+                const numberFields = ['software-build', 'uptime', 'trc-version', 'av-sync-calibration-enabled', 'time-zone-offset'];
+                for (const field of numberFields) {
+                    if (deviceInfo.hasOwnProperty(field)) {
+                        deviceInfo[field] = parseInt(deviceInfo[field]);
+                    }
+                }
+
+                return {
+                    url: url,
+                    host: host,
+                    port: port,
+                    deviceInfo: deviceInfo
+                } as DeviceInfoResult;
+            }
         } catch (e) {
-            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', results);
+            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
 
