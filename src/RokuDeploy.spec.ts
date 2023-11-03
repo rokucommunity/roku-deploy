@@ -321,52 +321,52 @@ describe('index', () => {
                     <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
                 </device-info>
                 `);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, sanitizeData: true, format: 'camelCase' });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
             expect(result.isStick).not.to.exist;
         });
 
         it('should sanitize additional data when the host+param+format signature is triggered', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, sanitizeData: true });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
             expect(result).to.include({
                 // make sure the number fields are turned into numbers
-                'software-build': 4170,
-                'uptime': 19799,
-                'trc-version': 3.0,
-                'time-zone-offset': -240,
+                softwareBuild: 4170,
+                uptime: 19799,
+                trcVersion: 3.0,
+                timeZoneOffset: -240,
 
                 // string booleans should be turned into booleans
-                'is-tv': false,
-                'is-stick': false,
-                'supports-ethernet': true,
-                'has-wifi-extender': false,
-                'has-wifi-5G-support': true,
-                'secure-device': true,
-                'time-zone-auto': true,
-                'supports-suspend': false,
-                'supports-find-remote': true,
-                'find-remote-is-possible': true,
-                'supports-audio-guide': true,
-                'supports-rva': true,
-                'developer-enabled': true,
-                'search-enabled': true,
-                'search-channels-enabled': true,
-                'voice-search-enabled': true,
-                'notifications-enabled': true,
-                'notifications-first-use': false,
-                'supports-private-listening': true,
-                'headphones-connected': false,
-                'supports-ecs-textedit': true,
-                'supports-ecs-microphone': true,
-                'supports-wake-on-wlan': false,
-                'has-play-on-roku': true,
-                'has-mobile-screensaver': true
+                isTv: false,
+                isStick: false,
+                supportsEthernet: true,
+                hasWifiExtender: false,
+                hasWifi5GSupport: true,
+                secureDevice: true,
+                timeZoneAuto: true,
+                supportsSuspend: false,
+                supportsFindRemote: true,
+                findRemoteIsPossible: true,
+                supportsAudioGuide: true,
+                supportsRva: true,
+                developerEnabled: true,
+                searchEnabled: true,
+                searchChannelsEnabled: true,
+                voiceSearchEnabled: true,
+                notificationsEnabled: true,
+                notificationsFirstUse: false,
+                supportsPrivateListening: true,
+                headphonesConnected: false,
+                supportsEcsTextedit: true,
+                supportsEcsMicrophone: true,
+                supportsWakeOnWlan: false,
+                hasPlayOnRoku: true,
+                hasMobileScreensaver: true
             });
         });
 
         it('converts keys to camel case when enabled', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, format: 'camelCase' });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
             const props = [
                 'udn',
                 'serialNumber',

@@ -17,7 +17,7 @@ import { Logger, LogLevel } from './Logger';
 import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
-import type { DeviceInfo, DeviceInfoOriginal } from './DeviceInfo';
+import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 
 export class RokuDeploy {
 
@@ -928,14 +928,10 @@ export class RokuDeploy {
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
      */
-    public async getDeviceInfo(options?: { format: 'camelCase'; sanitizeData: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
-    public async getDeviceInfo(options?: { format: 'camelCase'; sanitizeData?: false } & GetDeviceInfoOptions): Promise<DeviceInfo<string, string>>;
-    public async getDeviceInfo(options?: { sanitizeData: true } & GetDeviceInfoOptions): Promise<DeviceInfoOriginal>;
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoOriginal<string, string>>;
+    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = this.getOptions(options) as any;
-        options.sanitizeData ??= false;
-        options.format ??= 'original';
 
         //if the host is a DNS name, look up the IP address
         try {
@@ -962,7 +958,7 @@ export class RokuDeploy {
                 ...parsedContent['device-info']
             } as Record<string, any>;
 
-            if (options.sanitizeData) {
+            if (options.enhance) {
                 // convert 'true' and 'false' string values to boolean
                 for (let key in deviceInfo) {
                     if (deviceInfo[key] === 'true') {
@@ -979,9 +975,8 @@ export class RokuDeploy {
                         deviceInfo[field] = parseInt(deviceInfo[field]);
                     }
                 }
-            }
 
-            if (options.format === 'camelCase') {
+                //convert the property names to camel case
                 const result = {};
                 for (const key in deviceInfo) {
                     result[lodash.camelCase(key)] = deviceInfo[key];
@@ -1165,7 +1160,10 @@ export interface TakeScreenshotOptions {
 export interface GetDeviceInfoOptions {
     host: string;
     remotePort?: number;
-    sanitizeData?: boolean;
-    format?: 'original' | 'camelCase';
     timeout?: number;
+    /**
+     * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
+     * @default false
+     */
+    enhance?: boolean;
 }
