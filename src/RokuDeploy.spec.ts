@@ -283,38 +283,52 @@ describe('index', () => {
             <grandcentral-version>3.1.39</grandcentral-version>
             <trc-version>3.0</trc-version>
             <trc-channel-version>2.9.42</trc-channel-version>
+            <av-sync-calibration-enabled>3.0</av-sync-calibration-enabled>
             <davinci-version>2.8.20</davinci-version>
+            <brightscript-debugger-version>3.2.0</brightscript-debugger-version>
+            <has-hands-free-voice-remote>false</has-hands-free-voice-remote>
+            <mobile-has-live-tv>true</mobile-has-live-tv>
+            <network-name>Plumb-5G</network-name>
+            <supports-airplay>true</supports-airplay>
+            <supports-audio-settings>false</supports-audio-settings>
+            <ui-resolution>1080p</ui-resolution>
         </device-info>`;
 
         it('should return device info matching what was returned by ECP', async () => {
             mockDoGetRequest(body);
-            const deviceInfo = await rokuDeploy.getDeviceInfo(options);
+            const deviceInfo = await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
             expect(deviceInfo['serial-number']).to.equal('123');
             expect(deviceInfo['device-id']).to.equal('456');
             expect(deviceInfo['keyed-developer-id']).to.equal('789');
         });
 
         it('should default to port 8060 if not provided', async () => {
-            mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo('192.168.1.10');
-            expect(result.port).to.eql(8060);
+            const stub = mockDoGetRequest(body);
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:8060/query/device-info');
         });
 
         it('should use given port if provided', async () => {
-            mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo('192.168.1.10', 9999);
-            expect(result.port).to.eql(9999);
+            const stub = mockDoGetRequest(body);
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', remotePort: 9999 });
+            expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:9999/query/device-info');
+        });
+
+
+        it('does not crash when sanitizing fields that are not defined', async () => {
+            mockDoGetRequest(`
+                <device-info>
+                    <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
+                </device-info>
+                `);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, sanitizeData: true, format: 'camelCase' });
+            expect(result.isStick).not.to.exist;
         });
 
         it('should sanitize additional data when the host+param+format signature is triggered', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo('192.168.1.10', 8060);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, sanitizeData: true });
             expect(result).to.include({
-                host: '192.168.1.10',
-                port: 8060,
-                url: 'http://192.168.1.10:8060/query/device-info'
-            });
-            expect(result.deviceInfo).to.include({
                 // make sure the number fields are turned into numbers
                 'software-build': 4170,
                 'uptime': 19799,
@@ -350,10 +364,92 @@ describe('index', () => {
             });
         });
 
+        it('converts keys to camel case when enabled', async () => {
+            mockDoGetRequest(body);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, format: 'camelCase' });
+            const props = [
+                'udn',
+                'serialNumber',
+                'deviceId',
+                'advertisingId',
+                'vendorName',
+                'modelName',
+                'modelNumber',
+                'modelRegion',
+                'isTv',
+                'isStick',
+                'mobileHasLiveTv',
+                'uiResolution',
+                'supportsEthernet',
+                'wifiMac',
+                'wifiDriver',
+                'hasWifiExtender',
+                'hasWifi5GSupport',
+                'canUseWifiExtender',
+                'ethernetMac',
+                'networkType',
+                'networkName',
+                'friendlyDeviceName',
+                'friendlyModelName',
+                'defaultDeviceName',
+                'userDeviceName',
+                'userDeviceLocation',
+                'buildNumber',
+                'softwareVersion',
+                'softwareBuild',
+                'secureDevice',
+                'language',
+                'country',
+                'locale',
+                'timeZoneAuto',
+                'timeZone',
+                'timeZoneName',
+                'timeZoneTz',
+                'timeZoneOffset',
+                'clockFormat',
+                'uptime',
+                'powerMode',
+                'supportsSuspend',
+                'supportsFindRemote',
+                'findRemoteIsPossible',
+                'supportsAudioGuide',
+                'supportsRva',
+                'hasHandsFreeVoiceRemote',
+                'developerEnabled',
+                'keyedDeveloperId',
+                'searchEnabled',
+                'searchChannelsEnabled',
+                'voiceSearchEnabled',
+                'notificationsEnabled',
+                'notificationsFirstUse',
+                'supportsPrivateListening',
+                'headphonesConnected',
+                'supportsAudioSettings',
+                'supportsEcsTextedit',
+                'supportsEcsMicrophone',
+                'supportsWakeOnWlan',
+                'supportsAirplay',
+                'hasPlayOnRoku',
+                'hasMobileScreensaver',
+                'supportUrl',
+                'grandcentralVersion',
+                'trcVersion',
+                'trcChannelVersion',
+                'davinciVersion',
+                'avSyncCalibrationEnabled',
+                'brightscriptDebuggerVersion'
+            ];
+            expect(
+                Object.keys(result).sort()
+            ).to.eql(
+                props.sort()
+            );
+        });
+
         it('should throw our error on failure', async () => {
             mockDoGetRequest();
             try {
-                await rokuDeploy.getDeviceInfo(options);
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
@@ -3202,7 +3298,7 @@ describe('index', () => {
     });
 
     function mockDoGetRequest(body = '', statusCode = 200) {
-        sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
+        return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
             rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);
