@@ -944,7 +944,6 @@ export class RokuDeploy {
         if (typeof args[0] === 'string') {
             host = args[0];
             port = args[1];
-            timeout = Number.MAX_SAFE_INTEGER;
             sanitizeData = true;
             //old implementation
         } else {
