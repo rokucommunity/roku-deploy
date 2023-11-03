@@ -325,6 +325,16 @@ describe('index', () => {
             expect(result.isStick).not.to.exist;
         });
 
+        it('returns kebab-case by default', async () => {
+            mockDoGetRequest(`
+                <device-info>
+                    <has-mobile-screensaver>true</has-mobile-screensaver>
+                </device-info>
+                `);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10' });
+            expect(result['has-mobile-screensaver']).to.eql('true');
+        });
+
         it('should sanitize additional data when the host+param+format signature is triggered', async () => {
             mockDoGetRequest(body);
             const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
