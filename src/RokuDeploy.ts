@@ -1,6 +1,8 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as request from 'postman-request';
+import * as r from 'postman-request';
+import type * as requestType from 'request';
+const request = r as typeof requestType;
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
@@ -14,6 +16,8 @@ import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
+import * as lodash from 'lodash';
+import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 
 export class RokuDeploy {
 
@@ -370,7 +374,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): request.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): requestType.OptionsWithUrl {
         options = this.getOptions(options);
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -634,7 +638,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: any) {
+    private async doGetRequest(params: requestType.OptionsWithUrl) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             request.get(params, (err, resp, body) => {
                 if (err) {
@@ -919,26 +923,74 @@ export class RokuDeploy {
         return outPkgFilePath;
     }
 
-    public async getDeviceInfo(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
+    /**
+     * Get the `device-info` response from a Roku device
+     * @param host the host or IP address of the Roku
+     * @param port the port to use for the ECP request (defaults to 8060)
+     */
+    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
+    public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        options = this.getOptions(options) as any;
 
-        const requestOptions = {
-            url: `http://${options.host}:${options.remotePort}/query/device-info`,
-            timeout: options.timeout
-        };
-        let results = await this.doGetRequest(requestOptions);
+        //if the host is a DNS name, look up the IP address
         try {
-            const parsedContent = await xml2js.parseStringPromise(results.body, {
+            options.host = await util.dnsLookup(options.host);
+        } catch (e) {
+            //try using the host as-is (it'll probably fail...)
+        }
+
+        const url = `http://${options.host}:${options.remotePort}/query/device-info`;
+
+        let response = await this.doGetRequest({
+            url: url,
+            timeout: options.timeout,
+            headers: {
+                'User-Agent': 'https://github.com/RokuCommunity/roku-deploy'
+            }
+        });
+        try {
+            const parsedContent = await xml2js.parseStringPromise(response.body, {
                 explicitArray: false
             });
-            return parsedContent['device-info'];
+            // clone the data onto an object because xml2js somehow makes this object not an object???
+            let deviceInfo = {
+                ...parsedContent['device-info']
+            } as Record<string, any>;
+
+            if (options.enhance) {
+                // convert 'true' and 'false' string values to boolean
+                for (let key in deviceInfo) {
+                    if (deviceInfo[key] === 'true') {
+                        deviceInfo[key] = true;
+                    } else if (deviceInfo[key] === 'false') {
+                        deviceInfo[key] = false;
+                    }
+                }
+
+                // convert the following string values into numbers
+                const numberFields = ['software-build', 'uptime', 'trc-version', 'av-sync-calibration-enabled', 'time-zone-offset'];
+                for (const field of numberFields) {
+                    if (deviceInfo.hasOwnProperty(field)) {
+                        deviceInfo[field] = parseInt(deviceInfo[field]);
+                    }
+                }
+
+                //convert the property names to camel case
+                const result = {};
+                for (const key in deviceInfo) {
+                    result[lodash.camelCase(key)] = deviceInfo[key];
+                }
+                deviceInfo = result;
+            }
+            return deviceInfo;
         } catch (e) {
-            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', results);
+            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
 
     public async getDevId(options?: RokuDeployOptions) {
-        const deviceInfo = await this.getDeviceInfo(options);
+        const deviceInfo = await this.getDeviceInfo(options as any);
         return deviceInfo['keyed-developer-id'];
     }
 
@@ -1103,4 +1155,15 @@ export interface TakeScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     outFile?: string;
+}
+
+export interface GetDeviceInfoOptions {
+    host: string;
+    remotePort?: number;
+    timeout?: number;
+    /**
+     * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
+     * @default false
+     */
+    enhance?: boolean;
 }
