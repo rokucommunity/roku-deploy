@@ -55,13 +55,13 @@ describe('index', () => {
     describe('getOutputPkgFilePath', () => {
         it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
-            let outputPath = rokuDeploy.getOutputPkgFilePath(options);
+            let outputPath = rokuDeploy.getOutputPkgFilePath(options as any);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.pkg'));
         });
 
         it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
-            let outputPath = rokuDeploy.getOutputPkgFilePath(options);
+            let outputPath = rokuDeploy.getOutputPkgFilePath(options as any);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.pkg'));
         });
     });
@@ -69,13 +69,13 @@ describe('index', () => {
     describe('getOutputZipFilePath', () => {
         it('should return correct path if given basename', () => {
             options.outFile = 'roku-deploy';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy.getOutputZipFilePath(options as any);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.zip'));
         });
 
         it('should return correct path if given outFile option ending in .zip', () => {
             options.outFile = 'roku-deploy.zip';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy.getOutputZipFilePath(options as any);
             expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.zip'));
         });
     });
@@ -550,7 +550,7 @@ describe('index', () => {
             try {
                 options.stagingDir = s`${tempDir}/path/to/nowhere`;
                 fsExtra.ensureDirSync(options.stagingDir);
-                await rokuDeploy.zipPackage(options);
+                await rokuDeploy.zipPackage(options as any);
             } catch (e) {
                 err = (e as Error);
             }
@@ -561,7 +561,7 @@ describe('index', () => {
             let err;
             try {
                 options.stagingDir = s`${tempDir}/path/to/nowhere`;
-                await rokuDeploy.zipPackage(options);
+                await rokuDeploy.zipPackage(options as any);
             } catch (e) {
                 err = (e as Error);
             }
@@ -580,14 +580,14 @@ describe('index', () => {
                 ],
                 stagingDir: '.tmp/dist'
             };
-            await rokuDeploy.createPackage(opts);
-            expectPathExists(rokuDeploy.getOutputZipFilePath(opts));
+            await rokuDeploy.createPackage(opts as any);
+            expectPathExists(rokuDeploy.getOutputZipFilePath(opts as any));
         });
 
         it('should throw error when no files were found to copy', async () => {
             await assertThrowsAsync(async () => {
                 options.files = [];
-                await rokuDeploy.createPackage(options);
+                await rokuDeploy.createPackage(options as any);
             });
         });
 
@@ -597,15 +597,15 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ]
-            });
-            expectPathExists(rokuDeploy.getOutputZipFilePath(options));
+            } as any);
+            expectPathExists(rokuDeploy.getOutputZipFilePath(options as any));
         });
 
         it('should only include the specified files', async () => {
             const files = ['manifest'];
             options.files = files;
-            await rokuDeploy.createPackage(options);
-            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
+            await rokuDeploy.createPackage(options as any);
+            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options as any));
             const zip = await JSZip.loadAsync(data);
 
             for (const file of files) {
@@ -627,9 +627,9 @@ describe('index', () => {
                 ...options,
                 //target a subset of the files to make the test faster
                 files: filePaths
-            });
+            } as any);
 
-            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
+            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options as any));
             const zip = await JSZip.loadAsync(data);
 
             for (const file of filePaths) {
@@ -646,10 +646,10 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ]
-            });
+            } as any);
             expectPathExists(stagingDirValue);
             options.retainStagingDir = true;
-            await rokuDeploy.zipPackage(options);
+            await rokuDeploy.zipPackage(options as any);
             expectPathExists(stagingDirValue);
         });
 
@@ -661,7 +661,7 @@ describe('index', () => {
                 expect(info.manifestData.major_version).to.equal('1');
             });
 
-            await rokuDeploy.createPackage(options, spy);
+            await rokuDeploy.createPackage(options as any, spy);
 
             if (spy.notCalled) {
                 assert.fail('Callback not called');
@@ -674,7 +674,7 @@ describe('index', () => {
             await rokuDeploy.createPackage({
                 ...options,
                 files: ['manifest']
-            }, (info) => {
+            } as any, (info) => {
                 return Promise.resolve().then(() => {
                     count++;
                 }).then(() => {
@@ -693,7 +693,7 @@ describe('index', () => {
             await rokuDeploy.createPackage({
                 ...options,
                 files: ['manifest']
-            }, (info) => {
+            } as any, (info) => {
                 beforeZipInfo = info;
             });
             expect(beforeZipInfo.manifestData.build_version).to.not.equal('0');
@@ -707,7 +707,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ]
-            }, (info) => {
+            } as any, (info) => {
                 expect(info.manifestData.build_version).to.equal('0');
             });
         });
@@ -722,11 +722,11 @@ describe('index', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' } as any).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999 }).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999 } as any).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
@@ -811,7 +811,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish(options);
+            await rokuDeploy.publish(options as any);
             //the file should still exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
         });
@@ -823,7 +823,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false });
+            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false } as any);
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
             //the out folder should also be deleted since it's empty
@@ -848,7 +848,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false });
+            await rokuDeploy.publish({ ...options, retainDeploymentArchive: false } as any);
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
             //the out folder should also be deleted since it's empty
@@ -857,13 +857,13 @@ describe('index', () => {
         it('fails when the zip file is missing', async () => {
             options.outFile = 'fileThatDoesNotExist.zip';
             await expectThrowsAsync(async () => {
-                await rokuDeploy.publish(options);
-            }, `Cannot publish because file does not exist at '${rokuDeploy.getOutputZipFilePath(options)}'`);
+                await rokuDeploy.publish(options as any);
+            }, `Cannot publish because file does not exist at '${rokuDeploy.getOutputZipFilePath(options as any)}'`);
         });
 
         it('fails when no host is provided', () => {
             expectPathNotExists('rokudeploy.json');
-            return rokuDeploy.publish({ host: undefined }).then(() => {
+            return rokuDeploy.publish({ host: undefined } as any).then(() => {
                 assert.fail('Should not have succeeded');
             }, () => {
                 expect(true).to.be.true;
@@ -884,7 +884,7 @@ describe('index', () => {
             });
 
             try {
-                await rokuDeploy.publish(options);
+                await rokuDeploy.publish(options as any);
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
                 return;
@@ -899,7 +899,7 @@ describe('index', () => {
                 Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
             `);
 
-            return rokuDeploy.publish(options).then(() => {
+            return rokuDeploy.publish(options as any).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
                 expect(err).to.be.instanceOf(errors.CompileError);
@@ -913,7 +913,7 @@ describe('index', () => {
                 Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
             `);
 
-            return rokuDeploy.publish(options).then(() => {
+            return rokuDeploy.publish(options as any).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
                 expect(err).to.be.instanceOf(errors.CompileError);
@@ -925,7 +925,7 @@ describe('index', () => {
             let body = 'Install Failure: Compilation Failed.';
             mockDoPostRequest(body);
 
-            return rokuDeploy.publish(options).then(() => {
+            return rokuDeploy.publish(options as any).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
                 expect(err.message).to.equal('Compile error');
@@ -937,7 +937,7 @@ describe('index', () => {
             options.failOnCompileError = true;
             mockDoPostRequest('', 401);
 
-            return rokuDeploy.publish(options).then(() => {
+            return rokuDeploy.publish(options as any).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
                 expect(err.message).to.equal('Unauthorized. Please verify username and password for target Roku.');
@@ -949,7 +949,7 @@ describe('index', () => {
             options.failOnCompileError = true;
             mockDoPostRequest();
 
-            return rokuDeploy.publish(options).then((result) => {
+            return rokuDeploy.publish(options as any).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
             }, () => {
                 assert.fail('Should not have rejected the promise');
@@ -961,7 +961,7 @@ describe('index', () => {
             options.remoteDebug = true;
             const stub = mockDoPostRequest();
 
-            return rokuDeploy.publish(options).then((result) => {
+            return rokuDeploy.publish(options as any).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
                 expect(stub.getCall(0).args[0].formData.remotedebug).to.eql('1');
             }, () => {
@@ -975,7 +975,7 @@ describe('index', () => {
             options.remoteDebugConnectEarly = true;
             const stub = mockDoPostRequest();
 
-            return rokuDeploy.publish(options).then((result) => {
+            return rokuDeploy.publish(options as any).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
                 expect(stub.getCall(0).args[0].formData.remotedebug_connect_early).to.eql('1');
             }, () => {
@@ -989,7 +989,7 @@ describe('index', () => {
             let body = 'Identical to previous version -- not replacing.';
             mockDoPostRequest(body);
 
-            return rokuDeploy.publish(options).then((result) => {
+            return rokuDeploy.publish(options as any).then((result) => {
                 expect(result.results.body).to.equal(body);
             }, () => {
                 assert.fail('Should have resolved promise');
@@ -1002,7 +1002,7 @@ describe('index', () => {
             mockDoPostRequest(body, 123);
 
             try {
-                await rokuDeploy.publish(options);
+                await rokuDeploy.publish(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
                 return;
@@ -1015,7 +1015,7 @@ describe('index', () => {
             mockDoPostRequest('', 401);
 
             try {
-                await rokuDeploy.publish(options);
+                await rokuDeploy.publish(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnauthorizedDeviceResponseError);
                 return;
@@ -1028,7 +1028,7 @@ describe('index', () => {
             mockDoPostRequest(null);
 
             try {
-                await rokuDeploy.publish(options);
+                await rokuDeploy.publish(options as any);
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
                 return;
@@ -1040,14 +1040,14 @@ describe('index', () => {
     describe('convertToSquashfs', () => {
         it('should not return an error if successful', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
-            await rokuDeploy.convertToSquashfs(options);
+            await rokuDeploy.convertToSquashfs(options as any);
         });
 
         it('should return MissingRequiredOptionError if host was not provided', async () => {
             mockDoPostRequest();
             try {
                 options.host = undefined;
-                await rokuDeploy.convertToSquashfs(options);
+                await rokuDeploy.convertToSquashfs(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
                 return;
@@ -1058,7 +1058,7 @@ describe('index', () => {
         it('should return ConvertError if converting failed', async () => {
             mockDoPostRequest();
             try {
-                await rokuDeploy.convertToSquashfs(options);
+                await rokuDeploy.convertToSquashfs(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.ConvertError);
                 return;
@@ -1081,7 +1081,7 @@ describe('index', () => {
             sinon.stub(fsExtra, 'createReadStream').throws(expectedError);
             let actualError: Error;
             try {
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 actualError = e as Error;
             }
@@ -1096,7 +1096,7 @@ describe('index', () => {
             options.rekeySignedPackage = s`../notReal.pkg`;
             try {
                 fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } finally {
                 fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
             }
@@ -1109,7 +1109,7 @@ describe('index', () => {
             mockDoPostRequest(body);
 
             options.rekeySignedPackage = s`${tempDir}/testSignedPackage.pkg`;
-            await rokuDeploy.rekeyDevice(options);
+            await rokuDeploy.rekeyDevice(options as any);
         });
 
         it('should not return an error if dev ID is set and matches output', async () => {
@@ -1117,7 +1117,7 @@ describe('index', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            await rokuDeploy.rekeyDevice(options);
+            await rokuDeploy.rekeyDevice(options as any);
         });
 
         it('should not return an error if dev ID is not set', async () => {
@@ -1126,13 +1126,13 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             options.devId = undefined;
-            await rokuDeploy.rekeyDevice(options);
+            await rokuDeploy.rekeyDevice(options as any);
         });
 
         it('should throw error if missing rekeySignedPackage option', async () => {
             try {
                 options.rekeySignedPackage = null;
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
                 return;
@@ -1143,7 +1143,7 @@ describe('index', () => {
         it('should throw error if missing signingPassword option', async () => {
             try {
                 options.signingPassword = null;
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
                 return;
@@ -1154,7 +1154,7 @@ describe('index', () => {
         it('should throw error if response is not parsable', async () => {
             try {
                 mockDoPostRequest();
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
@@ -1168,7 +1168,7 @@ describe('index', () => {
                     <font color="red">Invalid public key.</font>
                 </div>`;
                 mockDoPostRequest(body);
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.FailedDeviceResponseError);
                 return;
@@ -1184,7 +1184,7 @@ describe('index', () => {
                 mockDoPostRequest(body);
 
                 options.devId = '45fdc2019903ac333ff624b0b2cddd2c733c3e74';
-                await rokuDeploy.rekeyDevice(options);
+                await rokuDeploy.rekeyDevice(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
                 return;
@@ -1201,7 +1201,7 @@ describe('index', () => {
         it('should return our error if signingPassword is not supplied', async () => {
             options.signingPassword = undefined;
             await expectThrowsAsync(async () => {
-                await rokuDeploy.signExistingPackage(options);
+                await rokuDeploy.signExistingPackage(options as any);
             }, 'Must supply signingPassword');
         });
 
@@ -1213,7 +1213,7 @@ describe('index', () => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
-                await rokuDeploy.signExistingPackage(options);
+                await rokuDeploy.signExistingPackage(options as any);
             } catch (e) {
                 expect(e).to.equal(error);
                 return;
@@ -1224,7 +1224,7 @@ describe('index', () => {
         it('should return our error if it received invalid data', async () => {
             try {
                 mockDoPostRequest(null);
-                await rokuDeploy.signExistingPackage(options);
+                await rokuDeploy.signExistingPackage(options as any);
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
@@ -1240,7 +1240,7 @@ describe('index', () => {
             mockDoPostRequest(body);
 
             await expectThrowsAsync(
-                rokuDeploy.signExistingPackage(options),
+                rokuDeploy.signExistingPackage(options as any),
                 'Invalid Password.'
             );
         });
@@ -1251,14 +1251,14 @@ describe('index', () => {
                         node.appendChild(pkgDiv);`;
             mockDoPostRequest(body);
 
-            let pkgPath = await rokuDeploy.signExistingPackage(options);
+            let pkgPath = await rokuDeploy.signExistingPackage(options as any);
             expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
         });
 
         it('should return our fallback error if neither error or package link was detected', async () => {
             mockDoPostRequest();
             await expectThrowsAsync(
-                rokuDeploy.signExistingPackage(options),
+                rokuDeploy.signExistingPackage(options as any),
                 'Unknown error signing package'
             );
         });
@@ -1270,13 +1270,13 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ]
-            });
+            } as any);
             expectPathExists(`${stagingDir}`);
         });
 
         it('should support overriding the staging folder', async () => {
             await rokuDeploy.prepublishToStaging({
-                ...options,
+                ...options as any,
                 files: ['manifest'],
                 stagingDir: `${tempDir}/custom-out-dir`
             });
@@ -1292,7 +1292,7 @@ describe('index', () => {
                 'manifest',
                 'source/main.brs'
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
@@ -1309,7 +1309,7 @@ describe('index', () => {
                     dest: 'source'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
 
@@ -1332,7 +1332,7 @@ describe('index', () => {
                     dest: 'source/main.brs'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
@@ -1352,7 +1352,7 @@ describe('index', () => {
                     dest: 'source/renamed.brs'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/source/renamed.brs`);
         });
 
@@ -1370,7 +1370,7 @@ describe('index', () => {
                     dest: 'source/renamed.brs'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/manifest`);
         });
 
@@ -1386,7 +1386,7 @@ describe('index', () => {
             ];
             options.retainStagingFolder = true;
             console.log('before');
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             console.log('after');
             expectPathExists(s`${stagingDir}/components/loader/loader.brs`);
             expectPathNotExists(s`${stagingDir}/components/scenes/home/home.brs`);
@@ -1406,7 +1406,7 @@ describe('index', () => {
                     'components/**/*',
                     '!components/scenes/**/*'
                 ]
-            });
+            } as any);
             expectPathExists(`${stagingDir}/components/Loader/Loader.brs`);
             expectPathNotExists(`${stagingDir}/components/scenes/Home/Home.brs`);
         });
@@ -1418,7 +1418,7 @@ describe('index', () => {
             ];
             options.retainStagingFolder = true;
             try {
-                await rokuDeploy.prepublishToStaging(options);
+                await rokuDeploy.prepublishToStaging(options as any);
                 expect(true).to.be.false;
             } catch (e) {
                 expect(true).to.be.true;
@@ -1434,7 +1434,7 @@ describe('index', () => {
                     dest: 'resources'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(`${stagingDir}/resources/images/fhd/image.jpg`);
         });
 
@@ -1452,7 +1452,7 @@ describe('index', () => {
                     dest: 'resources'
                 }
             ];
-            await rokuDeploy.prepublishToStaging(options);
+            await rokuDeploy.prepublishToStaging(options as any);
             expectPathExists(s`${stagingDir}/resources/images/fhd/image.jpg`);
             expectPathNotExists(s`${stagingDir}/resources/image.jpg`);
         });
@@ -1543,7 +1543,7 @@ describe('index', () => {
                     dest: s`renamed_test.md`
                 }]);
 
-                await rokuDeploy.prepublishToStaging(opts);
+                await rokuDeploy.prepublishToStaging(opts as any);
                 let stagedFilePath = s`${stagingDirValue}/renamed_test.md`;
                 expectPathExists(stagedFilePath);
                 let fileContents = await fsExtra.readFile(stagedFilePath);
@@ -1588,7 +1588,7 @@ describe('index', () => {
                     dest: s`source/main.brs`
                 }]);
 
-                await rokuDeploy.prepublishToStaging(opts);
+                await rokuDeploy.prepublishToStaging(opts as any);
                 expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
             });
         });
@@ -1730,7 +1730,7 @@ describe('index', () => {
 
             writeFiles(rootDir, ['manifest']);
 
-            let result = await rokuDeploy.deploy(options);
+            let result = await rokuDeploy.deploy(options as any);
             expect(result).not.to.be.undefined;
         });
 
@@ -1745,7 +1745,7 @@ describe('index', () => {
                 ...options,
                 //something in the previous test is locking the default output zip file. We should fix that at some point...
                 outDir: s`${tempDir}/test1`
-            });
+            } as any);
             expect(result).not.to.be.undefined;
         });
 
@@ -1754,7 +1754,7 @@ describe('index', () => {
             options.deleteInstalledChannel = true;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options);
+            await rokuDeploy.deploy(options as any);
 
             expect(spy.called).to.equal(true);
         });
@@ -1764,7 +1764,7 @@ describe('index', () => {
             options.deleteInstalledChannel = false;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options);
+            await rokuDeploy.deploy(options as any);
 
             expect(spy.notCalled).to.equal(true);
         });
@@ -3002,7 +3002,7 @@ describe('index', () => {
                 files: [
                     'source/main.brs'
                 ]
-            });
+            } as any);
             expectPathExists(s`${stagingDir}/source/main.brs`);
             expect(count).to.be.greaterThan(4);
         });
@@ -3278,7 +3278,7 @@ describe('index', () => {
             //this should not fail
             let pkgFilePath = await rokuDeploy.deployAndSignPackage({
                 retainStagingDir: false
-            });
+            } as any);
 
             //the return value should equal what retrieveSignedPackage returned.
             expect(pkgFilePath).to.equal('some_local_path');
@@ -3289,12 +3289,12 @@ describe('index', () => {
             //call it again, but specify true for retainStagingDir
             await rokuDeploy.deployAndSignPackage({
                 retainStagingDir: true
-            });
+            } as any);
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(1);
 
             //call it again, but don't specify retainStagingDir at all (it should default to FALSE)
-            await rokuDeploy.deployAndSignPackage({});
+            await rokuDeploy.deployAndSignPackage({} as any);
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(2);
         });
@@ -3302,7 +3302,7 @@ describe('index', () => {
         it('converts to squashfs if we request it to', async () => {
             options.convertToSquashfs = true;
             let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
-            await rokuDeploy.deployAndSignPackage(options);
+            await rokuDeploy.deployAndSignPackage(options as any);
             expect(stub.getCalls()).to.be.lengthOf(1);
         });
     });
