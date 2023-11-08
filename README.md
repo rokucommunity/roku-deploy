@@ -1,5 +1,7 @@
 # roku-deploy
 
+This is the V4 branch, it's a work in progress.
+
 Publish Roku projects to a Roku device by using Node.js.
 
 [![build status](https://img.shields.io/github/actions/workflow/status/rokucommunity/roku-deploy/build.yml?branch=master)](https://github.com/rokucommunity/roku-deploy/actions?query=branch%3Amaster+workflow%3Abuild)
