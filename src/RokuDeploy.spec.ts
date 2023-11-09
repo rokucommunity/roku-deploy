@@ -219,7 +219,7 @@ describe('index', () => {
             });
         });
 
-        it.only('pull many messages from the response body including json messages', () => {
+        it('pull many messages from the response body including json messages', () => {
             let body = getFakeResponseBody(`
             Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
             Shell.create('Roku.Message').trigger('Set message type', 'info').trigger('Set message content', 'Some random info message').trigger('Render', node);
