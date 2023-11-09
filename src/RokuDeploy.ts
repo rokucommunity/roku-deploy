@@ -680,8 +680,7 @@ export class RokuDeploy {
         let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
         let match: RegExpExecArray;
 
-        // eslint-disable-next-line no-cond-assign
-        while (match = errorRegex.exec(body)) {
+        while ((match = errorRegex.exec(body))) {
             let [, messageType, message] = match;
             switch (messageType.toLowerCase()) {
                 case RokuMessageType.error:
@@ -710,8 +709,7 @@ export class RokuDeploy {
         let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
         let jsonMatch: RegExpExecArray;
 
-        // eslint-disable-next-line no-cond-assign
-        while (jsonMatch = jsonParseRegex.exec(body)) {
+        while ((jsonMatch = jsonParseRegex.exec(body))) {
             let [, jsonString] = jsonMatch;
             let jsonObject = parseJsonc(jsonString);
             if (typeof jsonObject === 'object' && !Array.isArray(jsonObject) && jsonObject !== null) {
