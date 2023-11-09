@@ -213,9 +213,29 @@ describe('index', () => {
 
             let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
             expect(results).to.eql({
-                errors: ['Failure: Form Error: "archive" Field Not Found', 'Failure: Form Error: "archive" Field Not Found'],
+                errors: ['Failure: Form Error: "archive" Field Not Found'],
                 infos: ['Some random info message'],
                 successes: ['Screenshot ok']
+            });
+        });
+
+        it.only('pull many messages from the response body including json messages', () => {
+            let body = getFakeResponseBody(`
+            Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'info').trigger('Set message content', 'Some random info message').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"},{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Screenshot ok","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            `);
+
+            let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
+            expect(results).to.eql({
+                errors: ['Failure: Form Error: "archive" Field Not Found', 'Install Failure: Error parsing XML component SupportedFeaturesView.xml'],
+                infos: ['Some random info message'],
+                successes: ['Screenshot ok', 'Application Received: 2500809 bytes stored.']
             });
         });
     });
