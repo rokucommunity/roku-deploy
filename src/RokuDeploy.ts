@@ -697,7 +697,6 @@ export class RokuDeploy {
                     break;
 
                 case RokuMessageType.success:
-                    result.successes.push(message);
                     if (!result.successes.includes(message)) {
                         result.successes.push(message);
                     }
@@ -723,7 +722,8 @@ export class RokuDeploy {
                 }
 
                 for (let messageObject of messages) {
-                    if (RokuMessageType[messageObject?.type] !== null && messageObject?.text_type === 'text' && typeof messageObject?.text === 'string') {
+                    // Try to duck type the object to make sure it is some form of message to be displayed
+                    if (typeof messageObject.type === 'string' && messageObject.text_type === 'text' && typeof messageObject.text === 'string') {
                         const messageType: string = messageObject.type;
                         const text: string = messageObject.text;
                         switch (messageType.toLowerCase()) {
