@@ -36,7 +36,7 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    public async prepublishToStaging(options: PrepublushingOptions) {
+    public async prepublishToStaging(options: PrepublishToStagingOptions) {
         options = this.getOptions(options) as any;
 
         //clean the staging directory
@@ -105,7 +105,7 @@ export class RokuDeploy {
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zipPackage(options: ZipOptions) {
+    public async zipPackage(options: ZipPackageOptions) {
         options = this.getOptions(options) as any;
 
         //make sure the output folder exists
@@ -498,7 +498,7 @@ export class RokuDeploy {
      * Converts existing loaded package to squashfs for faster loading packages
      * @param options
      */
-    public async convertToSquashfs(options: SquashfsOptions) {
+    public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = this.getOptions(options) as any;
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
@@ -608,7 +608,7 @@ export class RokuDeploy {
      * @param options
      */
     public async retrieveSignedPackage(pkgPath: string, options: RetrieveSignedPackageOptions): Promise<string> {
-        options = this.getOptions(options);
+        options = this.getOptions(options) as any;
         let requestOptions = this.generateBaseRequestOptions(pkgPath, options as any);
 
         let pkgFilePath = this.getOutputPkgFilePath(options as any);
@@ -726,7 +726,7 @@ export class RokuDeploy {
      * Deletes any installed dev channel on the target Roku device
      * @param options
      */
-    public async deleteInstalledChannel(options?: DeleteChannelOptions) {
+    public async deleteInstalledChannel(options?: DeleteInstalledChannelOptions) {
         options = this.getOptions(options);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
@@ -801,7 +801,7 @@ export class RokuDeploy {
         }
 
         let remotePkgPath = await this.signExistingPackage(options as any);
-        let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
+        let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options as any);
         if (retainStagingDirInitialValue !== true) {
             await this.fsExtra.remove(options.stagingDir);
         }
@@ -891,7 +891,7 @@ export class RokuDeploy {
      * Centralizes getting output zip file path based on passed in options
      * @param options
      */
-    public getOutputZipFilePath(options: ZipPathOptions) {
+    public getOutputZipFilePath(options: GetOutputZipFilePathOptions) {
         options = this.getOptions(options) as any;
 
         let zipFileName = options.outFile;
@@ -908,7 +908,7 @@ export class RokuDeploy {
      * Centralizes getting output pkg file path based on passed in options
      * @param options
      */
-    public getOutputPkgFilePath(options?: OutputPkgFilePathOptions) {
+    public getOutputPkgFilePath(options?: GetOutputPkgFilePathOptions) {
         options = this.getOptions(options) as any;
 
         let pkgFileName = options.outFile;
@@ -989,7 +989,7 @@ export class RokuDeploy {
         }
     }
 
-    public async getDevId(options?: DevIdOptions) {
+    public async getDevId(options?: GetDevIdOptions) {
         const deviceInfo = await this.getDeviceInfo(options as any);
         return deviceInfo['keyed-developer-id'];
     }
@@ -1168,13 +1168,13 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
-export interface PrepublushingOptions {
+export interface PrepublishToStagingOptions {
     files: FileEntry[];
     stagingDir: string;
     rootDir: string;
 }
 
-export interface ZipOptions {
+export interface ZipPackageOptions {
     stagingDir: string;
     retainStagingDir: boolean;
     outDir: string;
@@ -1202,7 +1202,7 @@ export interface BaseOptions {
     password: string;
 }
 
-export interface SquashfsOptions {
+export interface ConvertToSquashfsOptions {
     host: string;
 }
 
@@ -1218,10 +1218,10 @@ export interface SignExistingPackageOptions {
     stagingDir: string;
 }
 
-type RetrieveSignedPackageOptions = RokuDeployOptions;
-type DeleteChannelOptions = RokuDeployOptions;
+type RetrieveSignedPackageOptions = BaseOptions;
+type DeleteInstalledChannelOptions = RokuDeployOptions;
 
-export interface ZipPathOptions {
+export interface GetOutputZipFilePathOptions {
     outFile: string;
     outDir: string;
 }
@@ -1235,9 +1235,9 @@ export interface DeployAndSignPackageOptions {
     convertToSquashfs: boolean;
     stagingDir: string;
 }
-export interface OutputPkgFilePathOptions {
+export interface GetOutputPkgFilePathOptions {
     outFile: string;
     outDir: string;
 }
 
-type DevIdOptions = RokuDeployOptions;
+type GetDevIdOptions = RokuDeployOptions;
