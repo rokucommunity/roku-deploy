@@ -1216,8 +1216,17 @@ export interface TakeScreenshotOptions {
 }
 
 export interface GetDeviceInfoOptions {
+    /**
+     * The hostname or IP address to use for the device-info URL
+     */
     host: string;
+    /**
+     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
+     */
     remotePort?: number;
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
     timeout?: number;
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
