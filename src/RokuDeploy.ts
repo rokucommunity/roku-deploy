@@ -677,25 +677,77 @@ export class RokuDeploy {
         let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
         let match: RegExpExecArray;
 
-        // eslint-disable-next-line no-cond-assign
-        while (match = errorRegex.exec(body)) {
+        while ((match = errorRegex.exec(body))) {
             let [, messageType, message] = match;
             switch (messageType.toLowerCase()) {
-                case 'error':
-                    result.errors.push(message);
+                case RokuMessageType.error:
+                    if (!result.errors.includes(message)) {
+                        result.errors.push(message);
+                    }
                     break;
 
-                case 'info':
-                    result.infos.push(message);
+                case RokuMessageType.info:
+                    if (!result.infos.includes(message)) {
+                        result.infos.push(message);
+                    }
                     break;
 
-                case 'success':
-                    result.successes.push(message);
+                case RokuMessageType.success:
+                    if (!result.successes.includes(message)) {
+                        result.successes.push(message);
+                    }
                     break;
 
                 default:
                     break;
             }
+        }
+
+        let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
+        let jsonMatch: RegExpExecArray;
+
+        while ((jsonMatch = jsonParseRegex.exec(body))) {
+            let [, jsonString] = jsonMatch;
+            let jsonObject = parseJsonc(jsonString);
+            if (typeof jsonObject === 'object' && !Array.isArray(jsonObject) && jsonObject !== null) {
+                let messages = jsonObject.messages;
+
+                if (!Array.isArray(messages)) {
+                    continue;
+                }
+
+                for (let messageObject of messages) {
+                    // Try to duck type the object to make sure it is some form of message to be displayed
+                    if (typeof messageObject.type === 'string' && messageObject.text_type === 'text' && typeof messageObject.text === 'string') {
+                        const messageType: string = messageObject.type;
+                        const text: string = messageObject.text;
+                        switch (messageType.toLowerCase()) {
+                            case RokuMessageType.error:
+                                if (!result.errors.includes(text)) {
+                                    result.errors.push(text);
+                                }
+                                break;
+
+                            case RokuMessageType.info:
+                                if (!result.infos.includes(text)) {
+                                    result.infos.push(text);
+                                }
+                                break;
+
+                            case RokuMessageType.success:
+                                if (!result.successes.includes(text)) {
+                                    result.successes.push(text);
+                                }
+
+                                break;
+
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+
         }
 
         return result;
@@ -1117,6 +1169,12 @@ export interface RokuMessages {
     successes: string[];
 }
 
+enum RokuMessageType {
+    success = 'success',
+    info = 'info',
+    error = 'error'
+}
+
 export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
@@ -1155,8 +1213,17 @@ export interface TakeScreenshotOptions {
 }
 
 export interface GetDeviceInfoOptions {
+    /**
+     * The hostname or IP address to use for the device-info URL
+     */
     host: string;
+    /**
+     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
+     */
     remotePort?: number;
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
     timeout?: number;
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
