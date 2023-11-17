@@ -987,7 +987,7 @@ describe('index', () => {
                     outFile: 'fileThatDoesNotExist.zip'
                 });
             }, `Cannot publish because file does not exist at '${rokuDeploy.getOutputZipFilePath({
-                outFile: 'roku-deploy',
+                outFile: 'fileThatDoesNotExist.zip',
                 outDir: outDir
             })}'`);
         });
