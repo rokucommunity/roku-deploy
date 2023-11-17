@@ -624,9 +624,11 @@ describe('index', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
             try {
-                options.stagingDir = s`${tempDir}/path/to/nowhere`;
                 fsExtra.ensureDirSync(options.stagingDir);
-                await rokuDeploy.zipPackage(options as any);
+                await rokuDeploy.zipPackage({
+                    stagingDir: s`${tempDir}/path/to/nowhere`,
+                    outDir: outDir
+                });
             } catch (e) {
                 err = (e as Error);
             }
@@ -636,8 +638,10 @@ describe('index', () => {
         it('should throw error when manifest is missing and stagingDir does not exist', async () => {
             let err;
             try {
-                options.stagingDir = s`${tempDir}/path/to/nowhere`;
-                await rokuDeploy.zipPackage(options as any);
+                await rokuDeploy.zipPackage({
+                    stagingDir: s`${tempDir}/path/to/nowhere`,
+                    outDir: outDir
+                });
             } catch (e) {
                 err = (e as Error);
             }
@@ -664,7 +668,7 @@ describe('index', () => {
             await assertThrowsAsync(async () => {
                 await rokuDeploy.createPackage({
                     files: [],
-                    stagingDir: '.tmp/dist',
+                    stagingDir: stagingDir,
                     outDir: outDir,
                     rootDir: rootDir
                 });
@@ -676,7 +680,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             });
@@ -688,7 +692,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             });
@@ -713,12 +717,12 @@ describe('index', () => {
             ]);
             await rokuDeploy.createPackage({
                 files: filePaths,
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             });
 
-            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options as any));
+            const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath({ outDir: outDir }));
             const zip = await JSZip.loadAsync(data);
 
             for (const file of filePaths) {
@@ -734,12 +738,15 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 rootDir: rootDir
             });
             expectPathExists(stagingDirValue);
             options.retainStagingDir = true;
-            await rokuDeploy.zipPackage(options as any);
+            await rokuDeploy.zipPackage({
+                retainStagingDir: true,
+                outDir: outDir
+            });
             expectPathExists(stagingDirValue);
         });
 
@@ -755,7 +762,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             }, spy);
@@ -772,7 +779,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             }, (info) => {
@@ -795,7 +802,7 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
                 rootDir: rootDir
             }, (info) => {
@@ -806,14 +813,14 @@ describe('index', () => {
 
         it('should not increment the build number if not requested', async () => {
             fsExtra.outputFileSync(`${rootDir}/manifest`, `build_version=0`);
-            options.incrementBuildNumber = false;
             await rokuDeploy.createPackage({
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist',
+                stagingDir: stagingDir,
                 outDir: outDir,
-                rootDir: rootDir
+                rootDir: rootDir,
+                incrementBuildNumber: false
             }, (info) => {
                 expect(info.manifestData.build_version).to.equal('0');
             });
@@ -829,11 +836,11 @@ describe('index', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' } as any).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: options.password }).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999 } as any).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: options.password }).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
