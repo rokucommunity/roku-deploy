@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.10.5](https://github.com/rokucommunity/roku-deploy/compare/v3.10.4...v3.10.5) - 2023-11-14
+### Changed
+ - better device-info docs ([#128](https://github.com/rokucommunity/roku-deploy/pull/128))
+ - Better deploy error detection ([#127](https://github.com/rokucommunity/roku-deploy/pull/127))
+
+
+
 ## [3.10.4](https://github.com/rokucommunity/roku-deploy/compare/v3.10.3...v3.10.4) - 2023-11-03
 ### Changed
  - Enhance getDeviceInfo() method to support camelCase and convert bool|number strings to their primitive types ([#120](https://github.com/rokucommunity/roku-deploy/pull/120))
