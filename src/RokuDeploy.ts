@@ -348,9 +348,6 @@ export class RokuDeploy {
         if (!stagingPath) {
             throw new Error('stagingPath is required');
         }
-        if (!rootDir) {
-            throw new Error('rootDir is required');
-        }
         if (!await this.fsExtra.pathExists(rootDir)) {
             throw new Error(`rootDir does not exist at "${rootDir}"`);
         }
