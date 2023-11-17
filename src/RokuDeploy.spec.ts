@@ -1387,7 +1387,6 @@ describe('index', () => {
                 await rokuDeploy.rekeyDevice({
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } catch (e) {
