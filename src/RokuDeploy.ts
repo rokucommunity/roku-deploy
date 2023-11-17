@@ -134,7 +134,7 @@ export class RokuDeploy {
     public async createPackage(options: CreatePackageOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => Promise<void> | void) {
         options = this.getOptions(options) as any;
 
-        await this.prepublishToStaging(options as any);
+        await this.prepublishToStaging(options);
 
         let manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
         let parsedManifest = await this.parseManifest(manifestPath);
@@ -154,7 +154,7 @@ export class RokuDeploy {
 
             await Promise.resolve(beforeZipCallback(info));
         }
-        await this.zipPackage(options as any);
+        await this.zipPackage(options);
     }
 
     /**
@@ -374,7 +374,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: BaseOptions, formData = {} as T): requestType.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
         options = this.getOptions(options) as any;
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -1170,35 +1170,40 @@ export interface GetDeviceInfoOptions {
 
 export interface PrepublishToStagingOptions {
     files: FileEntry[];
-    stagingDir: string;
-    rootDir: string;
+    stagingDir?: string;
+    retainStagingFolder?: boolean;
+    rootDir?: string;
 }
 
 export interface ZipPackageOptions {
     stagingDir: string;
-    retainStagingDir: boolean;
+    retainStagingDir?: boolean;
     outDir: string;
 }
 
 export interface CreatePackageOptions {
+    files: FileEntry[];
     stagingDir: string;
-    incrementBuildNumber: boolean;
+    retainStagingDir?: boolean;
+    outDir: string;
+    incrementBuildNumber?: boolean;
+    rootDir?: string;
 }
 
 export interface PublishOptions {
     host: string;
     outDir: string;
-    remoteDebug: boolean;
-    remoteDebugConnectEarly: boolean;
-    failOnCompileError: boolean;
-    retainDeploymentArchive: boolean;
+    remoteDebug?: boolean;
+    remoteDebugConnectEarly?: boolean;
+    failOnCompileError?: boolean;
+    retainDeploymentArchive?: boolean;
 }
 
-export interface BaseOptions {
+export interface BaseRequestOptions {
     host: string;
-    packagePort: number;
-    timeout: number;
-    username: string;
+    packagePort?: number;
+    timeout?: number;
+    username?: string;
     password: string;
 }
 
@@ -1218,11 +1223,18 @@ export interface SignExistingPackageOptions {
     stagingDir: string;
 }
 
-type RetrieveSignedPackageOptions = BaseOptions;
+export interface RetrieveSignedPackageOptions {
+    host: string;
+    packagePort?: number;
+    timeout?: number;
+    username?: string;
+    password: string;
+    outFile?: string;
+}
 type DeleteInstalledChannelOptions = RokuDeployOptions;
 
 export interface GetOutputZipFilePathOptions {
-    outFile: string;
+    outFile?: string;
     outDir: string;
 }
 
@@ -1231,9 +1243,9 @@ export interface DeployOptions {
 }
 
 export interface DeployAndSignPackageOptions {
-    retainStagingDir: boolean;
-    convertToSquashfs: boolean;
-    stagingDir: string;
+    retainStagingDir?: boolean;
+    convertToSquashfs?: boolean;
+    stagingDir?: string;
 }
 export interface GetOutputPkgFilePathOptions {
     outFile: string;
