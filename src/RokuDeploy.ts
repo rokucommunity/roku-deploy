@@ -1261,6 +1261,7 @@ export interface PublishOptions {
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
     retainDeploymentArchive?: boolean;
+    outFile: string;
 }
 
 export interface BaseRequestOptions {

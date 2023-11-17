@@ -925,7 +925,8 @@ describe('index', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
             await rokuDeploy.publish({
                 host: '1.2.3.4',
-                outDir: outDir
+                outDir: outDir,
+                outFile: options.outFile
             });
             //the file should still exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
@@ -933,7 +934,6 @@ describe('index', () => {
 
         it('deletes the archive when configured', async () => {
             let zipPath = `${outDir}/${options.outFile}`;
-
             mockDoPostRequest();
 
             //the file should exist
@@ -941,7 +941,8 @@ describe('index', () => {
             await rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                retainDeploymentArchive: false
+                retainDeploymentArchive: false,
+                outFile: options.outFile
             });
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
@@ -970,7 +971,8 @@ describe('index', () => {
             await rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                retainDeploymentArchive: false
+                retainDeploymentArchive: false,
+                outFile: options.outFile
             });
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
@@ -978,11 +980,11 @@ describe('index', () => {
         });
 
         it('fails when the zip file is missing', async () => {
-            options.outFile = 'fileThatDoesNotExist.zip';
             await expectThrowsAsync(async () => {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
-                    outDir: outDir
+                    outDir: outDir,
+                    outFile: 'fileThatDoesNotExist.zip'
                 });
             }, `Cannot publish because file does not exist at '${rokuDeploy.getOutputZipFilePath({
                 outFile: 'roku-deploy',
@@ -993,8 +995,9 @@ describe('index', () => {
         it('fails when no host is provided', () => {
             expectPathNotExists('rokudeploy.json');
             return rokuDeploy.publish({
-                host: '1.2.3.4',
-                outDir: outDir
+                host: undefined,
+                outDir: outDir,
+                outFile: options.outFile
             }).then(() => {
                 assert.fail('Should not have succeeded');
             }, () => {
@@ -1018,7 +1021,8 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
-                    outDir: outDir
+                    outDir: outDir,
+                    outFile: options.outFile
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
@@ -1036,7 +1040,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: true
+                failOnCompileError: true,
+                outFile: options.outFile
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1053,7 +1058,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: true
+                failOnCompileError: true,
+                outFile: options.outFile
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1068,7 +1074,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: true
+                failOnCompileError: true,
+                outFile: options.outFile
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1083,7 +1090,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: true
+                failOnCompileError: true,
+                outFile: options.outFile
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1098,7 +1106,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: true
+                failOnCompileError: true,
+                outFile: options.outFile
             }).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
             }, () => {
@@ -1113,7 +1122,8 @@ describe('index', () => {
                 host: '1.2.3.4',
                 outDir: outDir,
                 failOnCompileError: true,
-                remoteDebug: true
+                remoteDebug: true,
+                outFile: options.outFile
             }).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
                 expect(stub.getCall(0).args[0].formData.remotedebug).to.eql('1');
@@ -1130,7 +1140,8 @@ describe('index', () => {
                 outDir: outDir,
                 failOnCompileError: true,
                 remoteDebug: true,
-                remoteDebugConnectEarly: true
+                remoteDebugConnectEarly: true,
+                outFile: options.outFile
             }).then((result) => {
                 expect(result.message).to.equal('Successful deploy');
                 expect(stub.getCall(0).args[0].formData.remotedebug_connect_early).to.eql('1');
@@ -1146,7 +1157,8 @@ describe('index', () => {
             return rokuDeploy.publish({
                 host: '1.2.3.4',
                 outDir: outDir,
-                failOnCompileError: false
+                failOnCompileError: false,
+                outFile: options.outFile
             }).then((result) => {
                 expect(result.results.body).to.equal(body);
             }, () => {
@@ -1162,7 +1174,8 @@ describe('index', () => {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
                     outDir: outDir,
-                    failOnCompileError: true
+                    failOnCompileError: true,
+                    outFile: options.outFile
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
@@ -1178,7 +1191,8 @@ describe('index', () => {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
                     outDir: outDir,
-                    failOnCompileError: true
+                    failOnCompileError: true,
+                    outFile: options.outFile
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnauthorizedDeviceResponseError);
@@ -1194,7 +1208,8 @@ describe('index', () => {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
                     outDir: outDir,
-                    failOnCompileError: true
+                    failOnCompileError: true,
+                    outFile: options.outFile
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
