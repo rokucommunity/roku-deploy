@@ -1814,7 +1814,14 @@ describe('index', () => {
                     dest: s`renamed_test.md`
                 }]);
 
-                await rokuDeploy.prepublishToStaging(opts as any);
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    files: [
+                        'manifest',
+                        'renamed_test.md'
+                    ]
+                });
                 let stagedFilePath = s`${stagingDirValue}/renamed_test.md`;
                 expectPathExists(stagedFilePath);
                 let fileContents = await fsExtra.readFile(stagedFilePath);
@@ -1893,11 +1900,12 @@ describe('index', () => {
             fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
             await rokuDeploy.prepublishToStaging({
-                ...options,
+                rootDir: rootDir,
+                stagingDir: stagingDir,
                 files: [
                     'source/main.brs'
                 ]
-            } as any);
+            });
             expectPathExists(s`${stagingDir}/source/main.brs`);
             expect(count).to.be.greaterThan(4);
         });
@@ -2073,7 +2081,7 @@ describe('index', () => {
 
             writeFiles(rootDir, ['manifest']);
 
-            let result = await rokuDeploy.deploy(options as any);
+            let result = await rokuDeploy.deploy(options);
             expect(result).not.to.be.undefined;
         });
 
@@ -2088,7 +2096,7 @@ describe('index', () => {
                 ...options,
                 //something in the previous test is locking the default output zip file. We should fix that at some point...
                 outDir: s`${tempDir}/test1`
-            } as any);
+            });
             expect(result).not.to.be.undefined;
         });
 
@@ -2097,7 +2105,7 @@ describe('index', () => {
             options.deleteInstalledChannel = true;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options as any);
+            await rokuDeploy.deploy(options);
 
             expect(spy.called).to.equal(true);
         });
@@ -2107,7 +2115,7 @@ describe('index', () => {
             options.deleteInstalledChannel = false;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options as any);
+            await rokuDeploy.deploy(options);
 
             expect(spy.notCalled).to.equal(true);
         });

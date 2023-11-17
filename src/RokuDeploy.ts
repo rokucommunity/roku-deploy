@@ -1305,6 +1305,7 @@ export interface GetOutputZipFilePathOptions {
 
 export interface DeployOptions {
     deleteInstalledChannel?: boolean;
+    outDir?: string;
 }
 
 export interface DeployAndSignPackageOptions {
