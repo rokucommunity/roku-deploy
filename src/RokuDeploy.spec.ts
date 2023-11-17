@@ -56,17 +56,17 @@ describe('index', () => {
         it('should return correct path if given basename', () => {
             let outputPath = rokuDeploy.getOutputPkgFilePath({
                 outFile: 'roku-deploy',
-                outDir: options.outDir
+                outDir: outDir
             });
-            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), options.outFile + '.pkg'));
+            expect(outputPath).to.equal(path.join(path.resolve(outDir), options.outFile + '.pkg'));
         });
 
         it('should return correct path if given outFile option ending in .zip', () => {
             let outputPath = rokuDeploy.getOutputPkgFilePath({
                 outFile: 'roku-deploy.zip',
-                outDir: options.outDir
+                outDir: outDir
             });
-            expect(outputPath).to.equal(path.join(path.resolve(options.outDir), 'roku-deploy.pkg'));
+            expect(outputPath).to.equal(path.join(path.resolve(outDir), 'roku-deploy.pkg'));
         });
     });
 
@@ -654,7 +654,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             });
             expectPathExists(rokuDeploy.getOutputZipFilePath({ outDir: outDir }));
         });
@@ -664,7 +665,8 @@ describe('index', () => {
                 await rokuDeploy.createPackage({
                     files: [],
                     stagingDir: '.tmp/dist',
-                    outDir: outDir
+                    outDir: outDir,
+                    rootDir: rootDir
                 });
             });
         });
@@ -675,7 +677,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             });
             expectPathExists(rokuDeploy.getOutputZipFilePath({ outDir: outDir }));
         });
@@ -686,7 +689,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             });
             const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath({ outDir: outDir }));
             const zip = await JSZip.loadAsync(data);
@@ -710,7 +714,8 @@ describe('index', () => {
             await rokuDeploy.createPackage({
                 files: filePaths,
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             });
 
             const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options as any));
@@ -729,7 +734,8 @@ describe('index', () => {
                 files: [
                     'manifest'
                 ],
-                stagingDir: '.tmp/dist'
+                stagingDir: '.tmp/dist',
+                rootDir: rootDir
             });
             expectPathExists(stagingDirValue);
             options.retainStagingDir = true;
@@ -750,7 +756,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             }, spy);
 
             if (spy.notCalled) {
@@ -766,7 +773,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             }, (info) => {
                 return Promise.resolve().then(() => {
                     count++;
@@ -788,7 +796,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             }, (info) => {
                 beforeZipInfo = info;
             });
@@ -803,7 +812,8 @@ describe('index', () => {
                     'manifest'
                 ],
                 stagingDir: '.tmp/dist',
-                outDir: outDir
+                outDir: outDir,
+                rootDir: rootDir
             }, (info) => {
                 expect(info.manifestData.build_version).to.equal('0');
             });
@@ -895,12 +905,12 @@ describe('index', () => {
             //make a dummy output file...we don't care what's in it
             options.outFile = `temp${fileCounter++}.zip`;
             try {
-                fsExtra.outputFileSync(`${options.outDir}/${options.outFile}`, 'asdf');
+                fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
             } catch (e) { }
         });
 
         it('does not delete the archive by default', async () => {
-            let zipPath = `${options.outDir}/${options.outFile}`;
+            let zipPath = `${outDir}/${options.outFile}`;
 
             mockDoPostRequest();
 
@@ -915,7 +925,7 @@ describe('index', () => {
         });
 
         it('deletes the archive when configured', async () => {
-            let zipPath = `${options.outDir}/${options.outFile}`;
+            let zipPath = `${outDir}/${options.outFile}`;
 
             mockDoPostRequest();
 
@@ -944,7 +954,7 @@ describe('index', () => {
                 return stream;
             });
 
-            let zipPath = `${options.outDir}/${options.outFile}`;
+            let zipPath = `${outDir}/${options.outFile}`;
 
             mockDoPostRequest();
 
@@ -1478,7 +1488,8 @@ describe('index', () => {
             await rokuDeploy.prepublishToStaging({
                 files: [
                     'manifest'
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}`);
         });
@@ -1486,7 +1497,8 @@ describe('index', () => {
         it('should support overriding the staging folder', async () => {
             await rokuDeploy.prepublishToStaging({
                 files: ['manifest'],
-                stagingDir: `${tempDir}/custom-out-dir`
+                stagingDir: `${tempDir}/custom-out-dir`,
+                rootDir: rootDir
             });
             expectPathExists(`${tempDir}/custom-out-dir`);
         });
@@ -1500,7 +1512,8 @@ describe('index', () => {
                 files: [
                     'manifest',
                     'source/main.brs'
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
@@ -1518,7 +1531,8 @@ describe('index', () => {
                         src: 'source/**/*',
                         dest: 'source'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
@@ -1542,7 +1556,8 @@ describe('index', () => {
                         src: 'source/main.brs',
                         dest: 'source/main.brs'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
@@ -1563,7 +1578,8 @@ describe('index', () => {
                         src: 'source/main.brs',
                         dest: 'source/renamed.brs'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/source/renamed.brs`);
         });
@@ -1582,7 +1598,8 @@ describe('index', () => {
                         src: 'source/main.brs',
                         dest: 'source/renamed.brs'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/manifest`);
         });
@@ -1599,7 +1616,8 @@ describe('index', () => {
                     'manifest',
                     'components/!(scenes)/**/*'
                 ],
-                retainStagingFolder: true
+                retainStagingFolder: true,
+                rootDir: rootDir
             });
             console.log('after');
             expectPathExists(s`${stagingDir}/components/loader/loader.brs`);
@@ -1619,7 +1637,8 @@ describe('index', () => {
                     'components/**/*',
                     '!components/scenes/**/*'
                 ],
-                retainStagingFolder: true
+                retainStagingFolder: true,
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/components/Loader/Loader.brs`);
             expectPathNotExists(`${stagingDir}/components/scenes/Home/Home.brs`);
@@ -1632,7 +1651,8 @@ describe('index', () => {
                         'manifest',
                         <any>{}
                     ],
-                    retainStagingFolder: true
+                    retainStagingFolder: true,
+                    rootDir: rootDir
                 });
                 expect(true).to.be.false;
             } catch (e) {
@@ -1649,7 +1669,8 @@ describe('index', () => {
                         src: 'flavors/shared/resources/**/*',
                         dest: 'resources'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(`${stagingDir}/resources/images/fhd/image.jpg`);
         });
@@ -1668,7 +1689,8 @@ describe('index', () => {
                         src: 'flavors/shared/resources/**/*',
                         dest: 'resources'
                     }
-                ]
+                ],
+                rootDir: rootDir
             });
             expectPathExists(s`${stagingDir}/resources/images/fhd/image.jpg`);
             expectPathNotExists(s`${stagingDir}/resources/image.jpg`);

@@ -1236,7 +1236,7 @@ export interface PrepublishToStagingOptions {
     files: FileEntry[];
     stagingDir?: string;
     retainStagingFolder?: boolean;
-    rootDir?: string;
+    rootDir: string;
 }
 
 export interface ZipPackageOptions {
@@ -1251,7 +1251,7 @@ export interface CreatePackageOptions {
     retainStagingDir?: boolean;
     outDir: string;
     incrementBuildNumber?: boolean;
-    rootDir?: string;
+    rootDir: string;
 }
 
 export interface PublishOptions {
