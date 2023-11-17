@@ -742,8 +742,8 @@ describe('index', () => {
                 rootDir: rootDir
             });
             expectPathExists(stagingDirValue);
-            options.retainStagingDir = true;
             await rokuDeploy.zipPackage({
+                stagingDir: stagingDir,
                 retainStagingDir: true,
                 outDir: outDir
             });
