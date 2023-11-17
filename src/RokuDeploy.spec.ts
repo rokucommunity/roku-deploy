@@ -794,7 +794,6 @@ describe('index', () => {
 
         it('should increment the build number if requested', async () => {
             fsExtra.outputFileSync(`${rootDir}/manifest`, `build_version=0`);
-            options.incrementBuildNumber = true;
             //make the zipping immediately resolve
             sinon.stub(rokuDeploy, 'zipPackage').returns(Promise.resolve());
             let beforeZipInfo: BeforeZipCallbackInfo;
@@ -804,7 +803,8 @@ describe('index', () => {
                 ],
                 stagingDir: stagingDir,
                 outDir: outDir,
-                rootDir: rootDir
+                rootDir: rootDir,
+                incrementBuildNumber: true
             }, (info) => {
                 beforeZipInfo = info;
             });
