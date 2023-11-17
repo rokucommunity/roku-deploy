@@ -529,7 +529,6 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        console.log(rekeySignedPackagePath, options.rootDir);
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
             passwd: options.signingPassword,
