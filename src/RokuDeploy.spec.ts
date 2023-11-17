@@ -1426,7 +1426,7 @@ describe('index', () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.signExistingPackage({
                     signingPassword: undefined,
-                    stagingDir: options.stagingDir
+                    stagingDir: stagingDir
                 });
             }, 'Must supply signingPassword');
         });
@@ -1441,7 +1441,7 @@ describe('index', () => {
                 });
                 await rokuDeploy.signExistingPackage({
                     signingPassword: options.signingPassword,
-                    stagingDir: options.stagingDir
+                    stagingDir: stagingDir
                 });
             } catch (e) {
                 expect(e).to.equal(error);
@@ -1455,7 +1455,7 @@ describe('index', () => {
                 mockDoPostRequest(null);
                 await rokuDeploy.signExistingPackage({
                     signingPassword: options.signingPassword,
-                    stagingDir: options.stagingDir
+                    stagingDir: stagingDir
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
@@ -1474,7 +1474,7 @@ describe('index', () => {
             await expectThrowsAsync(
                 rokuDeploy.signExistingPackage({
                     signingPassword: options.signingPassword,
-                    stagingDir: options.stagingDir
+                    stagingDir: stagingDir
                 }),
                 'Invalid Password.'
             );
@@ -1488,7 +1488,7 @@ describe('index', () => {
 
             let pkgPath = await rokuDeploy.signExistingPackage({
                 signingPassword: options.signingPassword,
-                stagingDir: options.stagingDir
+                stagingDir: stagingDir
             });
             expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
         });
@@ -1498,7 +1498,7 @@ describe('index', () => {
             await expectThrowsAsync(
                 rokuDeploy.signExistingPackage({
                     signingPassword: options.signingPassword,
-                    stagingDir: options.stagingDir
+                    stagingDir: stagingDir
                 }),
                 'Unknown error signing package'
             );
@@ -1535,7 +1535,8 @@ describe('index', () => {
                     'manifest',
                     'source/main.brs'
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
@@ -1554,7 +1555,8 @@ describe('index', () => {
                         dest: 'source'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
@@ -1579,7 +1581,8 @@ describe('index', () => {
                         dest: 'source/main.brs'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/manifest`);
             expectPathExists(`${stagingDir}/source/main.brs`);
@@ -1601,7 +1604,8 @@ describe('index', () => {
                         dest: 'source/renamed.brs'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/source/renamed.brs`);
         });
@@ -1621,7 +1625,8 @@ describe('index', () => {
                         dest: 'source/renamed.brs'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/manifest`);
         });
@@ -1639,7 +1644,8 @@ describe('index', () => {
                     'components/!(scenes)/**/*'
                 ],
                 retainStagingFolder: true,
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             console.log('after');
             expectPathExists(s`${stagingDir}/components/loader/loader.brs`);
@@ -1660,7 +1666,8 @@ describe('index', () => {
                     '!components/scenes/**/*'
                 ],
                 retainStagingFolder: true,
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/components/Loader/Loader.brs`);
             expectPathNotExists(`${stagingDir}/components/scenes/Home/Home.brs`);
@@ -1674,7 +1681,8 @@ describe('index', () => {
                         <any>{}
                     ],
                     retainStagingFolder: true,
-                    rootDir: rootDir
+                    rootDir: rootDir,
+                    stagingDir: stagingDir
                 });
                 expect(true).to.be.false;
             } catch (e) {
@@ -1692,7 +1700,8 @@ describe('index', () => {
                         dest: 'resources'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(`${stagingDir}/resources/images/fhd/image.jpg`);
         });
@@ -1712,7 +1721,8 @@ describe('index', () => {
                         dest: 'resources'
                     }
                 ],
-                rootDir: rootDir
+                rootDir: rootDir,
+                stagingDir: stagingDir
             });
             expectPathExists(s`${stagingDir}/resources/images/fhd/image.jpg`);
             expectPathNotExists(s`${stagingDir}/resources/image.jpg`);
