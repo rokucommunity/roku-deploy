@@ -1011,33 +1011,35 @@ export class RokuDeploy {
             } as Record<string, any>;
 
             if (options.enhance) {
-                // convert 'true' and 'false' string values to boolean
-                for (let key in deviceInfo) {
-                    if (deviceInfo[key] === 'true') {
-                        deviceInfo[key] = true;
-                    } else if (deviceInfo[key] === 'false') {
-                        deviceInfo[key] = false;
-                    }
-                }
-
-                // convert the following string values into numbers
-                const numberFields = ['software-build', 'uptime', 'trc-version', 'av-sync-calibration-enabled', 'time-zone-offset'];
-                for (const field of numberFields) {
-                    if (deviceInfo.hasOwnProperty(field)) {
-                        deviceInfo[field] = parseInt(deviceInfo[field]);
-                    }
-                }
-
-                //convert the property names to camel case
                 const result = {};
-                for (const key in deviceInfo) {
-                    result[lodash.camelCase(key)] = deviceInfo[key];
+                // sanitize/normalize values to their native formats, and also convert property names to camelCase
+                for (let key in deviceInfo) {
+                    result[lodash.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
                 }
                 deviceInfo = result;
             }
             return deviceInfo;
         } catch (e) {
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
+        }
+    }
+
+    /**
+     * Normalize a deviceInfo field value. This includes things like converting boolean strings to booleans, number strings to numbers,
+     * decoding HtmlEntities, etc.
+     * @param deviceInfo
+     */
+    public normalizeDeviceInfoFieldValue(value: any) {
+        let num: number;
+        // convert 'true' and 'false' string values to boolean
+        if (value === 'true') {
+            return true;
+        } else if (value === 'false') {
+            return false;
+        } else if (value.trim() !== '' && !isNaN(num = Number(value))) {
+            return num;
+        } else {
+            return util.decodeHtmlEntities(value);
         }
     }
 
