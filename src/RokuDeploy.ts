@@ -915,9 +915,6 @@ export class RokuDeploy {
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
-        finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
-        //sync the new option with the old one (for back-compat)
-        finalOptions.retainStagingFolder = finalOptions.retainStagingDir;
 
         let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
 
@@ -1235,7 +1232,6 @@ export interface GetDeviceInfoOptions {
 export interface PrepublishToStagingOptions {
     files: FileEntry[];
     stagingDir?: string;
-    retainStagingFolder?: boolean;
     rootDir: string;
 }
 

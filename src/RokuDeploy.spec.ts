@@ -1642,7 +1642,6 @@ describe('index', () => {
                     'manifest',
                     'components/!(scenes)/**/*'
                 ],
-                retainStagingFolder: true,
                 rootDir: rootDir,
                 stagingDir: stagingDir
             });
@@ -1664,7 +1663,6 @@ describe('index', () => {
                     'components/**/*',
                     '!components/scenes/**/*'
                 ],
-                retainStagingFolder: true,
                 rootDir: rootDir,
                 stagingDir: stagingDir
             });
@@ -1679,7 +1677,6 @@ describe('index', () => {
                         'manifest',
                         <any>{}
                     ],
-                    retainStagingFolder: true,
                     rootDir: rootDir,
                     stagingDir: stagingDir
                 });
@@ -3361,21 +3358,6 @@ describe('index', () => {
             expect(
                 rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingFolderPath
             ).to.eql(s`${cwd}/staging-folder-path`);
-        });
-
-        it('supports deprecated retainStagingFolder option', () => {
-            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
-                return false;
-            });
-            expect(
-                rokuDeploy.getOptions({ retainStagingFolder: true }).retainStagingDir
-            ).to.be.true;
-            expect(
-                rokuDeploy.getOptions({ retainStagingFolder: true, retainStagingDir: false }).retainStagingDir
-            ).to.be.false;
-            expect(
-                rokuDeploy.getOptions({ retainStagingFolder: true, retainStagingDir: false }).retainStagingFolder
-            ).to.be.false;
         });
 
         it('calling with no parameters works', () => {

@@ -40,13 +40,6 @@ export interface RokuDeployOptions {
     /**
      * Set this to true to prevent the staging folder from being deleted after creating the package
      * @default false
-     * @deprecated use `retainStagingDir` instead
-     */
-    retainStagingFolder?: boolean;
-
-    /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @default false
      */
     retainStagingDir?: boolean;
 
