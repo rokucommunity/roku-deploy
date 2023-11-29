@@ -283,4 +283,15 @@ describe('util', () => {
             ).to.be.false;
         });
     });
+
+    describe('decodeHtmlEntities', () => {
+        it('decodes values properly', () => {
+            expect(util.decodeHtmlEntities('&nbsp;')).to.eql(' ');
+            expect(util.decodeHtmlEntities('&amp;')).to.eql('&');
+            expect(util.decodeHtmlEntities('&quot;')).to.eql('"');
+            expect(util.decodeHtmlEntities('&lt;')).to.eql('<');
+            expect(util.decodeHtmlEntities('&gt;')).to.eql('>');
+            expect(util.decodeHtmlEntities('&#39;')).to.eql(`'`);
+        });
+    });
 });
