@@ -544,6 +544,29 @@ describe('index', () => {
         });
     });
 
+    describe('normalizeDeviceInfoFieldValue', () => {
+        it('converts normal values', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('true')).to.eql(true);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('false')).to.eql(false);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1')).to.eql(1);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1.2')).to.eql(1.2);
+            //it'll trim whitespace too
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(' 1.2')).to.eql(1.2);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(' 1.2 ')).to.eql(1.2);
+        });
+
+        it('leaves invalid numbers as strings', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('v1.2.3')).to.eql('v1.2.3');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1.2.3-alpha.1')).to.eql('1.2.3-alpha.1');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('123Four')).to.eql('123Four');
+        });
+
+        it('decodes HTML entities', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&4')).to.eql('3&4');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&amp;4')).to.eql('3&4');
+        });
+    });
+
 
     describe('getDevId', () => {
         it('should return the current Dev ID if successful', async () => {

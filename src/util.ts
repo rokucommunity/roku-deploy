@@ -182,6 +182,28 @@ export class Util {
     }
 
     private dnsCache = new Map<string, string>();
+
+    /**
+     * Decode HTML entities like &nbsp; &#39; to its original character
+     */
+    public decodeHtmlEntities(encodedString: string) {
+        let translateRegex = /&(nbsp|amp|quot|lt|gt);/g;
+        let translate = {
+            'nbsp': ' ',
+            'amp': '&',
+            'quot': '"',
+            'lt': '<',
+            'gt': '>'
+        };
+
+        return encodedString.replace(translateRegex, (match, entity) => {
+            return translate[entity];
+        }).replace(/&#(\d+);/gi, (match, numStr) => {
+            let num = parseInt(numStr, 10);
+            return String.fromCharCode(num);
+        });
+    }
+
 }
 
 export let util = new Util();
