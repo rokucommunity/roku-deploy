@@ -755,7 +755,10 @@ export class RokuDeploy {
 
         if (imageUrlOnDevice) {
             saveFilePath = util.standardizePath(path.join(options.outDir, options.outFile + imageExt));
-            await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options), saveFilePath);
+            await this.getToFile(
+                this.generateBaseRequestOptions(imageUrlOnDevice, options),
+                saveFilePath
+            );
         } else {
             throw new Error('No screen shot url returned from device');
         }
@@ -763,31 +766,37 @@ export class RokuDeploy {
     }
 
     private async getToFile(requestParams: any, filePath: string) {
-        await this.fsExtra.ensureDir(path.dirname(filePath));
         let writeStream: _fsExtra.WriteStream;
+        await this.fsExtra.ensureFile(filePath);
         return new Promise<string>((resolve, reject) => {
-            writeStream = this.fsExtra.createWriteStream(filePath);
+            writeStream = this.fsExtra.createWriteStream(filePath, {
+                flags: 'w'
+            });
+            if (!writeStream) {
+                reject(new Error(`Unable to create write stream for "${filePath}"`));
+                return;
+            }
+            //when the file has finished writing to disk, we can finally resolve and say we're done
+            writeStream.on('finish', () => {
+                resolve(filePath);
+            });
+            //if anything does wrong with the write stream, reject the promise
+            writeStream.on('error', (error) => {
+                reject(error);
+            });
+
             request.get(requestParams).on('error', (err) => {
-                try { writeStream.destroy(); } catch { }
                 reject(err);
             }).on('response', (response) => {
                 if (response.statusCode !== 200) {
-                    reject(new Error('Invalid response code: ' + response.statusCode));
-                } else if (writeStream) {
-                    writeStream.on('close', () => {
-                        try { writeStream.destroy(); } catch { }
-
-                        resolve(filePath);
-                    });
-                    writeStream.on('error', (err) => {
-                        try { writeStream.destroy(); } catch { }
-
-                        reject(err);
-                    });
-                } else {
-                    resolve(filePath);
+                    return reject(new Error('Invalid response code: ' + response.statusCode));
                 }
             }).pipe(writeStream);
+
+        }).finally(() => {
+            try {
+                writeStream.close();
+            } catch { }
         });
     }
 
