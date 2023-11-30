@@ -1,9 +1,10 @@
-/* eslint-disable */
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dns from 'dns';
 import * as micromatch from 'micromatch';
-import fastGlob = require("fast-glob")
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import fastGlob = require('fast-glob');
 
 export class Util {
     /**
@@ -151,7 +152,7 @@ export class Util {
                     cwd: cwd,
                     absolute: true,
                     followSymbolicLinks: true,
-                    onlyFiles: true,
+                    onlyFiles: true
                 });
             }
         });
@@ -189,6 +190,44 @@ export class Util {
             }
         }
     }
+
+    /*
+     * Look up the ip address for a hostname. This is cached for the lifetime of the app, or bypassed with the `skipCache` parameter
+     * @param host
+     * @param skipCache
+     * @returns
+     */
+    public async dnsLookup(host: string, skipCache = false) {
+        if (!this.dnsCache.has(host) || skipCache) {
+            const result = await dns.promises.lookup(host);
+            this.dnsCache.set(host, result.address ?? host);
+        }
+        return this.dnsCache.get(host);
+    }
+
+    private dnsCache = new Map<string, string>();
+
+    /**
+     * Decode HTML entities like &nbsp; &#39; to its original character
+     */
+    public decodeHtmlEntities(encodedString: string) {
+        let translateRegex = /&(nbsp|amp|quot|lt|gt);/g;
+        let translate = {
+            'nbsp': ' ',
+            'amp': '&',
+            'quot': '"',
+            'lt': '<',
+            'gt': '>'
+        };
+
+        return encodedString.replace(translateRegex, (match, entity) => {
+            return translate[entity];
+        }).replace(/&#(\d+);/gi, (match, numStr) => {
+            let num = parseInt(numStr, 10);
+            return String.fromCharCode(num);
+        });
+    }
+
 }
 
 export let util = new Util();
@@ -206,4 +245,3 @@ export function standardizePath(stringParts, ...expressions: any[]) {
         result.join('')
     );
 }
-

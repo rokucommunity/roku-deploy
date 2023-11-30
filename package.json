@@ -1,6 +1,6 @@
 {
     "name": "roku-deploy",
-    "version": "3.10.3",
+    "version": "3.11.0",
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
@@ -25,6 +25,7 @@
         "is-glob": "^4.0.3",
         "jsonc-parser": "^2.3.0",
         "jszip": "^3.6.0",
+        "lodash": "^4.17.21",
         "micromatch": "^4.0.4",
         "moment": "^2.29.1",
         "parse-ms": "^2.1.0",
@@ -36,6 +37,7 @@
         "@types/chai": "^4.2.22",
         "@types/fs-extra": "^5.0.1",
         "@types/is-glob": "^4.0.2",
+        "@types/lodash": "^4.14.200",
         "@types/micromatch": "^4.0.2",
         "@types/mocha": "^9.0.0",
         "@types/node": "^16.11.3",

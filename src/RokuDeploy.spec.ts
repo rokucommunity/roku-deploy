@@ -168,7 +168,7 @@ describe('index', () => {
                 return {} as any;
             });
 
-            let results = await rokuDeploy['doGetRequest']({});
+            let results = await rokuDeploy['doGetRequest']({} as any);
             expect(results.body).to.equal(body);
         });
 
@@ -180,7 +180,7 @@ describe('index', () => {
             });
 
             try {
-                await rokuDeploy['doGetRequest']({});
+                await rokuDeploy['doGetRequest']({} as any);
             } catch (e) {
                 expect(e).to.equal(error);
                 return;
@@ -237,98 +237,349 @@ describe('index', () => {
 
             let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
             expect(results).to.eql({
-                errors: ['Failure: Form Error: "archive" Field Not Found', 'Failure: Form Error: "archive" Field Not Found'],
+                errors: ['Failure: Form Error: "archive" Field Not Found'],
                 infos: ['Some random info message'],
                 successes: ['Screenshot ok']
+            });
+        });
+
+        it('pull many messages from the response body including json messages', () => {
+            let body = getFakeResponseBody(`
+            Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'info').trigger('Set message content', 'Some random info message').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"},{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Screenshot ok","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            `);
+
+            let results = rokuDeploy['getRokuMessagesFromResponseBody'](body);
+            expect(results).to.eql({
+                errors: ['Failure: Form Error: "archive" Field Not Found', 'Install Failure: Error parsing XML component SupportedFeaturesView.xml'],
+                infos: ['Some random info message'],
+                successes: ['Screenshot ok', 'Application Received: 2500809 bytes stored.']
+            });
+        });
+
+        it('pull many messages from the response body including json messages and dedupe them', () => {
+            let bodyOne = getFakeResponseBody(`
+            Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'info').trigger('Set message content', 'Some random info message').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'info').trigger('Set message content', 'Some random info message').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+            Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Some random info message","text_type":"text","type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Some random info message","text_type":"text","type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"wont be added","text_type":"text","type":"unknown"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"doesn't look like a roku message","text_type":"text"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"doesn't look like a roku message","type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('[]');
+            `);
+
+            let resultsOne = rokuDeploy['getRokuMessagesFromResponseBody'](bodyOne);
+            expect(resultsOne).to.eql({
+                errors: ['Failure: Form Error: "archive" Field Not Found', 'Install Failure: Error parsing XML component SupportedFeaturesView.xml'],
+                infos: ['Some random info message'],
+                successes: ['Screenshot ok', 'Application Received: 2500809 bytes stored.']
+            });
+
+            let bodyTwo = getFakeResponseBody(`
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Application Received: 2500809 bytes stored.","text_type":"text","type":"success"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Install Failure: Error parsing XML component SupportedFeaturesView.xml","text_type":"text","type":"error"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Some random info message","text_type":"text","type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"messages":[{"text":"Some random info message","text_type":"text","type":"info"}],"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            var params = JSON.parse('{"metadata":{"dev_id":"123456789","dev_key":true,"voice_sdk":false},"packages":[]}');
+            `);
+
+            let resultsTwo = rokuDeploy['getRokuMessagesFromResponseBody'](bodyTwo);
+            expect(resultsTwo).to.eql({
+                errors: ['Install Failure: Error parsing XML component SupportedFeaturesView.xml'],
+                infos: ['Some random info message'],
+                successes: ['Application Received: 2500809 bytes stored.']
             });
         });
     });
 
     describe('getDeviceInfo', () => {
+        const body = `<device-info>
+            <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
+            <serial-number>123</serial-number>
+            <device-id>456</device-id>
+            <advertising-id>2cv488ca-d6ec-5222-9304-1925e72d0122</advertising-id>
+            <vendor-name>Roku</vendor-name>
+            <model-name>Roku Ultra</model-name>
+            <model-number>4660X</model-number>
+            <model-region>US</model-region>
+            <is-tv>false</is-tv>
+            <is-stick>false</is-stick>
+            <supports-ethernet>true</supports-ethernet>
+            <wifi-mac>d8:31:34:33:6d:6e</wifi-mac>
+            <wifi-driver>realtek</wifi-driver>
+            <has-wifi-extender>false</has-wifi-extender>
+            <has-wifi-5G-support>true</has-wifi-5G-support>
+            <can-use-wifi-extender>true</can-use-wifi-extender>
+            <ethernet-mac>e8:31:34:36:2d:2e</ethernet-mac>
+            <network-type>ethernet</network-type>
+            <friendly-device-name>Brian's Roku Ultra</friendly-device-name>
+            <friendly-model-name>Roku Ultra</friendly-model-name>
+            <default-device-name>Roku Ultra - YB0072009656</default-device-name>
+            <user-device-name>Brian's Roku Ultra</user-device-name>
+            <user-device-location>Hot Tub</user-device-location>
+            <build-number>469.30E04170A</build-number>
+            <software-version>9.3.0</software-version>
+            <software-build>4170</software-build>
+            <secure-device>true</secure-device>
+            <language>en</language>
+            <country>US</country>
+            <locale>en_US</locale>
+            <time-zone-auto>true</time-zone-auto>
+            <time-zone>US/Eastern</time-zone>
+            <time-zone-name>United States/Eastern</time-zone-name>
+            <time-zone-tz>America/New_York</time-zone-tz>
+            <time-zone-offset>-240</time-zone-offset>
+            <clock-format>12-hour</clock-format>
+            <uptime>19799</uptime>
+            <power-mode>PowerOn</power-mode>
+            <supports-suspend>false</supports-suspend>
+            <supports-find-remote>true</supports-find-remote>
+            <find-remote-is-possible>true</find-remote-is-possible>
+            <supports-audio-guide>true</supports-audio-guide>
+            <supports-rva>true</supports-rva>
+            <developer-enabled>true</developer-enabled>
+            <keyed-developer-id>789</keyed-developer-id>
+            <search-enabled>true</search-enabled>
+            <search-channels-enabled>true</search-channels-enabled>
+            <voice-search-enabled>true</voice-search-enabled>
+            <notifications-enabled>true</notifications-enabled>
+            <notifications-first-use>false</notifications-first-use>
+            <supports-private-listening>true</supports-private-listening>
+            <headphones-connected>false</headphones-connected>
+            <supports-ecs-textedit>true</supports-ecs-textedit>
+            <supports-ecs-microphone>true</supports-ecs-microphone>
+            <supports-wake-on-wlan>false</supports-wake-on-wlan>
+            <has-play-on-roku>true</has-play-on-roku>
+            <has-mobile-screensaver>true</has-mobile-screensaver>
+            <support-url>roku.com/support</support-url>
+            <grandcentral-version>3.1.39</grandcentral-version>
+            <trc-version>3.0</trc-version>
+            <trc-channel-version>2.9.42</trc-channel-version>
+            <av-sync-calibration-enabled>3.0</av-sync-calibration-enabled>
+            <davinci-version>2.8.20</davinci-version>
+            <brightscript-debugger-version>3.2.0</brightscript-debugger-version>
+            <has-hands-free-voice-remote>false</has-hands-free-voice-remote>
+            <mobile-has-live-tv>true</mobile-has-live-tv>
+            <network-name>Plumb-5G</network-name>
+            <supports-airplay>true</supports-airplay>
+            <supports-audio-settings>false</supports-audio-settings>
+            <ui-resolution>1080p</ui-resolution>
+        </device-info>`;
+
         it('should return device info matching what was returned by ECP', async () => {
-            const expectedSerialNumber = 'expectedSerialNumber';
-            const expectedDeviceId = 'expectedDeviceId';
-            const expectedDeveloperId = 'expectedDeveloperId';
-            const body = `<device-info>
-                <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
-                <serial-number>${expectedSerialNumber}</serial-number>
-                <device-id>${expectedDeviceId}</device-id>
-                <advertising-id>2cv488ca-d6ec-5222-9304-1925e72d0122</advertising-id>
-                <vendor-name>Roku</vendor-name>
-                <model-name>Roku Ultra</model-name>
-                <model-number>4660X</model-number>
-                <model-region>US</model-region>
-                <is-tv>false</is-tv>
-                <is-stick>false</is-stick>
-                <supports-ethernet>true</supports-ethernet>
-                <wifi-mac>d8:31:34:33:6d:6e</wifi-mac>
-                <wifi-driver>realtek</wifi-driver>
-                <has-wifi-extender>false</has-wifi-extender>
-                <has-wifi-5G-support>true</has-wifi-5G-support>
-                <can-use-wifi-extender>true</can-use-wifi-extender>
-                <ethernet-mac>e8:31:34:36:2d:2e</ethernet-mac>
-                <network-type>ethernet</network-type>
-                <friendly-device-name>Brian's Roku Ultra</friendly-device-name>
-                <friendly-model-name>Roku Ultra</friendly-model-name>
-                <default-device-name>Roku Ultra - YB0072009656</default-device-name>
-                <user-device-name>Brian's Roku Ultra</user-device-name>
-                <user-device-location>Hot Tub</user-device-location>
-                <build-number>469.30E04170A</build-number>
-                <software-version>9.3.0</software-version>
-                <software-build>4170</software-build>
-                <secure-device>true</secure-device>
-                <language>en</language>
-                <country>US</country>
-                <locale>en_US</locale>
-                <time-zone-auto>true</time-zone-auto>
-                <time-zone>US/Eastern</time-zone>
-                <time-zone-name>United States/Eastern</time-zone-name>
-                <time-zone-tz>America/New_York</time-zone-tz>
-                <time-zone-offset>-240</time-zone-offset>
-                <clock-format>12-hour</clock-format>
-                <uptime>19799</uptime>
-                <power-mode>PowerOn</power-mode>
-                <supports-suspend>false</supports-suspend>
-                <supports-find-remote>true</supports-find-remote>
-                <find-remote-is-possible>true</find-remote-is-possible>
-                <supports-audio-guide>true</supports-audio-guide>
-                <supports-rva>true</supports-rva>
-                <developer-enabled>true</developer-enabled>
-                <keyed-developer-id>${expectedDeveloperId}</keyed-developer-id>
-                <search-enabled>true</search-enabled>
-                <search-channels-enabled>true</search-channels-enabled>
-                <voice-search-enabled>true</voice-search-enabled>
-                <notifications-enabled>true</notifications-enabled>
-                <notifications-first-use>false</notifications-first-use>
-                <supports-private-listening>true</supports-private-listening>
-                <headphones-connected>false</headphones-connected>
-                <supports-ecs-textedit>true</supports-ecs-textedit>
-                <supports-ecs-microphone>true</supports-ecs-microphone>
-                <supports-wake-on-wlan>false</supports-wake-on-wlan>
-                <has-play-on-roku>true</has-play-on-roku>
-                <has-mobile-screensaver>true</has-mobile-screensaver>
-                <support-url>roku.com/support</support-url>
-                <grandcentral-version>3.1.39</grandcentral-version>
-                <trc-version>3.0</trc-version>
-                <trc-channel-version>2.9.42</trc-channel-version>
-                <davinci-version>2.8.20</davinci-version>
-            </device-info>`;
             mockDoGetRequest(body);
-            const deviceInfo = await rokuDeploy.getDeviceInfo(options);
-            expect(deviceInfo['serial-number']).to.equal(expectedSerialNumber);
-            expect(deviceInfo['device-id']).to.equal(expectedDeviceId);
-            expect(deviceInfo['keyed-developer-id']).to.equal(expectedDeveloperId);
+            const deviceInfo = await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            expect(deviceInfo['serial-number']).to.equal('123');
+            expect(deviceInfo['device-id']).to.equal('456');
+            expect(deviceInfo['keyed-developer-id']).to.equal('789');
+        });
+
+        it('should default to port 8060 if not provided', async () => {
+            const stub = mockDoGetRequest(body);
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:8060/query/device-info');
+        });
+
+        it('should use given port if provided', async () => {
+            const stub = mockDoGetRequest(body);
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', remotePort: 9999 });
+            expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:9999/query/device-info');
+        });
+
+
+        it('does not crash when sanitizing fields that are not defined', async () => {
+            mockDoGetRequest(`
+                <device-info>
+                    <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
+                </device-info>
+                `);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            expect(result.isStick).not.to.exist;
+        });
+
+        it('returns kebab-case by default', async () => {
+            mockDoGetRequest(`
+                <device-info>
+                    <has-mobile-screensaver>true</has-mobile-screensaver>
+                </device-info>
+                `);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10' });
+            expect(result['has-mobile-screensaver']).to.eql('true');
+        });
+
+        it('should sanitize additional data when the host+param+format signature is triggered', async () => {
+            mockDoGetRequest(body);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            expect(result).to.include({
+                // make sure the number fields are turned into numbers
+                softwareBuild: 4170,
+                uptime: 19799,
+                trcVersion: 3.0,
+                timeZoneOffset: -240,
+
+                // string booleans should be turned into booleans
+                isTv: false,
+                isStick: false,
+                supportsEthernet: true,
+                hasWifiExtender: false,
+                hasWifi5GSupport: true,
+                secureDevice: true,
+                timeZoneAuto: true,
+                supportsSuspend: false,
+                supportsFindRemote: true,
+                findRemoteIsPossible: true,
+                supportsAudioGuide: true,
+                supportsRva: true,
+                developerEnabled: true,
+                searchEnabled: true,
+                searchChannelsEnabled: true,
+                voiceSearchEnabled: true,
+                notificationsEnabled: true,
+                notificationsFirstUse: false,
+                supportsPrivateListening: true,
+                headphonesConnected: false,
+                supportsEcsTextedit: true,
+                supportsEcsMicrophone: true,
+                supportsWakeOnWlan: false,
+                hasPlayOnRoku: true,
+                hasMobileScreensaver: true
+            });
+        });
+
+        it('converts keys to camel case when enabled', async () => {
+            mockDoGetRequest(body);
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            const props = [
+                'udn',
+                'serialNumber',
+                'deviceId',
+                'advertisingId',
+                'vendorName',
+                'modelName',
+                'modelNumber',
+                'modelRegion',
+                'isTv',
+                'isStick',
+                'mobileHasLiveTv',
+                'uiResolution',
+                'supportsEthernet',
+                'wifiMac',
+                'wifiDriver',
+                'hasWifiExtender',
+                'hasWifi5GSupport',
+                'canUseWifiExtender',
+                'ethernetMac',
+                'networkType',
+                'networkName',
+                'friendlyDeviceName',
+                'friendlyModelName',
+                'defaultDeviceName',
+                'userDeviceName',
+                'userDeviceLocation',
+                'buildNumber',
+                'softwareVersion',
+                'softwareBuild',
+                'secureDevice',
+                'language',
+                'country',
+                'locale',
+                'timeZoneAuto',
+                'timeZone',
+                'timeZoneName',
+                'timeZoneTz',
+                'timeZoneOffset',
+                'clockFormat',
+                'uptime',
+                'powerMode',
+                'supportsSuspend',
+                'supportsFindRemote',
+                'findRemoteIsPossible',
+                'supportsAudioGuide',
+                'supportsRva',
+                'hasHandsFreeVoiceRemote',
+                'developerEnabled',
+                'keyedDeveloperId',
+                'searchEnabled',
+                'searchChannelsEnabled',
+                'voiceSearchEnabled',
+                'notificationsEnabled',
+                'notificationsFirstUse',
+                'supportsPrivateListening',
+                'headphonesConnected',
+                'supportsAudioSettings',
+                'supportsEcsTextedit',
+                'supportsEcsMicrophone',
+                'supportsWakeOnWlan',
+                'supportsAirplay',
+                'hasPlayOnRoku',
+                'hasMobileScreensaver',
+                'supportUrl',
+                'grandcentralVersion',
+                'trcVersion',
+                'trcChannelVersion',
+                'davinciVersion',
+                'avSyncCalibrationEnabled',
+                'brightscriptDebuggerVersion'
+            ];
+            expect(
+                Object.keys(result).sort()
+            ).to.eql(
+                props.sort()
+            );
         });
 
         it('should throw our error on failure', async () => {
             mockDoGetRequest();
             try {
-                await rokuDeploy.getDeviceInfo(options);
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
             }
             assert.fail('Exception should have been thrown');
+        });
+    });
+
+    describe('normalizeDeviceInfoFieldValue', () => {
+        it('converts normal values', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('true')).to.eql(true);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('false')).to.eql(false);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1')).to.eql(1);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1.2')).to.eql(1.2);
+            //it'll trim whitespace too
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(' 1.2')).to.eql(1.2);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(' 1.2 ')).to.eql(1.2);
+        });
+
+        it('leaves invalid numbers as strings', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('v1.2.3')).to.eql('v1.2.3');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('1.2.3-alpha.1')).to.eql('1.2.3-alpha.1');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('123Four')).to.eql('123Four');
+        });
+
+        it('decodes HTML entities', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&4')).to.eql('3&4');
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&amp;4')).to.eql('3&4');
         });
     });
 
@@ -373,7 +624,7 @@ describe('index', () => {
             });
             const copyPaths = [] as Array<{ src: string; dest: string }>;
             sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
-                copyPaths.push({ src: src, dest: dest });
+                copyPaths.push({ src: src as string, dest: dest as string });
                 return Promise.resolve();
             });
 
@@ -3244,7 +3495,7 @@ describe('index', () => {
     });
 
     function mockDoGetRequest(body = '', statusCode = 200) {
-        sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
+        return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
             rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);

@@ -1,6 +1,8 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as request from 'postman-request';
+import * as r from 'postman-request';
+import type * as requestType from 'request';
+const request = r as typeof requestType;
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
@@ -14,6 +16,8 @@ import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
+import * as lodash from 'lodash';
+import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 
 export class RokuDeploy {
 
@@ -370,7 +374,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): request.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): requestType.OptionsWithUrl {
         options = this.getOptions(options);
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -634,7 +638,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: any) {
+    private async doGetRequest(params: requestType.OptionsWithUrl) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             request.get(params, (err, resp, body) => {
                 if (err) {
@@ -676,25 +680,77 @@ export class RokuDeploy {
         let errorRegex = /Shell\.create\('Roku\.Message'\)\.trigger\('[\w\s]+',\s+'(\w+)'\)\.trigger\('[\w\s]+',\s+'(.*?)'\)/igm;
         let match: RegExpExecArray;
 
-        // eslint-disable-next-line no-cond-assign
-        while (match = errorRegex.exec(body)) {
+        while ((match = errorRegex.exec(body))) {
             let [, messageType, message] = match;
             switch (messageType.toLowerCase()) {
-                case 'error':
-                    result.errors.push(message);
+                case RokuMessageType.error:
+                    if (!result.errors.includes(message)) {
+                        result.errors.push(message);
+                    }
                     break;
 
-                case 'info':
-                    result.infos.push(message);
+                case RokuMessageType.info:
+                    if (!result.infos.includes(message)) {
+                        result.infos.push(message);
+                    }
                     break;
 
-                case 'success':
-                    result.successes.push(message);
+                case RokuMessageType.success:
+                    if (!result.successes.includes(message)) {
+                        result.successes.push(message);
+                    }
                     break;
 
                 default:
                     break;
             }
+        }
+
+        let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
+        let jsonMatch: RegExpExecArray;
+
+        while ((jsonMatch = jsonParseRegex.exec(body))) {
+            let [, jsonString] = jsonMatch;
+            let jsonObject = parseJsonc(jsonString);
+            if (typeof jsonObject === 'object' && !Array.isArray(jsonObject) && jsonObject !== null) {
+                let messages = jsonObject.messages;
+
+                if (!Array.isArray(messages)) {
+                    continue;
+                }
+
+                for (let messageObject of messages) {
+                    // Try to duck type the object to make sure it is some form of message to be displayed
+                    if (typeof messageObject.type === 'string' && messageObject.text_type === 'text' && typeof messageObject.text === 'string') {
+                        const messageType: string = messageObject.type;
+                        const text: string = messageObject.text;
+                        switch (messageType.toLowerCase()) {
+                            case RokuMessageType.error:
+                                if (!result.errors.includes(text)) {
+                                    result.errors.push(text);
+                                }
+                                break;
+
+                            case RokuMessageType.info:
+                                if (!result.infos.includes(text)) {
+                                    result.infos.push(text);
+                                }
+                                break;
+
+                            case RokuMessageType.success:
+                                if (!result.successes.includes(text)) {
+                                    result.successes.push(text);
+                                }
+
+                                break;
+
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+
         }
 
         return result;
@@ -937,26 +993,76 @@ export class RokuDeploy {
         return outPkgFilePath;
     }
 
-    public async getDeviceInfo(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
+    /**
+     * Get the `device-info` response from a Roku device
+     * @param host the host or IP address of the Roku
+     * @param port the port to use for the ECP request (defaults to 8060)
+     */
+    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
+    public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        options = this.getOptions(options) as any;
 
-        const requestOptions = {
-            url: `http://${options.host}:${options.remotePort}/query/device-info`,
-            timeout: options.timeout
-        };
-        let results = await this.doGetRequest(requestOptions);
+        //if the host is a DNS name, look up the IP address
         try {
-            const parsedContent = await xml2js.parseStringPromise(results.body, {
+            options.host = await util.dnsLookup(options.host);
+        } catch (e) {
+            //try using the host as-is (it'll probably fail...)
+        }
+
+        const url = `http://${options.host}:${options.remotePort}/query/device-info`;
+
+        let response = await this.doGetRequest({
+            url: url,
+            timeout: options.timeout,
+            headers: {
+                'User-Agent': 'https://github.com/RokuCommunity/roku-deploy'
+            }
+        });
+        try {
+            const parsedContent = await xml2js.parseStringPromise(response.body, {
                 explicitArray: false
             });
-            return parsedContent['device-info'];
+            // clone the data onto an object because xml2js somehow makes this object not an object???
+            let deviceInfo = {
+                ...parsedContent['device-info']
+            } as Record<string, any>;
+
+            if (options.enhance) {
+                const result = {};
+                // sanitize/normalize values to their native formats, and also convert property names to camelCase
+                for (let key in deviceInfo) {
+                    result[lodash.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+                }
+                deviceInfo = result;
+            }
+            return deviceInfo;
         } catch (e) {
-            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', results);
+            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
+        }
+    }
+
+    /**
+     * Normalize a deviceInfo field value. This includes things like converting boolean strings to booleans, number strings to numbers,
+     * decoding HtmlEntities, etc.
+     * @param deviceInfo
+     */
+    public normalizeDeviceInfoFieldValue(value: any) {
+        let num: number;
+        // convert 'true' and 'false' string values to boolean
+        if (value === 'true') {
+            return true;
+        } else if (value === 'false') {
+            return false;
+        } else if (value.trim() !== '' && !isNaN(num = Number(value))) {
+            return num;
+        } else {
+            return util.decodeHtmlEntities(value);
         }
     }
 
     public async getDevId(options?: RokuDeployOptions) {
-        const deviceInfo = await this.getDeviceInfo(options);
+        const deviceInfo = await this.getDeviceInfo(options as any);
         return deviceInfo['keyed-developer-id'];
     }
 
@@ -1086,6 +1192,12 @@ export interface RokuMessages {
     successes: string[];
 }
 
+enum RokuMessageType {
+    success = 'success',
+    info = 'info',
+    error = 'error'
+}
+
 export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
@@ -1121,4 +1233,24 @@ export interface TakeScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     outFile?: string;
+}
+
+export interface GetDeviceInfoOptions {
+    /**
+     * The hostname or IP address to use for the device-info URL
+     */
+    host: string;
+    /**
+     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
+     */
+    remotePort?: number;
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
+    timeout?: number;
+    /**
+     * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
+     * @default false
+     */
+    enhance?: boolean;
 }
