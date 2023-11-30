@@ -1,6 +1,9 @@
 import * as assert from 'assert';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
+import type { WriteStream, PathLike } from 'fs-extra';
+import * as fs from 'fs';
+import * as q from 'q';
 import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
@@ -12,13 +15,19 @@ import { util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
-import * as request from 'postman-request';
+import * as r from 'postman-request';
+import type * as requestType from 'request';
+const request = r as typeof requestType;
 
 const sinon = createSandbox();
 
 describe('index', () => {
     let rokuDeploy: RokuDeploy;
     let options: RokuDeployOptions;
+
+    let writeStreamPromise: Promise<WriteStream>;
+    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: undefined | true };
+    let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
@@ -38,9 +47,24 @@ describe('index', () => {
         fsExtra.ensureDirSync(stagingDir);
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+
+        writeStreamDeferred = q.defer<WriteStream>() as any;
+        writeStreamPromise = writeStreamDeferred.promise as any;
+
+        //fake out the write stream function
+        createWriteStreamStub = sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: PathLike) => {
+            const writeStream = fs.createWriteStream(filePath);
+            writeStreamDeferred.resolve(writeStream);
+            writeStreamDeferred.isComplete = true;
+            return writeStream;
+        });
     });
 
     afterEach(() => {
+        if (createWriteStreamStub.called && !writeStreamDeferred.isComplete) {
+            writeStreamDeferred.reject('Deferred was never resolved...so rejecting in the afterEach');
+        }
+
         sinon.restore();
         //restore the original working directory
         process.chdir(cwd);
@@ -1873,13 +1897,8 @@ describe('index', () => {
     describe('takeScreenshot', () => {
         let onHandler: any;
         let screenshotAddress: any;
+
         beforeEach(() => {
-            //fake out the write stream function
-            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: any) => {
-                fsExtra.outputFileSync(filePath, 'test');
-                screenshotAddress = filePath;
-                return null;
-            });
 
             //intercept the http request
             sinon.stub(request, 'get').callsFake(() => {
@@ -1890,7 +1909,11 @@ describe('index', () => {
                         });
                         return req;
                     },
-                    pipe: () => { }
+                    pipe: async () => {
+                        const writeStream = await writeStreamPromise;
+                        writeStream.write(Buffer.from('test-content'));
+                        writeStream.close();
+                    }
                 };
                 return req;
             });
@@ -3001,9 +3024,6 @@ describe('index', () => {
                 //do nothing, assume the dir gets created
             }) as any);
 
-            //fake out the write stream function
-            sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
-
             //intercept the http request
             sinon.stub(request, 'get').callsFake(() => {
                 let req: any = {
@@ -3013,12 +3033,17 @@ describe('index', () => {
                         });
                         return req;
                     },
-                    pipe: () => { }
+                    pipe: async () => {
+                        //if a write stream gets created, write some stuff and close it
+                        const writeStream = await writeStreamPromise;
+                        writeStream.write('test');
+                        writeStream.close();
+                    }
                 };
                 return req;
             });
-
         });
+
         it('returns a pkg file path on success', async () => {
             onHandler = (event, callback) => {
                 if (event === 'response') {
@@ -3031,6 +3056,31 @@ describe('index', () => {
                 outFile: 'roku-deploy-test'
             });
             expect(pkgFilePath).to.equal(path.join(process.cwd(), 'out', 'roku-deploy-test.pkg'));
+        });
+
+        it('returns a pkg file path on success', async () => {
+            //the write stream should return null, which causes a specific branch to be executed
+            createWriteStreamStub.callsFake(() => {
+                return null;
+            });
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            let error: Error;
+            try {
+                await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
+                    outFile: 'roku-deploy-test'
+                });
+            } catch (e) {
+                error = e as any;
+            }
+            expect(error.message.startsWith('Unable to create write stream for')).to.be.true;
         });
 
         it('throws when error in request is encountered', async () => {
@@ -3350,6 +3400,52 @@ describe('index', () => {
                 };
                 expect(rokuDeploy.getOptions(options).outFile).to.equal('project-config-outfile');
             });
+        });
+    });
+
+    describe('getToFile', () => {
+        it('waits for the write stream to finish writing before resolving', async () => {
+            let getToFileIsResolved = false;
+
+            let requestCalled = q.defer();
+            let onResponse = q.defer<(res) => any>();
+
+            //intercept the http request
+            sinon.stub(request, 'get').callsFake(() => {
+                requestCalled.resolve();
+                let req: any = {
+                    on: (event, callback) => {
+                        if (event === 'response') {
+                            onResponse.resolve(callback);
+                        }
+                        return req;
+                    },
+                    pipe: () => {
+                        return req;
+                    }
+                };
+                return req;
+            });
+
+            const finalPromise = rokuDeploy['getToFile']({}, s`${tempDir}/out/something.txt`).then(() => {
+                getToFileIsResolved = true;
+            });
+
+            await requestCalled.promise;
+            expect(getToFileIsResolved).to.be.false;
+
+            const callback = await onResponse.promise;
+            callback({ statusCode: 200 });
+            await util.sleep(10);
+
+            expect(getToFileIsResolved).to.be.false;
+
+            const writeStream = await writeStreamPromise;
+            writeStream.write('test');
+            writeStream.close();
+
+            await finalPromise;
+            expect(getToFileIsResolved).to.be.true;
         });
     });
 
