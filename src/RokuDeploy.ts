@@ -768,13 +768,22 @@ export class RokuDeploy {
         return new Promise<string>((resolve, reject) => {
             writeStream = this.fsExtra.createWriteStream(filePath);
             request.get(requestParams).on('error', (err) => {
-                try {
-                    writeStream.close();
-                } catch { }
+                try { writeStream.destroy(); } catch { }
                 reject(err);
             }).on('response', (response) => {
                 if (response.statusCode !== 200) {
                     reject(new Error('Invalid response code: ' + response.statusCode));
+                } else if (writeStream) {
+                    writeStream.on('close', () => {
+                        try { writeStream.destroy(); } catch { }
+
+                        resolve(filePath);
+                    });
+                    writeStream.on('error', (err) => {
+                        try { writeStream.destroy(); } catch { }
+
+                        reject(err);
+                    });
                 } else {
                     resolve(filePath);
                 }
