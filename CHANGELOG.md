@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.11.1](https://github.com/rokucommunity/roku-deploy/compare/v3.11.0...v3.11.1) - 2023-11-30
+### Fixed
+ - Wait for file stream to close before resolving promise ([#133](https://github.com/rokucommunity/roku-deploy/pull/133))
+
+
+
 ## [3.11.0](https://github.com/rokucommunity/roku-deploy/compare/v3.10.5...v3.11.0) - 2023-11-28
 ### Changed
  - Add public function `normalizeDeviceInfoFieldValue` to normalize device-info field values ([#129](https://github.com/rokucommunity/roku-deploy/pull/129))
