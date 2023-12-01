@@ -3441,6 +3441,8 @@ describe('index', () => {
             let error: Error;
             try {
                 await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
+                    host: '1.2.3.4',
+                    password: 'password',
                     outFile: 'roku-deploy-test'
                 });
             } catch (e) {
