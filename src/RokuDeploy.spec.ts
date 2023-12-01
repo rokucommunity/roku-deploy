@@ -575,8 +575,9 @@ describe('index', () => {
                 <keyed-developer-id>${expectedDevId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
-            options.devId = expectedDevId;
-            let devId = await rokuDeploy.getDevId(options);
+            let devId = await rokuDeploy.getDevId({
+                host: '1.2.3.4'
+            });
             expect(devId).to.equal(expectedDevId);
         });
     });
@@ -948,6 +949,7 @@ describe('index', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
             await rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 outFile: options.outFile
             });
@@ -963,6 +965,7 @@ describe('index', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
             await rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 retainDeploymentArchive: false,
                 outFile: options.outFile
@@ -993,6 +996,7 @@ describe('index', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
             await rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 retainDeploymentArchive: false,
                 outFile: options.outFile
@@ -1006,6 +1010,7 @@ describe('index', () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
+                    password: 'password',
                     outDir: outDir,
                     outFile: 'fileThatDoesNotExist.zip'
                 });
@@ -1019,6 +1024,7 @@ describe('index', () => {
             expectPathNotExists('rokudeploy.json');
             return rokuDeploy.publish({
                 host: undefined,
+                password: 'password',
                 outDir: outDir,
                 outFile: options.outFile
             }).then(() => {
@@ -1044,6 +1050,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
+                    password: 'password',
                     outDir: outDir,
                     outFile: options.outFile
                 });
@@ -1062,6 +1069,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 outFile: options.outFile
@@ -1080,6 +1088,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 outFile: options.outFile
@@ -1096,6 +1105,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 outFile: options.outFile
@@ -1112,6 +1122,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 outFile: options.outFile
@@ -1128,6 +1139,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 outFile: options.outFile
@@ -1143,6 +1155,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 remoteDebug: true,
@@ -1160,6 +1173,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
                 remoteDebug: true,
@@ -1179,6 +1193,7 @@ describe('index', () => {
 
             return rokuDeploy.publish({
                 host: '1.2.3.4',
+                password: 'password',
                 outDir: outDir,
                 failOnCompileError: false,
                 outFile: options.outFile
@@ -1196,6 +1211,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
+                    password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
                     outFile: options.outFile
@@ -1213,6 +1229,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
+                    password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
                     outFile: options.outFile
@@ -1230,6 +1247,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish({
                     host: '1.2.3.4',
+                    password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
                     outFile: options.outFile
@@ -1245,14 +1263,20 @@ describe('index', () => {
     describe('convertToSquashfs', () => {
         it('should not return an error if successful', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
-            await rokuDeploy.convertToSquashfs({ host: options.host });
+            await rokuDeploy.convertToSquashfs({
+                host: options.host,
+                password: 'password'
+            });
         });
 
         it('should return MissingRequiredOptionError if host was not provided', async () => {
             mockDoPostRequest();
             try {
                 options.host = undefined;
-                await rokuDeploy.convertToSquashfs({ host: options.host });
+                await rokuDeploy.convertToSquashfs({
+                    host: options.host,
+                    password: 'password'
+                });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
                 return;
@@ -1263,7 +1287,10 @@ describe('index', () => {
         it('should return ConvertError if converting failed', async () => {
             mockDoPostRequest();
             try {
-                await rokuDeploy.convertToSquashfs({ host: options.host });
+                await rokuDeploy.convertToSquashfs({
+                    host: options.host,
+                    password: 'password'
+                });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.ConvertError);
                 return;
@@ -1287,6 +1314,8 @@ describe('index', () => {
             let actualError: Error;
             try {
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
                     rootDir: options.rootDir,
@@ -1306,6 +1335,8 @@ describe('index', () => {
             try {
                 fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: s`../notReal.pkg`,
                     signingPassword: options.signingPassword,
                     rootDir: options.rootDir,
@@ -1322,6 +1353,8 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
+                host: '1.2.3.4',
+                password: 'password',
                 rekeySignedPackage: s`${tempDir}/testSignedPackage.pkg`,
                 signingPassword: options.signingPassword,
                 rootDir: options.rootDir,
@@ -1335,6 +1368,8 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
+                host: '1.2.3.4',
+                password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
                 rootDir: options.rootDir,
@@ -1348,6 +1383,8 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
+                host: '1.2.3.4',
+                password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
                 rootDir: options.rootDir,
@@ -1358,6 +1395,8 @@ describe('index', () => {
         it('should throw error if missing rekeySignedPackage option', async () => {
             try {
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: null,
                     signingPassword: options.signingPassword,
                     rootDir: options.rootDir,
@@ -1373,6 +1412,8 @@ describe('index', () => {
         it('should throw error if missing signingPassword option', async () => {
             try {
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: null,
                     rootDir: options.rootDir,
@@ -1389,6 +1430,8 @@ describe('index', () => {
             try {
                 mockDoPostRequest();
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
                     rootDir: options.rootDir,
@@ -1408,6 +1451,8 @@ describe('index', () => {
                 </div>`;
                 mockDoPostRequest(body);
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
                     devId: options.devId
@@ -1426,6 +1471,8 @@ describe('index', () => {
                 </div>`;
                 mockDoPostRequest(body);
                 await rokuDeploy.rekeyDevice({
+                    host: '1.2.3.4',
+                    password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
                     rootDir: options.rootDir,
@@ -1447,6 +1494,8 @@ describe('index', () => {
         it('should return our error if signingPassword is not supplied', async () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.signExistingPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
                     signingPassword: undefined,
                     stagingDir: stagingDir
                 });
@@ -1462,6 +1511,8 @@ describe('index', () => {
                     return {} as any;
                 });
                 await rokuDeploy.signExistingPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
                     signingPassword: options.signingPassword,
                     stagingDir: stagingDir
                 });
@@ -1476,6 +1527,8 @@ describe('index', () => {
             try {
                 mockDoPostRequest(null);
                 await rokuDeploy.signExistingPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
                     signingPassword: options.signingPassword,
                     stagingDir: stagingDir
                 });
@@ -1495,6 +1548,8 @@ describe('index', () => {
 
             await expectThrowsAsync(
                 rokuDeploy.signExistingPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
                     signingPassword: options.signingPassword,
                     stagingDir: stagingDir
                 }),
@@ -1509,6 +1564,8 @@ describe('index', () => {
             mockDoPostRequest(body);
 
             let pkgPath = await rokuDeploy.signExistingPackage({
+                host: '1.2.3.4',
+                password: 'password',
                 signingPassword: options.signingPassword,
                 stagingDir: stagingDir
             });
@@ -1519,6 +1576,8 @@ describe('index', () => {
             mockDoPostRequest();
             await expectThrowsAsync(
                 rokuDeploy.signExistingPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
                     signingPassword: options.signingPassword,
                     stagingDir: stagingDir
                 }),
@@ -2099,11 +2158,16 @@ describe('index', () => {
 
     describe('deploy', () => {
         it('does the whole migration', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
             mockDoPostRequest();
 
             writeFiles(rootDir, ['manifest']);
 
-            let result = await rokuDeploy.deploy(options);
+            let result = await rokuDeploy.deploy({
+                rootDir: rootDir,
+                host: '1.2.3.4',
+                password: 'password'
+            });
             expect(result).not.to.be.undefined;
         });
 
@@ -2115,6 +2179,8 @@ describe('index', () => {
             );
             mockDoPostRequest();
             let result = await rokuDeploy.deploy({
+                host: '1.2.3.4',
+                password: 'password',
                 ...options,
                 //something in the previous test is locking the default output zip file. We should fix that at some point...
                 outDir: s`${tempDir}/test1`
@@ -2123,21 +2189,34 @@ describe('index', () => {
         });
 
         it('should delete installed channel if requested', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
+
             const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
             options.deleteInstalledChannel = true;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options);
+            await rokuDeploy.deploy({
+                rootDir: rootDir,
+                host: '1.2.3.4',
+                password: 'password',
+                deleteInstalledChannel: true
+            });
 
             expect(spy.called).to.equal(true);
         });
 
         it('should not delete installed channel if not requested', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
+
             const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
-            options.deleteInstalledChannel = false;
             mockDoPostRequest();
 
-            await rokuDeploy.deploy(options);
+            await rokuDeploy.deploy({
+                rootDir: rootDir,
+                host: '1.2.3.4',
+                password: 'password',
+                deleteInstalledChannel: false
+            });
 
             expect(spy.notCalled).to.equal(true);
         });
@@ -2147,7 +2226,10 @@ describe('index', () => {
         it('attempts to delete any installed dev channel on the device', async () => {
             mockDoPostRequest();
 
-            let result = await rokuDeploy.deleteInstalledChannel(options);
+            let result = await rokuDeploy.deleteInstalledChannel({
+                host: '1.2.3.4',
+                password: 'password'
+            });
             expect(result).not.to.be.undefined;
         });
     });
@@ -3587,6 +3669,9 @@ describe('index', () => {
 
             //this should not fail
             let pkgFilePath = await rokuDeploy.deployAndSignPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: 'secret',
                 retainStagingDir: false
             });
 
@@ -3598,13 +3683,20 @@ describe('index', () => {
 
             //call it again, but specify true for retainStagingDir
             await rokuDeploy.deployAndSignPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: 'secret',
                 retainStagingDir: true
             });
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(1);
 
             //call it again, but don't specify retainStagingDir at all (it should default to FALSE)
-            await rokuDeploy.deployAndSignPackage({});
+            await rokuDeploy.deployAndSignPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: 'secret'
+            });
             //call count should NOT increase
             expect(stub.getCalls()).to.be.lengthOf(2);
         });
@@ -3613,6 +3705,9 @@ describe('index', () => {
             // options.convertToSquashfs = true;
             let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
             await rokuDeploy.deployAndSignPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: 'secret',
                 convertToSquashfs: true
             });
             expect(stub.getCalls()).to.be.lengthOf(1);

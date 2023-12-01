@@ -65,7 +65,7 @@ describe('device', function device() {
     describe('deploy', () => {
         it('works', async () => {
             options.retainDeploymentArchive = true;
-            let response = await rokuDeploy.deploy(options);
+            let response = await rokuDeploy.deploy(options as any);
             assert.equal(response.message, 'Successful deploy');
         });
 
@@ -73,7 +73,7 @@ describe('device', function device() {
             this.timeout(20000);
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
-                rokuDeploy.deploy(options),
+                rokuDeploy.deploy(options as any),
                 'Unauthorized. Please verify username and password for target Roku.'
             );
         });
@@ -81,10 +81,10 @@ describe('device', function device() {
 
     describe('deployAndSignPackage', () => {
         it('works', async () => {
-            await rokuDeploy.deleteInstalledChannel(options);
+            await rokuDeploy.deleteInstalledChannel(options as any);
             await rokuDeploy.rekeyDevice(options as any);
             expectPathExists(
-                await rokuDeploy.deployAndSignPackage(options)
+                await rokuDeploy.deployAndSignPackage(options as any)
             );
         });
     });
