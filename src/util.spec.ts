@@ -275,6 +275,15 @@ describe('util', () => {
         });
     });
 
+    describe('fileExistsCaseInsensitive', () => {
+        it('detects when a file does not exist inside a dir that does exist', async () => {
+            fsExtra.ensureDirSync(tempDir);
+            expect(
+                await util.fileExistsCaseInsensitive(s`${tempDir}/not-there`)
+            ).to.be.false;
+        });
+    });
+
     describe('decodeHtmlEntities', () => {
         it('decodes values properly', () => {
             expect(util.decodeHtmlEntities('&nbsp;')).to.eql(' ');
