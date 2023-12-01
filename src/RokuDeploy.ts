@@ -606,7 +606,7 @@ export class RokuDeploy {
      */
     public async retrieveSignedPackage(pkgPath: string, options: RetrieveSignedPackageOptions): Promise<string> {
         options = this.getOptions(options) as any;
-        let requestOptions = this.generateBaseRequestOptions(pkgPath, options as any);
+        let requestOptions = this.generateBaseRequestOptions(pkgPath, options);
 
         let pkgFilePath = this.getOutputPkgFilePath(options as any);
         return this.getToFile(requestOptions, pkgFilePath);
@@ -759,7 +759,7 @@ export class RokuDeploy {
      */
     public async deploy(options?: DeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options) as any;
-        await this.createPackage(options as any, beforeZipCallback);
+        await this.createPackage(options, beforeZipCallback);
         if (options.deleteInstalledChannel) {
             try {
                 await this.deleteInstalledChannel(options);
@@ -776,7 +776,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteInstalledChannel(options?: DeleteInstalledChannelOptions) {
-        options = this.getOptions(options);
+        options = this.getOptions(options) as any;
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
         deleteOptions.formData = {
@@ -808,7 +808,10 @@ export class RokuDeploy {
 
         if (imageUrlOnDevice) {
             saveFilePath = util.standardizePath(path.join(options.outDir, options.outFile + imageExt));
-            await this.getToFile(this.generateBaseRequestOptions(imageUrlOnDevice, options as any), saveFilePath);
+            await this.getToFile(
+                this.generateBaseRequestOptions(imageUrlOnDevice, options),
+                saveFilePath
+            );
         } else {
             throw new Error('No screen shot url returned from device');
         }
@@ -816,22 +819,37 @@ export class RokuDeploy {
     }
 
     private async getToFile(requestParams: any, filePath: string) {
-        await this.fsExtra.ensureDir(path.dirname(filePath));
         let writeStream: _fsExtra.WriteStream;
+        await this.fsExtra.ensureFile(filePath);
         return new Promise<string>((resolve, reject) => {
-            writeStream = this.fsExtra.createWriteStream(filePath);
+            writeStream = this.fsExtra.createWriteStream(filePath, {
+                flags: 'w'
+            });
+            if (!writeStream) {
+                reject(new Error(`Unable to create write stream for "${filePath}"`));
+                return;
+            }
+            //when the file has finished writing to disk, we can finally resolve and say we're done
+            writeStream.on('finish', () => {
+                resolve(filePath);
+            });
+            //if anything does wrong with the write stream, reject the promise
+            writeStream.on('error', (error) => {
+                reject(error);
+            });
+
             request.get(requestParams).on('error', (err) => {
-                try {
-                    writeStream.close();
-                } catch { }
                 reject(err);
             }).on('response', (response) => {
                 if (response.statusCode !== 200) {
-                    reject(new Error('Invalid response code: ' + response.statusCode));
-                } else {
-                    resolve(filePath);
+                    return reject(new Error('Invalid response code: ' + response.statusCode));
                 }
             }).pipe(writeStream);
+
+        }).finally(() => {
+            try {
+                writeStream.close();
+            } catch { }
         });
     }
 
@@ -1038,7 +1056,7 @@ export class RokuDeploy {
     }
 
     public async getDevId(options?: GetDevIdOptions) {
-        const deviceInfo = await this.getDeviceInfo(options as any);
+        const deviceInfo = await this.getDeviceInfo(options);
         return deviceInfo['keyed-developer-id'];
     }
 
@@ -1232,34 +1250,36 @@ export interface GetDeviceInfoOptions {
 }
 
 export interface PrepublishToStagingOptions {
-    files: FileEntry[];
+    rootDir?: string;
+    files?: FileEntry[];
     stagingDir?: string;
-    rootDir: string;
+    retainStagingDir?: boolean;
 }
 
 export interface ZipPackageOptions {
-    stagingDir: string;
+    stagingDir?: string;
     retainStagingDir?: boolean;
-    outDir: string;
+    outDir?: string;
 }
 
 export interface CreatePackageOptions {
-    files: FileEntry[];
-    stagingDir: string;
+    rootDir?: string;
+    files?: FileEntry[];
+    stagingDir?: string;
     retainStagingDir?: boolean;
-    outDir: string;
+    outDir?: string;
     incrementBuildNumber?: boolean;
-    rootDir: string;
 }
 
 export interface PublishOptions {
     host: string;
-    outDir: string;
+    password: string;
     remoteDebug?: boolean;
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
     retainDeploymentArchive?: boolean;
-    outFile: string;
+    outDir?: string;
+    outFile?: string;
 }
 
 export interface BaseRequestOptions {
@@ -1272,9 +1292,12 @@ export interface BaseRequestOptions {
 
 export interface ConvertToSquashfsOptions {
     host: string;
+    password: string;
 }
 
 export interface RekeyDeviceOptions {
+    host: string;
+    password: string;
     rekeySignedPackage: string;
     signingPassword: string;
     rootDir?: string;
@@ -1282,38 +1305,65 @@ export interface RekeyDeviceOptions {
 }
 
 export interface SignExistingPackageOptions {
+    host: string;
+    password: string;
     signingPassword: string;
-    stagingDir: string;
+    stagingDir?: string;
 }
 
 export interface RetrieveSignedPackageOptions {
     host: string;
+    password: string;
     packagePort?: number;
     timeout?: number;
     username?: string;
-    password: string;
+    outDir?: string;
     outFile?: string;
 }
-type DeleteInstalledChannelOptions = RokuDeployOptions;
+export interface DeleteInstalledChannelOptions {
+    host: string;
+    password: string;
+}
 
 export interface GetOutputZipFilePathOptions {
     outFile?: string;
-    outDir: string;
+    outDir?: string;
 }
 
 export interface DeployOptions {
+    host: string;
+    password: string;
+    files?: FileEntry[];
+    rootDir?: string;
+    stagingDir?: string;
     deleteInstalledChannel?: boolean;
+    outFile?: string;
     outDir?: string;
 }
 
 export interface DeployAndSignPackageOptions {
+    host: string;
+    password: string;
+    signingPassword: string;
+    rootDir?: string;
+    files?: FileEntry[];
     retainStagingDir?: boolean;
     convertToSquashfs?: boolean;
     stagingDir?: string;
 }
 export interface GetOutputPkgFilePathOptions {
-    outFile: string;
-    outDir: string;
+    outFile?: string;
+    outDir?: string;
 }
 
-type GetDevIdOptions = RokuDeployOptions;
+export interface GetDevIdOptions {
+    host: string;
+    /**
+     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
+     */
+    remotePort?: number;
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
+    timeout?: number;
+}

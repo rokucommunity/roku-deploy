@@ -360,7 +360,7 @@ Here are the available options. The defaults are shown to the right of the optio
 
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
 
-- **retainStagingFolder?:** boolean = `false`
+- **retainStagingDir?:** boolean = `false`
     Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
 - **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
