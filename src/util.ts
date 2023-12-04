@@ -129,8 +129,6 @@ export class Util {
         cwd = cwd.replace(/\\/g, '/');
 
         const globResults = patterns.map(async (pattern) => {
-            //force all windows-style slashes to unix style
-            pattern = pattern.replace(/\\/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
