@@ -39,6 +39,19 @@ export class Util {
     }
 
     /**
+     * Normalize path and replace all directory separators with current OS separators
+     * @param thePath
+     */
+    public standardizePath(thePath: string) {
+        if (!thePath) {
+            return thePath;
+        }
+        return path.normalize(
+            thePath.replace(/[\/\\]+/g, path.sep)
+        );
+    }
+
+    /**
      * Do a case-insensitive string replacement
      * @param subject the string that will have its contents replaced
      * @param search the search text to find in `subject`
