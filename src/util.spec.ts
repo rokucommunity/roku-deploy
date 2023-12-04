@@ -26,6 +26,19 @@ describe('util', () => {
         });
     });
 
+    describe('standardizePathPosix', () => {
+        it('returns falsey value back unchanged', () => {
+            expect(util.standardizePathPosix(null)).to.eql(null);
+            expect(util.standardizePathPosix(undefined)).to.eql(undefined);
+            expect(util.standardizePathPosix(false as any)).to.eql(false);
+            expect(util.standardizePathPosix(0 as any)).to.eql(0);
+        });
+
+        it('always returns forward slashes', () => {
+            expect(util.standardizePathPosix('C:\\projects/some\\folder')).to.eql('C:/projects/some/folder');
+        });
+    });
+
     describe('isChildOfPath', () => {
         it('works for child path', () => {
             let parentPath = `${process.cwd()}\\testProject`;
