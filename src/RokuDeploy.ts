@@ -111,7 +111,7 @@ export class RokuDeploy {
         //make sure the output folder exists
         await this.fsExtra.ensureDir(options.outDir);
 
-        let zipFilePath = this.getOutputZipFilePath(options);
+        let zipFilePath = this.getOutputZipFilePath(options as any);
 
         //ensure the manifest file exists in the staging folder
         if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
@@ -418,7 +418,7 @@ export class RokuDeploy {
         //make sure the outDir exists
         await this.fsExtra.ensureDir(options.outDir);
 
-        let zipFilePath = this.getOutputZipFilePath(options);
+        let zipFilePath = this.getOutputZipFilePath(options as any);
         let readStream: _fsExtra.ReadStream;
         try {
             if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
@@ -430,7 +430,7 @@ export class RokuDeploy {
                 readStream.on('open', resolve);
             });
 
-            let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
+            let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
                 mysubmit: 'Replace',
                 archive: readStream
             });
@@ -500,7 +500,7 @@ export class RokuDeploy {
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
+        let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
@@ -529,7 +529,7 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options, {
+        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
             passwd: options.signingPassword,
             archive: null as _fsExtra.ReadStream
@@ -577,7 +577,7 @@ export class RokuDeploy {
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', options, {
+        let requestOptions = this.generateBaseRequestOptions('plugin_package', options as any, {
             mysubmit: 'Package',
             pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
             passwd: options.signingPassword,
@@ -608,7 +608,7 @@ export class RokuDeploy {
         options = this.getOptions(options) as any;
         let requestOptions = this.generateBaseRequestOptions(pkgPath, options);
 
-        let pkgFilePath = this.getOutputPkgFilePath(options);
+        let pkgFilePath = this.getOutputPkgFilePath(options as any);
         return this.getToFile(requestOptions, pkgFilePath);
     }
 
@@ -767,7 +767,7 @@ export class RokuDeploy {
                 // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
             }
         }
-        let result = await this.publish(options);
+        let result = await this.publish(options as any);
         return result;
     }
 
@@ -778,7 +778,7 @@ export class RokuDeploy {
     public async deleteInstalledChannel(options?: DeleteInstalledChannelOptions) {
         options = this.getOptions(options) as any;
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
         deleteOptions.formData = {
             mysubmit: 'Delete',
             archive: ''
@@ -796,7 +796,7 @@ export class RokuDeploy {
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_inspect', options),
+            ...this.generateBaseRequestOptions('plugin_inspect', options as any),
             formData: {
                 mysubmit: 'Screenshot',
                 archive: ''
@@ -861,14 +861,14 @@ export class RokuDeploy {
         options = this.getOptions(options) as any;
         let retainStagingDirInitialValue = options.retainStagingDir;
         options.retainStagingDir = true;
-        await this.deploy(options, beforeZipCallback);
+        await this.deploy(options as any, beforeZipCallback);
 
         if (options.convertToSquashfs) {
-            await this.convertToSquashfs(options);
+            await this.convertToSquashfs(options as any);
         }
 
-        let remotePkgPath = await this.signExistingPackage(options);
-        let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
+        let remotePkgPath = await this.signExistingPackage(options as any);
+        let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options as any);
         if (retainStagingDirInitialValue !== true) {
             await this.fsExtra.remove(options.stagingDir);
         }
@@ -933,9 +933,6 @@ export class RokuDeploy {
         //fully resolve the folder paths
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
-        finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
-        //sync the new option with the old one (for back-compat)
-        finalOptions.retainStagingFolder = finalOptions.retainStagingDir;
 
         let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
 
@@ -1256,7 +1253,7 @@ export interface PrepublishToStagingOptions {
     rootDir?: string;
     files?: FileEntry[];
     stagingDir?: string;
-    retainStagingFolder?: boolean;
+    retainStagingDir?: boolean;
 }
 
 export interface ZipPackageOptions {
