@@ -74,7 +74,23 @@ export class RokuDeploy {
                     throw new Error(`Invalid type for "dest" at index ${i} of files array`);
                 }
 
-                if (typeof entry.src !== 'string' && !Array.isArray(entry.src)) {
+                //objects with src: string
+                if (typeof entry.src === 'string') {
+                    result.push({
+                        src: util.standardizePath(entry.src),
+                        dest: util.standardizePath(entry.dest)
+                    });
+
+                    //objects with src:string[]
+                } else if ('src' in entry && Array.isArray(entry.src)) {
+                    //create a distinct entry for each item in the src array
+                    for (let srcEntry of entry.src) {
+                        result.push({
+                            src: util.standardizePath(srcEntry),
+                            dest: util.standardizePath(entry.dest)
+                        });
+                    }
+                } else {
                     throw new Error(`Invalid type for "src" at index ${i} of files array`);
                 }
             } else {
