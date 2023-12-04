@@ -46,10 +46,20 @@ export class Util {
         if (!thePath) {
             return thePath;
         }
-        return path.normalize(
-            thePath.replace(/[\/\\]+/g, path.sep)
-        );
+        return path.normalize(thePath).replace(/[\/\\]+/g, path.sep);
     }
+
+    /**
+     * Normalize path and replace all directory separators with current OS separators
+     * @param thePath
+     */
+    public standardizePathPosix(thePath: string) {
+        if (!thePath) {
+            return thePath;
+        }
+        return path.normalize(thePath).replace(/[\/\\]+/g, '/');
+    }
+
 
     /**
      * Do a case-insensitive string replacement
@@ -229,6 +239,19 @@ export function standardizePath(stringParts, ...expressions: any[]) {
         result.push(stringParts[i], expressions[i]);
     }
     return util.standardizePath(
+        result.join('')
+    );
+}
+
+/**
+ * A tagged template literal function for standardizing the path and making all path separators forward slashes
+ */
+export function standardizePathPosix(stringParts, ...expressions: any[]) {
+    let result = [];
+    for (let i = 0; i < stringParts.length; i++) {
+        result.push(stringParts[i], expressions[i]);
+    }
+    return util.standardizePathPosix(
         result.join('')
     );
 }

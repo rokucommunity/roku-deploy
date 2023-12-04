@@ -11,7 +11,7 @@ import * as glob from 'glob';
 import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
-import { util, standardizePath as s } from './util';
+import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
@@ -1722,7 +1722,7 @@ describe('index', () => {
             await rokuDeploy.prepublishToStaging({
                 files: [
                     {
-                        src: `${rootDir}/manifest`,
+                        src: sp`${rootDir}/manifest`,
                         dest: ''
                     },
                     {
@@ -2093,7 +2093,7 @@ describe('index', () => {
                 src: `long/source/path`,
                 dest: `long/dest/path`
             }])).to.eql([{
-                src: s`long/source/path`,
+                src: sp`long/source/path`,
                 dest: s`long/dest/path`
             }]);
         });
@@ -2151,7 +2151,7 @@ describe('index', () => {
                 src: 'manifest',
                 dest: undefined
             }, {
-                src: s`source/main.brs`,
+                src: sp`source/main.brs`,
                 dest: undefined
             }]);
         });
@@ -2163,7 +2163,7 @@ describe('index', () => {
                     dest: 'source/config.brs'
                 }
             ])).to.eql([{
-                src: s`source/config.dev.brs`,
+                src: sp`source/config.dev.brs`,
                 dest: s`source/config.brs`
             }]);
         });
@@ -2651,7 +2651,7 @@ describe('index', () => {
 
     describe('getFilePaths', () => {
         const otherProjectName = 'otherProject';
-        const otherProjectDir = s`${rootDir}/../${otherProjectName}`;
+        const otherProjectDir = sp`${rootDir}/../${otherProjectName}`;
         //create baseline project structure
         beforeEach(() => {
             fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
@@ -3139,7 +3139,7 @@ describe('index', () => {
 
             //dest not specified
             expect(await rokuDeploy.getFilePaths([{
-                src: s`${cwd}/README.md`
+                src: sp`${cwd}/README.md`
             }], options.rootDir)).to.eql([{
                 src: s`${cwd}/README.md`,
                 dest: s`README.md`
@@ -3147,7 +3147,7 @@ describe('index', () => {
 
             //dest specified
             expect(await rokuDeploy.getFilePaths([{
-                src: path.join(cwd, 'README.md'),
+                src: sp`${cwd}/README.md`,
                 dest: 'docs/README.md'
             }], options.rootDir)).to.eql([{
                 src: s`${cwd}/README.md`,
@@ -3157,7 +3157,7 @@ describe('index', () => {
             let paths: any[];
 
             paths = await rokuDeploy.getFilePaths([{
-                src: s`${cwd}/README.md`,
+                src: sp`${cwd}/README.md`,
                 dest: s`docs/README.md`
             }], outDir);
 
@@ -3169,7 +3169,7 @@ describe('index', () => {
             //top-level string paths pointing to files outside the root should thrown an exception
             await expectThrowsAsync(async () => {
                 paths = await rokuDeploy.getFilePaths([
-                    s`${cwd}/README.md`
+                    sp`${cwd}/README.md`
                 ], outDir);
             });
         });
@@ -3180,7 +3180,7 @@ describe('index', () => {
             ]);
             expect(
                 await rokuDeploy.getFilePaths([{
-                    src: path.join('..', 'README.md')
+                    src: sp`../README.md`
                 }], rootDir)
             ).to.eql([{
                 src: s`${rootDir}/../README.md`,
@@ -3189,7 +3189,7 @@ describe('index', () => {
 
             expect(
                 await rokuDeploy.getFilePaths([{
-                    src: path.join('..', 'README.md'),
+                    src: sp`../README.md`,
                     dest: 'docs/README.md'
                 }], rootDir)
             ).to.eql([{
@@ -3204,17 +3204,17 @@ describe('index', () => {
             ]);
             await expectThrowsAsync(
                 rokuDeploy.getFilePaths([
-                    path.join('..', 'README.md')
+                    path.posix.join('..', 'README.md')
                 ], outDir)
             );
         });
 
         it('supports overriding paths', async () => {
             let paths = await rokuDeploy.getFilePaths([{
-                src: s`${rootDir}/components/component1.brs`,
+                src: sp`${rootDir}/components/component1.brs`,
                 dest: 'comp1.brs'
             }, {
-                src: s`${rootDir}/components/screen1/screen1.brs`,
+                src: sp`${rootDir}/components/screen1/screen1.brs`,
                 dest: 'comp1.brs'
             }], rootDir);
             expect(paths).to.be.lengthOf(1);
