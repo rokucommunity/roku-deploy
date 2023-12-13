@@ -657,7 +657,7 @@ export class RokuDeploy {
         }
 
         if (results.response.statusCode === 401) {
-            const host = results?.response?.request?.host?.toString?.();
+            const host = results.response.request?.host?.toString?.();
             throw new errors.UnauthorizedDeviceResponseError(`Unauthorized. Please verify credentials for host '${host}'`, results);
         }
 
