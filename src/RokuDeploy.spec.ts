@@ -1055,7 +1055,7 @@ describe('index', () => {
             return rokuDeploy.publish(options).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
-                expect(err.message).to.equal('Unauthorized. Please verify username and password for target Roku.');
+                expect(err.message).to.be.a('string').and.satisfy(msg => msg.startsWith('Unauthorized. Please verify credentials for host'));
                 expect(true).to.be.true;
             });
         });
