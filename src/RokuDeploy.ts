@@ -657,7 +657,8 @@ export class RokuDeploy {
         }
 
         if (results.response.statusCode === 401) {
-            throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
+            const host = results?.response?.request?.host?.toString?.();
+            throw new errors.UnauthorizedDeviceResponseError(`Unauthorized. Please verify credentials for host '${host}'`, results);
         }
 
         let rokuMessages = this.getRokuMessagesFromResponseBody(results.body);
