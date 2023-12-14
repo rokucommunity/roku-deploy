@@ -2825,7 +2825,7 @@ describe('index', () => {
                 rootDir
                 )).to.eql([{
                     src: s`${rootDir}/e/file.brs`,
-                    dest: 'e/file.brs'
+                    dest: s`e/file.brs`
                 }]);
             });
 
@@ -2838,7 +2838,7 @@ describe('index', () => {
                 rootDir
                 )).to.eql([{
                     src: s`${rootDir}/[test]/file.brs`,
-                    dest: '[test]/file.brs'
+                    dest: s`[test]/file.brs`
                 }]);
             });
 
