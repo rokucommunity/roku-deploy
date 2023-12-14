@@ -325,7 +325,7 @@ Here are the available options. The defaults are shown to the right of the optio
         "manifest"
     ]
     ```
-    An array of file paths, globs, or {src:string;dest:string} objects that will be copied into the deployment package. This is required to use glob style. You can learn more [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
+    An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. Make sure to _exclusively_ use forward slashes ( `/` ) for path separators (even on Windows), as backslashes are reserved for character escaping. You can learn more about this requirement [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
 
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location
