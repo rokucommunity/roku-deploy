@@ -2817,6 +2817,36 @@ describe('index', () => {
                 }]);
             });
 
+            it('Find files in folder using asterisk glob pattern', async () => {
+                fsExtra.outputFileSync(`${rootDir}/*est/file.brs`, '');
+                fsExtra.outputFileSync(`${rootDir}/test/file.brs`, '');
+                expect(await getFilePaths([
+                    '*est/*'
+                ],
+                rootDir
+                )).to.eql([{
+                    src: s`${rootDir}/*est/file.brs`,
+                    dest: '*est/file.brs'
+                },
+                {
+                    src: s`${rootDir}/test/file.brs`,
+                    dest: 'test/file.brs'
+                }]);
+            });
+
+            it('Finds files in folder with escaped asterisk glob pattern', async () => {
+                fsExtra.outputFileSync(`${rootDir}/*est/file.brs`, '');
+                fsExtra.outputFileSync(`${rootDir}/test/file.brs`, '');
+                expect(await getFilePaths([
+                    '\\*est/*'
+                ],
+                rootDir
+                )).to.eql([{
+                    src: s`${rootDir}/*est/file.brs`,
+                    dest: '*est/file.brs'
+                }]);
+            });
+
             it('throws exception when top-level strings reference files not under rootDir', async () => {
                 writeFiles(otherProjectDir, [
                     'manifest'
