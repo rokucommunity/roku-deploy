@@ -256,7 +256,7 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
- - if `src` is required to follow glob style (i.e. forward-slashes only). You can learn more [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
  `{ src: "lib/*.brs", dest: "source/lib"}`
