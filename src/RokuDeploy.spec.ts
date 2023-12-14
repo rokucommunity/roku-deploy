@@ -2817,33 +2817,28 @@ describe('index', () => {
                 }]);
             });
 
-            it('Find files in folder using asterisk glob pattern', async () => {
-                fsExtra.outputFileSync(`${rootDir}/*est/file.brs`, '');
-                fsExtra.outputFileSync(`${rootDir}/test/file.brs`, '');
+            it('Finds folder using square brackets glob pattern', async () => {
+                fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
                 expect(await getFilePaths([
-                    '*est/*'
+                    '[test]/*'
                 ],
                 rootDir
                 )).to.eql([{
-                    src: s`${rootDir}/*est/file.brs`,
-                    dest: '*est/file.brs'
-                },
-                {
-                    src: s`${rootDir}/test/file.brs`,
-                    dest: 'test/file.brs'
+                    src: s`${rootDir}/e/file.brs`,
+                    dest: 'e/file.brs'
                 }]);
             });
 
-            it('Finds files in folder with escaped asterisk glob pattern', async () => {
-                fsExtra.outputFileSync(`${rootDir}/*est/file.brs`, '');
-                fsExtra.outputFileSync(`${rootDir}/test/file.brs`, '');
+            it('Finds folder with escaped square brackets glob pattern as name', async () => {
+                fsExtra.outputFileSync(`${rootDir}/[test]/file.brs`, '');
+                fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
                 expect(await getFilePaths([
-                    '\\*est/*'
+                    '\\[test\\]/*'
                 ],
                 rootDir
                 )).to.eql([{
-                    src: s`${rootDir}/*est/file.brs`,
-                    dest: '*est/file.brs'
+                    src: s`${rootDir}/[test]/file.brs`,
+                    dest: '[test]/file.brs'
                 }]);
             });
 
