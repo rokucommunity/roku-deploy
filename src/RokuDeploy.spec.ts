@@ -1048,6 +1048,21 @@ describe('index', () => {
             });
         });
 
+        it('checkRequest handles edge case', () => {
+            function doTest(results, hostValue = undefined) {
+                let error: Error;
+                try {
+                    rokuDeploy['checkRequest'](results);
+                } catch (e) {
+                    error = e as any;
+                }
+                expect(error.message).to.eql(`Unauthorized. Please verify credentials for host '${hostValue}'`);
+            }
+            doTest({ body: 'something', response: { statusCode: 401, request: { host: '1.1.1.1' } } }, '1.1.1.1');
+            doTest({ body: 'something', response: { statusCode: 401, request: { host: undefined } } });
+            doTest({ body: 'something', response: { statusCode: 401, request: undefined } });
+        });
+
         it('rejects when response contains invalid password status code', () => {
             options.failOnCompileError = true;
             mockDoPostRequest('', 401);
@@ -1055,7 +1070,7 @@ describe('index', () => {
             return rokuDeploy.publish(options).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
-                expect(err.message).to.equal('Unauthorized. Please verify username and password for target Roku.');
+                expect(err.message).to.be.a('string').and.satisfy(msg => msg.startsWith('Unauthorized. Please verify credentials for host'));
                 expect(true).to.be.true;
             });
         });
