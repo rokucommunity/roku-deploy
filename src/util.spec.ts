@@ -26,14 +26,16 @@ describe('util', () => {
         });
     });
 
-    describe('toForwardSlashes', () => {
-        it('returns original value for non-strings', () => {
-            expect(util.toForwardSlashes(undefined)).to.be.undefined;
-            expect(util.toForwardSlashes(<any>false)).to.be.false;
+    describe('standardizePathPosix', () => {
+        it('returns falsey value back unchanged', () => {
+            expect(util.standardizePathPosix(null)).to.eql(null);
+            expect(util.standardizePathPosix(undefined)).to.eql(undefined);
+            expect(util.standardizePathPosix(false as any)).to.eql(false);
+            expect(util.standardizePathPosix(0 as any)).to.eql(0);
         });
 
-        it('converts mixed slashes to forward', () => {
-            expect(util.toForwardSlashes('a\\b/c\\d/e')).to.eql('a/b/c/d/e');
+        it('always returns forward slashes', () => {
+            expect(util.standardizePathPosix('C:\\projects/some\\folder')).to.eql('C:/projects/some/folder');
         });
     });
 

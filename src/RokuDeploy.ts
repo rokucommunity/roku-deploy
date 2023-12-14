@@ -77,7 +77,7 @@ export class RokuDeploy {
                 //objects with src: string
                 if (typeof entry.src === 'string') {
                     result.push({
-                        src: util.standardizePath(entry.src),
+                        src: entry.src,
                         dest: util.standardizePath(entry.dest)
                     });
 
@@ -86,7 +86,7 @@ export class RokuDeploy {
                     //create a distinct entry for each item in the src array
                     for (let srcEntry of entry.src) {
                         result.push({
-                            src: util.standardizePath(srcEntry),
+                            src: srcEntry,
                             dest: util.standardizePath(entry.dest)
                         });
                     }
