@@ -3275,18 +3275,18 @@ describe('index', () => {
         it('correctly assumes file path if not given', async () => {
             fsExtra.outputFileSync(`${rootDir}/components/CustomButton.brs`, '');
             expect(
-                await rokuDeploy.getFilePaths([
+                (await rokuDeploy.getFilePaths([
                     { src: 'components/*' }
-                ], rootDir)
+                ], rootDir)).sort((a, b) => a.src.localeCompare(b.src))
             ).to.eql([{
-                src: s`${rootDir}/components/CustomButton.brs`,
-                dest: s`components/CustomButton.brs`
-            }, {
                 src: s`${rootDir}/components/component1.brs`,
                 dest: s`components/component1.brs`
             }, {
                 src: s`${rootDir}/components/component1.xml`,
                 dest: s`components/component1.xml`
+            }, {
+                src: s`${rootDir}/components/CustomButton.brs`,
+                dest: s`components/CustomButton.brs`
             }]);
         });
     });
