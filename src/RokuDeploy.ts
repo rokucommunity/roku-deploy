@@ -329,9 +329,11 @@ export class RokuDeploy {
             //`pattern` is some other glob magic
         } else {
             const fileNameAndExtension = path.basename(srcPath);
-            const foundFilePath = util.standardizePath(`${entry.dest ?? ''}/${fileNameAndExtension}`);
-            const assumedFilePath = util.stringReplaceInsensitive(srcPath, rootDir, '');
-            result = entry.dest ? foundFilePath : assumedFilePath;
+            if (entry.dest) {
+                result = util.standardizePath(`${entry.dest ?? ''}/${fileNameAndExtension}`);
+            } else {
+                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            }
         }
 
         result = util.standardizePath(
