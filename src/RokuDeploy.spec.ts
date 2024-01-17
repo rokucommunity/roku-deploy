@@ -3062,28 +3062,6 @@ describe('index', () => {
                 }]);
             });
 
-            it('works for other globs without dest', async () => {
-                expect(await getFilePaths([{
-                    src: `components/screen1/*creen1.brs`
-                }])).to.eql([{
-                    src: s`${rootDir}/components/screen1/screen1.brs`,
-                    dest: s`screen1.brs`
-                }]);
-            });
-
-            it('skips directory folder names for other globs without dest', async () => {
-                expect(await getFilePaths([{
-                    //straight wildcard matches folder names too
-                    src: `components/*`
-                }])).to.eql([{
-                    src: s`${rootDir}/components/component1.brs`,
-                    dest: s`component1.brs`
-                }, {
-                    src: s`${rootDir}/components/component1.xml`,
-                    dest: s`component1.xml`
-                }]);
-            });
-
             it('applies negated patterns', async () => {
                 writeFiles(rootDir, [
                     'components/component1.brs',
@@ -3280,6 +3258,36 @@ describe('index', () => {
                 //clean up
                 await fsExtra.remove(s`${thisRootDir}/../`);
             }
+        });
+
+        it('maintains original file path', async () => {
+            fsExtra.outputFileSync(`${rootDir}/components/CustomButton.brs`, '');
+            expect(
+                await rokuDeploy.getFilePaths([
+                    'components/CustomButton.brs'
+                ], rootDir)
+            ).to.eql([{
+                src: s`${rootDir}/components/CustomButton.brs`,
+                dest: s`components/CustomButton.brs`
+            }]);
+        });
+
+        it('correctly assumes file path if not given', async () => {
+            fsExtra.outputFileSync(`${rootDir}/components/CustomButton.brs`, '');
+            expect(
+                (await rokuDeploy.getFilePaths([
+                    { src: 'components/*' }
+                ], rootDir)).sort((a, b) => a.src.localeCompare(b.src))
+            ).to.eql([{
+                src: s`${rootDir}/components/component1.brs`,
+                dest: s`components/component1.brs`
+            }, {
+                src: s`${rootDir}/components/component1.xml`,
+                dest: s`components/component1.xml`
+            }, {
+                src: s`${rootDir}/components/CustomButton.brs`,
+                dest: s`components/CustomButton.brs`
+            }]);
         });
     });
 
