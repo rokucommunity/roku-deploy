@@ -330,7 +330,7 @@ export class RokuDeploy {
         } else {
             const fileNameAndExtension = path.basename(srcPath);
             if (entry.dest) {
-                result = util.standardizePath(`${entry.dest ?? ''}/${fileNameAndExtension}`);
+                result = util.standardizePath(`${entry.dest}/${fileNameAndExtension}`);
             } else {
                 result = util.stringReplaceInsensitive(srcPath, rootDir, '');
             }
