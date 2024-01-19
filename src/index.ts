@@ -31,6 +31,7 @@ let retrieveSignedPackage = RokuDeploy.prototype.retrieveSignedPackage.bind(roku
 let signExistingPackage = RokuDeploy.prototype.signExistingPackage.bind(rokuDeploy);
 let stringifyManifest = RokuDeploy.prototype.stringifyManifest.bind(rokuDeploy);
 let takeScreenshot = RokuDeploy.prototype.takeScreenshot.bind(rokuDeploy);
+let getDevId = RokuDeploy.prototype.getDevId.bind(rokuDeploy);
 let zipFolder = RokuDeploy.prototype.zipFolder.bind(rokuDeploy);
 let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
 
@@ -56,6 +57,7 @@ export {
     signExistingPackage,
     stringifyManifest,
     takeScreenshot,
+    getDevId,
     zipFolder,
     zipPackage
 };

@@ -957,7 +957,7 @@ export class RokuDeploy {
      * Centralizes getting output zip file path based on passed in options
      * @param options
      */
-    public getOutputZipFilePath(options: GetOutputZipFilePathOptions) {
+    public getOutputZipFilePath(options?: GetOutputZipFilePathOptions) {
         options = this.getOptions(options) as any;
 
         let zipFileName = options.outFile;
