@@ -919,6 +919,34 @@ describe('index', () => {
             } catch (e) { }
         });
 
+        it('uses overridden route', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.publish({
+                ...options,
+                packageUploadOverrides: {
+                    route: 'alt_path'
+                }
+            });
+            expect(stub.getCall(0).args[0].url).to.eql('http://0.0.0.0:80/alt_path');
+        });
+
+        it('overrides formData', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.publish({
+                ...options,
+                remoteDebug: true,
+                packageUploadOverrides: {
+                    formData: {
+                        remotedebug: null,
+                        newfield: 'here'
+                    }
+                }
+            });
+            expect(stub.getCall(0).args[0].formData).to.include({
+                newfield: 'here'
+            }).and.to.not.haveOwnProperty('remotedebug');
+        });
+
         it('does not delete the archive by default', async () => {
             let zipPath = `${options.outDir}/${options.outFile}`;
 
@@ -2161,6 +2189,9 @@ describe('index', () => {
         it('rejects the promise when an error occurs', async () => {
             //zip path doesn't exist
             await assertThrowsAsync(async () => {
+                sinon.stub(fsExtra, 'outputFile').callsFake(() => {
+                    throw new Error();
+                });
                 await rokuDeploy.zipFolder('source', '.tmp/some/zip/path/that/does/not/exist');
             });
         });
