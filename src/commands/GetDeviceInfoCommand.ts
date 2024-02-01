@@ -2,8 +2,9 @@ import { rokuDeploy } from '../index';
 
 export class GetDeviceInfoCommand {
     async run(args) {
-        await rokuDeploy.getDeviceInfo({
+        const outputPath = await rokuDeploy.getDeviceInfo({
             host: args.host
         });
+        console.log(JSON.stringify(outputPath));
     }
 }

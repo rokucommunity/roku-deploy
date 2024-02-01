@@ -2,9 +2,10 @@ import { rokuDeploy } from '../index';
 
 export class GetOutputPkgFilePathCommand {
     run(args) {
-        rokuDeploy.getOutputPkgFilePath({
+        const outputPath = rokuDeploy.getOutputPkgFilePath({
             outFile: args.outFile,
             outDir: args.outDir
         });
+        console.log(outputPath);
     }
 }
