@@ -11,7 +11,7 @@ export * from './DeviceInfo';
 export const rokuDeploy = new RokuDeploy();
 
 let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
-let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
+let deleteInstalledChannel = RokuDeploy.prototype.deleteDevChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
 let getDestPath = RokuDeploy.prototype.getDestPath.bind(rokuDeploy);
@@ -23,17 +23,17 @@ let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDe
 let normalizeFilesArray = RokuDeploy.prototype.normalizeFilesArray.bind(rokuDeploy);
 let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let parseManifest = RokuDeploy.prototype.parseManifest.bind(rokuDeploy);
-let prepublishToStaging = RokuDeploy.prototype.prepublishToStaging.bind(rokuDeploy);
+let prepublishToStaging = RokuDeploy.prototype.stage.bind(rokuDeploy);
 let pressHomeButton = RokuDeploy.prototype.pressHomeButton.bind(rokuDeploy);
-let publish = RokuDeploy.prototype.publish.bind(rokuDeploy);
+let publish = RokuDeploy.prototype.sideload.bind(rokuDeploy);
 let rekeyDevice = RokuDeploy.prototype.rekeyDevice.bind(rokuDeploy);
 let retrieveSignedPackage = RokuDeploy.prototype.retrieveSignedPackage.bind(rokuDeploy);
-let signExistingPackage = RokuDeploy.prototype.signExistingPackage.bind(rokuDeploy);
+let signExistingPackage = RokuDeploy.prototype.signPackage.bind(rokuDeploy);
 let stringifyManifest = RokuDeploy.prototype.stringifyManifest.bind(rokuDeploy);
-let takeScreenshot = RokuDeploy.prototype.takeScreenshot.bind(rokuDeploy);
+let takeScreenshot = RokuDeploy.prototype.captureScreenshot.bind(rokuDeploy);
 let getDevId = RokuDeploy.prototype.getDevId.bind(rokuDeploy);
 let zipFolder = RokuDeploy.prototype.zipFolder.bind(rokuDeploy);
-let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
+let zipPackage = RokuDeploy.prototype.zip.bind(rokuDeploy);
 
 export {
     createPackage,

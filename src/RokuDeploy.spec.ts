@@ -31,6 +31,10 @@ describe('index', () => {
 
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
+
+
+        rokuDeploy.convertToSquashfs
+
         options = rokuDeploy.getOptions({
             rootDir: rootDir,
             outDir: outDir,
@@ -673,7 +677,7 @@ describe('index', () => {
             let err;
             try {
                 fsExtra.ensureDirSync(options.stagingDir);
-                await rokuDeploy.zipPackage({
+                await rokuDeploy.zip({
                     stagingDir: s`${tempDir}/path/to/nowhere`,
                     outDir: outDir
                 });
@@ -686,7 +690,7 @@ describe('index', () => {
         it('should throw error when manifest is missing and stagingDir does not exist', async () => {
             let err;
             try {
-                await rokuDeploy.zipPackage({
+                await rokuDeploy.zip({
                     stagingDir: s`${tempDir}/path/to/nowhere`,
                     outDir: outDir
                 });
@@ -782,7 +786,7 @@ describe('index', () => {
         });
 
         it('should retain the staging directory when told to', async () => {
-            let stagingDirValue = await rokuDeploy.prepublishToStaging({
+            let stagingDirValue = await rokuDeploy.stage({
                 files: [
                     'manifest'
                 ],
@@ -790,7 +794,7 @@ describe('index', () => {
                 rootDir: rootDir
             });
             expectPathExists(stagingDirValue);
-            await rokuDeploy.zipPackage({
+            await rokuDeploy.zip({
                 stagingDir: stagingDir,
                 retainStagingDir: true,
                 outDir: outDir
@@ -971,7 +975,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish({
+            await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -987,7 +991,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish({
+            await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1018,7 +1022,7 @@ describe('index', () => {
 
             //the file should exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.publish({
+            await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1032,7 +1036,7 @@ describe('index', () => {
 
         it('fails when the zip file is missing', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy.publish({
+                await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
@@ -1046,7 +1050,7 @@ describe('index', () => {
 
         it('fails when no host is provided', () => {
             expectPathNotExists('rokudeploy.json');
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: undefined,
                 password: 'password',
                 outDir: outDir,
@@ -1072,7 +1076,7 @@ describe('index', () => {
             });
 
             try {
-                await rokuDeploy.publish({
+                await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
@@ -1091,7 +1095,7 @@ describe('index', () => {
                 Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
             `);
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1110,7 +1114,7 @@ describe('index', () => {
                 Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Install Failure: Compilation Failed').trigger('Render', node);
             `);
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1127,7 +1131,7 @@ describe('index', () => {
             let body = 'Install Failure: Compilation Failed.';
             mockDoPostRequest(body);
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1144,7 +1148,7 @@ describe('index', () => {
         it('rejects when response contains invalid password status code', () => {
             mockDoPostRequest('', 401);
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1161,7 +1165,7 @@ describe('index', () => {
         it('handles successful deploy', () => {
             mockDoPostRequest();
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1177,7 +1181,7 @@ describe('index', () => {
         it('handles successful deploy with remoteDebug', () => {
             const stub = mockDoPostRequest();
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1195,7 +1199,7 @@ describe('index', () => {
         it('handles successful deploy with remotedebug_connect_early', () => {
             const stub = mockDoPostRequest();
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1215,7 +1219,7 @@ describe('index', () => {
             let body = 'Identical to previous version -- not replacing.';
             mockDoPostRequest(body);
 
-            return rokuDeploy.publish({
+            return rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
@@ -1233,7 +1237,7 @@ describe('index', () => {
             mockDoPostRequest(body, 123);
 
             try {
-                await rokuDeploy.publish({
+                await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
@@ -1251,7 +1255,7 @@ describe('index', () => {
             mockDoPostRequest('', 401);
 
             try {
-                await rokuDeploy.publish({
+                await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
@@ -1269,7 +1273,7 @@ describe('index', () => {
             mockDoPostRequest(null);
 
             try {
-                await rokuDeploy.publish({
+                await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
@@ -1517,7 +1521,7 @@ describe('index', () => {
 
         it('should return our error if signingPassword is not supplied', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy.signExistingPackage({
+                await rokuDeploy.signPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: undefined,
@@ -1534,7 +1538,7 @@ describe('index', () => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
-                await rokuDeploy.signExistingPackage({
+                await rokuDeploy.signPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1550,7 +1554,7 @@ describe('index', () => {
         it('should return our error if it received invalid data', async () => {
             try {
                 mockDoPostRequest(null);
-                await rokuDeploy.signExistingPackage({
+                await rokuDeploy.signPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1571,7 +1575,7 @@ describe('index', () => {
             mockDoPostRequest(body);
 
             await expectThrowsAsync(
-                rokuDeploy.signExistingPackage({
+                rokuDeploy.signPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1587,7 +1591,7 @@ describe('index', () => {
                         node.appendChild(pkgDiv);`;
             mockDoPostRequest(body);
 
-            let pkgPath = await rokuDeploy.signExistingPackage({
+            let pkgPath = await rokuDeploy.signPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
@@ -1599,7 +1603,7 @@ describe('index', () => {
         it('should return our fallback error if neither error or package link was detected', async () => {
             mockDoPostRequest();
             await expectThrowsAsync(
-                rokuDeploy.signExistingPackage({
+                rokuDeploy.signPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1612,7 +1616,7 @@ describe('index', () => {
 
     describe('prepublishToStaging', () => {
         it('should use outDir for staging folder', async () => {
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest'
                 ],
@@ -1622,7 +1626,7 @@ describe('index', () => {
         });
 
         it('should support overriding the staging folder', async () => {
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: ['manifest'],
                 stagingDir: `${tempDir}/custom-out-dir`,
                 rootDir: rootDir
@@ -1635,7 +1639,7 @@ describe('index', () => {
                 'manifest',
                 'source/main.brs'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     'source/main.brs'
@@ -1652,7 +1656,7 @@ describe('index', () => {
                 'manifest',
                 'source/main.brs'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     {
@@ -1671,7 +1675,7 @@ describe('index', () => {
                 'manifest',
                 'source/main.brs'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     {
                         src: 'manifest',
@@ -1698,7 +1702,7 @@ describe('index', () => {
                 'manifest',
                 'source/main.brs'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     {
                         src: 'manifest',
@@ -1719,7 +1723,7 @@ describe('index', () => {
             writeFiles(rootDir, [
                 'manifest'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     {
                         src: sp`${rootDir}/manifest`,
@@ -1743,7 +1747,7 @@ describe('index', () => {
                 'components/scenes/home/home.brs'
             ]);
             console.log('before');
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     'components/!(scenes)/**/*'
@@ -1763,7 +1767,7 @@ describe('index', () => {
                 'components/Loader/Loader.brs',
                 'components/scenes/Home/Home.brs'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     'source',
@@ -1780,7 +1784,7 @@ describe('index', () => {
 
         it('throws on invalid entries', async () => {
             try {
-                await rokuDeploy.prepublishToStaging({
+                await rokuDeploy.stage({
                     files: [
                         'manifest',
                         <any>{}
@@ -1797,7 +1801,7 @@ describe('index', () => {
 
         it('retains subfolder structure when referencing a folder', async () => {
             fsExtra.outputFileSync(`${rootDir}/flavors/shared/resources/images/fhd/image.jpg`, '');
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     {
@@ -1817,7 +1821,7 @@ describe('index', () => {
                 'flavors/shared/resources/images/fhd/image.jpg',
                 'resources/image.jpg'
             ]);
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 files: [
                     'manifest',
                     {
@@ -1919,7 +1923,7 @@ describe('index', () => {
                     dest: s`renamed_test.md`
                 }]);
 
-                await rokuDeploy.prepublishToStaging({
+                await rokuDeploy.stage({
                     rootDir: rootDir,
                     stagingDir: stagingDir,
                     files: [
@@ -1971,7 +1975,7 @@ describe('index', () => {
                     dest: s`source/main.brs`
                 }]);
 
-                await rokuDeploy.prepublishToStaging({
+                await rokuDeploy.stage({
                     files: [
                         'manifest',
                         'source/**/*'
@@ -2004,7 +2008,7 @@ describe('index', () => {
 
             fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
-            await rokuDeploy.prepublishToStaging({
+            await rokuDeploy.stage({
                 rootDir: rootDir,
                 stagingDir: stagingDir,
                 files: [
@@ -2038,7 +2042,7 @@ describe('index', () => {
 
             fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
             await expectThrowsAsync(
-                rokuDeploy.prepublishToStaging({
+                rokuDeploy.stage({
                     rootDir: rootDir,
                     stagingDir: stagingDir,
                     files: [
@@ -2250,7 +2254,7 @@ describe('index', () => {
         it('attempts to delete any installed dev channel on the device', async () => {
             mockDoPostRequest();
 
-            let result = await rokuDeploy.deleteInstalledChannel({
+            let result = await rokuDeploy.deleteDevChannel({
                 host: '1.2.3.4',
                 password: 'password'
             });
@@ -2301,19 +2305,19 @@ describe('index', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -2334,7 +2338,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.takeScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
         });
 
         it('handles the device returning a png', async () => {
@@ -2355,7 +2359,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.png');
             expect(fsExtra.existsSync(result));
@@ -2379,7 +2383,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.jpg');
             expect(fsExtra.existsSync(result));
@@ -2403,7 +2407,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: `${tempDir}/myScreenShots` });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, outDir: `${tempDir}/myScreenShots` });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(result));
@@ -2427,7 +2431,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
@@ -2451,7 +2455,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my.jpg' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, outDir: tempDir, outFile: 'my.jpg' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
@@ -2475,7 +2479,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -2498,7 +2502,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.takeScreenshot({ host: options.host, password: options.password, outFile: 'myFile' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, outFile: 'myFile' });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));

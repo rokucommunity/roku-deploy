@@ -225,6 +225,246 @@ export class Util {
         });
     }
 
+    /**
+     * Given an array of `FilesType`, normalize them each into a `StandardizedFileEntry`.
+     * Each entry in the array or inner `src` array will be extracted out into its own object.
+     * This makes it easier to reason about later on in the process.
+     * @param files
+     */
+    public normalizeFilesArray(files: FileEntry[]) {
+        const result: Array<string | StandardizedFileEntry> = [];
+
+        for (let i = 0; i < files.length; i++) {
+            let entry = files[i];
+            //skip falsey and blank entries
+            if (!entry) {
+                continue;
+
+                //string entries
+            } else if (typeof entry === 'string') {
+                result.push(entry);
+
+                //objects with src: (string | string[])
+            } else if ('src' in entry) {
+                //validate dest
+                if (entry.dest !== undefined && entry.dest !== null && typeof entry.dest !== 'string') {
+                    throw new Error(`Invalid type for "dest" at index ${i} of files array`);
+                }
+
+                //objects with src: string
+                if (typeof entry.src === 'string') {
+                    result.push({
+                        src: entry.src,
+                        dest: util.standardizePath(entry.dest)
+                    });
+
+                    //objects with src:string[]
+                } else if ('src' in entry && Array.isArray(entry.src)) {
+                    //create a distinct entry for each item in the src array
+                    for (let srcEntry of entry.src) {
+                        result.push({
+                            src: srcEntry,
+                            dest: util.standardizePath(entry.dest)
+                        });
+                    }
+                } else {
+                    throw new Error(`Invalid type for "src" at index ${i} of files array`);
+                }
+            } else {
+                throw new Error(`Invalid entry at index ${i} in files array`);
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
+    * Get all file paths for the specified options
+    * @param files
+    * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
+    */
+    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
+        //if the rootDir isn't absolute, convert it to absolute using the standard options flow
+        if (path.isAbsolute(rootDir) === false) {
+            rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
+        }
+        const entries = this.normalizeFilesArray(files);
+        const srcPathsByIndex = await util.globAllByIndex(
+            entries.map(x => {
+                return typeof x === 'string' ? x : x.src;
+            }),
+            rootDir
+        );
+
+        /**
+         * Result indexed by the dest path
+         */
+        let result = new Map<string, StandardizedFileEntry>();
+
+        //compute `dest` path for every file
+        for (let i = 0; i < srcPathsByIndex.length; i++) {
+            const srcPaths = srcPathsByIndex[i];
+            const entry = entries[i];
+            if (srcPaths) {
+                for (let srcPath of srcPaths) {
+                    srcPath = util.standardizePath(srcPath);
+
+                    const dest = this.computeFileDestPath(srcPath, entry, rootDir);
+                    //the last file with this `dest` will win, so just replace any existing entry with this one.
+                    result.set(dest, {
+                        src: srcPath,
+                        dest: dest
+                    });
+                }
+            }
+        }
+        return [...result.values()];
+    }
+
+    /**
+     * Given a full path to a file, determine its dest path
+     * @param srcPath the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+     * @param files the files array
+     * @param rootDir the absolute path to the root dir
+     * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
+     * @returns the RELATIVE path to the dest location for the file.
+     */
+    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
+        srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+        rootDir = rootDir.replace(/\\+/g, '/');
+        const entries = util.normalizeFilesArray(files);
+
+        function makeGlobAbsolute(pattern: string) {
+            return path.resolve(
+                path.posix.join(
+                    rootDir,
+                    //remove leading exclamation point if pattern is negated
+                    pattern
+                    //coerce all slashes to forward
+                )
+            ).replace(/\\/g, '/');
+        }
+
+        let result: string;
+
+        //add the file into every matching cache bucket
+        for (let entry of entries) {
+            const pattern = (typeof entry === 'string' ? entry : entry.src);
+            //filter previous paths
+            if (pattern.startsWith('!')) {
+                const keepFile = picomatch('!' + makeGlobAbsolute(pattern.replace(/^!/, '')));
+                if (!keepFile(srcPathAbsolute)) {
+                    result = undefined;
+                }
+            } else {
+                const keepFile = picomatch(makeGlobAbsolute(pattern));
+                if (keepFile(srcPathAbsolute)) {
+                    try {
+                        result = this.computeFileDestPath(
+                            srcPathAbsolute,
+                            entry,
+                            util.standardizePath(rootDir)
+                        );
+                    } catch {
+                        //ignore errors...the file just has no dest path
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Compute the `dest` path. This accounts for magic globstars in the pattern,
+     * as well as relative paths based on the dest. This is only used internally.
+     * @param src an absolute, normalized path for a file
+     * @param dest the `dest` entry for this file. If omitted, files will derive their paths relative to rootDir.
+     * @param pattern the glob pattern originally used to find this file
+     * @param rootDir absolute normalized path to the rootDir
+     */
+    private computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
+        let result: string;
+        let globstarIdx: number;
+        //files under rootDir with no specified dest
+        if (typeof entry === 'string') {
+            if (util.isParentOfPath(rootDir, srcPath, false)) {
+                //files that are actually relative to rootDir
+                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            } else {
+                // result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+                throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+            }
+
+            //non-glob-pattern explicit file reference
+        } else if (!isGlob(entry.src.replace(/\\/g, '/'), { strict: false })) {
+            let isEntrySrcAbsolute = path.isAbsolute(entry.src);
+            let entrySrcPathAbsolute = isEntrySrcAbsolute ? entry.src : util.standardizePath(`${rootDir}/${entry.src}`);
+
+            let isSrcChildOfRootDir = util.isParentOfPath(rootDir, entrySrcPathAbsolute, false);
+
+            let fileNameAndExtension = path.basename(entrySrcPathAbsolute);
+
+            //no dest
+            if (entry.dest === null || entry.dest === undefined) {
+                //no dest, absolute path or file outside of rootDir
+                if (isEntrySrcAbsolute || isSrcChildOfRootDir === false) {
+                    //copy file to root of staging folder
+                    result = fileNameAndExtension;
+
+                    //no dest, relative path, lives INSIDE rootDir
+                } else {
+                    //copy relative file structure to root of staging folder
+                    let srcPathRelative = util.stringReplaceInsensitive(entrySrcPathAbsolute, rootDir, '');
+                    result = srcPathRelative;
+                }
+
+                //assume entry.dest is the relative path to the folder AND file if applicable
+            } else if (entry.dest === '') {
+                result = fileNameAndExtension;
+            } else {
+                result = entry.dest;
+            }
+            //has a globstar
+        } else if ((globstarIdx = entry.src.indexOf('**')) > -1) {
+            const rootGlobstarPath = path.resolve(rootDir, entry.src.substring(0, globstarIdx)) + path.sep;
+            const srcPathRelative = util.stringReplaceInsensitive(srcPath, rootGlobstarPath, '');
+            if (entry.dest) {
+                result = `${entry.dest}/${srcPathRelative}`;
+            } else {
+                result = srcPathRelative;
+            }
+
+            //`pattern` is some other glob magic
+        } else {
+            const fileNameAndExtension = path.basename(srcPath);
+            if (entry.dest) {
+                result = util.standardizePath(`${entry.dest}/${fileNameAndExtension}`);
+            } else {
+                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            }
+        }
+
+        result = util.standardizePath(
+            //remove leading slashes
+            result.replace(/^[\/\\]+/, '')
+        );
+        return result;
+    }
+
+    /**
+     * Given a root directory, normalize it to a full path.
+     * Fall back to cwd if not specified
+     * @param rootDir
+     */
+    public normalizeRootDir(rootDir: string) {
+        if (!rootDir || (typeof rootDir === 'string' && rootDir.trim().length === 0)) {
+            return process.cwd();
+        } else {
+            return path.resolve(rootDir);
+        }
+    }
+
 }
 
 export let util = new Util();

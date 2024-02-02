@@ -18,7 +18,52 @@ import { GetDevIdCommand } from './commands/GetDevIdCommand';
 import { ZipFolderCommand } from './commands/ZipFolderCommand';
 
 void yargs
-    .command('prepublishToStaging', 'Copies all of the referenced files to the staging folder', (builder) => {
+
+    //not exposed
+    // .command('stage')
+    // .command('zip')
+    // .command('closeChannel')
+    // .command('sideload')
+    // .command('convertToSquashfs') //alias: squash
+    // .command('rekeyDevice') //alias: rekey
+    // .command('createSignedPackage') //alias: sign
+    // .command('deleteDevChannel') // alias: rmdev deldev
+
+    .command('keypress')
+    .command('keyup')
+    .command('keydown')
+    .command('text') //alias: sendText
+    .command('screenshot') // alias: captureScreenshot
+    .command('deviceinfo') // alias: getDeviceInfo
+    .command('devid') // alias: getDevId
+
+    //bundle
+    .command('stage|zip')
+
+    //deploy
+    .command('stage|zip|delete|close|sideload')
+
+    //package
+    .command('close|rekey|stage|zip|delete|close|sideload|squash|sign')
+
+    //exec
+    .command('magic')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    .command('stage', 'Copies all of the referenced files to the staging folder', (builder) => {
         return builder
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false });
@@ -26,13 +71,15 @@ void yargs
         return new PrepublishCommand().run(args);
     })
 
-    .command('zipPackage', 'Given an already-populated staging folder, create a zip archive of it and copy it to the output folder', (builder) => {
+    .command('zip', 'Given an already-populated staging folder, create a zip archive of it and copy it to the output folder', (builder) => {
         return builder
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
     }, (args: any) => {
         return new ZipPackageCommand().run(args);
     })
+
+
 
     .command('createPackage', 'Create a zip folder containing all of the specified roku project files', (builder) => {
         return builder
