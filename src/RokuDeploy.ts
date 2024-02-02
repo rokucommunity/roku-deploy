@@ -106,25 +106,31 @@ export class RokuDeploy {
      * @param options
      */
     public async zipPackage(options: RokuDeployOptions) {
+        console.log('zipPackage 1');
         options = this.getOptions(options);
 
         //make sure the output folder exists
         await this.fsExtra.ensureDir(options.outDir);
+        console.log('zipPackage 2');
 
         let zipFilePath = this.getOutputZipFilePath(options);
 
         //ensure the manifest file exists in the staging folder
         if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
+            console.log('zipPackage 3');
             throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
         }
 
         //create a zip of the staging folder
+        console.log('zipPackage 4');
         await this.zipFolder(options.stagingDir, zipFilePath);
 
         //delete the staging folder unless told to retain it.
         if (options.retainStagingDir !== true) {
+            console.log('zipPackage 5');
             await this.fsExtra.remove(options.stagingDir);
         }
+        console.log('zipPackage 6');
     }
 
     /**
@@ -132,20 +138,24 @@ export class RokuDeploy {
      * @param options
      */
     public async createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => Promise<void> | void) {
+        console.log('createPackage 1');
         options = this.getOptions(options);
 
         await this.prepublishToStaging(options);
 
+        console.log('createPackage 2');
         let manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
         let parsedManifest = await this.parseManifest(manifestPath);
 
         if (options.incrementBuildNumber) {
+            console.log('createPackage 3');
             let timestamp = dateformat(new Date(), 'yymmddHHMM');
             parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
             await this.fsExtra.writeFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
         if (beforeZipCallback) {
+            console.log('createPackage 4');
             let info: BeforeZipCallbackInfo = {
                 manifestData: parsedManifest,
                 stagingFolderPath: options.stagingDir,
@@ -154,7 +164,9 @@ export class RokuDeploy {
 
             await Promise.resolve(beforeZipCallback(info));
         }
+        console.log('createPackage 5');
         await this.zipPackage(options);
+        console.log('createPackage 6');
     }
 
     /**
@@ -762,16 +774,22 @@ export class RokuDeploy {
      * @param options
      */
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
+        console.log('deploy 1');
         options = this.getOptions(options);
+        console.log('deploy 2');
         await this.createPackage(options, beforeZipCallback);
+        console.log('deploy 3');
         if (options.deleteInstalledChannel) {
+            console.log('deploy 4');
             try {
                 await this.deleteInstalledChannel(options);
             } catch (e) {
                 // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
             }
         }
+        console.log('deploy 5');
         let result = await this.publish(options);
+        console.log('deploy 6');
         return result;
     }
 
@@ -862,20 +880,26 @@ export class RokuDeploy {
      * @param options
      */
     public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
+        console.log('deployAndSignPackage 1');
         options = this.getOptions(options);
+        console.log('deployAndSignPackage 2');
         let retainStagingDirInitialValue = options.retainStagingDir;
         options.retainStagingDir = true;
+        console.log('deployAndSignPackage 3');
         await this.deploy(options, beforeZipCallback);
 
         if (options.convertToSquashfs) {
+            console.log('deployAndSignPackage 4');
             await this.convertToSquashfs(options);
         }
 
         let remotePkgPath = await this.signExistingPackage(options);
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
         if (retainStagingDirInitialValue !== true) {
+            console.log('deployAndSignPackage 5');
             await this.fsExtra.remove(options.stagingDir);
         }
+        console.log('deployAndSignPackage 6');
         return localPkgFilePath;
     }
 
@@ -884,12 +908,15 @@ export class RokuDeploy {
      * @param options
      */
     public getOptions(options: RokuDeployOptions = {}) {
+        console.log('getOptions 1');
         let fileOptions: RokuDeployOptions = {};
         const fileNames = ['rokudeploy.json', 'bsconfig.json'];
         if (options.project) {
+            console.log('getOptions 2');
             fileNames.unshift(options.project);
         }
 
+        console.log('getOptions 3');
         for (const fileName of fileNames) {
             if (this.fsExtra.existsSync(fileName)) {
                 let configFileText = this.fsExtra.readFileSync(fileName).toString();
@@ -900,6 +927,7 @@ export class RokuDeploy {
                     disallowComments: false
                 });
                 if (parseErrors.length > 0) {
+                    console.log('getOptions 4');
                     throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
                         parseErrors.map(x => {
                             return {
@@ -935,6 +963,7 @@ export class RokuDeploy {
         this.logger.logLevel = finalOptions.logLevel;
 
         //fully resolve the folder paths
+        console.log('getOptions 5');
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
         finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
@@ -945,8 +974,10 @@ export class RokuDeploy {
 
         //stagingDir
         if (stagingDir) {
+            console.log('getOptions 6');
             finalOptions.stagingDir = path.resolve(process.cwd(), stagingDir);
         } else {
+            console.log('getOptions 7');
             finalOptions.stagingDir = path.resolve(
                 process.cwd(),
                 util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
@@ -955,6 +986,7 @@ export class RokuDeploy {
         //sync the new option with the old one (for back-compat)
         finalOptions.stagingFolderPath = finalOptions.stagingDir;
 
+        console.log('getOptions 8');
         return finalOptions;
     }
 
