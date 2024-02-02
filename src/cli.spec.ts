@@ -22,7 +22,6 @@ function execSync(command: string) {
     const output = childProcess.execSync(command, { cwd: tempDir });
     process.stdout.write(output);
     return output;
-    // return childProcess.execSync(command, { stdio: 'inherit', cwd: tempDir });
 }
 describe('cli', () => {
     before(function build() {
@@ -33,14 +32,15 @@ describe('cli', () => {
         fsExtra.emptyDirSync(tempDir);
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+        sinon.restore();
     });
     afterEach(() => {
         fsExtra.removeSync(tempDir);
+        sinon.restore();
     });
 
     it('Successfully runs prepublishToStaging', () => {
         //make the files
-        // fsExtra.outputFileSync(`${rootDir}/manifest`, '');
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
         expect(() => {
@@ -175,16 +175,14 @@ describe('cli', () => {
             password: '5536',
             outFile: 'roku-deploy-test'
         });
-        console.log(stub.getCall(0).args[0]);
 
         expect(
-            stub.getCall(0).args[0]
-        ).to.eql({
-            pathToPkg: 'path_to_pkg',
+            stub.getCall(0).args
+        ).to.eql(['path_to_pkg', {
             host: '1.2.3.4',
             password: '5536',
             outFile: 'roku-deploy-test'
-        });//TODO: fix!
+        }]);
     });
 
     it('Deploys a package', async () => {
@@ -284,7 +282,7 @@ describe('cli', () => {
     it('Prints device info to console', async () => {
         let consoleOutput = '';
         sinon.stub(console, 'log').callsFake((...args) => {
-            consoleOutput += args.join(' ') + '\n'; //TODO: I don't think this is accurately adding a new line
+            consoleOutput += args.join(' ') + '\n';
         });
         sinon.stub(rokuDeploy, 'getDeviceInfo').returns(Promise.resolve({
             'device-id': '1234',
@@ -293,10 +291,19 @@ describe('cli', () => {
         await new GetDeviceInfoCommand().run({
             host: '1.2.3.4'
         });
-        expect(consoleOutput.trim()).to.eql(
-            '{"device-id":"1234","serial-number":"abcd"}'
-        );
-    }); //TODO: This passes when it is it.only, but fails in the larger test suite?
+
+        // const consoleOutputObject: Record<string, string> = {
+        //     'device-id': '1234',
+        //     'serial-number': 'abcd'
+        // };
+
+        expect(consoleOutput).to.eql([
+            'Name              Value             ',
+            '---------------------------',
+            'device-id         1234              ',
+            'serial-number     abcd              \n'
+        ].join('\n'));
+    });
 
     it('Gets dev id', async () => {
         const stub = sinon.stub(rokuDeploy, 'getDevId').callsFake(async () => {
