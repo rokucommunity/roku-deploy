@@ -1013,7 +1013,8 @@ export class RokuDeploy {
     public getOutputZipFilePath(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
-        let zipFileName = options.outFile;
+        //let zipFileName = options.outFile;
+        let zipFileName = 'a';
         if (!zipFileName.toLowerCase().endsWith('.zip')) {
             zipFileName += '.zip';
         }
