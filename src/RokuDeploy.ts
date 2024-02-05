@@ -511,8 +511,10 @@ export class RokuDeploy {
      * @param options
      */
     public async convertToSquashfs(options: RokuDeployOptions) {
+        console.log('convertToSquashfs 1');
         options = this.getOptions(options);
         if (!options.host) {
+            console.log('convertToSquashfs 2');
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
@@ -520,10 +522,14 @@ export class RokuDeploy {
             mysubmit: 'Convert to squashfs'
         });
 
+        console.log('convertToSquashfs 3');
         let results = await this.doPostRequest(requestOptions);
+        console.log('convertToSquashfs 4');
         if (results.body.indexOf('Conversion succeeded') === -1) {
+            console.log('convertToSquashfs 5');
             throw new errors.ConvertError('Squashfs conversion failed');
         }
+        console.log('convertToSquashfs 6');
     }
 
     /**
