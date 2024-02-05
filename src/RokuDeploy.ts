@@ -426,21 +426,27 @@ export class RokuDeploy {
      * @param options
      */
     public async publish(options: RokuDeployOptions): Promise<{ message: string; results: any }> {
+        console.log('publish 1');
         options = this.getOptions(options);
         if (!options.host) {
+            console.log('publish 2');
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
         //make sure the outDir exists
+        console.log('publish 3');
         await this.fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options);
         let readStream: _fsExtra.ReadStream;
+        console.log('publish 4');
         try {
             if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
+                console.log('publish 5');
                 throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
             readStream = this.fsExtra.createReadStream(zipFilePath);
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
+            console.log('publish 6');
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
             });
@@ -464,10 +470,13 @@ export class RokuDeploy {
             //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {
+                console.log('publish 7');
                 response = await this.doPostRequest(requestOptions);
             } catch (replaceError: any) {
+                console.log('publish 8');
                 //fail if this is a compile error
                 if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
+                    console.log('publish 9');
                     throw new errors.CompileError('Compile error', replaceError, replaceError.results);
                 } else {
                     requestOptions.formData.mysubmit = 'Install';
@@ -477,26 +486,33 @@ export class RokuDeploy {
 
             if (options.failOnCompileError) {
                 if (this.isCompileError(response.body)) {
+                    console.log('publish 10');
                     throw new errors.CompileError('Compile error', response, this.getRokuMessagesFromResponseBody(response.body));
                 }
             }
 
             if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+                console.log('publish 11');
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
+            console.log('publish 12');
             return { message: 'Successful deploy', results: response };
         } finally {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
+                console.log('publish 13');
                 await this.fsExtra.remove(zipFilePath);
             }
             //try to close the read stream to prevent files becoming locked
             try {
+                console.log('publish 14');
                 readStream?.close();
             } catch (e) {
+                console.log('publish 15');
                 this.logger.info('Error closing read stream', e);
             }
         }
+        console.log('publish 16');
     }
 
     /**
@@ -915,7 +931,6 @@ export class RokuDeploy {
      * @param options
      */
     public getOptions(options: RokuDeployOptions = {}) {
-        console.log('getOptions 1');
         let fileOptions: RokuDeployOptions = {};
         const fileNames = ['rokudeploy.json', 'bsconfig.json'];
         if (options.project) {
@@ -923,7 +938,6 @@ export class RokuDeploy {
             fileNames.unshift(options.project);
         }
 
-        console.log('getOptions 3');
         for (const fileName of fileNames) {
             if (this.fsExtra.existsSync(fileName)) {
                 let configFileText = this.fsExtra.readFileSync(fileName).toString();
@@ -934,7 +948,6 @@ export class RokuDeploy {
                     disallowComments: false
                 });
                 if (parseErrors.length > 0) {
-                    console.log('getOptions 4');
                     throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
                         parseErrors.map(x => {
                             return {
@@ -970,7 +983,6 @@ export class RokuDeploy {
         this.logger.logLevel = finalOptions.logLevel;
 
         //fully resolve the folder paths
-        console.log('getOptions 5');
         finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
         finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
         finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
@@ -981,10 +993,8 @@ export class RokuDeploy {
 
         //stagingDir
         if (stagingDir) {
-            console.log('getOptions 6');
             finalOptions.stagingDir = path.resolve(process.cwd(), stagingDir);
         } else {
-            console.log('getOptions 7');
             finalOptions.stagingDir = path.resolve(
                 process.cwd(),
                 util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
@@ -993,7 +1003,6 @@ export class RokuDeploy {
         //sync the new option with the old one (for back-compat)
         finalOptions.stagingFolderPath = finalOptions.stagingDir;
 
-        console.log('getOptions 8');
         return finalOptions;
     }
 
