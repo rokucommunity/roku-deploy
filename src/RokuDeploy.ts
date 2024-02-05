@@ -523,6 +523,7 @@ export class RokuDeploy {
         });
 
         console.log('convertToSquashfs 3');
+        console.log(requestOptions);
         let results = await this.doPostRequest(requestOptions);
         console.log('convertToSquashfs 4');
         if (results.body.indexOf('Conversion succeeded') === -1) {
