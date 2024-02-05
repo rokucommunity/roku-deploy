@@ -479,6 +479,7 @@ export class RokuDeploy {
                     console.log('publish 9');
                     throw new errors.CompileError('Compile error', replaceError, replaceError.results);
                 } else {
+                    console.log('publish 9.1');
                     requestOptions.formData.mysubmit = 'Install';
                     response = await this.doPostRequest(requestOptions);
                 }
@@ -512,7 +513,6 @@ export class RokuDeploy {
                 this.logger.info('Error closing read stream', e);
             }
         }
-        console.log('publish 16');
     }
 
     /**
