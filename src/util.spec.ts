@@ -296,4 +296,42 @@ describe('util', () => {
             expect(util.decodeHtmlEntities('&#39;')).to.eql(`'`);
         });
     });
+
+    describe('printObjectToTable', () => {
+        it('should print an object to a table', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': 'abcd'
+            };
+
+            const result = util.printObjectToTable(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     abcd              '
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
+
+        it('should still print a table when a value is null', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': null
+            };
+
+            const result = util.printObjectToTable(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     undefined'
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
+    });
 });
