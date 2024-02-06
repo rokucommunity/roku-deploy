@@ -322,11 +322,7 @@ describe('util', () => {
                 'serial-number': null
             };
 
-<<<<<<< HEAD
-            const result = util.printObjectToTable(deviceInfo);
-=======
             const result = util.objectToTableString(deviceInfo);
->>>>>>> v4
 
             const expectedOutput = [
                 'Name              Value             ',
