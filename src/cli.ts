@@ -38,28 +38,32 @@ void yargs
     .command('devid') // alias: getDevId
 
     //bundle
-    .command('stage|zip')
+    .command('bundle', ()=>{
+        const command = new ExecCommand({
+            actions: 'stage|zip'
+        })
+    })
 
     //deploy
-    .command('stage|zip|delete|close|sideload')
+    .command('deploy', ()=>{
+        const command = new ExecCommand({
+            actions: 'stage|zip|delete|close|sideload'
+        })
+    })
 
     //package
-    .command('close|rekey|stage|zip|delete|close|sideload|squash|sign')
+    .command('package', ()=>{
+        const command = new ExecCommand({
+            actions: 'close|rekey|stage|zip|delete|close|sideload|squash|sign'
+        })
+    })
 
     //exec
-    .command('magic')
-
-
-
-
-
-
-
-
-
-
-
-
+    .command('exec', ()=>{
+        const command = new ExecCommand({
+            actions: builder.args.actions
+        })
+    })
 
 
 
