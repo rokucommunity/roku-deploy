@@ -315,5 +315,23 @@ describe('util', () => {
 
             expect(result).to.eql(expectedOutput);
         });
+
+        it('should still print a table when a value is null', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': null
+            };
+
+            const result = util.printObjectToTable(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     undefined'
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
     });
 });
