@@ -1,10 +1,11 @@
-import { rokuDeploy, printObjectToTable } from '../index';
+import { rokuDeploy } from '../index';
+import { util } from '../util';
 
 export class GetDeviceInfoCommand {
     async run(args) {
         const outputPath = await rokuDeploy.getDeviceInfo({
             host: args.host
         });
-        console.log(printObjectToTable(outputPath));
+        console.log(util.printObjectToTable(outputPath));
     }
 }
