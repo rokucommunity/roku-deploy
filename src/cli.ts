@@ -66,8 +66,7 @@ void yargs
     })
 
 
-
-    .command('stage', 'Copies all of the referenced files to the staging folder', (builder) => {
+    .command(['stage', 'prepublishToStaging'], 'Copies all of the referenced files to the staging folder', (builder) => {
         return builder
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false });
@@ -82,8 +81,6 @@ void yargs
     }, (args: any) => {
         return new ZipPackageCommand().run(args);
     })
-
-
 
     .command('createPackage', 'Create a zip folder containing all of the specified roku project files', (builder) => {
         return builder

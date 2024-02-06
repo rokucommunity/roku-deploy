@@ -465,7 +465,7 @@ export class Util {
         }
     }
 
-    public printObjectToTable(deviceInfo: Record<string, any>) {
+    public objectToTableString(deviceInfo: Record<string, any>) {
         const margin = 5;
         const keyWidth = Math.max(...Object.keys(deviceInfo).map(x => x.length)) + margin;
         const valueWidth = Math.max(...Object.values(deviceInfo).map(x => (x ?? '').toString().length)) + margin;

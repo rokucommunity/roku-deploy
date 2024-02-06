@@ -6,6 +6,6 @@ export class GetDeviceInfoCommand {
         const outputPath = await rokuDeploy.getDeviceInfo({
             host: args.host
         });
-        console.log(util.printObjectToTable(outputPath));
+        console.log(util.objectToTableString(outputPath));
     }
 }

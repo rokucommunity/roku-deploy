@@ -297,14 +297,14 @@ describe('util', () => {
         });
     });
 
-    describe('printObjectToTable', () => {
+    describe('objectToTableString', () => {
         it('should print an object to a table', () => {
             const deviceInfo = {
                 'device-id': '1234',
                 'serial-number': 'abcd'
             };
 
-            const result = util.printObjectToTable(deviceInfo);
+            const result = util.objectToTableString(deviceInfo);
 
             const expectedOutput = [
                 'Name              Value             ',
@@ -322,7 +322,7 @@ describe('util', () => {
                 'serial-number': null
             };
 
-            const result = util.printObjectToTable(deviceInfo);
+            const result = util.objectToTableString(deviceInfo);
 
             const expectedOutput = [
                 'Name              Value             ',
