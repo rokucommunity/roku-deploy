@@ -1,12 +1,13 @@
 import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
-import * as rokuDeploy from './index';
+import type { RokuDeployOptions } from './index';
+import { rokuDeploy } from './index';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
-    let options: rokuDeploy.RokuDeployOptions;
+    let options: RokuDeployOptions;
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
