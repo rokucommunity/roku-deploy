@@ -1,20 +1,17 @@
 import * as path from 'path';
-import * as _fsExtra from 'fs-extra';
+import * as fsExtra from 'fs-extra'; //TODO: This was removed in Bronley commit. How to fix errors?
+import type { WriteStream, ReadStream } from 'fs-extra';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
 const request = r as typeof requestType;
 import * as JSZip from 'jszip';
-import * as dateformat from 'dateformat';
 import * as errors from './Errors';
-import * as isGlob from 'is-glob';
-import * as picomatch from 'picomatch';
 import * as xml2js from 'xml2js';
 import type { ParseError } from 'jsonc-parser';
 import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
-import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
@@ -224,7 +221,7 @@ export class RokuDeploy {
             }
         }
 
-        let readStream: _fsExtra.ReadStream;
+        let readStream: ReadStream;
         try {
             if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
                 throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
@@ -337,12 +334,12 @@ export class RokuDeploy {
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
             passwd: options.signingPassword,
-            archive: null as _fsExtra.ReadStream
+            archive: null as ReadStream
         });
 
         let results: HttpResponse;
         try {
-            requestOptions.formData.archive = this.fsExtra.createReadStream(rekeySignedPackagePath);
+            requestOptions.formData.archive = fsExtra.createReadStream(rekeySignedPackagePath);
             results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
@@ -603,10 +600,10 @@ export class RokuDeploy {
     }
 
     private async getToFile(requestParams: any, filePath: string) {
-        let writeStream: _fsExtra.WriteStream;
-        await this.fsExtra.ensureFile(filePath);
+        let writeStream: WriteStream;
+        await fsExtra.ensureFile(filePath);
         return new Promise<string>((resolve, reject) => {
-            writeStream = this.fsExtra.createWriteStream(filePath, {
+            writeStream = fsExtra.createWriteStream(filePath, {
                 flags: 'w'
             });
             if (!writeStream) {
@@ -649,8 +646,8 @@ export class RokuDeploy {
         }
 
         for (const fileName of fileNames) {
-            if (this.fsExtra.existsSync(fileName)) {
-                let configFileText = this.fsExtra.readFileSync(fileName).toString();
+            if (fsExtra.existsSync(fileName)) {
+                let configFileText = fsExtra.readFileSync(fileName).toString();
                 let parseErrors = [] as ParseError[];
                 fileOptions = parseJsonc(configFileText, parseErrors, {
                     allowEmptyContent: true,
@@ -831,11 +828,11 @@ export class RokuDeploy {
      * TODO move these manifest functions to a util somewhere
      */
     private async parseManifest(manifestPath: string): Promise<ManifestData> {
-        if (!await this.fsExtra.pathExists(manifestPath)) {
+        if (!await fsExtra.pathExists(manifestPath)) {
             throw new Error(manifestPath + ' does not exist');
         }
 
-        let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
+        let manifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
         return this.parseManifestFromString(manifestContents);
     }
 

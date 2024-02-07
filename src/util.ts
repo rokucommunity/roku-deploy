@@ -5,6 +5,10 @@ import * as dns from 'dns';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
+import type { FileEntry } from './RokuDeployOptions';
+import type { StandardizedFileEntry } from './RokuDeploy';
+import * as isGlob from 'is-glob';
+import * as picomatch from 'picomatch';
 
 export class Util {
     /**
