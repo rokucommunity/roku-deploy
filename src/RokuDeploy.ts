@@ -54,12 +54,12 @@ export class RokuDeploy {
             let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
 
             //make sure the containing folder exists
-            await this.fsExtra.ensureDir(path.dirname(destFilePath));
+            await fsExtra.ensureDir(path.dirname(destFilePath));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
             await util.tryRepeatAsync(async () => {
                 //copy the src item using the filesystem
-                await this.fsExtra.copy(fileObject.src, destFilePath, {
+                await fsExtra.copy(fileObject.src, destFilePath, {
                     //copy the actual files that symlinks point to, not the symlinks themselves
                     dereference: true
                 });
@@ -76,7 +76,7 @@ export class RokuDeploy {
         options = this.getOptions(options) as any;
 
         //make sure the output folder exists
-        await this.fsExtra.ensureDir(options.outDir);
+        await fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
@@ -103,7 +103,7 @@ export class RokuDeploy {
         // Allows us to wait until all are done before we build the zip
         const promises = [];
         for (const file of filePaths) {
-            const promise = this.fsExtra.readFile(file.src).then((data) => {
+            const promise = fsExtra.readFile(file.src).then((data) => {
                 if (preFileZipCallback) {
                     data = preFileZipCallback(file, data);
                 }
@@ -123,7 +123,7 @@ export class RokuDeploy {
         await Promise.all(promises);
         // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
         const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
-        return this.fsExtra.writeFile(zipFilePath, content);
+        return fsExtra.writeFile(zipFilePath, content);
     }
 
     private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
@@ -209,7 +209,7 @@ export class RokuDeploy {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
         //make sure the outDir exists
-        await this.fsExtra.ensureDir(options.outDir);
+        await fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
@@ -223,10 +223,10 @@ export class RokuDeploy {
 
         let readStream: ReadStream;
         try {
-            if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
+            if ((await fsExtra.pathExists(zipFilePath)) === false) {
                 throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
-            readStream = this.fsExtra.createReadStream(zipFilePath);
+            readStream = fsExtra.createReadStream(zipFilePath);
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
@@ -275,7 +275,7 @@ export class RokuDeploy {
         } finally {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
-                await this.fsExtra.remove(zipFilePath);
+                await fsExtra.remove(zipFilePath);
             }
             //try to close the read stream to prevent files becoming locked
             try {
