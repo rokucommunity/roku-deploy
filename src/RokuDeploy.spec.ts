@@ -1208,6 +1208,38 @@ describe('index', () => {
                 assert.fail('Should not have throw');
             }
         });
+
+        it('should fail with HTTP_INVALID_CONSTANT and then fail on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new HPE_INVALID_CONSTANT_ERROR();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"zip"...' });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConvertError);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should fail with HTTP_INVALID_CONSTANT and then throw on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new HPE_INVALID_CONSTANT_ERROR();
+            });
+            doPostStub.onSecondCall().throws((params) => {
+                throw new Error('Never seen');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(HPE_INVALID_CONSTANT_ERROR);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
     });
 
     class HPE_INVALID_CONSTANT_ERROR extends Error {
