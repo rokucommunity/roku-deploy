@@ -1196,6 +1196,20 @@ describe('index', () => {
             assert.fail('Should not have succeeded');
         });
 
+        it('should fail with thrown error', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new Error('Some error');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(Error);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
         it('should fail with HTTP_INVALID_CONSTANT and then succeed on retry', async () => {
             let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
             doPostStub.onFirstCall().throws((params) => {
