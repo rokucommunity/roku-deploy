@@ -1195,7 +1195,24 @@ describe('index', () => {
             }
             assert.fail('Should not have succeeded');
         });
+
+        it('should fail with HTTP_INVALID_CONSTANT and then succeed on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new HPE_INVALID_CONSTANT_ERROR();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"squashfs"...' });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                assert.fail('Should not have throw');
+            }
+        });
     });
+
+    class HPE_INVALID_CONSTANT_ERROR extends Error {
+        code = 'HPE_INVALID_CONSTANT';
+    }
 
     describe('rekeyDevice', () => {
         beforeEach(() => {

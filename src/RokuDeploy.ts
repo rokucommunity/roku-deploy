@@ -511,6 +511,10 @@ export class RokuDeploy {
         try {
             results = await this.doPostRequest(requestOptions);
         } catch (error) {
+            //Occasionally this error is seen if the zip size and file name length at the
+            //wrong combination. The device fails to respond to our request with a valid response.
+            //The device successfully converted the zip, so ping the device and and check the response
+            //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
             if ((error as any)?.code === 'HPE_INVALID_CONSTANT') {
                 try {
                     results = await this.doPostRequest(requestOptions, false);
