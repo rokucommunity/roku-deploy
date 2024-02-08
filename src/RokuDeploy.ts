@@ -515,7 +515,7 @@ export class RokuDeploy {
             //wrong combination. The device fails to respond to our request with a valid response.
             //The device successfully converted the zip, so ping the device and and check the response
             //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
-            if ((error as any)?.code === 'HPE_INVALID_CONSTANT') {
+            if ((error as any).code === 'HPE_INVALID_CONSTANT') {
                 try {
                     results = await this.doPostRequest(requestOptions, false);
                     if (/"fileType"\s*:\s*"squashfs"/.test(results.body)) {

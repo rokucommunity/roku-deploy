@@ -1196,24 +1196,10 @@ describe('index', () => {
             assert.fail('Should not have succeeded');
         });
 
-        it('should fail with thrown error', async () => {
+        it('should throw with HPE_INVALID_CONSTANT and then succeed on retry', async () => {
             let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
             doPostStub.onFirstCall().throws((params) => {
-                throw new Error('Some error');
-            });
-            try {
-                await rokuDeploy.convertToSquashfs(options);
-            } catch (e) {
-                expect(e).to.be.instanceof(Error);
-                return;
-            }
-            assert.fail('Should not have throw');
-        });
-
-        it('should fail with HTTP_INVALID_CONSTANT and then succeed on retry', async () => {
-            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
-            doPostStub.onFirstCall().throws((params) => {
-                throw new HPE_INVALID_CONSTANT_ERROR();
+                throw new ErrorWithCode();
             });
             doPostStub.onSecondCall().returns({ body: '..."fileType":"squashfs"...' });
             try {
@@ -1223,10 +1209,25 @@ describe('index', () => {
             }
         });
 
-        it('should fail with HTTP_INVALID_CONSTANT and then fail on retry', async () => {
+        it('should throw and not retry', async () => {
             let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
             doPostStub.onFirstCall().throws((params) => {
-                throw new HPE_INVALID_CONSTANT_ERROR();
+                throw new ErrorWithCode('Something else');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(ErrorWithCode);
+                expect(e['code']).to.be.eql('Something else');
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should throw with HPE_INVALID_CONSTANT and then fail on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
             });
             doPostStub.onSecondCall().returns({ body: '..."fileType":"zip"...' });
             try {
@@ -1238,10 +1239,10 @@ describe('index', () => {
             assert.fail('Should not have throw');
         });
 
-        it('should fail with HTTP_INVALID_CONSTANT and then throw on retry', async () => {
+        it('should fail with HPE_INVALID_CONSTANT and then throw on retry', async () => {
             let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
             doPostStub.onFirstCall().throws((params) => {
-                throw new HPE_INVALID_CONSTANT_ERROR();
+                throw new ErrorWithCode();
             });
             doPostStub.onSecondCall().throws((params) => {
                 throw new Error('Never seen');
@@ -1249,15 +1250,20 @@ describe('index', () => {
             try {
                 await rokuDeploy.convertToSquashfs(options);
             } catch (e) {
-                expect(e).to.be.instanceof(HPE_INVALID_CONSTANT_ERROR);
+                expect(e).to.be.instanceof(ErrorWithCode);
                 return;
             }
             assert.fail('Should not have throw');
         });
     });
 
-    class HPE_INVALID_CONSTANT_ERROR extends Error {
-        code = 'HPE_INVALID_CONSTANT';
+    class ErrorWithCode extends Error {
+        code;
+
+        constructor(code = 'HPE_INVALID_CONSTANT') {
+            super();
+            this.code = code;
+        }
     }
 
     describe('rekeyDevice', () => {
