@@ -507,8 +507,23 @@ export class RokuDeploy {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
-
-        let results = await this.doPostRequest(requestOptions);
+        let results;
+        try {
+            results = await this.doPostRequest(requestOptions);
+        } catch (error) {
+            if ((error as any)?.code === 'HPE_INVALID_CONSTANT') {
+                try {
+                    results = await this.doPostRequest(requestOptions, false);
+                    if (/"fileType"\s*:\s*"squashfs"/.test(results.body)) {
+                        return results;
+                    }
+                } catch (e) {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new errors.ConvertError('Squashfs conversion failed');
         }
