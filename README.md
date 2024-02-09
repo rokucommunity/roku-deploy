@@ -1,5 +1,7 @@
 # roku-deploy
 
+This is the V4 branch, it's a work in progress.
+
 Publish Roku projects to a Roku device by using Node.js.
 
 [![build status](https://img.shields.io/github/actions/workflow/status/rokucommunity/roku-deploy/build.yml?branch=master)](https://github.com/rokucommunity/roku-deploy/actions?query=branch%3Amaster+workflow%3Abuild)
@@ -254,8 +256,7 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
- - if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
- `{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
  `{ src: "lib/*.brs", dest: "source/lib"}`
@@ -324,7 +325,7 @@ Here are the available options. The defaults are shown to the right of the optio
         "manifest"
     ]
     ```
-    An array of file paths, globs, or {src:string;dest:string} objects that will be copied into the deployment package.
+    An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. Make sure to _exclusively_ use forward slashes ( `/` ) for path separators (even on Windows), as backslashes are reserved for character escaping. You can learn more about this requirement [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
 
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location
@@ -358,7 +359,7 @@ Here are the available options. The defaults are shown to the right of the optio
 
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
 
-- **retainStagingFolder?:** boolean = `false`
+- **retainStagingDir?:** boolean = `false`
     Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
 - **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``

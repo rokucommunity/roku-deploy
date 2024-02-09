@@ -46,21 +46,20 @@ export class Util {
         if (!thePath) {
             return thePath;
         }
-        return path.normalize(
-            thePath.replace(/[\/\\]+/g, path.sep)
-        );
+        return path.normalize(thePath).replace(/[\/\\]+/g, path.sep);
     }
 
     /**
-     * Convert all slashes to forward slashes
+     * Normalize path and replace all directory separators with current OS separators
+     * @param thePath
      */
-    public toForwardSlashes(thePath: string) {
-        if (typeof thePath === 'string') {
-            return thePath.replace(/[\/\\]+/g, '/');
-        } else {
+    public standardizePathPosix(thePath: string) {
+        if (!thePath) {
             return thePath;
         }
+        return path.normalize(thePath).replace(/[\/\\]+/g, '/');
     }
+
 
     /**
      * Do a case-insensitive string replacement
@@ -140,8 +139,6 @@ export class Util {
         cwd = cwd.replace(/\\/g, '/');
 
         const globResults = patterns.map(async (pattern) => {
-            //force all windows-style slashes to unix style
-            pattern = pattern.replace(/\\/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
@@ -228,6 +225,20 @@ export class Util {
         });
     }
 
+    public objectToTableString(deviceInfo: Record<string, any>) {
+        const margin = 5;
+        const keyWidth = Math.max(...Object.keys(deviceInfo).map(x => x.length)) + margin;
+        const valueWidth = Math.max(...Object.values(deviceInfo).map(x => (x ?? '').toString().length)) + margin;
+        let table = [];
+        table.push('Name'.padEnd(keyWidth, ' ') + 'Value'.padEnd(keyWidth, ' '));
+        table.push('-'.repeat(keyWidth + valueWidth));
+        for (const [key, value] of Object.entries(deviceInfo)) {
+            table.push(key.padEnd(keyWidth, ' ') + value?.toString().padEnd(keyWidth, ' '));
+        }
+
+        return table.join('\n');
+    }
+
 }
 
 export let util = new Util();
@@ -242,6 +253,19 @@ export function standardizePath(stringParts, ...expressions: any[]) {
         result.push(stringParts[i], expressions[i]);
     }
     return util.standardizePath(
+        result.join('')
+    );
+}
+
+/**
+ * A tagged template literal function for standardizing the path and making all path separators forward slashes
+ */
+export function standardizePathPosix(stringParts, ...expressions: any[]) {
+    let result = [];
+    for (let i = 0; i < stringParts.length; i++) {
+        result.push(stringParts[i], expressions[i]);
+    }
+    return util.standardizePathPosix(
         result.join('')
     );
 }

@@ -1,12 +1,13 @@
 import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
-import * as rokuDeploy from './index';
+import type { RokuDeployOptions } from './index';
+import { rokuDeploy } from './index';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
-    let options: rokuDeploy.RokuDeployOptions;
+    let options: RokuDeployOptions;
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
@@ -65,7 +66,7 @@ describe('device', function device() {
     describe('deploy', () => {
         it('works', async () => {
             options.retainDeploymentArchive = true;
-            let response = await rokuDeploy.deploy(options);
+            let response = await rokuDeploy.deploy(options as any);
             assert.equal(response.message, 'Successful deploy');
         });
 
@@ -73,7 +74,7 @@ describe('device', function device() {
             this.timeout(20000);
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
-                rokuDeploy.deploy(options),
+                rokuDeploy.deploy(options as any),
                 'Unauthorized. Please verify username and password for target Roku.'
             );
         });
@@ -81,10 +82,10 @@ describe('device', function device() {
 
     describe('deployAndSignPackage', () => {
         it('works', async () => {
-            await rokuDeploy.deleteInstalledChannel(options);
-            await rokuDeploy.rekeyDevice(options);
+            await rokuDeploy.deleteInstalledChannel(options as any);
+            await rokuDeploy.rekeyDevice(options as any);
             expectPathExists(
-                await rokuDeploy.deployAndSignPackage(options)
+                await rokuDeploy.deployAndSignPackage(options as any)
             );
         });
     });

@@ -26,14 +26,16 @@ describe('util', () => {
         });
     });
 
-    describe('toForwardSlashes', () => {
-        it('returns original value for non-strings', () => {
-            expect(util.toForwardSlashes(undefined)).to.be.undefined;
-            expect(util.toForwardSlashes(<any>false)).to.be.false;
+    describe('standardizePathPosix', () => {
+        it('returns falsey value back unchanged', () => {
+            expect(util.standardizePathPosix(null)).to.eql(null);
+            expect(util.standardizePathPosix(undefined)).to.eql(undefined);
+            expect(util.standardizePathPosix(false as any)).to.eql(false);
+            expect(util.standardizePathPosix(0 as any)).to.eql(0);
         });
 
-        it('converts mixed slashes to forward', () => {
-            expect(util.toForwardSlashes('a\\b/c\\d/e')).to.eql('a/b/c/d/e');
+        it('always returns forward slashes', () => {
+            expect(util.standardizePathPosix('C:\\projects/some\\folder')).to.eql('C:/projects/some/folder');
         });
     });
 
@@ -275,6 +277,15 @@ describe('util', () => {
         });
     });
 
+    describe('fileExistsCaseInsensitive', () => {
+        it('detects when a file does not exist inside a dir that does exist', async () => {
+            fsExtra.ensureDirSync(tempDir);
+            expect(
+                await util.fileExistsCaseInsensitive(s`${tempDir}/not-there`)
+            ).to.be.false;
+        });
+    });
+
     describe('decodeHtmlEntities', () => {
         it('decodes values properly', () => {
             expect(util.decodeHtmlEntities('&nbsp;')).to.eql(' ');
@@ -283,6 +294,44 @@ describe('util', () => {
             expect(util.decodeHtmlEntities('&lt;')).to.eql('<');
             expect(util.decodeHtmlEntities('&gt;')).to.eql('>');
             expect(util.decodeHtmlEntities('&#39;')).to.eql(`'`);
+        });
+    });
+
+    describe('objectToTableString', () => {
+        it('should print an object to a table', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': 'abcd'
+            };
+
+            const result = util.objectToTableString(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     abcd              '
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
+
+        it('should still print a table when a value is null', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': null
+            };
+
+            const result = util.objectToTableString(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     undefined'
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
         });
     });
 });
