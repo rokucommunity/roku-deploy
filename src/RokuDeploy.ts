@@ -978,7 +978,7 @@ export class RokuDeploy {
         options = this.getOptions(options);
 
         let zipFileName = options.outFile;
-        if (!zipFileName.toLowerCase().endsWith('.zip')) {
+        if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
         let outFolderPath = path.resolve(options.outDir);
