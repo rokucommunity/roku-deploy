@@ -483,6 +483,25 @@ export class Util {
         return table.join('\n');
     }
 
+    /**
+     * A function to fill in any missing arguments with JSON values
+     */
+    public getOptionsFromJson(defaultArgs) { //TODO: create a test for this in cli.spec.ts too
+        let args = { ...defaultArgs };
+        const fileNames = ['rokudeploy.json', 'bsconfig.json'];
+
+        for (const fileName of fileNames) {
+            if (fsExtra.existsSync(fileName)) {
+                let rokudeployArgs = JSON.parse(fs.readFileSync('rokudeploy.json', 'utf-8'));
+                // args = Object.assign(rokudeployArgs ?? {}, args);
+                args = Object.assign(rokudeployArgs, args);
+                break;
+            }
+        }
+
+        return args;
+    }
+
 }
 
 export let util = new Util();

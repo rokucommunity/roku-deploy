@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fsExtra from 'fs-extra'; //TODO: This was removed in Bronley commit. How to fix errors?
+import * as fsExtra from 'fs-extra';
 import type { WriteStream, ReadStream } from 'fs-extra';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
@@ -640,34 +640,6 @@ export class RokuDeploy {
      */
     private __getOptions(options: RokuDeployOptions = {}) {
         let fileOptions: RokuDeployOptions = {};
-        const fileNames = ['rokudeploy.json', 'bsconfig.json'];
-        if (options.project) {
-            fileNames.unshift(options.project);
-        }
-
-        for (const fileName of fileNames) {
-            if (fsExtra.existsSync(fileName)) {
-                let configFileText = fsExtra.readFileSync(fileName).toString();
-                let parseErrors = [] as ParseError[];
-                fileOptions = parseJsonc(configFileText, parseErrors, {
-                    allowEmptyContent: true,
-                    allowTrailingComma: true,
-                    disallowComments: false
-                });
-                if (parseErrors.length > 0) {
-                    throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
-                        parseErrors.map(x => {
-                            return {
-                                message: printParseErrorCode(x.error),
-                                offset: x.offset,
-                                length: x.length
-                            };
-                        })
-                    ));
-                }
-                break;
-            }
-        }
 
         let defaultOptions = <RokuDeployOptions>{
             outDir: './out',
@@ -995,15 +967,6 @@ export interface StageOptions {
 export interface ZipPackageOptions {
     stagingDir?: string;
     outDir?: string;
-}
-
-export interface CreatePackageOptions {
-    rootDir?: string;
-    files?: FileEntry[];
-    stagingDir?: string;
-    retainStagingDir?: boolean;
-    outDir?: string;
-    incrementBuildNumber?: boolean;
 }
 
 export interface PublishOptions {
