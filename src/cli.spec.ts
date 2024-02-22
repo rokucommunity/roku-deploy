@@ -39,6 +39,11 @@ describe('cli', () => {
         sinon.restore();
     });
 
+    it('Successfully bundles an app', () => {
+        execSync(`node ${cwd}/dist/cli.js bundle --rootDir ${rootDir} --outDir ${outDir}`);
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
     it('Successfully runs prepublishToStaging', () => {
         //make the files
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
@@ -60,11 +65,6 @@ describe('cli', () => {
         fsExtra.outputFileSync(`${stagingDir}/manifest`, '');
 
         execSync(`node ${cwd}/dist/cli.js zipPackage --stagingDir ${stagingDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
-    it('Successfully uses createPackage to create .pkg', () => {
-        execSync(`node ${cwd}/dist/cli.js createPackage --stagingDir ${stagingDir} --rootDir ${rootDir} --outDir ${outDir}`);
         expectPathExists(`${outDir}/roku-deploy.zip`);
     });
 
