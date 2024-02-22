@@ -1,7 +1,7 @@
 import { util, standardizePath as s } from './util';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
-import { tempDir } from './testUtils.spec';
+import { tempDir, rootDir } from './testUtils.spec';
 import * as path from 'path';
 import * as dns from 'dns';
 import { createSandbox } from 'sinon';
@@ -14,6 +14,7 @@ describe('util', () => {
     });
 
     afterEach(() => {
+        fsExtra.emptyDirSync(tempDir);
         sinon.restore();
     });
 
@@ -332,6 +333,55 @@ describe('util', () => {
             ].join('\n');
 
             expect(result).to.eql(expectedOutput);
+        });
+    });
+
+    describe('getOptionsFromJson', () => {
+        beforeEach(() => {
+            fsExtra.ensureDirSync(rootDir);
+            process.chdir(rootDir);
+        });
+        it('should fill in missing options from rokudeploy.json', () => {
+            fsExtra.writeJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
+            let options = util.getOptionsFromJson({
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4'
+            });
+            let expectedOutput = {
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4',
+                password: 'password'
+            };
+            expect(options).to.eql(expectedOutput);
+        });
+
+        it('should fill in missing default options from bsconfig.json', () => {
+            fsExtra.writeJsonSync(s`${rootDir}/bsconfig.json`, { password: 'password' });
+            let options = util.getOptionsFromJson({
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4'
+            });
+            let expectedOutput = {
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4',
+                password: 'password'
+            };
+            expect(options).to.eql(expectedOutput);
+
+        });
+
+        it('should not replace default options', () => {
+            fsExtra.writeJsonSync(s`${rootDir}/rokudeploy.json`, { host: '4.3.2.1' });
+            let options = util.getOptionsFromJson({
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4'
+            });
+            let expectedOutput = {
+                rootDir: `${rootDir}`,
+                host: '1.2.3.4',
+            };
+            expect(options).to.eql(expectedOutput);
+
         });
     });
 });

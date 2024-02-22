@@ -492,9 +492,10 @@ export class Util {
 
         for (const fileName of fileNames) {
             if (fsExtra.existsSync(fileName)) {
-                let rokudeployArgs = JSON.parse(fs.readFileSync('rokudeploy.json', 'utf-8'));
+                const sourcePath = path.join(defaultArgs.rootDir, fileName);
+                const rokuDeployArgs = JSON.parse(fsExtra.readFileSync(sourcePath, 'utf8'));
                 // args = Object.assign(rokudeployArgs ?? {}, args);
-                args = Object.assign(rokudeployArgs, args);
+                args = Object.assign(rokuDeployArgs, args);
                 break;
             }
         }
