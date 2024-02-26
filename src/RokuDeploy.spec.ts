@@ -1195,7 +1195,76 @@ describe('index', () => {
             }
             assert.fail('Should not have succeeded');
         });
+
+        it('should throw with HPE_INVALID_CONSTANT and then succeed on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"squashfs"...' });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                assert.fail('Should not have throw');
+            }
+        });
+
+        it('should throw and not retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode('Something else');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(ErrorWithCode);
+                expect(e['code']).to.be.eql('Something else');
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should throw with HPE_INVALID_CONSTANT and then fail on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"zip"...' });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConvertError);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should fail with HPE_INVALID_CONSTANT and then throw on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().throws((params) => {
+                throw new Error('Never seen');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs(options);
+            } catch (e) {
+                expect(e).to.be.instanceof(ErrorWithCode);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
     });
+
+    class ErrorWithCode extends Error {
+        code;
+
+        constructor(code = 'HPE_INVALID_CONSTANT') {
+            super();
+            this.code = code;
+        }
+    }
 
     describe('rekeyDevice', () => {
         beforeEach(() => {

@@ -507,8 +507,27 @@ export class RokuDeploy {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
-
-        let results = await this.doPostRequest(requestOptions);
+        let results;
+        try {
+            results = await this.doPostRequest(requestOptions);
+        } catch (error) {
+            //Occasionally this error is seen if the zip size and file name length at the
+            //wrong combination. The device fails to respond to our request with a valid response.
+            //The device successfully converted the zip, so ping the device and and check the response
+            //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
+            if ((error as any).code === 'HPE_INVALID_CONSTANT') {
+                try {
+                    results = await this.doPostRequest(requestOptions, false);
+                    if (/"fileType"\s*:\s*"squashfs"/.test(results.body)) {
+                        return results;
+                    }
+                } catch (e) {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new errors.ConvertError('Squashfs conversion failed');
         }
