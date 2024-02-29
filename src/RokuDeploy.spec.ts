@@ -2419,13 +2419,13 @@ describe('index', () => {
     describe('parseManifest', () => {
         it('correctly parses valid manifest', async () => {
             fsExtra.outputFileSync(`${rootDir}/manifest`, `title=AwesomeApp`);
-            let parsedManifest = await rokuDeploy.parseManifest(`${rootDir}/manifest`);
+            let parsedManifest = await rokuDeploy['parseManifest'](`${rootDir}/manifest`);
             expect(parsedManifest.title).to.equal('AwesomeApp');
         });
 
         it('Throws our error message for a missing file', async () => {
             await expectThrowsAsync(
-                rokuDeploy.parseManifest('invalid-path'),
+                rokuDeploy['parseManifest']('invalid-path'),
                 `invalid-path does not exist`
             );
         });
@@ -2433,7 +2433,7 @@ describe('index', () => {
 
     describe('parseManifestFromString', () => {
         it('correctly parses valid manifest', () => {
-            let parsedManifest = rokuDeploy.parseManifestFromString(`
+            let parsedManifest = rokuDeploy['parseManifestFromString'](`
                 title=RokuDeployTestChannel
                 major_version=1
                 minor_version=0
@@ -2458,7 +2458,7 @@ describe('index', () => {
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', () => {
             expect(
                 rokuDeploy.stringifyManifest(
-                    rokuDeploy.parseManifestFromString('major_version=3\nminor_version=4')
+                    rokuDeploy['parseManifestFromString']('major_version=3\nminor_version=4')
                 )
             ).to.equal(
                 'major_version=3\nminor_version=4'
@@ -2466,10 +2466,10 @@ describe('index', () => {
         });
 
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are not provided', () => {
-            const parsed = rokuDeploy.parseManifestFromString('title=App\nmajor_version=3');
+            const parsed = rokuDeploy['parseManifestFromString']('title=App\nmajor_version=3');
             delete parsed.keyIndexes;
             delete parsed.lineCount;
-            let outputParsedManifest = rokuDeploy.parseManifestFromString(
+            let outputParsedManifest = rokuDeploy['parseManifestFromString'](
                 rokuDeploy.stringifyManifest(parsed)
             );
             expect(outputParsedManifest.title).to.equal('App');
