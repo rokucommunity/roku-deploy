@@ -631,12 +631,12 @@ describe('index', () => {
 
         it('computes absolute path for all operations', async () => {
             const ensureDirPaths = [];
-            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake((p) => {
+            sinon.stub(fsExtra, 'ensureDir').callsFake((p) => {
                 ensureDirPaths.push(p);
                 return Promise.resolve;
             });
             const copyPaths = [] as Array<{ src: string; dest: string }>;
-            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+            sinon.stub(fsExtra as any, 'copy').callsFake((src, dest) => {
                 copyPaths.push({ src: src as string, dest: dest as string });
                 return Promise.resolve();
             });
@@ -828,10 +828,10 @@ describe('index', () => {
         });
 
         it('failure to close read stream does not crash', async () => {
-            const orig = rokuDeploy.fsExtra.createReadStream;
+            const orig = fsExtra.createReadStream;
             //wrap the stream.close call so we can throw
-            sinon.stub(rokuDeploy.fsExtra, 'createReadStream').callsFake((pathLike) => {
-                const stream = orig.call(rokuDeploy.fsExtra, pathLike);
+            sinon.stub(fsExtra, 'createReadStream').callsFake((pathLike) => {
+                const stream = orig.call(fsExtra, pathLike);
                 const originalClose = stream.close;
                 stream.close = () => {
                     originalClose.call(stream);
@@ -1810,17 +1810,17 @@ describe('index', () => {
             });
         });
         it('is resilient to file system errors', async () => {
-            let copy = rokuDeploy.fsExtra.copy;
+            let copy = fsExtra.copy;
             let count = 0;
 
             //mock writeFile so we can throw a few errors during the test
-            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+            sinon.stub(fsExtra, 'copy').callsFake((...args) => {
                 count += 1;
                 //fail a few times
                 if (count < 5) {
                     throw new Error('fake error thrown as part of the unit test');
                 } else {
-                    return copy.apply(rokuDeploy.fsExtra, args);
+                    return copy.apply(fsExtra, args);
                 }
             });
 
@@ -1844,17 +1844,17 @@ describe('index', () => {
         });
 
         it('throws underlying error after the max fs error threshold is reached', async () => {
-            let copy = rokuDeploy.fsExtra.copy;
+            let copy = fsExtra.copy;
             let count = 0;
 
             //mock writeFile so we can throw a few errors during the test
-            sinon.stub(rokuDeploy.fsExtra, 'copy').callsFake((...args) => {
+            sinon.stub(fsExtra, 'copy').callsFake((...args) => {
                 count += 1;
                 //fail a few times
                 if (count < 15) {
                     throw new Error('fake error thrown as part of the unit test');
                 } else {
-                    return copy.apply(rokuDeploy.fsExtra, args);
+                    return copy.apply(fsExtra, args);
                 }
             });
 
@@ -3127,125 +3127,10 @@ describe('index', () => {
         });
     });
 
-    describe('getDestPath', () => {
-        it('handles unrelated exclusions properly', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/components/comp1/comp1.brs`,
-                    [
-                        '**/*',
-                        '!exclude.me'
-                    ],
-                    rootDir
-                )
-            ).to.equal(s`components/comp1/comp1.brs`);
-        });
-
-        it('finds dest path for top-level path', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/components/comp1/comp1.brs`,
-                    ['components/**/*'],
-                    rootDir
-                )
-            ).to.equal(s`components/comp1/comp1.brs`);
-        });
-
-        it('does not find dest path for non-matched top-level path', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    ['components/**/*'],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes a file that is negated', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    [
-                        'source/**/*',
-                        '!source/main.brs'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes file from non-rootdir top-level pattern', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/../externalDir/source/main.brs`,
-                    [
-                        '!../externalDir/**/*'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('excludes a file that is negated in src;dest;', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/source/main.brs`,
-                    [
-                        'source/**/*',
-                        {
-                            src: '!source/main.brs'
-                        }
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-
-        it('works for brighterscript files', () => {
-            let destPath = rokuDeploy.getDestPath(
-                util.standardizePath(`${cwd}/src/source/main.bs`),
-                [
-                    'manifest',
-                    'source/**/*.bs'
-                ],
-                s`${cwd}/src`
-            );
-            expect(s`${destPath}`).to.equal(s`source/main.bs`);
-        });
-
-        it('excludes a file found outside the root dir', () => {
-            expect(
-                rokuDeploy.getDestPath(
-                    s`${rootDir}/../source/main.brs`,
-                    [
-                        '../source/**/*'
-                    ],
-                    rootDir
-                )
-            ).to.be.undefined;
-        });
-    });
-
-    describe('normalizeRootDir', () => {
-        it('handles falsey values', () => {
-            expect(rokuDeploy.normalizeRootDir(null)).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir(undefined)).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir('')).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir(' ')).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir('\t')).to.equal(cwd);
-        });
-
-        it('handles non-falsey values', () => {
-            expect(rokuDeploy.normalizeRootDir(cwd)).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir('./')).to.equal(cwd);
-            expect(rokuDeploy.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));
-        });
-    });
-
     describe('retrieveSignedPackage', () => {
         let onHandler: any;
         beforeEach(() => {
-            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
+            sinon.stub(fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
                 //do nothing, assume the dir gets created
             }) as any);
 
@@ -3597,6 +3482,35 @@ describe('index', () => {
             expect(getToFileIsResolved).to.be.true;
         });
     });
+
+    function mockDoGetRequest(body = '', statusCode = 200) {
+        return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
+            let results = { response: { statusCode: statusCode }, body: body };
+            rokuDeploy['checkRequest'](results);
+            return Promise.resolve(results);
+        });
+    }
+
+    function mockDoPostRequest(body = '', statusCode = 200) {
+        return sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+            let results = { response: { statusCode: statusCode }, body: body };
+            rokuDeploy['checkRequest'](results);
+            return Promise.resolve(results);
+        });
+    }
+
+    async function assertThrowsAsync(fn) {
+        let f = () => { };
+        try {
+            await fn();
+        } catch (e) {
+            f = () => {
+                throw e;
+            };
+        } finally {
+            assert.throws(f);
+        }
+    }
 });
 
 function getFakeResponseBody(messages: string): string {

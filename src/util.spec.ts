@@ -1,7 +1,7 @@
 import { util, standardizePath as s } from './util';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
-import { tempDir, rootDir } from './testUtils.spec';
+import { cwd, tempDir, rootDir } from './testUtils.spec';
 import * as path from 'path';
 import * as dns from 'dns';
 import { createSandbox } from 'sinon';
@@ -333,6 +333,121 @@ describe('util', () => {
             ].join('\n');
 
             expect(result).to.eql(expectedOutput);
+        });
+    });
+
+    describe('normalizeRootDir', () => {
+        it('handles falsey values', () => {
+            expect(util.normalizeRootDir(null)).to.equal(cwd);
+            expect(util.normalizeRootDir(undefined)).to.equal(cwd);
+            expect(util.normalizeRootDir('')).to.equal(cwd);
+            expect(util.normalizeRootDir(' ')).to.equal(cwd);
+            expect(util.normalizeRootDir('\t')).to.equal(cwd);
+        });
+
+        it('handles non-falsey values', () => {
+            expect(util.normalizeRootDir(cwd)).to.equal(cwd);
+            expect(util.normalizeRootDir('./')).to.equal(cwd);
+            expect(util.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));
+        });
+    });
+
+    describe('getDestPath', () => {
+        it('handles unrelated exclusions properly', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    [
+                        '**/*',
+                        '!exclude.me'
+                    ],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('finds dest path for top-level path', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('does not find dest path for non-matched top-level path', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes file from non-rootdir top-level pattern', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../externalDir/source/main.brs`,
+                    [
+                        '!../externalDir/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated in src;dest;', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        {
+                            src: '!source/main.brs'
+                        }
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('works for brighterscript files', () => {
+            let destPath = util.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                s`${cwd}/src`
+            );
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
+        });
+
+        it('excludes a file found outside the root dir', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../source/main.brs`,
+                    [
+                        '../source/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
         });
     });
 
