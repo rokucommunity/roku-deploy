@@ -291,7 +291,7 @@ export class Util {
     public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
-            rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
+            rootDir = rokuDeploy.getOptions({ rootDir: rootDir }).rootDir; //TODO: This moved from rokudeploy to here, but if we need to get options how do we fix this?
         }
         const entries = this.normalizeFilesArray(files);
         const srcPathsByIndex = await util.globAllByIndex(
@@ -486,7 +486,7 @@ export class Util {
     /**
      * A function to fill in any missing arguments with JSON values
      */
-    public getOptionsFromJson(defaultArgs) { //TODO: create a test for this in cli.spec.ts too
+    public getOptionsFromJson(defaultArgs) {//TODO: The original function handled parse errors, but this one doesn't
         let args = { ...defaultArgs };
         const fileNames = ['rokudeploy.json', 'bsconfig.json'];
 
