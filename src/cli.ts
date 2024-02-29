@@ -9,7 +9,6 @@ import { PublishCommand } from './commands/PublishCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
-import { RetrieveSignedPackageCommand } from './commands/RetrieveSignedPackageCommand';
 import { DeployCommand } from './commands/DeployCommand';
 import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
@@ -141,15 +140,6 @@ void yargs
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
-    })
-
-    .command('retrieveSignedPackage', 'Retrieve a signed package', (builder) => {
-        return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
-    }, (args: any) => {
-        return new RetrieveSignedPackageCommand().run(args);
     })
 
     .command('deploy', 'Deploy a pre-existing packaged zip file to a remote Roku', (builder) => {

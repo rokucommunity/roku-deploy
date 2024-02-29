@@ -14,7 +14,6 @@ import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannel
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
-import { RetrieveSignedPackageCommand } from './commands/RetrieveSignedPackageCommand';
 
 const sinon = createSandbox();
 
@@ -161,28 +160,6 @@ describe('cli', () => {
             signingPassword: undefined,
             stagingDir: stagingDir
         });
-    });
-
-    it('Retrieves a signed package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'retrieveSignedPackage').callsFake(async () => {
-            return Promise.resolve('');
-        });
-
-        const command = new RetrieveSignedPackageCommand();
-        await command.run({
-            pathToPkg: 'path_to_pkg',
-            host: '1.2.3.4',
-            password: '5536',
-            outFile: 'roku-deploy-test'
-        });
-
-        expect(
-            stub.getCall(0).args
-        ).to.eql(['path_to_pkg', {
-            host: '1.2.3.4',
-            password: '5536',
-            outFile: 'roku-deploy-test'
-        }]);
     });
 
     it('Deploys a package', async () => {
