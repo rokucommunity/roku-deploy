@@ -48,7 +48,7 @@ export class RokuDeploy {
             throw new Error(`rootDir does not exist at "${rootDir}"`);
         }
 
-        let fileObjects = await this.getFilePaths(options.files, rootDir);
+        let fileObjects = await util.getFilePaths(options.files, rootDir);
         //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
@@ -370,7 +370,7 @@ export class RokuDeploy {
      * Sign a pre-existing package using Roku and return path to retrieve it
      * @param options
      */
-    public async createSignedPackage(options: SignExistingPackageOptions): Promise<string> {
+    public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
         options = this.getOptions(options) as any;
         if (!options.signingPassword) {
             throw new errors.MissingRequiredOptionError('Must supply signingPassword');
@@ -1013,15 +1013,6 @@ export interface CreateSignedPackageOptions {
     devId?: string;
 }
 
-export interface RetrieveSignedPackageOptions {
-    host: string;
-    password: string;
-    packagePort?: number;
-    timeout?: number;
-    username?: string;
-    outDir?: string;
-    outFile?: string;
-}
 export interface DeleteInstalledChannelOptions {
     host: string;
     password: string;
@@ -1043,16 +1034,6 @@ export interface DeployOptions {
     outDir?: string;
 }
 
-export interface DeployAndSignPackageOptions {
-    host: string;
-    password: string;
-    signingPassword: string;
-    rootDir?: string;
-    files?: FileEntry[];
-    retainStagingDir?: boolean;
-    convertToSquashfs?: boolean;
-    stagingDir?: string;
-}
 export interface GetOutputPkgFilePathOptions {
     outFile?: string;
     outDir?: string;

@@ -56,7 +56,7 @@ describe('index', () => {
         writeStreamPromise = writeStreamDeferred.promise as any;
 
         //fake out the write stream function
-        createWriteStreamStub = sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: PathLike) => {
+        createWriteStreamStub = sinon.stub(fsExtra, 'createWriteStream').callsFake((filePath: PathLike) => {
             const writeStream = fs.createWriteStream(filePath);
             writeStreamDeferred.resolve(writeStream);
             writeStreamDeferred.isComplete = true;
