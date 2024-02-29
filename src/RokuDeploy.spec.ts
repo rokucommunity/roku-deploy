@@ -1338,14 +1338,14 @@ describe('index', () => {
         });
     });
 
-    describe('signExistingPackage', () => {
+    describe('createSignedPackage', () => {
         beforeEach(() => {
             fsExtra.outputFileSync(`${stagingDir}/manifest`, ``);
         });
 
         it('should return our error if signingPassword is not supplied', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy.signPackage({
+                await rokuDeploy.createSignedPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: undefined,
@@ -1362,7 +1362,7 @@ describe('index', () => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
-                await rokuDeploy.signPackage({
+                await rokuDeploy.createSignedPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1378,7 +1378,7 @@ describe('index', () => {
         it('should return our error if it received invalid data', async () => {
             try {
                 mockDoPostRequest(null);
-                await rokuDeploy.signPackage({
+                await rokuDeploy.createSignedPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1399,7 +1399,7 @@ describe('index', () => {
             mockDoPostRequest(body);
 
             await expectThrowsAsync(
-                rokuDeploy.signPackage({
+                rokuDeploy.createSignedPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1415,7 +1415,7 @@ describe('index', () => {
                         node.appendChild(pkgDiv);`;
             mockDoPostRequest(body);
 
-            let pkgPath = await rokuDeploy.signPackage({
+            let pkgPath = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
@@ -1427,7 +1427,7 @@ describe('index', () => {
         it('should return our fallback error if neither error or package link was detected', async () => {
             mockDoPostRequest();
             await expectThrowsAsync(
-                rokuDeploy.signPackage({
+                rokuDeploy.createSignedPackage({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,

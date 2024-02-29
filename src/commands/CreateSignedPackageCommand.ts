@@ -1,8 +1,8 @@
 import { rokuDeploy } from '../index';
 
-export class SignExistingPackageCommand {
+export class CreateSignedPackageCommand {
     async run(args) {
-        await rokuDeploy.signPackage({
+        await rokuDeploy.createSignedPackage({
             host: args.host,
             password: args.password,
             signingPassword: args.signingPassword,

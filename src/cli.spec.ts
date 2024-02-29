@@ -8,7 +8,7 @@ import { rokuDeploy } from './index';
 import { PublishCommand } from './commands/PublishCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
-import { SignExistingPackageCommand } from './commands/SignExistingPackageCommand';
+import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { DeployCommand } from './commands/DeployCommand';
 import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
@@ -141,11 +141,11 @@ describe('cli', () => {
     });
 
     it('Signs an existing package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'signExistingPackage').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve('');
         });
 
-        const command = new SignExistingPackageCommand();
+        const command = new CreateSignedPackageCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536',

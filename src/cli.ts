@@ -8,7 +8,7 @@ import { ZipPackageCommand } from './commands/ZipPackageCommand';
 import { PublishCommand } from './commands/PublishCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
-import { SignExistingPackageCommand } from './commands/SignExistingPackageCommand';
+import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { RetrieveSignedPackageCommand } from './commands/RetrieveSignedPackageCommand';
 import { DeployCommand } from './commands/DeployCommand';
 import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
@@ -140,7 +140,7 @@ void yargs
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
     }, (args: any) => {
-        return new SignExistingPackageCommand().run(args);
+        return new CreateSignedPackageCommand().run(args);
     })
 
     .command('retrieveSignedPackage', 'Retrieve a signed package', (builder) => {

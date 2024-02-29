@@ -1002,7 +1002,7 @@ export interface RekeyDeviceOptions {
     devId: string;
 }
 
-export interface SignExistingPackageOptions {
+export interface CreateSignedPackageOptions {
     host: string;
     password: string;
     signingPassword: string;
