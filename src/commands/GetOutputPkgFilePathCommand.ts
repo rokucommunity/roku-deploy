@@ -2,7 +2,8 @@ import { rokuDeploy } from '../index';
 
 export class GetOutputPkgFilePathCommand {
     run(args) {
-        const outputPath = rokuDeploy.getOutputPkgFilePath({
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        const outputPath = rokuDeploy['getOutputPkgPath']({
             outFile: args.outFile,
             outDir: args.outDir
         });

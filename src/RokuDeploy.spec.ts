@@ -82,7 +82,7 @@ describe('index', () => {
 
     describe('getOutputPkgFilePath', () => {
         it('should return correct path if given basename', () => {
-            let outputPath = rokuDeploy.getOutputPkgFilePath({
+            let outputPath = rokuDeploy['getOutputPkgFilePath']({
                 outFile: 'roku-deploy',
                 outDir: outDir
             });
@@ -90,7 +90,7 @@ describe('index', () => {
         });
 
         it('should return correct path if given outFile option ending in .zip', () => {
-            let outputPath = rokuDeploy.getOutputPkgFilePath({
+            let outputPath = rokuDeploy['getOutputPkgFilePath']({
                 outFile: 'roku-deploy.zip',
                 outDir: outDir
             });
@@ -100,7 +100,7 @@ describe('index', () => {
 
     describe('getOutputZipFilePath', () => {
         it('should return correct path if given basename', () => {
-            let outputPath = rokuDeploy.getOutputZipFilePath({
+            let outputPath = rokuDeploy['getOutputZipFilePath']({
                 outFile: 'roku-deploy',
                 outDir: outDir
             });
@@ -108,7 +108,7 @@ describe('index', () => {
         });
 
         it('should return correct path if given outFile option ending in .zip', () => {
-            let outputPath = rokuDeploy.getOutputZipFilePath({
+            let outputPath = rokuDeploy['getOutputZipFilePath']({
                 outFile: 'roku-deploy.zip',
                 outDir: outDir
             });
@@ -866,7 +866,7 @@ describe('index', () => {
                     outDir: outDir,
                     outFile: 'fileThatDoesNotExist.zip'
                 });
-            }, `Cannot publish because file does not exist at '${rokuDeploy.getOutputZipFilePath({
+            }, `Cannot publish because file does not exist at '${rokuDeploy['getOutputZipFilePath']({
                 outFile: 'fileThatDoesNotExist.zip',
                 outDir: outDir
             })}'`);
