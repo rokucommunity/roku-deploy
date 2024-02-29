@@ -68,7 +68,7 @@ describe('cli', () => {
     });
 
     it('Publish passes proper options', async () => {
-        const stub = sinon.stub(rokuDeploy, 'publish').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
                 message: 'Publish successful',
                 results: {}

@@ -556,7 +556,7 @@ export class RokuDeploy {
      * Deletes any installed dev channel on the target Roku device
      * @param options
      */
-    public async deleteDevChannel(options?: DeleteInstalledChannelOptions) {
+    public async deleteDevChannel(options?: DeleteDevChannelOptions) {
         options = this.getOptions(options) as any;
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
@@ -647,7 +647,7 @@ export class RokuDeploy {
             retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
-            deleteInstalledChannel: true,
+            deleteDevChannel: true,
             packagePort: 80,
             remotePort: 8060,
             timeout: 150000,
@@ -1013,7 +1013,7 @@ export interface CreateSignedPackageOptions {
     devId?: string;
 }
 
-export interface DeleteInstalledChannelOptions {
+export interface DeleteDevChannelOptions {
     host: string;
     password: string;
 }
@@ -1029,7 +1029,7 @@ export interface DeployOptions {
     files?: FileEntry[];
     rootDir?: string;
     stagingDir?: string;
-    deleteInstalledChannel?: boolean;
+    deleteDevChannel?: boolean;
     outFile?: string;
     outDir?: string;
 }

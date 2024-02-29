@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
 import type { RokuDeployOptions } from './index';
 import { rokuDeploy } from './index';
-import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
+import { cwd, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
@@ -76,16 +76,6 @@ describe('device', function device() {
             await expectThrowsAsync(
                 rokuDeploy.deploy(options as any),
                 'Unauthorized. Please verify username and password for target Roku.'
-            );
-        });
-    });
-
-    describe('deployAndSignPackage', () => {
-        it('works', async () => {
-            await rokuDeploy.deleteInstalledChannel(options as any);
-            await rokuDeploy.rekeyDevice(options as any);
-            expectPathExists(
-                await rokuDeploy.deployAndSignPackage(options as any)
             );
         });
     });
