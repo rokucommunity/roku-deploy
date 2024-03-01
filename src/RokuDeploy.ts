@@ -142,7 +142,7 @@ export class RokuDeploy {
         if (options.incrementBuildNumber) {
             let timestamp = dateformat(new Date(), 'yymmddHHMM');
             parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
-            await this.fsExtra.writeFile(manifestPath, this.stringifyManifest(parsedManifest));
+            await this.fsExtra.outputFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
         if (beforeZipCallback) {
@@ -433,7 +433,9 @@ export class RokuDeploy {
                 readStream.on('open', resolve);
             });
 
-            let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
+            const route = options.packageUploadOverrides?.route ?? 'plugin_install';
+
+            let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
                 archive: readStream
             });
@@ -447,6 +449,16 @@ export class RokuDeploy {
             if (options.remoteDebugConnectEarly) {
                 // eslint-disable-next-line camelcase
                 requestOptions.formData.remotedebug_connect_early = '1';
+            }
+
+            //apply any supplied formData overrides
+            for (const key in options.packageUploadOverrides?.formData ?? {}) {
+                const value = options.packageUploadOverrides.formData[key];
+                if (value === undefined || value === null) {
+                    delete requestOptions.formData[key];
+                } else {
+                    requestOptions.formData[key] = value;
+                }
             }
 
             //try to "replace" the channel first since that usually works.
@@ -985,7 +997,7 @@ export class RokuDeploy {
         options = this.getOptions(options);
 
         let zipFileName = options.outFile;
-        if (!zipFileName.toLowerCase().endsWith('.zip')) {
+        if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
         let outFolderPath = path.resolve(options.outDir);
@@ -1170,7 +1182,7 @@ export class RokuDeploy {
         await Promise.all(promises);
         // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
         const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
-        return this.fsExtra.writeFile(zipFilePath, content);
+        return this.fsExtra.outputFile(zipFilePath, content);
     }
 }
 
