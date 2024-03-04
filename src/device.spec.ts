@@ -1,8 +1,7 @@
-import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
 import type { RokuDeployOptions } from './index';
 import { rokuDeploy } from './index';
-import { cwd, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
+import { cwd, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
@@ -62,21 +61,5 @@ describe('device', function device() {
     });
 
     this.timeout(20000);
-
-    describe('deploy', () => {
-        it('works', async () => {
-            options.retainDeploymentArchive = true;
-            let response = await rokuDeploy.deploy(options as any);
-            assert.equal(response.message, 'Successful deploy');
-        });
-
-        it('Presents nice message for 401 unauthorized status code', async () => {
-            this.timeout(20000);
-            options.password = 'NOT_THE_PASSWORD';
-            await expectThrowsAsync(
-                rokuDeploy.deploy(options as any),
-                'Unauthorized. Please verify username and password for target Roku.'
-            );
-        });
-    });
+    console.log(options); // So there are no errors about unused variable
 });

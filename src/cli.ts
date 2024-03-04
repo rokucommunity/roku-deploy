@@ -9,14 +9,13 @@ import { PublishCommand } from './commands/PublishCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
-import { DeployCommand } from './commands/DeployCommand';
-import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
+import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
 import { GetOutputZipFilePathCommand } from './commands/GetOutputZipFilePathCommand';
 import { GetOutputPkgFilePathCommand } from './commands/GetOutputPkgFilePathCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
-import { ZipFolderCommand } from './commands/ZipFolderCommand';
+import { ZipCommand } from './commands/ZipCommand';
 
 void yargs
 

@@ -1,6 +1,6 @@
 import { rokuDeploy } from '../index';
 
-export class DeleteInstalledChannelCommand {
+export class DeleteDevChannelCommand {
     async run(args) {
         await rokuDeploy.deleteDevChannel({
             host: args.host,

@@ -41,17 +41,17 @@ export class RokuDeploy {
         await fsExtra.ensureDir(options.stagingDir);
         // await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
 
-        if (!stagingPath) {
+        if (!options.stagingDir) {
             throw new Error('stagingPath is required');
         }
-        if (!await fsExtra.pathExists(rootDir)) {
-            throw new Error(`rootDir does not exist at "${rootDir}"`);
+        if (!await fsExtra.pathExists(options.rootDir)) {
+            throw new Error(`rootDir does not exist at "${options.rootDir}"`);
         }
 
-        let fileObjects = await util.getFilePaths(options.files, rootDir);
+        let fileObjects = await util.getFilePaths(options.files, options.rootDir);
         //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
-            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
+            let destFilePath = util.standardizePath(`${options.stagingDir}/${fileObject.dest}`);
 
             //make sure the containing folder exists
             await fsExtra.ensureDir(path.dirname(destFilePath));
@@ -644,6 +644,7 @@ export class RokuDeploy {
         let defaultOptions = <RokuDeployOptions>{
             outDir: './out',
             outFile: 'roku-deploy',
+            stagingDir: `./out/.roku-deploy-staging`,
             retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
@@ -668,16 +669,14 @@ export class RokuDeploy {
         let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
 
         //stagingDir
-        if (stagingDir) {
-            finalOptions.stagingDir = path.resolve(process.cwd(), stagingDir);
+        if (options.stagingDir) {
+            finalOptions.stagingDir = path.resolve(options.cwd, options.stagingDir);
         } else {
             finalOptions.stagingDir = path.resolve(
                 process.cwd(),
                 util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
             );
         }
-        //sync the new option with the old one (for back-compat)
-        finalOptions.stagingFolderPath = finalOptions.stagingDir;
 
         return finalOptions;
     }
@@ -867,10 +866,6 @@ export interface BeforeZipCallbackInfo {
      * Contains an associative array of the parsed values in the manifest
      */
     manifestData: ManifestData;
-    /**
-     * @deprecated since 3.9.0. use `stagingDir` instead
-     */
-    stagingFolderPath: string;
     /**
      * The directory where the files were staged
      */

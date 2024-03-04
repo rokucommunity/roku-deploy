@@ -9,8 +9,7 @@ import { PublishCommand } from './commands/PublishCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
-import { DeployCommand } from './commands/DeployCommand';
-import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
+import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
@@ -162,36 +161,12 @@ describe('cli', () => {
         });
     });
 
-    it('Deploys a package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'deploy').callsFake(async () => {
-            return Promise.resolve({
-                message: 'Convert successful',
-                results: {}
-            });
-        });
-
-        const command = new DeployCommand();
-        await command.run({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir
-        });
-
-        expect(
-            stub.getCall(0).args[0]
-        ).to.eql({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir
-        });
-    });
-
     it('Deletes an installed channel', async () => {
-        const stub = sinon.stub(rokuDeploy, 'deleteInstalledChannel').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
             return Promise.resolve({ response: {}, body: {} });
         });
 
-        const command = new DeleteInstalledChannelCommand();
+        const command = new DeleteDevChannelCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536'
@@ -206,7 +181,7 @@ describe('cli', () => {
     });
 
     it('Takes a screenshot', async () => {
-        const stub = sinon.stub(rokuDeploy, 'takeScreenshot').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
             return Promise.resolve('');
         });
 

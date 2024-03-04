@@ -8,7 +8,6 @@ import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
-import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
@@ -2023,8 +2022,8 @@ describe('index', () => {
             expect(result).not.to.be.undefined;
         });
 
-        it('continues with deploy if deleteInstalledChannel fails', async () => {
-            sinon.stub(rokuDeploy, 'deleteInstalledChannel').returns(
+        it('continues with deploy if deleteDevChannel fails', async () => {
+            sinon.stub(rokuDeploy, 'deleteDevChannel').returns(
                 Promise.reject(
                     new Error('failed')
                 )
@@ -2043,7 +2042,7 @@ describe('index', () => {
         it('should delete installed channel if requested', async () => {
             fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
 
-            const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
+            const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
             options.deleteInstalledChannel = true;
             mockDoPostRequest();
 
@@ -2060,7 +2059,7 @@ describe('index', () => {
         it('should not delete installed channel if not requested', async () => {
             fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
 
-            const spy = sinon.spy(rokuDeploy, 'deleteInstalledChannel');
+            const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
             mockDoPostRequest();
 
             await rokuDeploy.deploy({
