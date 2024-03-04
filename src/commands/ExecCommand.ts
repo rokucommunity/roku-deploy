@@ -1,24 +1,25 @@
-import { rokuDeploy } from '../index';
-import { cwd } from '../testUtils.spec';
 import { util } from '../util';
+import { rokuDeploy } from '../RokuDeploy';
+import type { CloseChannelOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, RekeyDeviceOptions, SideloadOptions } from '../RokuDeploy';
+import type { RokuDeployOptions } from '../RokuDeployOptions';
 
 export class ExecCommand {
     private actions: string[];
 
-    private configPath: string;
-
     // eslint-disable-next-line @typescript-eslint/ban-types
-    private options: {};
+    private options: RokuDeployOptions;
 
-    constructor(actions: string, configPath: string, ...rokuDeployOptions) {
+    constructor(actions: string, rokuDeployOptions: RokuDeployOptions) {
         this.actions = actions.split('|');
-        this.configPath = configPath;
         this.options = rokuDeployOptions;
     }
 
     async run() {
-        //load options from json
-        this.options = util.getOptionsFromJson(this.options);
+        //Load options from json, and overwrite with cli options
+        this.options = {
+            ...util.getOptionsFromJson(this.options),
+            ...this.options
+        };
 
         // Possibilities:
         // 'stage|zip'
@@ -34,15 +35,16 @@ export class ExecCommand {
         }
 
         if (this.actions.includes('delete')) {
-            await rokuDeploy.deleteDevChannel(this.options);
+            // defaults -> config -> cli options
+            await rokuDeploy.deleteDevChannel(this.options as DeleteDevChannelOptions);
         }
 
         if (this.actions.includes('close')) {
-            await rokuDeploy.closeChannel(this.options);
+            await rokuDeploy.closeChannel(this.options as CloseChannelOptions);
         }
 
         if (this.actions.includes('sideload')) {
-            await rokuDeploy.sideload(this.options);
+            await rokuDeploy.sideload(this.options as SideloadOptions);
         }
 
         if (this.actions.includes('stage')) {
@@ -50,15 +52,15 @@ export class ExecCommand {
         }
 
         if (this.actions.includes('rekey')) {
-            await rokuDeploy.rekeyDevice(this.options);
+            await rokuDeploy.rekeyDevice(this.options as RekeyDeviceOptions);
         }
 
         if (this.actions.includes('squash')) {
-            await rokuDeploy.convertToSquashfs(this.options);
+            await rokuDeploy.convertToSquashfs(this.options as ConvertToSquashfsOptions);
         }
 
         if (this.actions.includes('sign')) {
-            await rokuDeploy.createSignedPackage(this.options);
+            await rokuDeploy.createSignedPackage(this.options as CreateSignedPackageOptions);
         }
 
 
