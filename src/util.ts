@@ -9,6 +9,7 @@ import type { FileEntry } from './RokuDeployOptions';
 import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
+import { ParseError, parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 
 export class Util {
     /**
@@ -485,24 +486,33 @@ export class Util {
 
     /**
      * A function to fill in any missing arguments with JSON values
+     * Only run when CLI commands are used
      */
-    public getOptionsFromJson(defaultArgs) {//TODO: The original function handled parse errors, but this one doesn't
-        let args = { ...defaultArgs };
-        const fileNames = ['rokudeploy.json', 'bsconfig.json'];
+    public getOptionsFromJson(options?: { cwd?: string }) {
+        let fileOptions: RokuDeployOptions = {};
+        const cwd = options?.cwd ?? process.cwd();
+        const configPath = path.join(cwd, 'rokudeploy.json');
 
-        for (const fileName of fileNames) {
-            if (fsExtra.existsSync(fileName)) {
-                const sourcePath = path.join(defaultArgs.rootDir, fileName);
-                const rokuDeployArgs = JSON.parse(fsExtra.readFileSync(sourcePath, 'utf8'));
-                // args = Object.assign(rokudeployArgs ?? {}, args);
-                args = Object.assign(rokuDeployArgs, args);
-                break;
-            }
+        let configFileText = fsExtra.readFileSync(configPath).toString();
+        let parseErrors = [] as ParseError[];
+        fileOptions = parseJsonc(configFileText, parseErrors, {
+            allowEmptyContent: true,
+            allowTrailingComma: true,
+            disallowComments: false
+        });
+        if (parseErrors.length > 0) {
+            throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                parseErrors.map(x => {
+                    return {
+                        message: printParseErrorCode(x.error),
+                        offset: x.offset,
+                        length: x.length
+                    };
+                })
+            ));
         }
-
-        return args;
+        return fileOptions;
     }
-
 }
 
 export let util = new Util();

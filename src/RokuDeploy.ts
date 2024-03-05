@@ -7,8 +7,7 @@ const request = r as typeof requestType;
 import * as JSZip from 'jszip';
 import * as errors from './Errors';
 import * as xml2js from 'xml2js';
-import type { ParseError } from 'jsonc-parser';
-import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
@@ -23,9 +22,6 @@ export class RokuDeploy {
     }
 
     private logger: Logger;
-
-    //this should just
-    // public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
 
     /**
      * Copies all of the referenced files to the staging folder

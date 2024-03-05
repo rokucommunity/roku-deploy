@@ -11,7 +11,7 @@ import * as glob from 'glob';
 import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
-import type { RokuDeployOptions } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
@@ -30,9 +30,6 @@ describe('index', () => {
 
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
-
-
-        rokuDeploy.convertToSquashfs
 
         options = rokuDeploy.getOptions({
             rootDir: rootDir,
@@ -640,7 +637,7 @@ describe('index', () => {
                 return Promise.resolve();
             });
 
-            sinon.stub(util, 'getFilePaths').returns(
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
                 Promise.resolve([
                     {
                         src: s`${rootDir}/source/main.brs`,
@@ -726,7 +723,7 @@ describe('index', () => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
-            return rokuDeploy.pressHomeButton({}).then(() => {
+            return rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' }).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
                 expect(true).to.be.true;
@@ -740,7 +737,7 @@ describe('index', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.pressHomeButton('1.2.3.4');
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' });
             await promise;
         });
 
@@ -751,7 +748,7 @@ describe('index', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.pressHomeButton('1.2.3.4', 987);
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', remotePort: 987, key: 'home' });
             await promise;
         });
 
@@ -763,7 +760,7 @@ describe('index', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.pressHomeButton('1.2.3.4');
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' });
             await promise;
         });
 
@@ -776,7 +773,7 @@ describe('index', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.pressHomeButton('1.2.3.4', 987, 1000);
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', remotePort: 987, key: 'home', timeout: 1000 });
             await promise;
         });
     });
@@ -1741,7 +1738,7 @@ describe('index', () => {
 
                 let stagingDirValue = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
-                expect(await util.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
+                expect(await rokuDeploy.getFilePaths(['renamed_test.md'], opts.rootDir)).to.eql([{
                     src: s`${opts.rootDir}/renamed_test.md`,
                     dest: s`renamed_test.md`
                 }]);
@@ -1786,7 +1783,7 @@ describe('index', () => {
                 let stagingPath = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
                 expect(
-                    (await util.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
+                    (await rokuDeploy.getFilePaths(opts.files, opts.rootDir)).sort((a, b) => a.src.localeCompare(b.src))
                 ).to.eql([{
                     src: s`${tempDir}/mainProject/source/lib/lib.brs`,
                     dest: s`source/lib/lib.brs`
@@ -2004,72 +2001,6 @@ describe('index', () => {
             expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: /asdf/ }])).to.throw();
             expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: new Date() }])).to.throw();
             expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: 1 }])).to.throw();
-        });
-    });
-
-    describe('deploy', () => {
-        it('does the whole migration', async () => {
-            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
-            mockDoPostRequest();
-
-            writeFiles(rootDir, ['manifest']);
-
-            let result = await rokuDeploy.deploy({
-                rootDir: rootDir,
-                host: '1.2.3.4',
-                password: 'password'
-            });
-            expect(result).not.to.be.undefined;
-        });
-
-        it('continues with deploy if deleteDevChannel fails', async () => {
-            sinon.stub(rokuDeploy, 'deleteDevChannel').returns(
-                Promise.reject(
-                    new Error('failed')
-                )
-            );
-            mockDoPostRequest();
-            let result = await rokuDeploy.deploy({
-                host: '1.2.3.4',
-                password: 'password',
-                ...options,
-                //something in the previous test is locking the default output zip file. We should fix that at some point...
-                outDir: s`${tempDir}/test1`
-            });
-            expect(result).not.to.be.undefined;
-        });
-
-        it('should delete installed channel if requested', async () => {
-            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
-
-            const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
-            options.deleteInstalledChannel = true;
-            mockDoPostRequest();
-
-            await rokuDeploy.deploy({
-                rootDir: rootDir,
-                host: '1.2.3.4',
-                password: 'password',
-                deleteInstalledChannel: true
-            });
-
-            expect(spy.called).to.equal(true);
-        });
-
-        it('should not delete installed channel if not requested', async () => {
-            fsExtra.outputFileSync(s`${rootDir}/manifest`, '');
-
-            const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
-            mockDoPostRequest();
-
-            await rokuDeploy.deploy({
-                rootDir: rootDir,
-                host: '1.2.3.4',
-                password: 'password',
-                deleteInstalledChannel: false
-            });
-
-            expect(spy.notCalled).to.equal(true);
         });
     });
 
@@ -2332,12 +2263,12 @@ describe('index', () => {
         });
     });
 
-    describe('zipFolder', () => {
+    describe('makeZip', () => {
         //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
         it('rejects the promise when an error occurs', async () => {
             //zip path doesn't exist
             await assertThrowsAsync(async () => {
-                await rokuDeploy.zipFolder('source', '.tmp/some/zip/path/that/does/not/exist');
+                await rokuDeploy['makeZip']('source', '.tmp/some/zip/path/that/does/not/exist');
             });
         });
 
@@ -2362,7 +2293,7 @@ describe('index', () => {
 
             const outputZipPath = path.join(tempDir, 'output.zip');
             const addedManifestLine = 'bs_libs_required=roku_ads_lib';
-            await rokuDeploy.zipFolder(stageFolder, outputZipPath, (file, data) => {
+            await rokuDeploy['makeZip'](stageFolder, outputZipPath, (file, data) => {
                 if (file.dest === 'manifest') {
                     let manifestContents = data.toString();
                     manifestContents += addedManifestLine;
@@ -2397,7 +2328,7 @@ describe('index', () => {
             writeFiles(stagingDir, files);
 
             const outputZipPath = path.join(tempDir, 'output.zip');
-            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, ['**/*', '!**/*.map']);
+            await rokuDeploy['makeZip'](stagingDir, outputZipPath, null, ['**/*', '!**/*.map']);
 
             const data = fsExtra.readFileSync(outputZipPath);
             const zip = await JSZip.loadAsync(data);
@@ -2412,6 +2343,648 @@ describe('index', () => {
                     ...files
                 ].sort().filter(x => !x.endsWith('.map'))
             );
+        });
+    });
+
+    describe('getFilePaths', () => {
+        const otherProjectName = 'otherProject';
+        const otherProjectDir = sp`${rootDir}/../${otherProjectName}`;
+        //create baseline project structure
+        beforeEach(() => {
+            rokuDeploy = new RokuDeploy();
+            options = rokuDeploy.getOptions({});
+            fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
+            writeFiles(rootDir, [
+                `manifest`,
+                `source/main.brs`,
+                `source/lib.brs`,
+                `components/component1.xml`,
+                `components/component1.brs`,
+                `components/screen1/screen1.xml`,
+                `components/screen1/screen1.brs`
+            ]);
+        });
+
+        async function getFilePaths(files: FileEntry[], rootDirOverride = rootDir) {
+            return (await rokuDeploy.getFilePaths(files, rootDirOverride))
+                .sort((a, b) => a.src.localeCompare(b.src));
+        }
+
+        describe('top-level-patterns', () => {
+            it('excludes a file that is negated', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    '!source/main.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }]);
+            });
+
+            it('excludes file from non-rootdir top-level pattern', async () => {
+                writeFiles(rootDir, ['../externalDir/source/main.brs']);
+                expect(await getFilePaths([
+                    '../externalDir/**/*',
+                    '!../externalDir/**/*'
+                ])).to.eql([]);
+            });
+
+            it('throws when using top-level string referencing file outside the root dir', async () => {
+                writeFiles(rootDir, [`../source/main.brs`]);
+                await expectThrowsAsync(async () => {
+                    await getFilePaths([
+                        '../source/**/*'
+                    ]);
+                }, 'Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+            });
+
+            it('works for brighterscript files', async () => {
+                writeFiles(rootDir, ['src/source/main.bs']);
+                expect(await getFilePaths([
+                    'manifest',
+                    'source/**/*.bs'
+                ], s`${rootDir}/src`)).to.eql([{
+                    src: s`${rootDir}/src/source/main.bs`,
+                    dest: s`source/main.bs`
+                }]);
+            });
+
+            it('works for root-level double star in top-level pattern', async () => {
+                expect(await getFilePaths([
+                    '**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                },
+                {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                },
+                {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                },
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('works for multile entries', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    'components/**/*',
+                    'manifest'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }, {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('copies top-level-string single-star globs', async () => {
+                writeFiles(rootDir, [
+                    'source/lib.brs',
+                    'source/main.brs'
+                ]);
+                expect(await getFilePaths([
+                    'source/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('works for double-star globs', async () => {
+                expect(await getFilePaths([
+                    '**/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('copies subdir-level relative double-star globs', async () => {
+                expect(await getFilePaths([
+                    'components/**/*.brs'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }]);
+            });
+
+            it('Finds folder using square brackets glob pattern', async () => {
+                fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
+                expect(await getFilePaths([
+                    '[test]/*'
+                ],
+                rootDir
+                )).to.eql([{
+                    src: s`${rootDir}/e/file.brs`,
+                    dest: s`e/file.brs`
+                }]);
+            });
+
+            it('Finds folder with escaped square brackets glob pattern as name', async () => {
+                fsExtra.outputFileSync(`${rootDir}/[test]/file.brs`, '');
+                fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
+                expect(await getFilePaths([
+                    '\\[test\\]/*'
+                ],
+                rootDir
+                )).to.eql([{
+                    src: s`${rootDir}/[test]/file.brs`,
+                    dest: s`[test]/file.brs`
+                }]);
+            });
+
+            it('throws exception when top-level strings reference files not under rootDir', async () => {
+                writeFiles(otherProjectDir, [
+                    'manifest'
+                ]);
+                await expectThrowsAsync(
+                    getFilePaths([
+                        `../${otherProjectName}/**/*`
+                    ])
+                );
+            });
+
+            it('applies negated patterns', async () => {
+                expect(await getFilePaths([
+                    //include all components
+                    'components/**/*.brs',
+                    //exclude all xml files
+                    '!components/**/*.xml',
+                    //re-include a specific xml file
+                    'components/screen1/screen1.xml'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }]);
+            });
+
+            it('handles negated multi-globs', async () => {
+                expect((await getFilePaths([
+                    'components/**/*',
+                    '!components/screen1/**/*'
+                ])).map(x => x.dest)).to.eql([
+                    s`components/component1.brs`,
+                    s`components/component1.xml`
+                ]);
+            });
+
+            it('allows negating paths outside rootDir without requiring src;dest; syntax', async () => {
+                fsExtra.outputFileSync(`${rootDir}/../externalLib/source/lib.brs`, '');
+                const filePaths = await getFilePaths([
+                    'source/**/*',
+                    { src: '../externalLib/**/*', dest: 'source' },
+                    '!../externalLib/source/**/*'
+                ], rootDir);
+                expect(
+                    filePaths.map(x => s`${x.src}`).sort()
+                ).to.eql([
+                    s`${rootDir}/source/lib.brs`,
+                    s`${rootDir}/source/main.brs`
+                ]);
+            });
+
+            it('applies multi-glob paths relative to rootDir', async () => {
+                expect(await getFilePaths([
+                    'manifest',
+                    'source/**/*',
+                    'components/**/*',
+                    '!components/scenes/**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }, {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('ignores non-glob folder paths', async () => {
+                expect(await getFilePaths([
+                    //this is the folder called "components"
+                    'components'
+                ])).to.eql([]); //there should be no matches because rokudeploy ignores folders
+            });
+
+        });
+
+        describe('{src;dest} objects', () => {
+            it('excludes a file that is negated in src;dest;', async () => {
+                expect(await getFilePaths([
+                    'source/**/*',
+                    {
+                        src: '!source/main.brs'
+                    }
+                ])).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                }]);
+            });
+
+            it('works for root-level double star in {src;dest} object', async () => {
+                expect(await getFilePaths([{
+                    src: '**/*',
+                    dest: ''
+                }
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/component1.xml`,
+                    dest: s`components/component1.xml`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                },
+                {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                },
+                {
+                    src: s`${rootDir}/manifest`,
+                    dest: s`manifest`
+                },
+                {
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`source/lib.brs`
+                },
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('uses the root of staging folder for dest when not specified with star star', async () => {
+                writeFiles(otherProjectDir, [
+                    'components/component1/subComponent/screen.brs',
+                    'manifest',
+                    'source/thirdPartyLib.brs'
+                ]);
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/**/*`
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`components/component1/subComponent/screen.brs`
+                }, {
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`manifest`
+                }, {
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`source/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('copies absolute path files to specified dest', async () => {
+                writeFiles(otherProjectDir, [
+                    'source/thirdPartyLib.brs'
+                ]);
+                expect(await getFilePaths([{
+                    src: `${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: 'lib/thirdPartyLib.brs'
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`lib/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('copies relative path files to specified dest', async () => {
+                const rootDirName = path.basename(rootDir);
+                writeFiles(rootDir, [
+                    'source/main.brs'
+                ]);
+                expect(await getFilePaths([{
+                    src: `../${rootDirName}/source/main.brs`,
+                    dest: 'source/main.brs'
+                }])).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('maintains relative path after **', async () => {
+                writeFiles(otherProjectDir, [
+                    'components/component1/subComponent/screen.brs',
+                    'manifest',
+                    'source/thirdPartyLib.brs'
+                ]);
+                expect(await getFilePaths([{
+                    src: `../otherProject/**/*`,
+                    dest: 'outFolder/'
+                }])).to.eql([{
+                    src: s`${otherProjectDir}/components/component1/subComponent/screen.brs`,
+                    dest: s`outFolder/components/component1/subComponent/screen.brs`
+                }, {
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`outFolder/manifest`
+                }, {
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`outFolder/source/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('works for other globs', async () => {
+                expect(await getFilePaths([{
+                    src: `components/screen1/*creen1.brs`,
+                    dest: s`/source`
+                }])).to.eql([{
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`source/screen1.brs`
+                }]);
+            });
+
+            it('applies negated patterns', async () => {
+                writeFiles(rootDir, [
+                    'components/component1.brs',
+                    'components/component1.xml',
+                    'components/screen1/screen1.brs',
+                    'components/screen1/screen1.xml'
+                ]);
+                expect(await getFilePaths([
+                    //include all component brs files
+                    'components/**/*.brs',
+                    //exclude all xml files
+                    '!components/**/*.xml',
+                    //re-include a specific xml file
+                    'components/screen1/screen1.xml'
+                ])).to.eql([{
+                    src: s`${rootDir}/components/component1.brs`,
+                    dest: s`components/component1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.brs`,
+                    dest: s`components/screen1/screen1.brs`
+                }, {
+                    src: s`${rootDir}/components/screen1/screen1.xml`,
+                    dest: s`components/screen1/screen1.xml`
+                }]);
+            });
+        });
+
+        it('converts relative rootDir path to absolute', async () => {
+            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
+            await getFilePaths([
+                'source/main.brs'
+            ], './rootDir');
+            expect(stub.callCount).to.be.greaterThan(0);
+            expect(stub.getCall(0).args[0].rootDir).to.eql('./rootDir');
+            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/rootDir`);
+        });
+
+        it('works when using a different current working directory than rootDir', async () => {
+            writeFiles(rootDir, [
+                'manifest',
+                'images/splash_hd.jpg'
+            ]);
+            //sanity check, make sure it works without fiddling with cwd intact
+            let paths = await getFilePaths([
+                'manifest',
+                'images/splash_hd.jpg'
+            ]);
+
+            expect(paths).to.eql([{
+                src: s`${rootDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
+            }, {
+                src: s`${rootDir}/manifest`,
+                dest: s`manifest`
+            }]);
+
+            //change the working directory and verify everything still works
+
+            let wrongCwd = path.dirname(path.resolve(options.rootDir));
+            process.chdir(wrongCwd);
+
+            paths = await getFilePaths([
+                'manifest',
+                'images/splash_hd.jpg'
+            ]);
+
+            expect(paths).to.eql([{
+                src: s`${rootDir}/images/splash_hd.jpg`,
+                dest: s`images/splash_hd.jpg`
+            }, {
+                src: s`${rootDir}/manifest`,
+                dest: s`manifest`
+            }]);
+        });
+
+        it('supports absolute paths from outside of the rootDir', async () => {
+            //dest not specified
+            expect(await getFilePaths([{
+                src: sp`${cwd}/README.md`
+            }], options.rootDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`README.md`
+            }]);
+
+            //dest specified
+            expect(await getFilePaths([{
+                src: sp`${cwd}/README.md`,
+                dest: 'docs/README.md'
+            }], options.rootDir)).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }]);
+
+            let paths: any[];
+
+            paths = await getFilePaths([{
+                src: sp`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }], outDir);
+
+            expect(paths).to.eql([{
+                src: s`${cwd}/README.md`,
+                dest: s`docs/README.md`
+            }]);
+
+            //top-level string paths pointing to files outside the root should thrown an exception
+            await expectThrowsAsync(async () => {
+                paths = await getFilePaths([
+                    sp`${cwd}/README.md`
+                ], outDir);
+            });
+        });
+
+        it('supports relative paths that grab files from outside of the rootDir', async () => {
+            writeFiles(`${rootDir}/../`, [
+                'README.md'
+            ]);
+            expect(
+                await getFilePaths([{
+                    src: sp`../README.md`
+                }], rootDir)
+            ).to.eql([{
+                src: s`${rootDir}/../README.md`,
+                dest: s`README.md`
+            }]);
+
+            expect(
+                await getFilePaths([{
+                    src: sp`../README.md`,
+                    dest: 'docs/README.md'
+                }], rootDir)
+            ).to.eql([{
+                src: s`${rootDir}/../README.md`,
+                dest: s`docs/README.md`
+            }]);
+        });
+
+        it('should throw exception because we cannot have top-level string paths pointed to files outside the root', async () => {
+            writeFiles(rootDir, [
+                '../README.md'
+            ]);
+            await expectThrowsAsync(
+                getFilePaths([
+                    path.posix.join('..', 'README.md')
+                ], outDir)
+            );
+        });
+
+        it('supports overriding paths', async () => {
+            let paths = await getFilePaths([{
+                src: sp`${rootDir}/components/component1.brs`,
+                dest: 'comp1.brs'
+            }, {
+                src: sp`${rootDir}/components/screen1/screen1.brs`,
+                dest: 'comp1.brs'
+            }], rootDir);
+            expect(paths).to.be.lengthOf(1);
+            expect(s`${paths[0].src}`).to.equal(s`${rootDir}/components/screen1/screen1.brs`);
+        });
+
+        it('supports overriding paths from outside the root dir', async () => {
+            let thisRootDir = s`${tempDir}/tempTestOverrides/src`;
+            try {
+
+                fsExtra.ensureDirSync(s`${thisRootDir}/source`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/components`);
+                fsExtra.ensureDirSync(s`${thisRootDir}/../.tmp`);
+
+                fsExtra.writeFileSync(s`${thisRootDir}/source/main.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.brs`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.xml`, '');
+                fsExtra.writeFileSync(s`${thisRootDir}/../.tmp/MainScene.brs`, '');
+
+                let files = [
+                    '**/*.xml',
+                    '**/*.brs',
+                    {
+                        src: '../.tmp/MainScene.brs',
+                        dest: 'components/MainScene.brs'
+                    }
+                ];
+                let paths = await getFilePaths(files, thisRootDir);
+
+                //the MainScene.brs file from source should NOT be included
+                let mainSceneEntries = paths.filter(x => s`${x.dest}` === s`components/MainScene.brs`);
+                expect(
+                    mainSceneEntries,
+                    `Should only be one files entry for 'components/MainScene.brs'`
+                ).to.be.lengthOf(1);
+                expect(s`${mainSceneEntries[0].src}`).to.eql(s`${thisRootDir}/../.tmp/MainScene.brs`);
+            } finally {
+                //clean up
+                await fsExtra.remove(s`${thisRootDir}/../`);
+            }
+        });
+
+        it('maintains original file path', async () => {
+            fsExtra.outputFileSync(`${rootDir}/components/CustomButton.brs`, '');
+            expect(
+                await getFilePaths([
+                    'components/CustomButton.brs'
+                ], rootDir)
+            ).to.eql([{
+                src: s`${rootDir}/components/CustomButton.brs`,
+                dest: s`components/CustomButton.brs`
+            }]);
+        });
+
+        it('correctly assumes file path if not given', async () => {
+            fsExtra.outputFileSync(`${rootDir}/components/CustomButton.brs`, '');
+            expect(
+                (await getFilePaths([
+                    { src: 'components/*' }
+                ], rootDir)).sort((a, b) => a.src.localeCompare(b.src))
+            ).to.eql([{
+                src: s`${rootDir}/components/component1.brs`,
+                dest: s`components/component1.brs`
+            }, {
+                src: s`${rootDir}/components/component1.xml`,
+                dest: s`components/component1.xml`
+            }, {
+                src: s`${rootDir}/components/CustomButton.brs`,
+                dest: s`components/CustomButton.brs`
+            }]);
         });
     });
 
@@ -2456,7 +3029,7 @@ describe('index', () => {
     describe('stringifyManifest', () => {
         it('correctly converts back to a valid manifest when lineNumber and keyIndexes are provided', () => {
             expect(
-                rokuDeploy.stringifyManifest(
+                rokuDeploy['stringifyManifest'](
                     rokuDeploy['parseManifestFromString']('major_version=3\nminor_version=4')
                 )
             ).to.equal(
@@ -2469,7 +3042,7 @@ describe('index', () => {
             delete parsed.keyIndexes;
             delete parsed.lineCount;
             let outputParsedManifest = rokuDeploy['parseManifestFromString'](
-                rokuDeploy.stringifyManifest(parsed)
+                rokuDeploy['stringifyManifest'](parsed)
             );
             expect(outputParsedManifest.title).to.equal('App');
             expect(outputParsedManifest.major_version).to.equal('3');
@@ -2503,21 +3076,6 @@ describe('index', () => {
     });
 
     describe('getOptions', () => {
-        it('supports deprecated stagingFolderPath option', () => {
-            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
-                return false;
-            });
-            expect(
-                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingDir
-            ).to.eql(s`${cwd}/staging-folder-path`);
-            expect(
-                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path', stagingDir: 'staging-dir' }).stagingDir
-            ).to.eql(s`${cwd}/staging-dir`);
-            expect(
-                rokuDeploy.getOptions({ stagingFolderPath: 'staging-folder-path' }).stagingFolderPath
-            ).to.eql(s`${cwd}/staging-folder-path`);
-        });
-
         it('calling with no parameters works', () => {
             sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                 return false;
