@@ -449,23 +449,25 @@ export class Util {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = path.join(cwd, 'rokudeploy.json');
 
-        let configFileText = fsExtra.readFileSync(configPath).toString();
-        let parseErrors = [] as ParseError[];
-        fileOptions = parseJsonc(configFileText, parseErrors, {
-            allowEmptyContent: true,
-            allowTrailingComma: true,
-            disallowComments: false
-        });
-        if (parseErrors.length > 0) {
-            throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
-                parseErrors.map(x => {
-                    return {
-                        message: printParseErrorCode(x.error),
-                        offset: x.offset,
-                        length: x.length
-                    };
-                })
-            ));
+        if (fsExtra.existsSync(configPath)) {
+            let configFileText = fsExtra.readFileSync(configPath).toString();
+            let parseErrors = [] as ParseError[];
+            fileOptions = parseJsonc(configFileText, parseErrors, {
+                allowEmptyContent: true,
+                allowTrailingComma: true,
+                disallowComments: false
+            });
+            if (parseErrors.length > 0) {
+                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                    parseErrors.map(x => {
+                        return {
+                            message: printParseErrorCode(x.error),
+                            offset: x.offset,
+                            length: x.length
+                        };
+                    })
+                ));
+            }
         }
         return fileOptions;
     }

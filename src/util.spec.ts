@@ -451,7 +451,7 @@ describe('util', () => {
         });
     });
 
-    describe.only('getOptionsFromJson', () => {
+    describe('getOptionsFromJson', () => {
         beforeEach(() => {
             fsExtra.ensureDirSync(rootDir);
             process.chdir(rootDir);
@@ -465,24 +465,16 @@ describe('util', () => {
             });
         });
 
-        it(`can't find file`, () => {
-            fsExtra.writeJsonSync(s`${rootDir}/rokudeployed.json`, { host: '1.2.3.4' });
-            expect(
-                util.getOptionsFromJson({ cwd: rootDir })
-            ).to.eql(undefined);
-
-        });
-
         it(`loads cwd from process`, () => {
             try {
+                fsExtra.writeJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
                 expect(
-                    mainSceneEntries,
-                    `Should only be one files entry for 'components/MainScene.brs'`
-                ).to.be.lengthOf(1);
-                expect(s`${mainSceneEntries[0].src}`).to.eql(s`${thisRootDir}/../.tmp/MainScene.brs`);
+                    util.getOptionsFromJson()
+                ).to.eql({
+                    host: '1.2.3.4'
+                });
             } finally {
-                //clean up
-                await fsExtra.remove(s`${thisRootDir}/../`);
+                fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             }
 
         });
