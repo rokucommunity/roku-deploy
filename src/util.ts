@@ -5,7 +5,7 @@ import * as dns from 'dns';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
-import type { FileEntry } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
@@ -283,50 +283,6 @@ export class Util {
         return result;
     }
 
-
-    /**
-    * Get all file paths for the specified options
-    * @param files
-    * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
-    */
-    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
-        //if the rootDir isn't absolute, convert it to absolute using the standard options flow
-        if (path.isAbsolute(rootDir) === false) {
-            rootDir = rokuDeploy.getOptions({ rootDir: rootDir }).rootDir; //TODO: This moved from rokudeploy to here, but if we need to get options how do we fix this?
-        }
-        const entries = this.normalizeFilesArray(files);
-        const srcPathsByIndex = await util.globAllByIndex(
-            entries.map(x => {
-                return typeof x === 'string' ? x : x.src;
-            }),
-            rootDir
-        );
-
-        /**
-         * Result indexed by the dest path
-         */
-        let result = new Map<string, StandardizedFileEntry>();
-
-        //compute `dest` path for every file
-        for (let i = 0; i < srcPathsByIndex.length; i++) {
-            const srcPaths = srcPathsByIndex[i];
-            const entry = entries[i];
-            if (srcPaths) {
-                for (let srcPath of srcPaths) {
-                    srcPath = util.standardizePath(srcPath);
-
-                    const dest = this.computeFileDestPath(srcPath, entry, rootDir);
-                    //the last file with this `dest` will win, so just replace any existing entry with this one.
-                    result.set(dest, {
-                        src: srcPath,
-                        dest: dest
-                    });
-                }
-            }
-        }
-        return [...result.values()];
-    }
-
     /**
      * Given a full path to a file, determine its dest path
      * @param srcPath the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
@@ -388,7 +344,7 @@ export class Util {
      * @param pattern the glob pattern originally used to find this file
      * @param rootDir absolute normalized path to the rootDir
      */
-    private computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
+    public computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
         let result: string;
         let globstarIdx: number;
         //files under rootDir with no specified dest
