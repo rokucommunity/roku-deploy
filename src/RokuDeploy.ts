@@ -183,33 +183,35 @@ export class RokuDeploy {
         return baseRequestOptions;
     }
 
-    public async keypress(options: { key: string }) {
+    public async keyPress(options: KeyPressOptions) {
         return this.sendKeyEvent({
             ...options,
+            key: 'all.the.others',
             action: 'keypress'
         });
     }
 
-    public async keyup(options: any) {
+    public async keyUp(options: KeyUpOptions) {
         return this.sendKeyEvent({
             ...options,
             action: 'keyup'
         });
     }
 
-    public async keydown(options: any) {
+    public async keyDown(options: KeyDownOptions) {
         return this.sendKeyEvent({
             ...options,
             action: 'keydown'
         });
     }
 
-    public async sendText(options: any) {
+    public async sendText(options: SendTextOptions) {
         const chars = options.text.split('');
         for (const char of chars) {
-            await this.keypress({
+            await this.sendKeyEvent({
                 ...options,
-                key: `lit_${char}`
+                key: `lit_${char}`,
+                action: 'keypress'
             });
         }
     }
@@ -217,18 +219,13 @@ export class RokuDeploy {
     /**
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
-     * @param host - the host
-     * @param port - the port that should be used for the request. defaults to 8060
-     * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
-    private async sendKeyEvent(options: { host: string; port?: string; key: 'home' | 'left' | 'all.the.others'; action: 'keypress' | 'keyup' | 'keydown'; timeout?: number }) {
-        let options = this.getOptions();
-        port = port ? port : options.remotePort;
-        timeout = timeout ? timeout : options.timeout;
+    private async sendKeyEvent(options: SendKeyEventOptions) {
+        let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
-            url: `http://${host}:${port}/keypress/Home`,
-            timeout: timeout
+            url: `http://${filledOptions.host}:${filledOptions.remotePort}/${filledOptions.action}/${filledOptions.key}`,
+            timeout: filledOptions.timeout
         }, false);
     }
 
@@ -964,6 +961,41 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
+type RokuKey = 'home' | 'rev' | 'fwd' | 'play' | 'select' | 'left' | 'right' | 'down' | 'up' | 'back' | 'instantreplay' | 'info' | 'backspace' | 'search' | 'enter' | 'findremote' | 'volumeup' | 'volumedown' | 'volumemute' | 'poweroff' | 'channelup' | 'channeldown' | 'inputtuner' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputav1';
+export interface SendKeyEventOptions {
+    action?: 'keypress' | 'keydown' | 'keyup';
+    host: string;
+    key: RokuKey | string;
+    remotePort?: number;
+    timeout?: number;
+}
+
+export interface KeyUpOptions extends SendKeyEventOptions {
+    action?: 'keyup';
+    key: RokuKey;
+}
+
+export interface KeyDownOptions extends SendKeyEventOptions {
+    action?: 'keydown';
+    key: RokuKey;
+}
+
+export interface KeyPressOptions extends SendKeyEventOptions {
+    action?: 'keypress';
+    key: RokuKey;
+}
+
+export interface SendTextOptions extends SendKeyEventOptions {
+    action?: 'keypress';
+    text: string;
+}
+
+export interface CloseChannelOptions {
+    host: string;
+    remotePort: number;
+    timeout?: number;
+
+}
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];

@@ -3215,11 +3215,6 @@ describe('index', () => {
                 expect(rokuDeploy.getOptions().outFile).to.equal('rokudeploy-outfile');
             });
 
-            it('if bsconfig.json config file is available it should use those values instead of the default', () => {
-                fsExtra.writeJsonSync(`${rootDir}/bsconfig.json`, { outFile: 'bsconfig-outfile' });
-                expect(rokuDeploy.getOptions().outFile).to.equal('bsconfig-outfile');
-            });
-
             it('if rokudeploy.json config file is available and bsconfig.json is also available it should use rokudeploy.json instead of bsconfig.json', () => {
                 fsExtra.outputJsonSync(`${rootDir}/bsconfig.json`, { outFile: 'bsconfig-outfile' });
                 fsExtra.outputJsonSync(`${rootDir}/rokudeploy.json`, { outFile: 'rokudeploy-outfile' });
@@ -3227,22 +3222,10 @@ describe('index', () => {
             });
 
             it('if runtime options are provided, they should override any existing config file options', () => {
-                fsExtra.writeJsonSync(`${rootDir}/bsconfig.json`, { outFile: 'bsconfig-outfile' });
                 fsExtra.writeJsonSync(`${rootDir}/rokudeploy.json`, { outFile: 'rokudeploy-outfile' });
                 expect(rokuDeploy.getOptions({
                     outFile: 'runtime-outfile'
                 }).outFile).to.equal('runtime-outfile');
-            });
-
-            it('if runtime config should override any existing config file options', () => {
-                fsExtra.writeJsonSync(s`${rootDir}/rokudeploy.json`, { outFile: 'rokudeploy-outfile' });
-                fsExtra.writeJsonSync(s`${rootDir}/bsconfig`, { outFile: 'rokudeploy-outfile' });
-
-                fsExtra.writeJsonSync(s`${rootDir}/brsconfig.json`, { outFile: 'project-config-outfile' });
-                options = {
-                    project: 'brsconfig.json'
-                };
-                expect(rokuDeploy.getOptions(options).outFile).to.equal('project-config-outfile');
             });
         });
     });
