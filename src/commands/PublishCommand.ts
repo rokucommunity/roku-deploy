@@ -1,12 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class PublishCommand {
     async run(args) {
-        await rokuDeploy.sideload({
-            host: args.host,
-            password: args.password,
-            outDir: args.outDir,
-            outFile: args.outFile
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.sideload(options);
     }
 }

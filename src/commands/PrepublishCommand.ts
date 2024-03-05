@@ -1,10 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class PrepublishCommand {
     async run(args) {
-        await rokuDeploy.stage({
-            stagingDir: args.stagingDir,
-            rootDir: args.rootDir
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.stage(options);
     }
 }

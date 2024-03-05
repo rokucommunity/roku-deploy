@@ -1,12 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class CreateSignedPackageCommand {
     async run(args) {
-        await rokuDeploy.createSignedPackage({
-            host: args.host,
-            password: args.password,
-            signingPassword: args.signingPassword,
-            stagingDir: args.stagingDir
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.createSignedPackage(options);
     }
 }

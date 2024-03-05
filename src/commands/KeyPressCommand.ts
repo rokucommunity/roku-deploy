@@ -1,7 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class KeyPressCommand {
     async run(args) {
-        await rokuDeploy.keyPress(args.text);
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.keyPress(options);
     }
 }

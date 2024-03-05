@@ -1,10 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class ZipCommand {
     async run(args) {
-        await rokuDeploy.zip({
-            stagingDir: args.stagingDir,
-            outDir: args.outDir
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.zip(options);
     }
 }

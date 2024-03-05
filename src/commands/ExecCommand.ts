@@ -21,11 +21,6 @@ export class ExecCommand {
             ...this.options
         };
 
-        // Possibilities:
-        // 'stage|zip'
-        // 'stage|zip|delete|close|sideload'
-        // 'close|rekey|stage|zip|delete|close|sideload|squash|sign'
-
         if (this.actions.includes('stage')) {
             await rokuDeploy.stage(this.options);
         }
