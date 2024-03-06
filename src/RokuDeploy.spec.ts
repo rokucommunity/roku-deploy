@@ -1877,35 +1877,35 @@ describe('index', () => {
     describe('normalizeFilesArray', () => {
         it('catches invalid dest entries', () => {
             expect(() => {
-                rokuDeploy['normalizeFilesArray']([{
+                util['normalizeFilesArray']([{
                     src: 'some/path',
                     dest: <any>true
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy['normalizeFilesArray']([{
+                util['normalizeFilesArray']([{
                     src: 'some/path',
                     dest: <any>false
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy['normalizeFilesArray']([{
+                util['normalizeFilesArray']([{
                     src: 'some/path',
                     dest: <any>/asdf/gi
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy['normalizeFilesArray']([{
+                util['normalizeFilesArray']([{
                     src: 'some/path',
                     dest: <any>{}
                 }]);
             }).to.throw();
 
             expect(() => {
-                rokuDeploy['normalizeFilesArray']([{
+                util['normalizeFilesArray']([{
                     src: 'some/path',
                     dest: <any>[]
                 }]);
@@ -1913,7 +1913,7 @@ describe('index', () => {
         });
 
         it('normalizes directory separators paths', () => {
-            expect(rokuDeploy['normalizeFilesArray']([{
+            expect(util['normalizeFilesArray']([{
                 src: `long/source/path`,
                 dest: `long/dest/path`
             }])).to.eql([{
@@ -1923,7 +1923,7 @@ describe('index', () => {
         });
 
         it('works for simple strings', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 'manifest',
                 'source/main.brs'
             ])).to.eql([
@@ -1933,7 +1933,7 @@ describe('index', () => {
         });
 
         it('works for negated strings', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 '!.git'
             ])).to.eql([
                 '!.git'
@@ -1941,7 +1941,7 @@ describe('index', () => {
         });
 
         it('skips falsey and bogus entries', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 '',
                 'manifest',
                 <any>false,
@@ -1953,7 +1953,7 @@ describe('index', () => {
         });
 
         it('works for {src:string} objects', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 {
                     src: 'manifest'
                 }
@@ -1964,7 +1964,7 @@ describe('index', () => {
         });
 
         it('works for {src:string[]} objects', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 {
                     src: [
                         'manifest',
@@ -1981,7 +1981,7 @@ describe('index', () => {
         });
 
         it('retains dest option', () => {
-            expect(rokuDeploy['normalizeFilesArray']([
+            expect(util['normalizeFilesArray']([
                 {
                     src: 'source/config.dev.brs',
                     dest: 'source/config.brs'
@@ -1993,14 +1993,14 @@ describe('index', () => {
         });
 
         it('throws when encountering invalid entries', () => {
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[true])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[/asdf/])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[new Date()])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[1])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: true }])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: /asdf/ }])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: new Date() }])).to.throw();
-            expect(() => rokuDeploy['normalizeFilesArray'](<any>[{ src: 1 }])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[true])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[/asdf/])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[new Date()])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[1])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[{ src: true }])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[{ src: /asdf/ }])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[{ src: new Date() }])).to.throw();
+            expect(() => util['normalizeFilesArray'](<any>[{ src: 1 }])).to.throw();
         });
     });
 

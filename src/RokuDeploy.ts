@@ -69,7 +69,7 @@ export class RokuDeploy {
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zip(options: ZipPackageOptions) {
+    public async zip(options: ZipOptions) {
         options = this.getOptions(options) as any;
 
         //make sure the output folder exists
@@ -708,8 +708,8 @@ export class RokuDeploy {
         this.logger.logLevel = finalOptions.logLevel; //TODO: Handle logging differently
 
         //fully resolve the folder paths
-        finalOptions.rootDir = path.resolve(options.cwd, finalOptions.rootDir);
-        finalOptions.outDir = path.resolve(options.cwd, finalOptions.outDir);
+        finalOptions.rootDir = path.resolve(finalOptions.cwd, finalOptions.rootDir);
+        finalOptions.outDir = path.resolve(finalOptions.cwd, finalOptions.outDir);
 
         //stagingDir
         if (options.stagingDir) {
@@ -1003,7 +1003,7 @@ export interface StageOptions {
     retainStagingDir?: boolean;
 }
 
-export interface ZipPackageOptions {
+export interface ZipOptions {
     stagingDir?: string;
     outDir?: string;
 }

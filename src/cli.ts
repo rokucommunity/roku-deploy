@@ -10,8 +10,6 @@ import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
-import { GetOutputZipFilePathCommand } from './commands/GetOutputZipFilePathCommand';
-import { GetOutputPkgFilePathCommand } from './commands/GetOutputPkgFilePathCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
 import { ZipCommand } from './commands/ZipCommand';
@@ -172,23 +170,6 @@ void yargs
         return new TakeScreenshotCommand().run(args);
     })
 
-    .command('getOutputZipFilePath', 'Centralizes getting output zip file path based on passed in options', (builder) => {
-        return builder
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
-        return builder;
-    }, (args: any) => {
-        return new GetOutputZipFilePathCommand().run(args);
-    })
-
-    .command('getOutputPkgFilePath', 'Centralizes getting output pkg file path based on passed in options', (builder) => {
-        return builder
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
-    }, (args: any) => {
-        return new GetOutputPkgFilePathCommand().run(args);
-    })
-
     .command(['getDeviceInfo', 'deviceinfo'], 'Get the `device-info` response from a Roku device', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false });
@@ -203,13 +184,13 @@ void yargs
         return new GetDevIdCommand().run(args);
     })
 
-    .command('zipFolder', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
+    .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
         return builder
-            .option('srcFolder', { type: 'string', description: 'The folder that should be zipped', demandOption: false })
-            .option('zipFilePath', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false });
+            .option('stagingDir', { type: 'string', description: 'The folder that should be zipped', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false });
     }, (args: any) => {
         console.log('args', args);
-        return new ZipFolderCommand().run(args);
+        return new ZipCommand().run(args);
     })
 
     .argv;

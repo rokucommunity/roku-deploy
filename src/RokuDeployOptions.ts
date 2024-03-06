@@ -2,6 +2,11 @@ import type { LogLevel } from './Logger';
 
 export interface RokuDeployOptions {
     /**
+     * The working directory where the command should be executed
+     */
+    cwd?: string;
+
+    /**
      * Path to a bsconfig.json project file
      */
     project?: string;
