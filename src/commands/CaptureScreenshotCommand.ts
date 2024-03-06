@@ -1,6 +1,6 @@
 import { rokuDeploy, util } from '../index';
 
-export class TakeScreenshotCommand {
+export class CaptureScreenshotCommand {
     async run(args) {
         let options = {
             ...util.getOptionsFromJson(args),

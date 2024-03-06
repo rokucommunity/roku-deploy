@@ -10,7 +10,7 @@ import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
-import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
+import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
 
@@ -185,7 +185,7 @@ describe('cli', () => {
             return Promise.resolve('');
         });
 
-        const command = new TakeScreenshotCommand();
+        const command = new CaptureScreenshotCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536'

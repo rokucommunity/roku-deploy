@@ -2016,7 +2016,7 @@ describe('index', () => {
         });
     });
 
-    describe('takeScreenshot', () => {
+    describe('captureScreenshot', () => {
         let onHandler: any;
         let screenshotAddress: any;
 

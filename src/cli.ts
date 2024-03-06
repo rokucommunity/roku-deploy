@@ -9,7 +9,7 @@ import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
-import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
+import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
 import { ZipCommand } from './commands/ZipCommand';
@@ -167,7 +167,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
     }, (args: any) => {
-        return new TakeScreenshotCommand().run(args);
+        return new CaptureScreenshotCommand().run(args);
     })
 
     .command(['getDeviceInfo', 'deviceinfo'], 'Get the `device-info` response from a Roku device', (builder) => {

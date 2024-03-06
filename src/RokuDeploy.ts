@@ -614,7 +614,7 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async captureScreenshot(options: TakeScreenshotOptions) {
+    public async captureScreenshot(options: CaptureScreenshotOptions) {
         options = this.getOptions(options);
         options.screenshotFile = options.screenshotFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
@@ -916,7 +916,7 @@ export interface HttpResponse {
     body: any;
 }
 
-export interface TakeScreenshotOptions {
+export interface CaptureScreenshotOptions {
     /**
      * The IP address or hostname of the target Roku device.
      * @example '192.168.1.21'
