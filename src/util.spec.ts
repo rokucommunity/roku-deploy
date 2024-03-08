@@ -110,10 +110,10 @@ describe('util', () => {
     });
 
     describe('globAllByIndex', () => {
-        function writeFiles(filePaths: string[], cwd = tempDir) {
+        function writeFiles(filePaths: string[], dir = tempDir) {
             for (const filePath of filePaths) {
                 fsExtra.outputFileSync(
-                    path.resolve(cwd, filePath),
+                    path.resolve(dir, filePath),
                     ''
                 );
             }
@@ -477,6 +477,58 @@ describe('util', () => {
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             }
 
+        });
+
+        it('catches invalid json with jsonc parser', () => {
+            fsExtra.writeJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "rootDir": "src"
+            `);
+            let ex;
+            try {
+                util.getOptionsFromJson();
+            } catch (e) {
+                console.log(e);
+                ex = e;
+            }
+            expect(ex).to.exist;
+            expect(ex.message.startsWith('Error parsing')).to.be.true;
+            fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
+        });
+
+        it('works when loading stagingDir from rokudeploy.json', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return true;
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "stagingDir": "./staging-dir"
+                }
+            `);
+            let options = util.getOptionsFromJson();
+            expect(options.stagingDir.endsWith('staging-dir')).to.be.true;
+        });
+
+        it('supports jsonc for rokudeploy.json', () => {
+            fsExtra.writeFileSync(s`${tempDir}/rokudeploy.json`, `
+                //leading comment
+                {
+                    //inner comment
+                    "rootDir": "src" //trailing comment
+                }
+                //trailing comment
+            `);
+            let options = util.getOptionsFromJson({ cwd: tempDir });
+            expect(options.rootDir).to.equal('src');
+        });
+    });
+
+    describe('computeFileDestPath', () => {
+        it('treats {src;dest} without dest as a top-level string', () => {
+            expect(
+                util['computeFileDestPath'](s`${rootDir}/source/main.brs`, { src: s`source/main.brs` } as any, rootDir)
+            ).to.eql(s`source/main.brs`);
         });
     });
 });

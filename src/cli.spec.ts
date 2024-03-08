@@ -2,7 +2,6 @@ import * as childProcess from 'child_process';
 import { cwd, expectPathExists, rootDir, stagingDir, tempDir, outDir } from './testUtils.spec';
 import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
-import * as path from 'path';
 import { createSandbox } from 'sinon';
 import { rokuDeploy } from './index';
 import { PublishCommand } from './commands/PublishCommand';
@@ -199,18 +198,6 @@ describe('cli', () => {
         });
     });
 
-    it('Gets output zip file path', () => {
-        let zipFilePath = execSync(`node ${cwd}/dist/cli.js getOutputZipFilePath --outFile "roku-deploy" --outDir ${outDir}`).toString();
-
-        expect(zipFilePath.trim()).to.equal(path.join(path.resolve(outDir), 'roku-deploy.zip'));
-    });
-
-    it('Gets output pkg file path', () => {
-        let pkgFilePath = execSync(`node ${cwd}/dist/cli.js getOutputPkgFilePath --outFile "roku-deploy" --outDir ${outDir}`).toString();
-
-        expect(pkgFilePath.trim()).to.equal(path.join(path.resolve(outDir), 'roku-deploy.pkg'));
-    });
-
     it('Device info arguments are correct', async () => {
         const stub = sinon.stub(rokuDeploy, 'getDeviceInfo').callsFake(async () => {
             return Promise.resolve({
@@ -271,12 +258,13 @@ describe('cli', () => {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
-            host: '1.2.3.4'
+            host: '1.2.3.4',
+            password: '5536'
         });
     });
 
     it('Zips a folder', () => {
-        execSync(`node ${cwd}/dist/cli.js zipFolder --srcFolder ${rootDir} --zipFilePath "roku-deploy.zip"`);
+        execSync(`node ${cwd}/dist/cli.js zip --srcFolder ${rootDir} --zipFilePath "roku-deploy.zip"`);
 
         expectPathExists(`${tempDir}/roku-deploy.zip`);
     });

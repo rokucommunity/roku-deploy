@@ -9,7 +9,8 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
-import { ParseError, parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
+import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
+import type { ParseError } from 'jsonc-parser';
 
 export class Util {
     /**

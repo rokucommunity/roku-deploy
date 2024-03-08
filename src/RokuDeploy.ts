@@ -36,7 +36,6 @@ export class RokuDeploy {
 
         //make sure the staging folder exists
         await fsExtra.ensureDir(options.stagingDir);
-        // await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
 
         if (!options.stagingDir) {
             throw new Error('stagingPath is required');
@@ -186,7 +185,7 @@ export class RokuDeploy {
     public async keyPress(options: KeyPressOptions) {
         return this.sendKeyEvent({
             ...options,
-            key: 'all.the.others',
+            key: options.key,
             action: 'keypress'
         });
     }
@@ -445,11 +444,11 @@ export class RokuDeploy {
         let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         if (pkgSearchMatches) {
             const url = pkgSearchMatches[1];
-            options = this.getOptions(options) as any;
             let requestOptions2 = this.generateBaseRequestOptions(url, options);
 
             let pkgFilePath = this.getOutputPkgFilePath(options as any);
-            return this.getToFile(requestOptions2, pkgFilePath);
+            await this.downloadFile(requestOptions2, pkgFilePath);
+            return pkgFilePath;
         }
 
         throw new errors.UnknownDeviceResponseError('Unknown error signing package', results);
@@ -633,7 +632,7 @@ export class RokuDeploy {
 
         if (imageUrlOnDevice) {
             saveFilePath = util.standardizePath(path.join(options.screenshotDir, options.screenshotFile + imageExt));
-            await this.getToFile(
+            await this.downloadFile(
                 this.generateBaseRequestOptions(imageUrlOnDevice, options),
                 saveFilePath
             );
@@ -643,7 +642,7 @@ export class RokuDeploy {
         return saveFilePath;
     }
 
-    private async getToFile(requestParams: any, filePath: string) {
+    private async downloadFile(requestParams: any, filePath: string) {
         let writeStream: WriteStream;
         await fsExtra.ensureFile(filePath);
         return new Promise<string>((resolve, reject) => {
@@ -683,11 +682,11 @@ export class RokuDeploy {
      * @param options
      */
     public getOptions<T = RokuDeployOptions>(options: T & RokuDeployOptions = {} as any): RokuDeployOptions & T {
-        let defaultOptions = <RokuDeployOptions>{
+        // Fill in default options for any missing values
+        options = {
             cwd: process.cwd(),
             outDir: './out',
             outFile: 'roku-deploy',
-            stagingDir: `./out/.roku-deploy-staging`,
             retainDeploymentArchive: true,
             incrementBuildNumber: false,
             failOnCompileError: true,
@@ -699,29 +698,26 @@ export class RokuDeploy {
             files: [...DefaultFiles],
             username: 'rokudev',
             logLevel: LogLevel.log,
-            screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/')
+            screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/'),
+            ...options
         };
-
-        // Fill in default options for any missing values
-        let finalOptions = { ...defaultOptions, ...options };
-        finalOptions.cwd ??= process.cwd();
-        this.logger.logLevel = finalOptions.logLevel; //TODO: Handle logging differently
+        this.logger.logLevel = options.logLevel; //TODO: Handle logging differently
 
         //fully resolve the folder paths
-        finalOptions.rootDir = path.resolve(finalOptions.cwd, finalOptions.rootDir);
-        finalOptions.outDir = path.resolve(finalOptions.cwd, finalOptions.outDir);
+        options.rootDir = path.resolve(options.cwd, options.rootDir);
+        options.outDir = path.resolve(options.cwd, options.outDir);
 
         //stagingDir
         if (options.stagingDir) {
-            finalOptions.stagingDir = path.resolve(options.cwd, options.stagingDir);
+            options.stagingDir = path.resolve(options.cwd, options.stagingDir);
         } else {
-            finalOptions.stagingDir = path.resolve(
+            options.stagingDir = path.resolve(
                 options.cwd,
-                util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
+                util.standardizePath(`${options.outDir}/.roku-deploy-staging`)
             );
         }
 
-        return finalOptions;
+        return options;
     }
 
     /**
@@ -1047,6 +1043,7 @@ export interface CreateSignedPackageOptions {
     password: string;
     signingPassword: string;
     stagingDir?: string;
+    outDir?: string;
     /**
      * If specified, signing will fail if the device's devId is different than this value
      */
