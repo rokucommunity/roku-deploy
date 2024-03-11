@@ -22,40 +22,67 @@ void yargs
 
     .command('bundle', 'execute build actions for bundling app', (builder) => {
         return builder
-            .option('configPath', { type: 'string', description: 'The path to the config file', demandOption: false });
+            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'stage|zip',
-            args.configPath
+            args
         ).run();
     })
 
     .command('deploy', 'execute build actions for deploying app', (builder) => {
         return builder
-            .option('configPath', { type: 'string', description: 'The path to the config file', demandOption: false });
+            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
+            .option('outDir', { type: 'number', description: 'The output directory', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
+            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
+            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'stage|zip|delete|close|sideload',
-            args.configPath
+            args
         ).run();
     })
 
     .command('package', 'execute build actions for packaging app', (builder) => {
         return builder
-            .option('configPath', { type: 'string', description: 'The path to the config file', demandOption: false });
+            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
+            .option('outDir', { type: 'number', description: 'The output directory', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
+            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
+            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
+            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'close|rekey|stage|zip|delete|close|sideload|squash|sign',
-            args.configPath
+            args
         ).run();
     })
 
-    .command('exec', 'larger command for handling a series of smaller commands', (builder) => {
-        return builder
-            .option('actions', { type: 'string', description: 'The actions to be executed, separated by |', demandOption: true })
-            .option('configPath', { type: 'string', description: 'The path to the config file', demandOption: false });
+    .command('exec', 'larger command for handling a series of smaller commands', () => {
+        return attachCommonArgs;
     }, (args: any) => {
-        return new ExecCommand(args.actions, args.configPath).run();
+        return new ExecCommand(args.actions, args).run();
     })
 
     .command('keypress', 'send keypress command', (builder) => {
@@ -95,7 +122,7 @@ void yargs
             .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
-        return new SendTextCommand().run(args); //TODO: Add default options
+        return new SendTextCommand().run(args);
     })
 
     .command(['stage', 'prepublishToStaging'], 'Copies all of the referenced files to the staging folder', (builder) => {
@@ -144,7 +171,7 @@ void yargs
         return new RekeyDeviceCommand().run(args);
     })
 
-    .command('createSignedPackage', 'Sign a package', (builder) => {
+    .command(['createSignedPackage', 'sign'], 'Sign a package', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
@@ -194,3 +221,23 @@ void yargs
     })
 
     .argv;
+
+function attachCommonArgs(build: yargs.Argv<RokuDeploy>) {
+    return build
+        .option('actions', { type: 'string', description: 'The actions to be executed, separated by |', demandOption: true })
+        .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+        .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+        .option('outDir', { type: 'string', description: 'The output directory', demandOption: false }) //TODO finish this. Are all of these necessary?
+        .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+        .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
+        .option('retainedStagingDir', { type: 'boolean', description: 'Should the staging folder be retained after the command is complete', demandOption: false })
+        .option('incrementBuildNumber', { type: 'boolean', description: 'Should the build number be incremented', demandOption: false })
+        .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+        .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+        .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })
+        .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
+        .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
+        .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
+        .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
+        .option('username', { type: 'string', description: 'The username for the Roku', demandOption: false });
+}

@@ -264,8 +264,8 @@ describe('cli', () => {
     });
 
     it('Zips a folder', () => {
-        execSync(`node ${cwd}/dist/cli.js zip --srcFolder ${rootDir} --zipFilePath "roku-deploy.zip"`);
+        execSync(`node ${cwd}/dist/cli.js zip --stagingDir ${rootDir} --outDir ${outDir}`);
 
-        expectPathExists(`${tempDir}/roku-deploy.zip`);
+        expectPathExists(`${outDir}/roku-deploy.zip`);
     });
 });
