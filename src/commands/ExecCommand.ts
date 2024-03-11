@@ -30,7 +30,6 @@ export class ExecCommand {
         }
 
         if (this.actions.includes('delete')) {
-            // defaults -> config -> cli options
             await rokuDeploy.deleteDevChannel(this.options as DeleteDevChannelOptions);
         }
 
