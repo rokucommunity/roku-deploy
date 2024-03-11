@@ -452,12 +452,8 @@ describe('util', () => {
     });
 
     describe('getOptionsFromJson', () => {
-        beforeEach(() => {
-            fsExtra.ensureDirSync(rootDir);
-            process.chdir(rootDir);
-        });
         it('should fill in options from rokudeploy.json', () => {
-            fsExtra.writeJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
+            fsExtra.outputJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
             expect(
                 util.getOptionsFromJson({ cwd: rootDir })
             ).to.eql({
@@ -467,7 +463,7 @@ describe('util', () => {
 
         it(`loads cwd from process`, () => {
             try {
-                fsExtra.writeJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+                fsExtra.outputJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
                 expect(
                     util.getOptionsFromJson()
                 ).to.eql({
@@ -476,7 +472,6 @@ describe('util', () => {
             } finally {
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             }
-
         });
 
         it('catches invalid json with jsonc parser', () => {
