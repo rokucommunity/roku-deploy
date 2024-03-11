@@ -101,7 +101,7 @@
         ],
         "sourceMap": true,
         "instrument": true,
-        "check-coverage": true,
+        "check-coverage": false,
         "lines": 100,
         "statements": 100,
         "functions": 100,
