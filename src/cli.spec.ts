@@ -4,7 +4,7 @@ import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import { rokuDeploy } from './index';
-import { PublishCommand } from './commands/PublishCommand';
+import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
@@ -73,7 +73,7 @@ describe('cli', () => {
             });
         });
 
-        const command = new PublishCommand();
+        const command = new SideloadCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536',

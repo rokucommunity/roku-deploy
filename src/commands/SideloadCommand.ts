@@ -1,6 +1,6 @@
 import { rokuDeploy, util } from '../index';
 
-export class PublishCommand {
+export class SideloadCommand {
     async run(args) {
         let options = {
             ...util.getOptionsFromJson(args),

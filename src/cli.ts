@@ -4,7 +4,7 @@ import { ExecCommand } from './commands/ExecCommand';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { PrepublishCommand } from './commands/PrepublishCommand';
 import { ZipPackageCommand } from './commands/ZipPackageCommand';
-import { PublishCommand } from './commands/PublishCommand';
+import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
@@ -141,14 +141,14 @@ void yargs
         return new ZipPackageCommand().run(args);
     })
 
-    .command('publish', 'Publish a pre-existing packaged zip file to a remote Roku', (builder) => {
+    .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
     }, (args: any) => {
-        return new PublishCommand().run(args);
+        return new SideloadCommand().run(args);
     })
 
     .command(['squash', 'convertToSquashfs'], 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {

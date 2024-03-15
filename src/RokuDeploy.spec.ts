@@ -801,7 +801,7 @@ describe('index', () => {
                     outFile: 'fileThatDoesNotExist.zip',
                     deleteDevChannel: false
                 });
-            }, `Cannot publish because file does not exist at '${rokuDeploy['getOutputZipFilePath']({
+            }, `Cannot sideload because file does not exist at '${rokuDeploy['getOutputZipFilePath']({
                 outFile: 'fileThatDoesNotExist.zip',
                 outDir: outDir
             })}'`);

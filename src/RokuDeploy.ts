@@ -267,7 +267,7 @@ export class RokuDeploy {
         let readStream: ReadStream;
         try {
             if ((await fsExtra.pathExists(zipFilePath)) === false) {
-                throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
+                throw new Error(`Cannot sideload because file does not exist at '${zipFilePath}'`);
             }
             readStream = fsExtra.createReadStream(zipFilePath);
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
