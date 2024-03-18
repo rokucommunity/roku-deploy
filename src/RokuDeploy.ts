@@ -423,8 +423,11 @@ export class RokuDeploy {
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
         //prevent devId mismatch (if devId is specified)
-        if (options.devId && options.devId !== await this.getDevId()) {
-            throw new Error('devId mismatch. nope, not gonna sign');
+        if (options.devId) {
+            const deviceDevId = await this.getDevId();
+            if (options.devId !== deviceDevId) {
+                throw new Error(`Package signing cancelled: provided devId '${options.devId}' does not match on-device devId '${deviceDevId}'`);
+            }
         }
 
         let requestOptions = this.generateBaseRequestOptions('plugin_package', options as any, {

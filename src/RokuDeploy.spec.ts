@@ -1377,6 +1377,24 @@ describe('index', () => {
                 'Unknown error signing package'
             );
         });
+
+        it('should return our fallback error if neither error or package link was detected', async () => {
+            mockDoGetRequest(`
+                <device-info>
+                    <keyed-developer-id>789</keyed-developer-id>
+                </device-info>
+                `);
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    stagingDir: stagingDir,
+                    devId: '123'
+                }),
+                `Package signing cancelled: provided devId '123' does not match on-device devId '789'`
+            );
+        });
     });
 
     describe('prepublishToStaging', () => {
