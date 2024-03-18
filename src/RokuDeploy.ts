@@ -828,6 +828,7 @@ export class RokuDeploy {
     }
 
     /**
+     * Get the developer ID from the device-info response
      * @param options
      * @returns
      */
