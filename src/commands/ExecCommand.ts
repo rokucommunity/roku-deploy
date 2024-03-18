@@ -30,7 +30,11 @@ export class ExecCommand {
         }
 
         if (this.actions.includes('delete')) {
-            await rokuDeploy.deleteDevChannel(this.options as DeleteDevChannelOptions);
+            try {
+                await rokuDeploy.deleteDevChannel(this.options as DeleteDevChannelOptions);
+            } catch (e) {
+                // note we don't report the error; as we don't actually care that we could not delete - it's just useless noise to log it.
+            }
         }
 
         if (this.actions.includes('close')) {

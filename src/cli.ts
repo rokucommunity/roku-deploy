@@ -16,7 +16,6 @@ import { ZipCommand } from './commands/ZipCommand';
 import { KeyPressCommand } from './commands/KeyPressCommand';
 import { KeyUpCommand } from './commands/KeyUpCommand';
 import { KeyDownCommand } from './commands/KeyDownCommand';
-import type { RokuDeploy } from './RokuDeploy';
 
 void yargs
 
@@ -49,7 +48,7 @@ void yargs
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
-            'stage|zip|delete|close|sideload',
+            'stage|zip|close|sideload',
             args
         ).run();
     })
@@ -74,7 +73,7 @@ void yargs
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
-            'close|rekey|stage|zip|delete|close|sideload|squash|sign',
+            'close|rekey|stage|zip|close|sideload|squash|sign',
             args
         ).run();
     })

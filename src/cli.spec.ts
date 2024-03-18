@@ -12,6 +12,7 @@ import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
+import { ExecCommand } from './commands/ExecCommand';
 
 const sinon = createSandbox();
 
@@ -268,4 +269,80 @@ describe('cli', () => {
 
         expectPathExists(`${outDir}/roku-deploy.zip`);
     });
+
+    it('does the whole migration', async () => {
+        const mock = mockDoPostRequest();
+
+        const args = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir
+        };
+        await new ExecCommand('stage|zip|close|sideload', args).run();
+
+        expect(mock.getCall(2).args[0].url).to.equal('http://1.2.3.4:80/plugin_install');
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
+    it('continues with deploy if deleteDevChannel fails', async () => {
+        sinon.stub(rokuDeploy, 'deleteDevChannel').returns(
+            Promise.reject(
+                new Error('failed')
+            )
+        );
+        const mock = mockDoPostRequest();
+        const args = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir
+        };
+        await new ExecCommand('stage|zip|close|sideload', args).run();
+        expect(mock.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/home');
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
+    it.only('should delete installed channel if requested', async () => {
+        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
+        mockDoPostRequest();
+        const args = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir,
+            deleteDevChannel: true
+        };
+
+        await new ExecCommand('stage|zip|close|sideload', args).run();
+        expect(spy.called).to.equal(true);
+    });
+
+    it.only('should not delete installed channel if not requested', async () => {
+        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
+        mockDoPostRequest();
+
+        const args = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir,
+            deleteDevChannel: false
+        };
+
+        await new ExecCommand('stage|zip|close|sideload', args).run();
+        expect(spy.notCalled).to.equal(true);
+    });
+
+    function mockDoPostRequest(body = '', statusCode = 200) {
+        return sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+            let results = { response: { statusCode: statusCode }, body: body };
+            rokuDeploy['checkRequest'](results);
+            return Promise.resolve(results);
+        });
+    }
 });
