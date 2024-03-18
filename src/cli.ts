@@ -78,8 +78,29 @@ void yargs
         ).run();
     })
 
-    .command('exec', 'larger command for handling a series of smaller commands', () => {
-        return attachCommonArgs;
+    .command('exec', 'larger command for handling a series of smaller commands', (builder) => {
+        return builder
+            .option('actions', { type: 'string', description: 'The actions to be executed, separated by |', demandOption: true })
+            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false }) //TODO finish this. Are all of these necessary?
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
+            .option('retainedStagingDir', { type: 'boolean', description: 'Should the staging folder be retained after the command is complete', demandOption: false })
+            .option('incrementBuildNumber', { type: 'boolean', description: 'Should the build number be incremented', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
+            .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
+            .option('username', { type: 'string', description: 'The username for the Roku', demandOption: false })
+            .usage(`Usage: npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`)
+            .example(
+                `npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`,
+                'Stages the contents of rootDir and then zips the staged files into outDir - Will fail if there is no manifest in the staging folder'
+            );
     }, (args: any) => {
         return new ExecCommand(args.actions, args).run();
     })
@@ -220,23 +241,3 @@ void yargs
     })
 
     .argv;
-
-function attachCommonArgs(build: yargs.Argv<RokuDeploy>) {
-    return build
-        .option('actions', { type: 'string', description: 'The actions to be executed, separated by |', demandOption: true })
-        .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-        .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-        .option('outDir', { type: 'string', description: 'The output directory', demandOption: false }) //TODO finish this. Are all of these necessary?
-        .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-        .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
-        .option('retainedStagingDir', { type: 'boolean', description: 'Should the staging folder be retained after the command is complete', demandOption: false })
-        .option('incrementBuildNumber', { type: 'boolean', description: 'Should the build number be incremented', demandOption: false })
-        .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
-        .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
-        .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })
-        .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
-        .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
-        .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
-        .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
-        .option('username', { type: 'string', description: 'The username for the Roku', demandOption: false });
-}
