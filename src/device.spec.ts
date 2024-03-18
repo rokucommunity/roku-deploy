@@ -1,26 +1,14 @@
 import * as fsExtra from 'fs-extra';
-import type { RokuDeployOptions } from './index';
-import { rokuDeploy } from './index';
-import { cwd, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
+import { cwd, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import * as dedent from 'dedent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
-    let options: RokuDeployOptions;
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
         process.chdir(rootDir);
-        options = rokuDeploy.getOptions({
-            outDir: outDir,
-            host: '192.168.1.32',
-            retainDeploymentArchive: true,
-            password: 'aaaa',
-            devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
-            rekeySignedPackage: `${cwd}/testSignedPackage.pkg`,
-            signingPassword: 'drRCEVWP/++K5TYnTtuAfQ=='
-        });
 
         writeFiles(rootDir, [
             ['manifest', dedent`
@@ -61,5 +49,4 @@ describe('device', function device() {
     });
 
     this.timeout(20000);
-    console.log(options); // So there are no errors about unused variable
 });
