@@ -1535,7 +1535,6 @@ describe('index', () => {
                     'manifest',
                     'components/!(scenes)/**/*'
                 ],
-                retainStagingDir: true,
                 rootDir: rootDir,
                 stagingDir: stagingDir
             });
@@ -1557,7 +1556,6 @@ describe('index', () => {
                     'components/**/*',
                     '!components/scenes/**/*'
                 ],
-                retainStagingDir: true,
                 rootDir: rootDir,
                 stagingDir: stagingDir
             });
@@ -1572,7 +1570,6 @@ describe('index', () => {
                         'manifest',
                         <any>{}
                     ],
-                    retainStagingDir: true,
                     rootDir: rootDir,
                     stagingDir: stagingDir
                 });
@@ -2235,50 +2232,6 @@ describe('index', () => {
             });
         });
 
-        it('allows modification of file contents with callback', async () => {
-            writeFiles(rootDir, [
-                'components/components/Loader/Loader.brs',
-                'images/splash_hd.jpg',
-                'source/main.brs',
-                'manifest'
-            ]);
-            const stageFolder = path.join(tempDir, 'testProject');
-            fsExtra.ensureDirSync(stageFolder);
-            const files = [
-                'components/components/Loader/Loader.brs',
-                'images/splash_hd.jpg',
-                'source/main.brs',
-                'manifest'
-            ];
-            for (const file of files) {
-                fsExtra.copySync(path.join(options.rootDir, file), path.join(stageFolder, file));
-            }
-
-            const outputZipPath = path.join(tempDir, 'output.zip');
-            const addedManifestLine = 'bs_libs_required=roku_ads_lib';
-            await rokuDeploy['makeZip'](stageFolder, outputZipPath, (file, data) => {
-                if (file.dest === 'manifest') {
-                    let manifestContents = data.toString();
-                    manifestContents += addedManifestLine;
-                    data = Buffer.from(manifestContents, 'utf8');
-                }
-                return data;
-            });
-
-            const data = fsExtra.readFileSync(outputZipPath);
-            const zip = await JSZip.loadAsync(data);
-            for (const file of files) {
-                const zipFileContents = await zip.file(file.toString()).async('string');
-                const sourcePath = path.join(options.rootDir, file);
-                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
-                if (file === 'manifest') {
-                    expect(zipFileContents).to.contain(addedManifestLine);
-                } else {
-                    expect(zipFileContents).to.equal(incomingContents);
-                }
-            }
-        });
-
         it('filters the folders before making the zip', async () => {
             const files = [
                 'components/MainScene.brs',
@@ -2291,7 +2244,7 @@ describe('index', () => {
             writeFiles(stagingDir, files);
 
             const outputZipPath = path.join(tempDir, 'output.zip');
-            await rokuDeploy['makeZip'](stagingDir, outputZipPath, null, ['**/*', '!**/*.map']);
+            await rokuDeploy['makeZip'](stagingDir, outputZipPath, ['**/*', '!**/*.map']);
 
             const data = fsExtra.readFileSync(outputZipPath);
             const zip = await JSZip.loadAsync(data);
@@ -2306,6 +2259,64 @@ describe('index', () => {
                     ...files
                 ].sort().filter(x => !x.endsWith('.map'))
             );
+        });
+
+        it('should create zip in proper directory', async () => {
+            const outputZipPath = path.join(outDir, 'output.zip');
+            await rokuDeploy['makeZip'](rootDir, outputZipPath, ['**/*', '!**/*.map']);
+            expectPathExists(rokuDeploy['getOutputZipFilePath']({ outDir: outDir, outFile: 'output.zip' }));
+        });
+
+        it('should only include the specified files', async () => {
+            await rokuDeploy.stage({
+                files: [
+                    'manifest'
+                ],
+                stagingDir: stagingDir,
+                rootDir: rootDir
+            });
+
+            await rokuDeploy.zip({
+                stagingDir: stagingDir,
+                outDir: outDir
+            });
+            const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
+            const zip = await JSZip.loadAsync(data);
+
+            const files = ['manifest'];
+            for (const file of files) {
+                const zipFileContents = await zip.file(file.toString()).async('string');
+                const sourcePath = path.join(options.rootDir, file);
+                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
+                expect(zipFileContents).to.equal(incomingContents);
+            }
+        });
+
+        it('generates full package with defaults', async () => {
+            const filePaths = writeFiles(rootDir, [
+                'components/components/Loader/Loader.brs',
+                'images/splash_hd.jpg',
+                'source/main.brs',
+                'manifest'
+            ]);
+            options = {
+                files: filePaths,
+                stagingDir: stagingDir,
+                outDir: outDir,
+                rootDir: rootDir
+            };
+            await rokuDeploy.stage(options);
+            await rokuDeploy.zip(options);
+
+            const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
+            const zip = await JSZip.loadAsync(data);
+
+            for (const file of filePaths) {
+                const zipFileContents = await zip.file(file.toString())?.async('string');
+                const sourcePath = path.join(options.rootDir, file);
+                const incomingContents = fsExtra.readFileSync(sourcePath, 'utf8');
+                expect(zipFileContents).to.equal(incomingContents);
+            }
         });
     });
 

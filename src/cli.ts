@@ -87,7 +87,6 @@ void yargs
             .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('retainedStagingDir', { type: 'boolean', description: 'Should the staging folder be retained after the command is complete', demandOption: false })
-            .option('incrementBuildNumber', { type: 'boolean', description: 'Should the build number be incremented', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })

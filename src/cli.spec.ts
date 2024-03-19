@@ -305,7 +305,7 @@ describe('cli', () => {
         expectPathExists(`${outDir}/roku-deploy.zip`);
     });
 
-    it.only('should delete installed channel if requested', async () => {
+    it('should delete installed channel if requested', async () => {
         const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
         mockDoPostRequest();
         const args = {
@@ -321,7 +321,7 @@ describe('cli', () => {
         expect(spy.called).to.equal(true);
     });
 
-    it.only('should not delete installed channel if not requested', async () => {
+    it('should not delete installed channel if not requested', async () => {
         const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
         mockDoPostRequest();
 

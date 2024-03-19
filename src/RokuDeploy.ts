@@ -89,10 +89,9 @@ export class RokuDeploy {
      * Given a path to a folder, zip up that folder and all of its contents
      * @param srcFolder the folder that should be zipped
      * @param zipFilePath the path to the zip that will be created
-     * @param preZipCallback a function to call right before every file gets added to the zip
      * @param files a files array used to filter the files from `srcFolder`
      */
-    private async makeZip(srcFolder: string, zipFilePath: string, preFileZipCallback?: (file: StandardizedFileEntry, data: Buffer) => Buffer, files: FileEntry[] = ['**/*']) {
+    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
         const filePaths = await this.getFilePaths(files, srcFolder);
 
         const zip = new JSZip();
@@ -100,10 +99,6 @@ export class RokuDeploy {
         const promises = [];
         for (const file of filePaths) {
             const promise = fsExtra.readFile(file.src).then((data) => {
-                if (preFileZipCallback) {
-                    data = preFileZipCallback(file, data);
-                }
-
                 const ext = path.extname(file.dest).toLowerCase();
                 let compression = 'DEFLATE';
 
@@ -691,7 +686,6 @@ export class RokuDeploy {
             outDir: './out',
             outFile: 'roku-deploy',
             retainDeploymentArchive: true,
-            incrementBuildNumber: false,
             failOnCompileError: true,
             deleteDevChannel: true,
             packagePort: 80,
@@ -870,17 +864,6 @@ export interface ManifestData {
     lineCount?: number;
 }
 
-export interface BeforeZipCallbackInfo {
-    /**
-     * Contains an associative array of the parsed values in the manifest
-     */
-    manifestData: ManifestData;
-    /**
-     * The directory where the files were staged
-     */
-    stagingDir: string;
-}
-
 export interface StandardizedFileEntry {
     /**
      * The full path to the source file
@@ -1000,7 +983,6 @@ export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
     stagingDir?: string;
-    retainStagingDir?: boolean;
 }
 
 export interface ZipOptions {

@@ -43,12 +43,6 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
 
     /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @default false
-     */
-    retainStagingDir?: boolean;
-
-    /**
      * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
      * @default true
      */
@@ -124,11 +118,6 @@ export interface RokuDeployOptions {
      * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
      */
     devId?: string;
-
-    /**
-     * If true we increment the build number to be a timestamp in the format yymmddHHMM
-     */
-    incrementBuildNumber?: boolean;
 
     /**
      * If true we convert to squashfs before creating the pkg file
