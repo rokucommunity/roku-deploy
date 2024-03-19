@@ -120,11 +120,6 @@ export interface RokuDeployOptions {
     devId?: string;
 
     /**
-     * If true we convert to squashfs before creating the pkg file
-     */
-    convertToSquashfs?: boolean;
-
-    /**
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;

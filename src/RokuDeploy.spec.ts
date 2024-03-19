@@ -1276,8 +1276,31 @@ describe('index', () => {
     });
 
     describe('createSignedPackage', () => {
+        let onHandler: any;
         beforeEach(() => {
             fsExtra.outputFileSync(`${stagingDir}/manifest`, ``);
+            sinon.stub(fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
+                //do nothing, assume the dir gets created
+            }) as any);
+
+            //intercept the http request
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        process.nextTick(() => {
+                            onHandler(event, callback);
+                        });
+                        return req;
+                    },
+                    pipe: async () => {
+                        //if a write stream gets created, write some stuff and close it
+                        const writeStream = await writeStreamPromise;
+                        writeStream.write('test');
+                        writeStream.close();
+                    }
+                };
+                return req;
+            });
         });
 
         it('should return our error if signingPassword is not supplied', async () => {
@@ -1393,6 +1416,63 @@ describe('index', () => {
                     devId: '123'
                 }),
                 `Package signing cancelled: provided devId '123' does not match on-device devId '789'`
+            );
+        });
+
+        it('returns a pkg file path on success', async () => {
+            //the write stream should return null, which causes a specific branch to be executed
+            createWriteStreamStub.callsFake(() => {
+                return null;
+            });
+
+            // let onHandler: any;
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+
+            let error: Error;
+            try {
+                await rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    stagingDir: stagingDir
+                });
+            } catch (e) {
+                error = e as any;
+            }
+            expect(error.message.startsWith('Unable to create write stream for')).to.be.true;
+        });
+
+        it('throws when error in request is encountered', async () => {
+            onHandler = (event, callback) => {
+                if (event === 'error') {
+                    callback(new Error('Some error'));
+                }
+            };
+
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'aaaa',
+                    signingPassword: options.signingPassword,
+                    stagingDir: stagingDir
+                }),
+                'Some error'
             );
         });
     });
