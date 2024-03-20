@@ -3,9 +3,11 @@ import { util } from '../util';
 
 export class GetDeviceInfoCommand {
     async run(args) {
-        const outputPath = await rokuDeploy.getDeviceInfo({
-            host: args.host
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        const outputPath = await rokuDeploy.getDeviceInfo(options);
         console.log(util.objectToTableString(outputPath));
     }
 }

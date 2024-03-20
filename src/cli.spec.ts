@@ -2,19 +2,17 @@ import * as childProcess from 'child_process';
 import { cwd, expectPathExists, rootDir, stagingDir, tempDir, outDir } from './testUtils.spec';
 import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
-import * as path from 'path';
 import { createSandbox } from 'sinon';
 import { rokuDeploy } from './index';
-import { PublishCommand } from './commands/PublishCommand';
+import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
-import { SignExistingPackageCommand } from './commands/SignExistingPackageCommand';
-import { DeployCommand } from './commands/DeployCommand';
-import { DeleteInstalledChannelCommand } from './commands/DeleteInstalledChannelCommand';
-import { TakeScreenshotCommand } from './commands/TakeScreenshotCommand';
+import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
+import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
+import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
-import { RetrieveSignedPackageCommand } from './commands/RetrieveSignedPackageCommand';
+import { ExecCommand } from './commands/ExecCommand';
 
 const sinon = createSandbox();
 
@@ -39,44 +37,37 @@ describe('cli', () => {
         sinon.restore();
     });
 
-    it('Successfully runs prepublishToStaging', () => {
+    it('Successfully bundles an app', () => {
+        execSync(`node ${cwd}/dist/cli.js bundle --rootDir ${rootDir} --outDir ${outDir}`);
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
+    it('Successfully runs stage', () => {
         //make the files
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
         expect(() => {
-            execSync(`node ${cwd}/dist/cli.js prepublishToStaging --stagingDir ${stagingDir} --rootDir ${rootDir}`);
+            execSync(`node ${cwd}/dist/cli.js stage --stagingDir ${stagingDir} --rootDir ${rootDir}`);
         }).to.not.throw();
     });
 
     it('Successfully copies rootDir folder to staging folder', () => {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
-        execSync(`node ${cwd}/dist/cli.js prepublishToStaging --rootDir ${rootDir} --stagingDir ${stagingDir}`);
+        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --stagingDir ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
-    it('Successfully uses zipPackage to create .zip', () => {
-        fsExtra.outputFileSync(`${stagingDir}/manifest`, '');
-
-        execSync(`node ${cwd}/dist/cli.js zipPackage --stagingDir ${stagingDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
-    it('Successfully uses createPackage to create .pkg', () => {
-        execSync(`node ${cwd}/dist/cli.js createPackage --stagingDir ${stagingDir} --rootDir ${rootDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
     it('Publish passes proper options', async () => {
-        const stub = sinon.stub(rokuDeploy, 'publish').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
                 message: 'Publish successful',
                 results: {}
             });
         });
 
-        const command = new PublishCommand();
+        const command = new SideloadCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536',
@@ -141,11 +132,11 @@ describe('cli', () => {
     });
 
     it('Signs an existing package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'signExistingPackage').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve('');
         });
 
-        const command = new SignExistingPackageCommand();
+        const command = new CreateSignedPackageCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536',
@@ -160,61 +151,15 @@ describe('cli', () => {
             password: '5536',
             signingPassword: undefined,
             stagingDir: stagingDir
-        });
-    });
-
-    it('Retrieves a signed package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'retrieveSignedPackage').callsFake(async () => {
-            return Promise.resolve('');
-        });
-
-        const command = new RetrieveSignedPackageCommand();
-        await command.run({
-            pathToPkg: 'path_to_pkg',
-            host: '1.2.3.4',
-            password: '5536',
-            outFile: 'roku-deploy-test'
-        });
-
-        expect(
-            stub.getCall(0).args
-        ).to.eql(['path_to_pkg', {
-            host: '1.2.3.4',
-            password: '5536',
-            outFile: 'roku-deploy-test'
-        }]);
-    });
-
-    it('Deploys a package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'deploy').callsFake(async () => {
-            return Promise.resolve({
-                message: 'Convert successful',
-                results: {}
-            });
-        });
-
-        const command = new DeployCommand();
-        await command.run({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir
-        });
-
-        expect(
-            stub.getCall(0).args[0]
-        ).to.eql({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir
         });
     });
 
     it('Deletes an installed channel', async () => {
-        const stub = sinon.stub(rokuDeploy, 'deleteInstalledChannel').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
             return Promise.resolve({ response: {}, body: {} });
         });
 
-        const command = new DeleteInstalledChannelCommand();
+        const command = new DeleteDevChannelCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536'
@@ -229,11 +174,11 @@ describe('cli', () => {
     });
 
     it('Takes a screenshot', async () => {
-        const stub = sinon.stub(rokuDeploy, 'takeScreenshot').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
             return Promise.resolve('');
         });
 
-        const command = new TakeScreenshotCommand();
+        const command = new CaptureScreenshotCommand();
         await command.run({
             host: '1.2.3.4',
             password: '5536'
@@ -245,18 +190,6 @@ describe('cli', () => {
             host: '1.2.3.4',
             password: '5536'
         });
-    });
-
-    it('Gets output zip file path', () => {
-        let zipFilePath = execSync(`node ${cwd}/dist/cli.js getOutputZipFilePath --outFile "roku-deploy" --outDir ${outDir}`).toString();
-
-        expect(zipFilePath.trim()).to.equal(path.join(path.resolve(outDir), 'roku-deploy.zip'));
-    });
-
-    it('Gets output pkg file path', () => {
-        let pkgFilePath = execSync(`node ${cwd}/dist/cli.js getOutputPkgFilePath --outFile "roku-deploy" --outDir ${outDir}`).toString();
-
-        expect(pkgFilePath.trim()).to.equal(path.join(path.resolve(outDir), 'roku-deploy.pkg'));
     });
 
     it('Device info arguments are correct', async () => {
@@ -319,13 +252,118 @@ describe('cli', () => {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
-            host: '1.2.3.4'
+            host: '1.2.3.4',
+            password: '5536'
         });
     });
 
     it('Zips a folder', () => {
-        execSync(`node ${cwd}/dist/cli.js zipFolder --srcFolder ${rootDir} --zipFilePath "roku-deploy.zip"`);
+        execSync(`node ${cwd}/dist/cli.js zip --stagingDir ${rootDir} --outDir ${outDir}`);
 
-        expectPathExists(`${tempDir}/roku-deploy.zip`);
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+});
+
+describe('ExecCommand', () => {
+    beforeEach(() => {
+        fsExtra.emptyDirSync(tempDir);
+        //most tests depend on a manifest file existing, so write an empty one
+        fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+        sinon.restore();
+    });
+    afterEach(() => {
+        fsExtra.removeSync(tempDir);
+        sinon.restore();
+    });
+    function mockDoPostRequest(body = '', statusCode = 200) {
+        return sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+            let results = { response: { statusCode: statusCode }, body: body };
+            rokuDeploy['checkRequest'](results);
+            return Promise.resolve(results);
+        });
+    }
+
+    it('does the whole migration', async () => {
+        const mock = mockDoPostRequest();
+
+        const options = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir
+        };
+        await new ExecCommand('stage|zip|close|sideload', options).run();
+
+        expect(mock.getCall(2).args[0].url).to.equal('http://1.2.3.4:80/plugin_install');
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
+    it('continues with deploy if deleteDevChannel fails', async () => {
+        sinon.stub(rokuDeploy, 'deleteDevChannel').returns(
+            Promise.reject(
+                new Error('failed')
+            )
+        );
+        const mock = mockDoPostRequest();
+        const options = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir
+        };
+        await new ExecCommand('stage|zip|close|sideload', options).run();
+        expect(mock.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/home');
+        expectPathExists(`${outDir}/roku-deploy.zip`);
+    });
+
+    it('should delete installed channel if requested', async () => {
+        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
+        mockDoPostRequest();
+        const options = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir,
+            deleteDevChannel: true
+        };
+
+        await new ExecCommand('stage|zip|close|sideload', options).run();
+        expect(spy.called).to.equal(true);
+    });
+
+    it('should not delete installed channel if not requested', async () => {
+        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
+        mockDoPostRequest();
+
+        const options = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir,
+            deleteDevChannel: false
+        };
+
+        await new ExecCommand('stage|zip|close|sideload', options).run();
+        expect(spy.notCalled).to.equal(true);
+    });
+
+    it('converts to squashfs if we request it to', async () => {
+        let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
+        mockDoPostRequest();
+        const options = {
+            host: '1.2.3.4',
+            password: 'abcd',
+            rootDir: rootDir,
+            stagingDir: stagingDir,
+            outDir: outDir,
+            deleteDevChannel: false
+        };
+
+        await new ExecCommand('close|stage|zip|close|sideload|squash', options).run();
+        expect(stub.getCalls()).to.be.lengthOf(1);
     });
 });

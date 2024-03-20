@@ -1,11 +1,11 @@
 import { rokuDeploy, util } from '../index';
 
-export class ConvertToSquashfsCommand {
+export class KeyUpCommand {
     async run(args) {
         let options = {
             ...util.getOptionsFromJson(args),
             ...args
         };
-        await rokuDeploy.convertToSquashfs(options);
+        await rokuDeploy.keyUp(options);
     }
 }

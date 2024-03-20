@@ -1,9 +1,11 @@
-import { rokuDeploy } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class GetDevIdCommand {
     async run(args) {
-        await rokuDeploy.getDevId({
-            host: args.host
-        });
+        let options = {
+            ...util.getOptionsFromJson(args),
+            ...args
+        };
+        await rokuDeploy.getDevId(options);
     }
 }

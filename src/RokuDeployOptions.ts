@@ -2,6 +2,11 @@ import type { LogLevel } from './Logger';
 
 export interface RokuDeployOptions {
     /**
+     * The working directory where the command should be executed
+     */
+    cwd?: string;
+
+    /**
      * Path to a bsconfig.json project file
      */
     project?: string;
@@ -38,22 +43,10 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
 
     /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @default false
-     */
-    retainStagingDir?: boolean;
-
-    /**
      * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
      * @default true
      */
     retainDeploymentArchive?: boolean;
-
-    /**
-     * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
-     * @deprecated since 3.9.0. use `stagingDir` instead
-     */
-    stagingFolderPath?: string;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
@@ -127,16 +120,6 @@ export interface RokuDeployOptions {
     devId?: string;
 
     /**
-     * If true we increment the build number to be a timestamp in the format yymmddHHMM
-     */
-    incrementBuildNumber?: boolean;
-
-    /**
-     * If true we convert to squashfs before creating the pkg file
-     */
-    convertToSquashfs?: boolean;
-
-    /**
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;
@@ -150,7 +133,7 @@ export interface RokuDeployOptions {
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one
      */
-    deleteInstalledChannel?: boolean;
+    deleteDevChannel?: boolean;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });

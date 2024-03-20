@@ -1,11 +1,11 @@
 import { rokuDeploy, util } from '../index';
 
-export class ConvertToSquashfsCommand {
+export class StageCommand {
     async run(args) {
         let options = {
             ...util.getOptionsFromJson(args),
             ...args
         };
-        await rokuDeploy.convertToSquashfs(options);
+        await rokuDeploy.stage(options);
     }
 }
