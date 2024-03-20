@@ -1477,7 +1477,7 @@ describe('index', () => {
         });
     });
 
-    describe('prepublishToStaging', () => {
+    describe('stage', () => {
         it('should use outDir for staging folder', async () => {
             await rokuDeploy.stage({
                 files: [

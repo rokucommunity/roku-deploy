@@ -2,7 +2,7 @@
 import * as yargs from 'yargs';
 import { ExecCommand } from './commands/ExecCommand';
 import { SendTextCommand } from './commands/SendTextCommand';
-import { PrepublishCommand } from './commands/PrepublishCommand';
+import { StageCommand } from './commands/StageCommand';
 import { ZipPackageCommand } from './commands/ZipPackageCommand';
 import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
@@ -149,7 +149,7 @@ void yargs
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false });
     }, (args: any) => {
-        return new PrepublishCommand().run(args);
+        return new StageCommand().run(args);
     })
 
     .command(['zip', 'zipPackage'], 'Given an already-populated staging folder, create a zip archive of it and copy it to the output folder', (builder) => {

@@ -42,19 +42,19 @@ describe('cli', () => {
         expectPathExists(`${outDir}/roku-deploy.zip`);
     });
 
-    it('Successfully runs prepublishToStaging', () => {
+    it('Successfully runs stage', () => {
         //make the files
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
         expect(() => {
-            execSync(`node ${cwd}/dist/cli.js prepublishToStaging --stagingDir ${stagingDir} --rootDir ${rootDir}`);
+            execSync(`node ${cwd}/dist/cli.js stage --stagingDir ${stagingDir} --rootDir ${rootDir}`);
         }).to.not.throw();
     });
 
     it('Successfully copies rootDir folder to staging folder', () => {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
-        execSync(`node ${cwd}/dist/cli.js prepublishToStaging --rootDir ${rootDir} --stagingDir ${stagingDir}`);
+        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --stagingDir ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
