@@ -3,7 +3,6 @@ import * as yargs from 'yargs';
 import { ExecCommand } from './commands/ExecCommand';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
-import { ZipPackageCommand } from './commands/ZipPackageCommand';
 import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
@@ -22,7 +21,8 @@ void yargs
     .command('bundle', 'execute build actions for bundling app', (builder) => {
         return builder
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'stage|zip',
@@ -152,14 +152,6 @@ void yargs
         return new StageCommand().run(args);
     })
 
-    .command(['zip', 'zipPackage'], 'Given an already-populated staging folder, create a zip archive of it and copy it to the output folder', (builder) => {
-        return builder
-            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false });
-    }, (args: any) => {
-        return new ZipPackageCommand().run(args);
-    })
-
     .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
@@ -233,7 +225,8 @@ void yargs
     .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
         return builder
             .option('stagingDir', { type: 'string', description: 'The folder that should be zipped', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false });
+            .option('outDir', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false })
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
     }, (args: any) => {
         console.log('args', args);
         return new ZipCommand().run(args);

@@ -983,6 +983,7 @@ export interface StageOptions {
 export interface ZipOptions {
     stagingDir?: string;
     outDir?: string;
+    outFile?: string;
 }
 
 export interface SideloadOptions {

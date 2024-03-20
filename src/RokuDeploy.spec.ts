@@ -606,7 +606,7 @@ describe('index', () => {
         });
     });
 
-    describe('zipPackage', () => {
+    describe('zip', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
             try {

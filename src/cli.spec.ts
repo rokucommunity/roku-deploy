@@ -59,13 +59,6 @@ describe('cli', () => {
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
-    it('Successfully uses zipPackage to create .zip', () => {
-        fsExtra.outputFileSync(`${stagingDir}/manifest`, '');
-
-        execSync(`node ${cwd}/dist/cli.js zipPackage --stagingDir ${stagingDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
     it('Publish passes proper options', async () => {
         const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
