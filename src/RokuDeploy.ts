@@ -236,7 +236,7 @@ export class RokuDeploy {
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
         options = this.getOptions(options) as any;
         if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
+            throw new Error('must specify the host for the Roku device');
         }
         //make sure the outDir exists
         await fsExtra.ensureDir(options.outDir);
@@ -330,7 +330,7 @@ export class RokuDeploy {
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = this.getOptions(options) as any;
         if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
+            throw new Error('must specify the host for the Roku device');
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
             archive: '',
@@ -350,11 +350,11 @@ export class RokuDeploy {
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = this.getOptions(options) as any;
         if (!options.rekeySignedPackage) {
-            throw new errors.MissingRequiredOptionError('Must supply rekeySignedPackage');
+            throw new Error('Must supply rekeySignedPackage');
         }
 
         if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
+            throw new Error('Must supply signingPassword');
         }
 
         let rekeySignedPackagePath = options.rekeySignedPackage;
@@ -403,7 +403,7 @@ export class RokuDeploy {
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
         options = this.getOptions(options) as any;
         if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
+            throw new Error('Must supply signingPassword');
         }
         let manifestPath = path.join(options.stagingDir, 'manifest');
         let parsedManifest = await this.parseManifest(manifestPath);

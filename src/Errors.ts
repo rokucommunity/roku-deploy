@@ -48,10 +48,3 @@ export class ConvertError extends Error {
         Object.setPrototypeOf(this, ConvertError.prototype);
     }
 }
-
-export class MissingRequiredOptionError extends Error {
-    constructor(message: string) {
-        super(message);
-        Object.setPrototypeOf(this, MissingRequiredOptionError.prototype);
-    }
-}
