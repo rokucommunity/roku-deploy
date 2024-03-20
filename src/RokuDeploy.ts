@@ -970,7 +970,7 @@ export interface SendTextOptions extends SendKeyEventOptions {
 
 export interface CloseChannelOptions {
     host: string;
-    remotePort: number;
+    remotePort?: number;
     timeout?: number;
 
 }
