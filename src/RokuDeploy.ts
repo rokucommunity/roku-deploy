@@ -709,6 +709,14 @@ export class RokuDeploy {
         return options;
     }
 
+    public checkRequiredOptions(options: RokuDeployOptions, requiredOptions: string[]) {
+        for (let opt of requiredOptions) {
+            if (options[opt] === undefined) {
+                throw new Error('Missing required option: ' + opt);
+            }
+        }
+    }
+
     /**
      * Centralizes getting output zip file path based on passed in options
      * @param options
