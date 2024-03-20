@@ -224,13 +224,8 @@ export class RokuDeploy {
     }
 
     public async closeChannel(options: CloseChannelOptions) {
-        // TODO: After 13.0 releases, add check for ECP close-app support, and use that if available
+        // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
         await this.sendKeyEvent({
-            ...options,
-            action: 'keypress',
-            key: 'home'
-        });
-        return this.sendKeyEvent({
             ...options,
             action: 'keypress',
             key: 'home'
