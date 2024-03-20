@@ -16,6 +16,7 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
+import type { SendKeyEventOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
@@ -3172,6 +3173,21 @@ describe('index', () => {
                     outFile: 'runtime-outfile'
                 }).outFile).to.equal('runtime-outfile');
             });
+        });
+    });
+
+    describe('checkRequiredOptions', () => {
+        async function testRequiredOptions(action: string, requiredOptions: Partial<SendKeyEventOptions>, testedOption: string) {
+            const newOptions = { ...requiredOptions };
+            delete newOptions[testedOption];
+            await expectThrowsAsync(async () => {
+                await rokuDeploy[action](newOptions);
+            }, `Missing required option: ${testedOption}`);
+        }
+        it.only('throws error when sendKeyEvent is missing required options', async () => {
+            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'string' };
+            await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
+            await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
         });
     });
 

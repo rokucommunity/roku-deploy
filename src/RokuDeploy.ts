@@ -212,6 +212,7 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
+        this.checkRequiredOptions(options, ['host', 'key']);
         let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
