@@ -37,9 +37,6 @@ export class RokuDeploy {
         //make sure the staging folder exists
         await fsExtra.ensureDir(options.stagingDir);
 
-        if (!options.stagingDir) {
-            throw new Error('stagingPath is required');
-        }
         if (!await fsExtra.pathExists(options.rootDir)) {
             throw new Error(`rootDir does not exist at "${options.rootDir}"`);
         }
