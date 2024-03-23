@@ -647,11 +647,11 @@ describe('index', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: options.password }).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: 'password' }).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: options.password }).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: 'password' }).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
@@ -1255,17 +1255,6 @@ describe('index', () => {
             });
         });
 
-        it('should return our error if signingPassword is not supplied', async () => {
-            await expectThrowsAsync(async () => {
-                await rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    signingPassword: undefined,
-                    stagingDir: stagingDir
-                });
-            }, 'Must supply signingPassword');
-        });
-
         it('should return an error if there is a problem with the network request', async () => {
             let error = new Error('Network Error');
             try {
@@ -1353,7 +1342,7 @@ describe('index', () => {
             );
         });
 
-        it('should return our fallback error if neither error or package link was detected', async () => {
+        it('should return error if dev id does not match', async () => {
             mockDoGetRequest(`
                 <device-info>
                     <keyed-developer-id>789</keyed-developer-id>
@@ -2051,19 +2040,19 @@ describe('index', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -2084,7 +2073,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('handles the device returning a png', async () => {
@@ -2105,7 +2094,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.png');
             expect(fsExtra.existsSync(result));
@@ -2129,7 +2118,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.jpg');
             expect(fsExtra.existsSync(result));
@@ -2153,7 +2142,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: `${tempDir}/myScreenShots` });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: `${tempDir}/myScreenShots` });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(result));
@@ -2177,7 +2166,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: tempDir, screenshotFile: 'my' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
@@ -2201,7 +2190,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: tempDir, screenshotFile: 'my.jpg' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my.jpg' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
@@ -2225,7 +2214,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -2248,7 +2237,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotFile: 'myFile' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile' });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));

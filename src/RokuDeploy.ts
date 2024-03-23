@@ -416,7 +416,7 @@ export class RokuDeploy {
 
         //prevent devId mismatch (if devId is specified)
         if (options.devId) {
-            const deviceDevId = await this.getDevId();
+            const deviceDevId = await this.getDevId(options);
             if (options.devId !== deviceDevId) {
                 throw new Error(`Package signing cancelled: provided devId '${options.devId}' does not match on-device devId '${deviceDevId}'`);
             }
