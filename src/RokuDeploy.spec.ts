@@ -3144,7 +3144,7 @@ describe('index', () => {
         });
 
         it('throws error when rekeyDevice is missing required options', async () => {
-            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', rekeySignedPackage: 'abcd', signingPassword: 'abcd'};
+            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', rekeySignedPackage: 'abcd', signingPassword: 'abcd' };
             await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'rekeySignedPackage');
@@ -3152,7 +3152,7 @@ describe('index', () => {
         });
 
         it('throws error when createSignedPackage is missing required options', async () => {
-            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd'};
+            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd' };
             await testRequiredOptions('createSignedPackage', requiredOptions, 'host');
             await testRequiredOptions('createSignedPackage', requiredOptions, 'password');
             await testRequiredOptions('createSignedPackage', requiredOptions, 'signingPassword');
