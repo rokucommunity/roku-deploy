@@ -16,7 +16,7 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
-import type { SendKeyEventOptions } from './RokuDeploy';
+import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
@@ -3184,10 +3184,60 @@ describe('index', () => {
                 await rokuDeploy[action](newOptions);
             }, `Missing required option: ${testedOption}`);
         }
+
         it.only('throws error when sendKeyEvent is missing required options', async () => {
             const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'string' };
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
+        });
+
+        it.only('throws error when sideload is missing required options', async () => {
+            const requiredOptions: Partial<SideloadOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('sideload', requiredOptions, 'host');
+            await testRequiredOptions('sideload', requiredOptions, 'password');
+        });
+
+        it.only('throws error when convertToSquashfs is missing required options', async () => {
+            const requiredOptions: Partial<ConvertToSquashfsOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('convertToSquashfs', requiredOptions, 'host');
+            await testRequiredOptions('convertToSquashfs', requiredOptions, 'password');
+        });
+
+        it.only('throws error when rekeyDevice is missing required options', async () => {
+            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', rekeySignedPackage: 'abcd', signingPassword: 'abcd'};
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'rekeySignedPackage');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'signingPassword');
+        });
+
+        it.only('throws error when createSignedPackage is missing required options', async () => {
+            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd'};
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'host');
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'password');
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'signingPassword');
+        });
+
+        it.only('throws error when deleteDevChannel is missing required options', async () => {
+            const requiredOptions: Partial<DeleteDevChannelOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('deleteDevChannel', requiredOptions, 'host');
+            await testRequiredOptions('deleteDevChannel', requiredOptions, 'password');
+        });
+
+        it.only('throws error when captureScreenshot is missing required options', async () => {
+            const requiredOptions: Partial<CaptureScreenshotOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('captureScreenshot', requiredOptions, 'host');
+            await testRequiredOptions('captureScreenshot', requiredOptions, 'password');
+        });
+
+        it.only('throws error when getDeviceInfo is missing required options', async () => {
+            const requiredOptions: Partial<GetDeviceInfoOptions> = { host: '1.2.3.4' };
+            await testRequiredOptions('getDeviceInfo', requiredOptions, 'host');
+        });
+
+        it.only('throws error when getDevId is missing required options', async () => {
+            const requiredOptions: Partial<GetDevIdOptions> = { host: '1.2.3.4' };
+            await testRequiredOptions('getDevId', requiredOptions, 'host');
         });
     });
 

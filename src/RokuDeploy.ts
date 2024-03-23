@@ -235,6 +235,7 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
         if (!options.host) {
             throw new Error('must specify the host for the Roku device');
@@ -329,6 +330,7 @@ export class RokuDeploy {
      * @param options
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
         if (!options.host) {
             throw new Error('must specify the host for the Roku device');
@@ -349,6 +351,7 @@ export class RokuDeploy {
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
+        this.checkRequiredOptions(options, ['host', 'password', 'rekeySignedPackage', 'signingPassword']);
         options = this.getOptions(options) as any;
         if (!options.rekeySignedPackage) {
             throw new Error('Must supply rekeySignedPackage');
@@ -402,6 +405,7 @@ export class RokuDeploy {
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+        this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
         if (!options.signingPassword) {
             throw new Error('Must supply signingPassword');
@@ -591,6 +595,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
@@ -605,6 +610,7 @@ export class RokuDeploy {
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
     public async captureScreenshot(options: CaptureScreenshotOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options);
         options.screenshotFile = options.screenshotFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
@@ -762,6 +768,7 @@ export class RokuDeploy {
     public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        this.checkRequiredOptions(options, ['host']);
         options = this.getOptions(options) as any;
 
         //if the host is a DNS name, look up the IP address
@@ -828,6 +835,7 @@ export class RokuDeploy {
      * @returns
      */
     public async getDevId(options?: GetDevIdOptions) {
+        this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
         return deviceInfo['keyed-developer-id'];
     }
