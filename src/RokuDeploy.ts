@@ -710,8 +710,8 @@ export class RokuDeploy {
         return options;
     }
 
-    public checkRequiredOptions(options: RokuDeployOptions, requiredOptions: string[]) {
-        for (let opt of requiredOptions) {
+    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
+        for (let opt of requiredOptions as string[]) {
             if (options[opt] === undefined) {
                 throw new Error('Missing required option: ' + opt);
             }
