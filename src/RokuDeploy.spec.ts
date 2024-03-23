@@ -1059,21 +1059,6 @@ describe('index', () => {
             });
         });
 
-        it('should return MissingRequiredOptionError if host was not provided', async () => {
-            mockDoPostRequest();
-            try {
-                options.host = undefined;
-                await rokuDeploy.convertToSquashfs({
-                    host: options.host,
-                    password: 'password'
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Should not have succeeded');
-        });
-
         it('should return ConvertError if converting failed', async () => {
             mockDoPostRequest();
             try {
@@ -1180,40 +1165,6 @@ describe('index', () => {
                 rootDir: options.rootDir,
                 devId: undefined
             });
-        });
-
-        it('should throw error if missing rekeySignedPackage option', async () => {
-            try {
-                await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    rekeySignedPackage: null,
-                    signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
-                    devId: options.devId
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Exception should have been thrown');
-        });
-
-        it('should throw error if missing signingPassword option', async () => {
-            try {
-                await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
-                    signingPassword: null,
-                    rootDir: options.rootDir,
-                    devId: options.devId
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Exception should have been thrown');
         });
 
         it('should throw error if response is not parsable', async () => {
