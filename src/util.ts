@@ -9,8 +9,7 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
-import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
-import type { ParseError } from 'jsonc-parser';
+import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 
 export class Util {
     /**
@@ -238,7 +237,7 @@ export class Util {
      * @param files
      */
     public normalizeFilesArray(files: FileEntry[]) {
-        const result: Array<string | StandardizedFileEntry> = [];
+        const result: Array<StandardizedFileEntry | string> = [];
 
         for (let i = 0; i < files.length; i++) {
             let entry = files[i];
@@ -345,7 +344,7 @@ export class Util {
      * @param pattern the glob pattern originally used to find this file
      * @param rootDir absolute normalized path to the rootDir
      */
-    public computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
+    public computeFileDestPath(srcPath: string, entry: StandardizedFileEntry | string, rootDir: string) {
         let result: string;
         let globstarIdx: number;
         //files under rootDir with no specified dest

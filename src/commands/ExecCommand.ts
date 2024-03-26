@@ -1,7 +1,6 @@
 import { util } from '../util';
-import { rokuDeploy } from '../RokuDeploy';
-import type { CloseChannelOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, RekeyDeviceOptions, SideloadOptions } from '../RokuDeploy';
 import type { RokuDeployOptions } from '../RokuDeployOptions';
+import { rokuDeploy, type CloseChannelOptions, type ConvertToSquashfsOptions, type CreateSignedPackageOptions, type DeleteDevChannelOptions, type RekeyDeviceOptions, type SideloadOptions } from '../RokuDeploy';
 
 export class ExecCommand {
     private actions: string[];

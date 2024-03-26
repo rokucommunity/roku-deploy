@@ -8,7 +8,6 @@ import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
-import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -16,7 +15,7 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
-import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
+import { RokuDeploy, type CaptureScreenshotOptions, type ConvertToSquashfsOptions, type CreateSignedPackageOptions, type DeleteDevChannelOptions, type GetDevIdOptions, type GetDeviceInfoOptions, type RekeyDeviceOptions, type SendKeyEventOptions, type SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
@@ -26,7 +25,7 @@ describe('index', () => {
     let options: RokuDeployOptions;
 
     let writeStreamPromise: Promise<WriteStream>;
-    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: undefined | true };
+    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: true | undefined };
     let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
