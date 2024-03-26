@@ -16,6 +16,7 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
+import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
@@ -646,11 +647,11 @@ describe('index', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: options.password }).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: 'password' }).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: options.password }).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: 'password' }).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
@@ -1058,21 +1059,6 @@ describe('index', () => {
             });
         });
 
-        it('should return MissingRequiredOptionError if host was not provided', async () => {
-            mockDoPostRequest();
-            try {
-                options.host = undefined;
-                await rokuDeploy.convertToSquashfs({
-                    host: options.host,
-                    password: 'password'
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Should not have succeeded');
-        });
-
         it('should return ConvertError if converting failed', async () => {
             mockDoPostRequest();
             try {
@@ -1181,40 +1167,6 @@ describe('index', () => {
             });
         });
 
-        it('should throw error if missing rekeySignedPackage option', async () => {
-            try {
-                await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    rekeySignedPackage: null,
-                    signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
-                    devId: options.devId
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Exception should have been thrown');
-        });
-
-        it('should throw error if missing signingPassword option', async () => {
-            try {
-                await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
-                    signingPassword: null,
-                    rootDir: options.rootDir,
-                    devId: options.devId
-                });
-            } catch (e) {
-                expect(e).to.be.instanceof(errors.MissingRequiredOptionError);
-                return;
-            }
-            assert.fail('Exception should have been thrown');
-        });
-
         it('should throw error if response is not parsable', async () => {
             try {
                 mockDoPostRequest();
@@ -1301,17 +1253,6 @@ describe('index', () => {
                 };
                 return req;
             });
-        });
-
-        it('should return our error if signingPassword is not supplied', async () => {
-            await expectThrowsAsync(async () => {
-                await rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
-                    password: 'password',
-                    signingPassword: undefined,
-                    stagingDir: stagingDir
-                });
-            }, 'Must supply signingPassword');
         });
 
         it('should return an error if there is a problem with the network request', async () => {
@@ -1401,7 +1342,7 @@ describe('index', () => {
             );
         });
 
-        it('should return our fallback error if neither error or package link was detected', async () => {
+        it('should return error if dev id does not match', async () => {
             mockDoGetRequest(`
                 <device-info>
                     <keyed-developer-id>789</keyed-developer-id>
@@ -2099,19 +2040,19 @@ describe('index', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -2132,7 +2073,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: options.password }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
         });
 
         it('handles the device returning a png', async () => {
@@ -2153,7 +2094,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.png');
             expect(fsExtra.existsSync(result));
@@ -2177,7 +2118,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.jpg');
             expect(fsExtra.existsSync(result));
@@ -2201,7 +2142,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: `${tempDir}/myScreenShots` });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: `${tempDir}/myScreenShots` });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(result));
@@ -2225,7 +2166,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: tempDir, screenshotFile: 'my' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
@@ -2249,7 +2190,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotDir: tempDir, screenshotFile: 'my.jpg' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my.jpg' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
@@ -2273,7 +2214,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -2296,7 +2237,7 @@ describe('index', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: options.password, screenshotFile: 'myFile' });
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile' });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
@@ -3172,6 +3113,71 @@ describe('index', () => {
                     outFile: 'runtime-outfile'
                 }).outFile).to.equal('runtime-outfile');
             });
+        });
+    });
+
+    describe('checkRequiredOptions', () => {
+        async function testRequiredOptions(action: string, requiredOptions: Partial<RokuDeployOptions>, testedOption: string) {
+            const newOptions = { ...requiredOptions };
+            delete newOptions[testedOption];
+            await expectThrowsAsync(async () => {
+                await rokuDeploy[action](newOptions);
+            }, `Missing required option: ${testedOption}`);
+        }
+
+        it('throws error when sendKeyEvent is missing required options', async () => {
+            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'string' };
+            await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
+            await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
+        });
+
+        it('throws error when sideload is missing required options', async () => {
+            const requiredOptions: Partial<SideloadOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('sideload', requiredOptions, 'host');
+            await testRequiredOptions('sideload', requiredOptions, 'password');
+        });
+
+        it('throws error when convertToSquashfs is missing required options', async () => {
+            const requiredOptions: Partial<ConvertToSquashfsOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('convertToSquashfs', requiredOptions, 'host');
+            await testRequiredOptions('convertToSquashfs', requiredOptions, 'password');
+        });
+
+        it('throws error when rekeyDevice is missing required options', async () => {
+            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', rekeySignedPackage: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'rekeySignedPackage');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'signingPassword');
+        });
+
+        it('throws error when createSignedPackage is missing required options', async () => {
+            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'host');
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'password');
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'signingPassword');
+        });
+
+        it('throws error when deleteDevChannel is missing required options', async () => {
+            const requiredOptions: Partial<DeleteDevChannelOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('deleteDevChannel', requiredOptions, 'host');
+            await testRequiredOptions('deleteDevChannel', requiredOptions, 'password');
+        });
+
+        it('throws error when captureScreenshot is missing required options', async () => {
+            const requiredOptions: Partial<CaptureScreenshotOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('captureScreenshot', requiredOptions, 'host');
+            await testRequiredOptions('captureScreenshot', requiredOptions, 'password');
+        });
+
+        it('throws error when getDeviceInfo is missing required options', async () => {
+            const requiredOptions: Partial<GetDeviceInfoOptions> = { host: '1.2.3.4' };
+            await testRequiredOptions('getDeviceInfo', requiredOptions, 'host');
+        });
+
+        it('throws error when getDevId is missing required options', async () => {
+            const requiredOptions: Partial<GetDevIdOptions> = { host: '1.2.3.4' };
+            await testRequiredOptions('getDevId', requiredOptions, 'host');
         });
     });
 

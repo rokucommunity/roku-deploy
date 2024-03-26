@@ -37,9 +37,6 @@ export class RokuDeploy {
         //make sure the staging folder exists
         await fsExtra.ensureDir(options.stagingDir);
 
-        if (!options.stagingDir) {
-            throw new Error('stagingPath is required');
-        }
         if (!await fsExtra.pathExists(options.rootDir)) {
             throw new Error(`rootDir does not exist at "${options.rootDir}"`);
         }
@@ -215,6 +212,7 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
+        this.checkRequiredOptions(options, ['host', 'key']);
         let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
@@ -237,10 +235,8 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
-        if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
-        }
         //make sure the outDir exists
         await fsExtra.ensureDir(options.outDir);
 
@@ -331,10 +327,8 @@ export class RokuDeploy {
      * @param options
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
-        if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
-        }
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
             archive: '',
             mysubmit: 'Convert to squashfs'
@@ -351,14 +345,8 @@ export class RokuDeploy {
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
+        this.checkRequiredOptions(options, ['host', 'password', 'rekeySignedPackage', 'signingPassword']);
         options = this.getOptions(options) as any;
-        if (!options.rekeySignedPackage) {
-            throw new errors.MissingRequiredOptionError('Must supply rekeySignedPackage');
-        }
-
-        if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
-        }
 
         let rekeySignedPackagePath = options.rekeySignedPackage;
         if (!path.isAbsolute(options.rekeySignedPackage)) {
@@ -404,17 +392,15 @@ export class RokuDeploy {
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+        this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
-        if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
-        }
         let manifestPath = path.join(options.stagingDir, 'manifest');
         let parsedManifest = await this.parseManifest(manifestPath);
         let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
 
         //prevent devId mismatch (if devId is specified)
         if (options.devId) {
-            const deviceDevId = await this.getDevId();
+            const deviceDevId = await this.getDevId(options);
             if (options.devId !== deviceDevId) {
                 throw new Error(`Package signing cancelled: provided devId '${options.devId}' does not match on-device devId '${deviceDevId}'`);
             }
@@ -593,6 +579,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
@@ -607,6 +594,7 @@ export class RokuDeploy {
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
     public async captureScreenshot(options: CaptureScreenshotOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options);
         options.screenshotFile = options.screenshotFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
@@ -712,6 +700,14 @@ export class RokuDeploy {
         return options;
     }
 
+    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
+        for (let opt of requiredOptions as string[]) {
+            if (options[opt] === undefined) {
+                throw new Error('Missing required option: ' + opt);
+            }
+        }
+    }
+
     /**
      * Centralizes getting output zip file path based on passed in options
      * @param options
@@ -756,6 +752,7 @@ export class RokuDeploy {
     public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        this.checkRequiredOptions(options, ['host']);
         options = this.getOptions(options) as any;
 
         //if the host is a DNS name, look up the IP address
@@ -822,6 +819,7 @@ export class RokuDeploy {
      * @returns
      */
     public async getDevId(options?: GetDevIdOptions) {
+        this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
         return deviceInfo['keyed-developer-id'];
     }
