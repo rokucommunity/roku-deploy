@@ -3117,7 +3117,7 @@ describe('index', () => {
     });
 
     describe('checkRequiredOptions', () => {
-        async function testRequiredOptions(action: string, requiredOptions: Partial<SendKeyEventOptions>, testedOption: string) {
+        async function testRequiredOptions(action: string, requiredOptions: Partial<RokuDeployOptions>, testedOption: string) {
             const newOptions = { ...requiredOptions };
             delete newOptions[testedOption];
             await expectThrowsAsync(async () => {
