@@ -470,7 +470,7 @@ export class RokuDeploy {
     }
 
     private checkRequest(results) {
-        if (!results || !results.response || typeof results.body !== 'string') {
+        if (!results?.response || typeof results?.body !== 'string') {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
@@ -662,7 +662,7 @@ export class RokuDeploy {
      * Get an options with all overridden values, and then defaults for missing values
      * @param options
      */
-    public getOptions<T = RokuDeployOptions>(options: T & RokuDeployOptions = {} as any): RokuDeployOptions & T {
+    public getOptions<T = RokuDeployOptions>(options: RokuDeployOptions & T = {} as any): RokuDeployOptions & T {
         // Fill in default options for any missing values
         options = {
             cwd: process.cwd(),
@@ -749,8 +749,8 @@ export class RokuDeploy {
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
      */
-    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
+    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         this.checkRequiredOptions(options, ['host']);
         options = this.getOptions(options) as any;
@@ -937,11 +937,11 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
-type RokuKey = 'home' | 'rev' | 'fwd' | 'play' | 'select' | 'left' | 'right' | 'down' | 'up' | 'back' | 'instantreplay' | 'info' | 'backspace' | 'search' | 'enter' | 'findremote' | 'volumeup' | 'volumedown' | 'volumemute' | 'poweroff' | 'channelup' | 'channeldown' | 'inputtuner' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputav1';
+type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
 export interface SendKeyEventOptions {
-    action?: 'keypress' | 'keydown' | 'keyup';
+    action?: 'keydown' | 'keypress' | 'keyup';
     host: string;
-    key: RokuKey | string;
+    key: RokuKey;
     remotePort?: number;
     timeout?: number;
 }
