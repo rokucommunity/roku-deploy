@@ -470,7 +470,7 @@ export class RokuDeploy {
     }
 
     private checkRequest(results) {
-        if (!results || !results.response || typeof results.body !== 'string') {
+        if (!results?.response || typeof results?.body !== 'string') {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
@@ -941,7 +941,7 @@ type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'en
 export interface SendKeyEventOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     host: string;
-    key: RokuKey | string;
+    key: RokuKey;
     remotePort?: number;
     timeout?: number;
 }

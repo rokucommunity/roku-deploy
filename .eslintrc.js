@@ -23,6 +23,7 @@ module.exports = {
         '@typescript-eslint/explicit-member-accessibility': 'off',
         '@typescript-eslint/explicit-module-boundary-types': 'off',
         '@typescript-eslint/init-declarations': 'off',
+        '@typescript-eslint/lines-around-comment': 'off',
         '@typescript-eslint/member-ordering': 'off',
         "@typescript-eslint/naming-convention": 'off',
         '@typescript-eslint/no-base-to-string': 'off',
@@ -52,6 +53,7 @@ module.exports = {
             'error',
             'always'
         ],
+        '@typescript-eslint/prefer-nullish-coalescing': 'off',
         '@typescript-eslint/prefer-readonly': 'off',
         '@typescript-eslint/prefer-readonly-parameter-types': 'off',
         '@typescript-eslint/promise-function-async': 'off',
@@ -94,7 +96,6 @@ module.exports = {
         'init-declarations': 'off',
         'line-comment-position': 'off',
         'linebreak-style': 'off',
-        'lines-around-comment': 'off',
         'lines-between-class-members': 'off',
         'max-classes-per-file': 'off',
         'max-depth': 'off',
