@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { Logger, LogLevel, noop } from './Logger';
+import chalk from 'chalk';
 import { createSandbox } from 'sinon';
 const sinon = createSandbox();
 
@@ -9,6 +10,8 @@ describe('Logger', () => {
     beforeEach(() => {
         logger = new Logger(LogLevel.trace);
         sinon.restore();
+        //disable chalk colors for testing
+        sinon.stub(chalk, 'grey').callsFake((arg) => arg as any);
     });
 
     it('noop does nothing', () => {
