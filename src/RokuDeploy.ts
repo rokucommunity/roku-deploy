@@ -15,6 +15,7 @@ import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
+import { Compression } from 'jszip';
 
 export class RokuDeploy {
 
@@ -97,7 +98,7 @@ export class RokuDeploy {
         for (const file of filePaths) {
             const promise = fsExtra.readFile(file.src).then((data) => {
                 const ext = path.extname(file.dest).toLowerCase();
-                let compression = 'DEFLATE';
+                let compression: Compression = 'DEFLATE';
 
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
