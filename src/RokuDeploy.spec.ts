@@ -15,7 +15,9 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
-import { RokuDeploy, type CaptureScreenshotOptions, type ConvertToSquashfsOptions, type CreateSignedPackageOptions, type DeleteDevChannelOptions, type GetDevIdOptions, type GetDeviceInfoOptions, type RekeyDeviceOptions, type SendKeyEventOptions, type SideloadOptions } from './RokuDeploy';
+import { RokuDeploy } from './RokuDeploy';
+// eslint-disable-next-line no-duplicate-imports
+import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
