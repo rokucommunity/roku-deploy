@@ -470,7 +470,7 @@ export class RokuDeploy {
     }
 
     private checkRequest(results) {
-        if (!results?.response || typeof results?.body !== 'string') {
+        if (!results || !results.response || typeof results.body !== 'string') {
             throw new errors.UnparsableDeviceResponseError('Invalid response', results);
         }
 
