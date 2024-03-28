@@ -941,7 +941,8 @@ type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'en
 export interface SendKeyEventOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     host: string;
-    key: RokuKey;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RokuKey | string;
     remotePort?: number;
     timeout?: number;
 }

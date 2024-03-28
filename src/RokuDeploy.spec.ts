@@ -3125,7 +3125,7 @@ describe('index', () => {
         }
 
         it('throws error when sendKeyEvent is missing required options', async () => {
-            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'string' };
+            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'up' };
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
         });
