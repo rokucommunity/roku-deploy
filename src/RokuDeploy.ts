@@ -596,7 +596,7 @@ export class RokuDeploy {
     public async captureScreenshot(options: CaptureScreenshotOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options);
-        options.screenshotFile = options.screenshotFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
+        options.screenshotFile ??= `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
 
         // Ask for the device to make an image

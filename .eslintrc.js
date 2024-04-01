@@ -10,7 +10,8 @@ module.exports = {
         project: './tsconfig.json'
     },
     plugins: [
-        '@typescript-eslint'
+        '@typescript-eslint',
+        'import'
     ],
     extends: [
         'eslint:all',
@@ -93,6 +94,7 @@ module.exports = {
         'function-paren-newline': 'off',
         'guard-for-in': 'off',
         'id-length': 'off',
+        'import/no-duplicates': 'error',
         'indent': 'off',
         'init-declarations': 'off',
         'line-comment-position': 'off',
@@ -114,6 +116,7 @@ module.exports = {
         'no-constant-condition': 'off',
         'no-console': 'off',
         'no-continue': 'off',
+        'no-duplicate-imports': 'off',
         'no-else-return': 'off',
         'no-empty': 'off',
         'no-implicit-coercion': 'off',
