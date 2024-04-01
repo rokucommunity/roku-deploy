@@ -16,7 +16,6 @@ import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
 import { RokuDeploy } from './RokuDeploy';
-// eslint-disable-next-line no-duplicate-imports
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
