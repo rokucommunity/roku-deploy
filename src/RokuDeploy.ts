@@ -97,7 +97,7 @@ export class RokuDeploy {
         for (const file of filePaths) {
             const promise = fsExtra.readFile(file.src).then((data) => {
                 const ext = path.extname(file.dest).toLowerCase();
-                let compression = 'DEFLATE';
+                let compression: 'DEFLATE' | 'STORE' = 'DEFLATE';
 
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
