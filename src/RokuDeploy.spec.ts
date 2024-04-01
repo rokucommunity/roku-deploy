@@ -8,7 +8,6 @@ import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
-import { RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -16,6 +15,7 @@ import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, 
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
+import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
@@ -26,7 +26,7 @@ describe('index', () => {
     let options: RokuDeployOptions;
 
     let writeStreamPromise: Promise<WriteStream>;
-    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: undefined | true };
+    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: true | undefined };
     let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
@@ -3126,7 +3126,7 @@ describe('index', () => {
         }
 
         it('throws error when sendKeyEvent is missing required options', async () => {
-            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'string' };
+            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'up' };
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
         });

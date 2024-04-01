@@ -136,4 +136,4 @@ export interface RokuDeployOptions {
     deleteDevChannel?: boolean;
 }
 
-export type FileEntry = (string | { src: string | string[]; dest?: string });
+export type FileEntry = (string | { src: string[] | string; dest?: string });
