@@ -22,7 +22,8 @@ void yargs
         return builder
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'stage|zip',
@@ -45,7 +46,8 @@ void yargs
             .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false });
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'stage|zip|close|sideload',
@@ -70,7 +72,8 @@ void yargs
             .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
-            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
+            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new ExecCommand(
             'close|rekey|stage|zip|close|sideload|squash|sign',
@@ -95,6 +98,7 @@ void yargs
             .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
             .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
             .option('username', { type: 'string', description: 'The username for the Roku', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .usage(`Usage: npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`)
             .example(
                 `npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`,
@@ -147,7 +151,9 @@ void yargs
     .command(['stage', 'prepublishToStaging'], 'Copies all of the referenced files to the staging folder', (builder) => {
         return builder
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
-            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false });
+            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
+            .option('files', { type: 'array', description: 'An array of source file paths indicating where the source files are', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new StageCommand().run(args);
     })
@@ -156,8 +162,14 @@ void yargs
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
+            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new SideloadCommand().run(args);
     })
@@ -177,7 +189,8 @@ void yargs
             .option('rekeySignedPackage', { type: 'string', description: 'The signed package to be used for rekeying', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
-            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false });
+            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new RekeyDeviceCommand().run(args);
     })
@@ -187,7 +200,10 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
-            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false });
+            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
+            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
     })
@@ -203,7 +219,10 @@ void yargs
     .command(['screenshot', 'captureScreenshot'], 'Take a screenshot', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('screenshotDir', { type: 'string', description: 'A full path to the folder where the screenshots should be saved.', demandOption: false })
+            .option('screenshotFile', { type: 'string', description: 'The base filename the image file should be given (excluding the extension). Default: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new CaptureScreenshotCommand().run(args);
     })
@@ -226,7 +245,8 @@ void yargs
         return builder
             .option('stagingDir', { type: 'string', description: 'The folder that should be zipped', demandOption: false })
             .option('outDir', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false });
+            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         console.log('args', args);
         return new ZipCommand().run(args);

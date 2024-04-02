@@ -916,6 +916,11 @@ export interface CaptureScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     screenshotFile?: string;
+
+    /**
+     * The current working directory to use for relative paths
+     */
+    cwd?: string;
 }
 
 export interface GetDeviceInfoOptions {
@@ -978,12 +983,14 @@ export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
     stagingDir?: string;
+    cwd?: string;
 }
 
 export interface ZipOptions {
     stagingDir?: string;
     outDir?: string;
     outFile?: string;
+    cwd?: string;
 }
 
 export interface SideloadOptions {
@@ -996,6 +1003,7 @@ export interface SideloadOptions {
     outDir?: string;
     outFile?: string;
     deleteDevChannel?: boolean;
+    cwd?: string;
 }
 
 export interface BaseRequestOptions {
@@ -1018,6 +1026,7 @@ export interface RekeyDeviceOptions {
     signingPassword: string;
     rootDir?: string;
     devId: string;
+    cwd?: string;
 }
 
 export interface CreateSignedPackageOptions {
@@ -1030,6 +1039,7 @@ export interface CreateSignedPackageOptions {
      * If specified, signing will fail if the device's devId is different than this value
      */
     devId?: string;
+    cwd?: string;
 }
 
 export interface DeleteDevChannelOptions {
@@ -1040,6 +1050,7 @@ export interface DeleteDevChannelOptions {
 export interface GetOutputZipFilePathOptions {
     outFile?: string;
     outDir?: string;
+    cwd?: string;
 }
 
 export interface DeployOptions {
@@ -1051,11 +1062,13 @@ export interface DeployOptions {
     deleteDevChannel?: boolean;
     outFile?: string;
     outDir?: string;
+    cwd?: string;
 }
 
 export interface GetOutputPkgFilePathOptions {
     outFile?: string;
     outDir?: string;
+    cwd?: string;
 }
 
 export interface GetDevIdOptions {
