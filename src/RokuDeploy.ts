@@ -686,6 +686,7 @@ export class RokuDeploy {
         //fully resolve the folder paths
         options.rootDir = path.resolve(options.cwd, options.rootDir);
         options.outDir = path.resolve(options.cwd, options.outDir);
+        options.screenshotDir = path.resolve(options.cwd, options.screenshotDir);
 
         //stagingDir
         if (options.stagingDir) {

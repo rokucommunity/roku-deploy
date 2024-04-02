@@ -86,6 +86,11 @@ export interface RokuDeployOptions {
     remotePort?: number;
 
     /**
+     * The directory where screenshots should be saved. Will use the OS temp directory by default
+     */
+        screenshotDir?: string;
+
+    /**
      * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
      * This is mainly useful for preventing hang ups if the Roku loses power or restarts due to a firmware bug.
      * This is applied per network request to the device and does not apply to the total time it takes to completely execute a call to roku-deploy.
