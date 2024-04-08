@@ -3114,6 +3114,37 @@ describe('index', () => {
                 }).outFile).to.equal('runtime-outfile');
             });
         });
+
+        describe('cwd', () => {
+            it('Only has cwd supplied', () => {
+                options = rokuDeploy.getOptions({
+                    cwd: rootDir
+                });
+
+                expect(options.rootDir).to.equal(s`${rootDir}`);
+                expect(options.outDir).to.equal(s`${rootDir}/out`);
+                expect(options.screenshotDir.endsWith('/roku-deploy/screenshots')).to.be.true;
+            });
+
+            it('has no cwd supplied', () => {
+                options = rokuDeploy.getOptions({});
+
+                expect(options.rootDir).to.equal(s`${__dirname}/..`);
+                expect(options.outDir).to.equal(s`${__dirname}/../out`);
+                expect(options.screenshotDir.endsWith('/roku-deploy/screenshots')).to.be.true;
+            });
+
+            it('has no cwd supplied but screenshotDir is supplied', () => {
+                options = rokuDeploy.getOptions({
+                    screenshotDir: './screenshotDir'
+                });
+
+                expect(options.rootDir).to.equal(s`${__dirname}/..`);
+                expect(options.outDir).to.equal(s`${__dirname}/../out`);
+                expect(options.screenshotDir).to.equal(s`${__dirname}/../screenshotDir`);
+            });
+        });
+        
     });
 
     describe('checkRequiredOptions', () => {
