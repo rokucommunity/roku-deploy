@@ -3123,7 +3123,7 @@ describe('index', () => {
 
                 expect(options.rootDir).to.equal(s`${rootDir}`);
                 expect(options.outDir).to.equal(s`${rootDir}/out`);
-                expect(options.screenshotDir.endsWith('/roku-deploy/screenshots')).to.be.true;
+                expect(options.screenshotDir.endsWith(s`/roku-deploy/screenshots`)).to.be.true;
             });
 
             it('has no cwd supplied', () => {
@@ -3131,7 +3131,7 @@ describe('index', () => {
 
                 expect(options.rootDir).to.equal(s`${__dirname}/..`);
                 expect(options.outDir).to.equal(s`${__dirname}/../out`);
-                expect(options.screenshotDir.endsWith('/roku-deploy/screenshots')).to.be.true;
+                expect(options.screenshotDir.endsWith(s`/roku-deploy/screenshots`)).to.be.true;
             });
 
             it('has no cwd supplied but screenshotDir is supplied', () => {
@@ -3144,7 +3144,7 @@ describe('index', () => {
                 expect(options.screenshotDir).to.equal(s`${__dirname}/../screenshotDir`);
             });
         });
-        
+
     });
 
     describe('checkRequiredOptions', () => {
