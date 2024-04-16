@@ -44,10 +44,6 @@ export class ExecCommand {
             await rokuDeploy.sideload(this.options as SideloadOptions);
         }
 
-        if (this.actions.includes('stage')) {
-            await rokuDeploy.stage(this.options);
-        }
-
         if (this.actions.includes('rekey')) {
             await rokuDeploy.rekeyDevice(this.options as RekeyDeviceOptions);
         }
