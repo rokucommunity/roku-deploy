@@ -20,8 +20,7 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
         with:
-          node-version: "14.17.0"
-      - run: cd src && cd .. #trying to fix "ENOENT: no such file or directory, uv_cwd" error
+          node-version: "14.18.1"
       - run: npm ci
       - run: npm run build
       - run: npm run lint
@@ -38,7 +37,7 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
         with:
-          node-version: "14.17.0"
+          node-version: "14.18.1"
       - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ./.npmrc
       - run: npm ci
       - run: npm run build
@@ -65,5 +64,7 @@ jobs:
         with:
           asset_paths: '["./*.tgz"]'
 
+      #If there's a dash followed by an alpha character, this is a prerelease and should be tagged "next". Otherwise tag as "latest"
+      - run: if [[ "${{ github.ref }}" =~ -[a-zA-Z] ]]; then echo "DIST_TAG=next" >> $GITHUB_ENV; else echo "DIST_TAG=latest" >> $GITHUB_ENV; fi
       #upload to npm
-      - run: npm publish
+      - run: npm publish --tag ${{env.DIST_TAG}}
