@@ -3143,6 +3143,15 @@ describe('index', () => {
                 expect(options.outDir).to.equal(s`${__dirname}/../out`);
                 expect(options.screenshotDir).to.equal(s`${__dirname}/../screenshotDir`);
             });
+
+            it('screenshotDir is built relative to cwd', () => {
+                options = rokuDeploy.getOptions({
+                    cwd: tempDir,
+                    screenshotDir: './screenshotDir'
+                });
+
+                expect(options.screenshotDir).to.equal(s`${tempDir}/screenshotDir`);
+            });
         });
 
     });

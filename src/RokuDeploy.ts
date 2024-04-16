@@ -681,6 +681,7 @@ export class RokuDeploy {
             screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/'),
             ...options
         };
+        options.cwd ??= process.cwd();
         this.logger.logLevel = options.logLevel; //TODO: Handle logging differently
 
         //fully resolve the folder paths
