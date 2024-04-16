@@ -248,7 +248,6 @@ void yargs
             .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        console.log('args', args);
         return new ZipCommand().run(args);
     })
 

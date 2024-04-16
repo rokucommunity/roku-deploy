@@ -69,7 +69,6 @@ export class RokuDeploy {
         options = this.getOptions(options) as any;
 
         //make sure the output folder exists
-        await fsExtra.ensureDir(options.outDir);
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
@@ -109,6 +108,11 @@ export class RokuDeploy {
             promises.push(promise);
         }
         await Promise.all(promises);
+
+        //ensure the outDir exists
+        await fsExtra.ensureDir(
+            path.dirname(zipFilePath)
+        );
         // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
         const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
         return fsExtra.writeFile(zipFilePath, content);
@@ -721,9 +725,7 @@ export class RokuDeploy {
         if (!zipFileName.toLowerCase().endsWith('.zip')) {
             zipFileName += '.zip';
         }
-        let outFolderPath = path.resolve(options.outDir);
-
-        let outZipFilePath = path.join(outFolderPath, zipFileName);
+        let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
         return outZipFilePath;
     }
 
