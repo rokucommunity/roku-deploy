@@ -35,43 +35,17 @@ sample rokudeploy.json
 ```
 ## Usage
 
-From a node script
+
+```CLI Commands/node script:
+
+
+
 ```javascript
-var rokuDeploy = require('roku-deploy');
-
-//deploy a .zip package of your project to a roku device
-rokuDeploy.deploy({
-    host: 'ip-of-roku',
-    password: 'password for roku dev admin portal'
-    //other options if necessary
-}).then(function(){
-    //it worked
-}, function(error) {
-    //it failed
-    console.error(error);
-});
 ```
-Or
-```javascript
-//create a signed package of your project
-rokuDeploy.deployAndSignPackage({
-    host: 'ip-of-roku',
-    password: 'password for roku dev admin portal',
-    signingPassword: 'signing password'
-    //other options if necessary
-}).then(function(pathToSignedPackage){
-    console.log('Signed package created at ', pathToSignedPackage);
-}, function(error) {
-    //it failed
-    console.error(error);
-});
-```
-
-
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
 ```typescript
-rokuDeploy.prepublishToStaging({
+rokuDeploy.stage({
     rootDir: "folder/with/your/source/code",
     stagingDir: 'path/to/staging/folder',
     files: [
@@ -93,7 +67,7 @@ rokuDeploy.prepublishToStaging({
 Use this logic if you'd like to create a zip from your application folder.
 ```typescript
 /create a signed package of your project
-rokuDeploy.zipPackage({
+rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
     stagingDir: 'path/to/files/to/zip',
     outFile: 'filename-of-your-app.zip'
@@ -107,11 +81,12 @@ rokuDeploy.zipPackage({
 ```
 
 
-### Deploying an existing zip
+### Sideloading a project
 If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
 ```typescript
 /create a signed package of your project
-rokuDeploy.publish({
+
+rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
     outDir: 'folder/where/your/zip/resides/',
@@ -124,6 +99,26 @@ rokuDeploy.publish({
     console.error(error);
 });
 ```
+
+
+Can't find what you need? All public functions:
+- getFilPaths
+- keyPress
+- keyUp
+- keyDown
+- sendText
+- closeChannel
+- rekeyDevice
+- createSignedPackage
+- deleteDevChannel
+- captureScreenshot
+- getOptions
+- checkRequiredOptions
+- getDeviceInfo
+- getDevId
+
+
+
 
 ### running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
