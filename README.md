@@ -37,8 +37,6 @@ sample rokudeploy.json
 
 From the CLI:
 ```shell
-var rokuDeploy = require('roku-deploy');
-
 # deploy a .zip package of your project to a roku device
 npx roku-deploy deploy --host 'ip-of-roku' --password 'password for roku dev admin portal' --rootDir . --outDir ./out
 
@@ -90,8 +88,7 @@ rokuDeploy.zip({
 ### Sideloading a project
 If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
 ```typescript
-/create a signed package of your project
-
+//sideload a package onto a specified Roku
 rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
