@@ -33,18 +33,70 @@ sample rokudeploy.json
     "password": "securePassword"
 }
 ```
-## Usage
+## CLI Usage
 
-From the CLI:
+### Deploy a zip package
+Deploy a .zip package of your project to a roku device
 ```shell
-# deploy a .zip package of your project to a roku device
-npx roku-deploy deploy --host 'ip-of-roku' --password 'password for roku dev admin portal' --rootDir . --outDir ./out
-
-# create a signed package of your project
-npx roku-deploy deploy package --host 'ip-of-roku' --password 'password for roku dev admin portal' --signingPassword 'signing password'
+npx roku-deploy deploy --host ${ip-of-roku} --password ${password} --rootDir '.' --outDir './out'
 ```
 
-Or from a node script:
+
+### Create a signed package of your project
+```shell
+npx roku-deploy deploy package --host ${ip-of-roku} --password ${password} --signingPassword ${signing-password}
+```
+
+### Other uses
+Stage the root directory
+```shell
+npx roku-deploy stage --stagingDir ${stagingDir} --rootDir ${rootDir}
+```
+Zip the contents of a given directory
+```shell
+npx roku-deploy zip --stagingDir ${rootDir} --outDir ${outDir}
+```
+Press the Home key
+```shell
+npx roku-deploy keyPress --key 'Home' --host ${ip-of-roku} --remotePort ${remotePort} --timeout ${timeout}
+```
+Sideload a build
+```shell
+npx roku-deploy sideload --host ${ip-of-roku} --password ${password} --outDir ${outDir} 
+```
+
+Convert to SquashFS
+```shell
+npx roku-deploy squash --host ${ip-of-roku} --password ${password}
+```
+
+```shell
+npx roku-deploy sign --host ${ip-of-roku} --password ${password}
+```
+sign
+
+Here are all the possible cli commands:
+- bundle
+- deploy
+- package
+- exec
+- keypress
+- keyup
+- keydown
+- sendText
+- stage
+- sideload
+- squash
+- rekey
+- createSignedPackage
+- deleteDevChannel
+- screenshot
+- getDeviceInfo
+- getDevId
+- zip
+
+
+## Node script Usage
 
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
@@ -122,26 +174,6 @@ Can't find what you need? Here are all of the public functions:
 - getDeviceInfo
 - getDevId
 
-And here are all the possible cli commands:
-- bundle
-- deploy
-- package
-- exec
-- keypress
-- keyup
-- keydown
-- sendText
-- stage
-- sideload
-- squash
-- rekey
-- createSignedPackage
-- deleteDevChannel
-- screenshot
-- getDeviceInfo
-- getDevId
-- zip
-
 
 ### running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
@@ -152,33 +184,7 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-You can provide a callback in any of the higher level methods, which allows you to modify the copied contents before the package is zipped. An info object is passed in with the following attributes
-- **manifestData:** [key: string]: string
-    Contains all the parsed values from the manifest file
-- **stagingDir:** string
-    Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
-
-    ```javascript
-    let options = {
-        host: 'ip-of-roku',
-        password: 'password for roku dev admin portal'
-        //other options if necessary
-    };
-
-    rokuDeploy.sideload(options, (info) => {
-        //modify staging dir before it's zipped.
-        //At this point, all files have been copied to the staging directory.
-        manipulateFilesInStagingFolder(info.stagingDir)
-        //this function can also return a promise,
-        //which will be awaited before roku-deploy starts deploying.
-    }).then(function(){
-        //it worked
-    }, function(){
-        //it failed
-    });
-    ```
-
-//## roku-deploy.json
+## roku-deploy.json
 As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
  - if CLI arguments are found, those are used.
  - if `roku-deploy.json` is found, fill in any missing settings.
