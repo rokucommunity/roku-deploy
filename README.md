@@ -69,11 +69,10 @@ Convert to SquashFS
 ```shell
 npx roku-deploy squash --host ${ip-of-roku} --password ${password}
 ```
-
+Create a signed package
 ```shell
 npx roku-deploy sign --host ${ip-of-roku} --password ${password}
 ```
-sign
 
 Here are all the possible cli commands:
 - bundle
