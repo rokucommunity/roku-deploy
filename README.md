@@ -35,22 +35,23 @@ sample rokudeploy.json
 ```
 ## Usage
 
-CLI Commands/node script:
-```typescript
+From the CLI:
+```shell
 var rokuDeploy = require('roku-deploy');
 
-//deploy a .zip package of your project to a roku device
-npx ts-node ./src/cli.ts deploy --host 'ip-of-roku' --password 'password for roku dev admin portal' --rootDir . --outDir ./out`
+# deploy a .zip package of your project to a roku device
+npx roku-deploy deploy --host 'ip-of-roku' --password 'password for roku dev admin portal' --rootDir . --outDir ./out
 
-//create a signed package of your project
-//npx ts-node ./src/cli.ts package --host 'ip-of-roku' --password 'password for roku dev admin portal' --signingPassword 'signing password'`
+# create a signed package of your project
+npx roku-deploy deploy package --host 'ip-of-roku' --password 'password for roku dev admin portal' --signingPassword 'signing password'
 ```
 
-Or
+Or from a node script:
 
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
 ```typescript
+import { rokuDeploy } from 'roku-deploy';
 rokuDeploy.stage({
     rootDir: "folder/with/your/source/code",
     stagingDir: 'path/to/staging/folder',
@@ -105,7 +106,10 @@ rokuDeploy.sideload({
 });
 ```
 
-Can't find what you need? All public functions:
+Can't find what you need? Here are all of the public functions:
+- stage
+- zip
+- sideload
 - getFilPaths
 - keyPress
 - keyUp
@@ -120,6 +124,26 @@ Can't find what you need? All public functions:
 - checkRequiredOptions
 - getDeviceInfo
 - getDevId
+
+And here are all the possible cli commands:
+- bundle
+- deploy
+- package
+- exec
+- keypress
+- keyup
+- keydown
+- sendText
+- stage
+- sideload
+- squash
+- rekey
+- createSignedPackage
+- deleteDevChannel
+- screenshot
+- getDeviceInfo
+- getDevId
+- zip
 
 
 ### running roku-deploy as an npm script
@@ -144,7 +168,7 @@ You can provide a callback in any of the higher level methods, which allows you 
         //other options if necessary
     };
 
-    rokuDeploy.deploy(options, (info) => {
+    rokuDeploy.sideload(options, (info) => {
         //modify staging dir before it's zipped.
         //At this point, all files have been copied to the staging directory.
         manipulateFilesInStagingFolder(info.stagingDir)
@@ -157,12 +181,13 @@ You can provide a callback in any of the higher level methods, which allows you 
     });
     ```
 
-## bsconfig.json
-Another common config file is [bsconfig.json](https://github.com/rokucommunity/brighterscript#bsconfigjson-options), used by the [BrighterScript](https://github.com/rokucommunity/brighterscript) project and the [BrightScript extension for VSCode](https://github.com/rokucommunity/vscode-brightscript-language). Since many of the config settings are shared between `roku-deploy.json` and `bsconfig.json`, `roku-deploy` supports reading from that file as well. Here is the loading order:
- - if `roku-deploy.json` is found, those settings are used.
- - if `roku-deploy.json` is not found, look for `bsconfig.json` and use those settings.
+//## roku-deploy.json
+As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
+ - if CLI arguments are found, those are used.
+ - if `roku-deploy.json` is found, fill in any missing settings.
+ - Fill in any still missing settings with defaults specified in rokyeDeploy.getOptions().
 
-Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json` and `bsconfig.json`.
+Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json`.
 
 
 ## Files Array
@@ -355,9 +380,6 @@ Here are the available options. The defaults are shown to the right of the optio
     ```
 
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
-
-- **retainStagingDir?:** boolean = `false`
-    Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
 - **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
    The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
