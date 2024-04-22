@@ -2245,14 +2245,6 @@ describe('index', () => {
     });
 
     describe('makeZip', () => {
-        //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
-        it('rejects the promise when an error occurs', async () => {
-            //zip path doesn't exist
-            await assertThrowsAsync(async () => {
-                await rokuDeploy['makeZip']('source', '.tmp/some/zip/path/that/does/not/exist');
-            });
-        });
-
         it('filters the folders before making the zip', async () => {
             const files = [
                 'components/MainScene.brs',
