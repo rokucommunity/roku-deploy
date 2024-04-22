@@ -35,13 +35,19 @@ sample rokudeploy.json
 ```
 ## Usage
 
+CLI Commands/node script:
+```typescript
+var rokuDeploy = require('roku-deploy');
 
-```CLI Commands/node script:
+//deploy a .zip package of your project to a roku device
+npx ts-node ./src/cli.ts deploy --host 'ip-of-roku' --password 'password for roku dev admin portal' --rootDir . --outDir ./out`
 
-
-
-```javascript
+//create a signed package of your project
+//npx ts-node ./src/cli.ts package --host 'ip-of-roku' --password 'password for roku dev admin portal' --signingPassword 'signing password'`
 ```
+
+Or
+
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
 ```typescript
@@ -66,7 +72,7 @@ rokuDeploy.stage({
 ### Creating a zip from an already-populated staging folder
 Use this logic if you'd like to create a zip from your application folder.
 ```typescript
-/create a signed package of your project
+//create a signed package of your project
 rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
     stagingDir: 'path/to/files/to/zip',
@@ -79,7 +85,6 @@ rokuDeploy.zip({
     console.error(error);
 });
 ```
-
 
 ### Sideloading a project
 If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
@@ -100,7 +105,6 @@ rokuDeploy.sideload({
 });
 ```
 
-
 Can't find what you need? All public functions:
 - getFilPaths
 - keyPress
@@ -116,8 +120,6 @@ Can't find what you need? All public functions:
 - checkRequiredOptions
 - getDeviceInfo
 - getDevId
-
-
 
 
 ### running roku-deploy as an npm script
