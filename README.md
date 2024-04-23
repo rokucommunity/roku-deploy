@@ -38,61 +38,47 @@ sample rokudeploy.json
 ### Deploy a zip package
 Deploy a .zip package of your project to a roku device
 ```shell
-npx roku-deploy deploy --host ${ip-of-roku} --password ${password} --rootDir '.' --outDir './out'
+npx roku-deploy deploy --host 'ip.of.roku' --password 'password of device' --rootDir '.' --outDir './out'
 ```
 
 
 ### Create a signed package of your project
 ```shell
-npx roku-deploy deploy package --host ${ip-of-roku} --password ${password} --signingPassword ${signing-password}
+npx roku-deploy deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
 ```
 
 ### Other uses
 Stage the root directory
 ```shell
-npx roku-deploy stage --stagingDir ${stagingDir} --rootDir ${rootDir}
+npx roku-deploy stage --stagingDir './path/to/staging/dir --rootDir './path/to/root/dir'
 ```
 Zip the contents of a given directory
 ```shell
-npx roku-deploy zip --stagingDir ${rootDir} --outDir ${outDir}
+npx roku-deploy zip --stagingDir './path/to/root/dir' --outDir './path/to/out/dir'
 ```
 Press the Home key
 ```shell
-npx roku-deploy keyPress --key 'Home' --host ${ip-of-roku} --remotePort ${remotePort} --timeout ${timeout}
+npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --timeout 5000
 ```
 Sideload a build
 ```shell
-npx roku-deploy sideload --host ${ip-of-roku} --password ${password} --outDir ${outDir} 
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
 ```
 
 Convert to SquashFS
 ```shell
-npx roku-deploy squash --host ${ip-of-roku} --password ${password}
+npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 ```
 Create a signed package
 ```shell
-npx roku-deploy sign --host ${ip-of-roku} --password ${password}
+npx roku-deploy sign --host 'ip.of.roku' --password 'password'
 ```
 
-Here are all the possible cli commands:
-- bundle
-- deploy
-- package
-- exec
-- keypress
-- keyup
-- keydown
-- sendText
-- stage
-- sideload
-- squash
-- rekey
-- createSignedPackage
-- deleteDevChannel
-- screenshot
-- getDeviceInfo
-- getDevId
-- zip
+You can view the full list of commands by running:
+
+```shell
+npx roku-deploy --help
+```
 
 
 ## Node script Usage
