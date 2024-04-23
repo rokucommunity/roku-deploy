@@ -81,7 +81,7 @@ npx roku-deploy --help
 ```
 
 
-## Node script Usage
+## JavaScript Usage
 
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
