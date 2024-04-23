@@ -47,33 +47,32 @@ npx roku-deploy deploy --host 'ip.of.roku' --password 'password of device' --roo
 npx roku-deploy deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
 ```
 
-### Other uses
-Stage the root directory
+### Stage the root directory
 ```shell
 npx roku-deploy stage --stagingDir './path/to/staging/dir --rootDir './path/to/root/dir'
 ```
 
-Zip the contents of a given directory
+### Zip the contents of a given directory
 ```shell
 npx roku-deploy zip --stagingDir './path/to/root/dir' --outDir './path/to/out/dir'
 ```
 
-Press the Home key
+### Press the Home key
 ```shell
 npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --timeout 5000
 ```
 
-Sideload a build
+### Sideload a build
 ```shell
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
 ```
 
-Convert to SquashFS
+### Convert to SquashFS
 ```shell
 npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 ```
 
-Create a signed package
+### Create a signed package
 ```shell
 npx roku-deploy sign --host 'ip.of.roku' --password 'password'
 ```
