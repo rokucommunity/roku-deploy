@@ -52,14 +52,17 @@ Stage the root directory
 ```shell
 npx roku-deploy stage --stagingDir './path/to/staging/dir --rootDir './path/to/root/dir'
 ```
+
 Zip the contents of a given directory
 ```shell
 npx roku-deploy zip --stagingDir './path/to/root/dir' --outDir './path/to/out/dir'
 ```
+
 Press the Home key
 ```shell
 npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --timeout 5000
 ```
+
 Sideload a build
 ```shell
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
@@ -69,6 +72,7 @@ Convert to SquashFS
 ```shell
 npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 ```
+
 Create a signed package
 ```shell
 npx roku-deploy sign --host 'ip.of.roku' --password 'password'
@@ -122,6 +126,14 @@ rokuDeploy.zip({
 });
 ```
 
+### Pressing the Home key
+```typescript
+rokuDeploy.keyPress({
+    key: 'Home'
+    //...other options if necessary
+})
+```
+
 ### Sideloading a project
 If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
 ```typescript
@@ -138,6 +150,26 @@ rokuDeploy.sideload({
     //it failed
     console.error(error);
 });
+```
+
+### Convert to SquashFS
+```typescript
+rokuDeploy.convertToSquashfs({
+    host: '1.2.3.4',
+    password: 'password'
+    //...other options if necessary
+})
+```
+
+### Create a signed package
+```typescript
+rokuDeploy.createSignedPackage({
+    host: '1.2.3.4',
+    password: 'password',
+    signingPassword: 'signing password',
+    stagingDir: './path/to/staging/directory'
+    //...other options if necessary
+})
 ```
 
 Can't find what you need? Here are all of the public functions:
