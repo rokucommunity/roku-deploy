@@ -139,6 +139,22 @@ export interface RokuDeployOptions {
      * If true, the previously installed dev channel will be deleted before installing the new one
      */
     deleteDevChannel?: boolean;
+
+    /**
+     * Overrides for values used during the zip upload process. You probably don't need to change these...
+     */
+    packageUploadOverrides?: {
+        /**
+         * The route to use for uploading to the Roku device. Defaults to 'plugin_install'
+         * @default 'plugin_install'
+         */
+        route?: string;
+
+        /**
+         * A dictionary of form fields to be included in the package upload request. Set a value to null to delete from the form
+         */
+        formData?: Record<string, any>;
+    };
 }
 
 export type FileEntry = (string | { src: string[] | string; dest?: string });
