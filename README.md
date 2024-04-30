@@ -256,7 +256,8 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
-- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example: 
+`{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
  `{ src: "lib/*.brs", dest: "source/lib"}`
@@ -358,9 +359,6 @@ Here are the available options. The defaults are shown to the right of the optio
     ```
 
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
-
-- **retainStagingDir?:** boolean = `false`
-    Set this to true to prevent the staging folder from being deleted after creating the package. This is helpful for troubleshooting why your package isn't being created the way you expected.
 
 - **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
    The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
