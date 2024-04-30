@@ -21,6 +21,7 @@ jobs:
       - uses: actions/setup-node@master
         with:
           node-version: "14.18.1"
+          architecture: 'x64' # fix for macos-latest
       - run: cd src && cd .. #trying to fix "ENOENT: no such file or directory, uv_cwd" error
       - run: npm ci
       - run: npm run build
