@@ -919,7 +919,11 @@ export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
-    'manifest'
+    'manifest',
+    'locale/**/*',
+    'fonts/**/*',
+    '!node_modules',
+    '!**/*.{md,DS_Store,db}'
 ];
 
 export interface HttpResponse {
