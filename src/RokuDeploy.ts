@@ -68,8 +68,6 @@ export class RokuDeploy {
     public async zip(options: ZipOptions) {
         options = this.getOptions(options) as any;
 
-        //make sure the output folder exists
-
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
         //ensure the manifest file exists in the staging folder

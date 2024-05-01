@@ -38,7 +38,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
@@ -62,7 +62,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
@@ -108,31 +108,31 @@ void yargs
         return new ExecCommand(args.actions, args).run();
     })
 
-    .command('keypress', 'send keypress command', (builder) => {
+    .command('keyPress', 'send keypress command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
         return new KeyPressCommand().run(args);
     })
 
-    .command('keyup', 'send keyup command', (builder) => {
+    .command('keyUp', 'send keyup command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
         return new KeyUpCommand().run(args);
     })
 
-    .command('keydown', 'send keydown command', (builder) => {
+    .command('keyDown', 'send keydown command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
         return new KeyDownCommand().run(args);
@@ -142,7 +142,7 @@ void yargs
         return builder
             .option('text', { type: 'string', description: 'The text to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remoteport', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
         return new SendTextCommand().run(args);

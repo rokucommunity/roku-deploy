@@ -33,45 +33,64 @@ sample rokudeploy.json
     "password": "securePassword"
 }
 ```
-## Usage
+## CLI Usage
 
-From a node script
-```javascript
-var rokuDeploy = require('roku-deploy');
-
-//deploy a .zip package of your project to a roku device
-rokuDeploy.deploy({
-    host: 'ip-of-roku',
-    password: 'password for roku dev admin portal'
-    //other options if necessary
-}).then(function(){
-    //it worked
-}, function(error) {
-    //it failed
-    console.error(error);
-});
-```
-Or
-```javascript
-//create a signed package of your project
-rokuDeploy.deployAndSignPackage({
-    host: 'ip-of-roku',
-    password: 'password for roku dev admin portal',
-    signingPassword: 'signing password'
-    //other options if necessary
-}).then(function(pathToSignedPackage){
-    console.log('Signed package created at ', pathToSignedPackage);
-}, function(error) {
-    //it failed
-    console.error(error);
-});
+### Deploy a zip package
+Deploy a .zip package of your project to a roku device
+```shell
+npx roku-deploy deploy --host 'ip.of.roku' --password 'password of device' --rootDir '.' --outDir './out'
 ```
 
+
+### Create a signed package of your project
+```shell
+npx roku-deploy deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
+```
+
+### Stage the root directory
+```shell
+npx roku-deploy stage --stagingDir './path/to/staging/dir --rootDir './path/to/root/dir'
+```
+
+### Zip the contents of a given directory
+```shell
+npx roku-deploy zip --stagingDir './path/to/root/dir' --outDir './path/to/out/dir'
+```
+
+### Press the Home key
+```shell
+npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --timeout 5000
+```
+
+### Sideload a build
+```shell
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
+```
+
+### Convert to SquashFS
+```shell
+npx roku-deploy squash --host 'ip.of.roku' --password 'password'
+```
+
+### Create a signed package
+```shell
+npx roku-deploy sign --host 'ip.of.roku' --password 'password'
+```
+
+You can view the full list of commands by running:
+
+```shell
+npx roku-deploy --help
+```
+
+
+## JavaScript Usage
 
 ### Copying the files to staging
 If you'd like to use roku-deploy to copy files to a staging folder, you can do the following:
 ```typescript
-rokuDeploy.prepublishToStaging({
+import { rokuDeploy } from 'roku-deploy';
+rokuDeploy.stage({
     rootDir: "folder/with/your/source/code",
     stagingDir: 'path/to/staging/folder',
     files: [
@@ -92,8 +111,8 @@ rokuDeploy.prepublishToStaging({
 ### Creating a zip from an already-populated staging folder
 Use this logic if you'd like to create a zip from your application folder.
 ```typescript
-/create a signed package of your project
-rokuDeploy.zipPackage({
+//create a signed package of your project
+rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
     stagingDir: 'path/to/files/to/zip',
     outFile: 'filename-of-your-app.zip'
@@ -106,12 +125,19 @@ rokuDeploy.zipPackage({
 });
 ```
 
+### Pressing the Home key
+```typescript
+rokuDeploy.keyPress({
+    key: 'Home'
+    //...other options if necessary
+})
+```
 
-### Deploying an existing zip
+### Sideloading a project
 If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
 ```typescript
-/create a signed package of your project
-rokuDeploy.publish({
+//sideload a package onto a specified Roku
+rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
     outDir: 'folder/where/your/zip/resides/',
@@ -125,6 +151,46 @@ rokuDeploy.publish({
 });
 ```
 
+### Convert to SquashFS
+```typescript
+rokuDeploy.convertToSquashfs({
+    host: '1.2.3.4',
+    password: 'password'
+    //...other options if necessary
+})
+```
+
+### Create a signed package
+```typescript
+rokuDeploy.createSignedPackage({
+    host: '1.2.3.4',
+    password: 'password',
+    signingPassword: 'signing password',
+    stagingDir: './path/to/staging/directory'
+    //...other options if necessary
+})
+```
+
+Can't find what you need? Here are all of the public functions:
+- stage
+- zip
+- sideload
+- getFilPaths
+- keyPress
+- keyUp
+- keyDown
+- sendText
+- closeChannel
+- rekeyDevice
+- createSignedPackage
+- deleteDevChannel
+- captureScreenshot
+- getOptions
+- checkRequiredOptions
+- getDeviceInfo
+- getDevId
+
+
 ### running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
 
@@ -134,38 +200,13 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-You can provide a callback in any of the higher level methods, which allows you to modify the copied contents before the package is zipped. An info object is passed in with the following attributes
-- **manifestData:** [key: string]: string
-    Contains all the parsed values from the manifest file
-- **stagingDir:** string
-    Path to staging folder to make it so you only need to know the relative path to what you're trying to modify
+## roku-deploy.json
+As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
+ - if CLI arguments are found, those are used.
+ - if `roku-deploy.json` is found, fill in any missing settings.
+ - Fill in any still missing settings with defaults specified in rokyeDeploy.getOptions().
 
-    ```javascript
-    let options = {
-        host: 'ip-of-roku',
-        password: 'password for roku dev admin portal'
-        //other options if necessary
-    };
-
-    rokuDeploy.deploy(options, (info) => {
-        //modify staging dir before it's zipped.
-        //At this point, all files have been copied to the staging directory.
-        manipulateFilesInStagingFolder(info.stagingDir)
-        //this function can also return a promise,
-        //which will be awaited before roku-deploy starts deploying.
-    }).then(function(){
-        //it worked
-    }, function(){
-        //it failed
-    });
-    ```
-
-## bsconfig.json
-Another common config file is [bsconfig.json](https://github.com/rokucommunity/brighterscript#bsconfigjson-options), used by the [BrighterScript](https://github.com/rokucommunity/brighterscript) project and the [BrightScript extension for VSCode](https://github.com/rokucommunity/vscode-brightscript-language). Since many of the config settings are shared between `roku-deploy.json` and `bsconfig.json`, `roku-deploy` supports reading from that file as well. Here is the loading order:
- - if `roku-deploy.json` is found, those settings are used.
- - if `roku-deploy.json` is not found, look for `bsconfig.json` and use those settings.
-
-Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json` and `bsconfig.json`.
+Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json`.
 
 
 ## Files Array
