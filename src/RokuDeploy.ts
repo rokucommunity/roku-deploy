@@ -263,7 +263,8 @@ export class RokuDeploy {
                 readStream.on('open', resolve);
             });
 
-            let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
+            const route = options.packageUploadOverrides?.route ?? 'plugin_install';
+            let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
                 archive: readStream
             });
@@ -277,6 +278,16 @@ export class RokuDeploy {
             if (options.remoteDebugConnectEarly) {
                 // eslint-disable-next-line camelcase
                 requestOptions.formData.remotedebug_connect_early = '1';
+            }
+
+            //apply any supplied formData overrides
+            for (const key in options.packageUploadOverrides?.formData ?? {}) {
+                const value = options.packageUploadOverrides.formData[key];
+                if (value === undefined || value === null) {
+                    delete requestOptions.formData[key];
+                } else {
+                    requestOptions.formData[key] = value;
+                }
             }
 
             //try to "replace" the channel first since that usually works.
@@ -335,8 +346,27 @@ export class RokuDeploy {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
-
-        let results = await this.doPostRequest(requestOptions);
+        let results;
+        try {
+            results = await this.doPostRequest(requestOptions);
+        } catch (error) {
+            //Occasionally this error is seen if the zip size and file name length at the
+            //wrong combination. The device fails to respond to our request with a valid response.
+            //The device successfully converted the zip, so ping the device and and check the response
+            //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
+            if ((error as any).code === 'HPE_INVALID_CONSTANT') {
+                try {
+                    results = await this.doPostRequest(requestOptions, false);
+                    if (/"fileType"\s*:\s*"squashfs"/.test(results.body)) {
+                        return results;
+                    }
+                } catch (e) {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new errors.ConvertError('Squashfs conversion failed');
         }
@@ -477,7 +507,8 @@ export class RokuDeploy {
         }
 
         if (results.response.statusCode === 401) {
-            throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
+            const host = results.response.request?.host?.toString?.();
+            throw new errors.UnauthorizedDeviceResponseError(`Unauthorized. Please verify credentials for host '${host}'`, results);
         }
 
         let rokuMessages = this.getRokuMessagesFromResponseBody(results.body);
@@ -720,7 +751,7 @@ export class RokuDeploy {
         options = this.getOptions(options) as any;
 
         let zipFileName = options.outFile;
-        if (!zipFileName.toLowerCase().endsWith('.zip')) {
+        if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
         let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
@@ -1005,6 +1036,12 @@ export interface SideloadOptions {
     outFile?: string;
     deleteDevChannel?: boolean;
     cwd?: string;
+    packageUploadOverrides?: PackageUploadOverridesOptions;
+}
+
+export interface PackageUploadOverridesOptions {
+    route?: string;
+    formData?: Record<string, any>;
 }
 
 export interface BaseRequestOptions {

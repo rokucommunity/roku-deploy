@@ -727,6 +727,38 @@ describe('index', () => {
             } catch (e) { }
         });
 
+        it('uses overridden route', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.sideload({
+                ...options,
+                host: '0.0.0.0',
+                password: 'password',
+                packageUploadOverrides: {
+                    route: 'alt_path'
+                }
+            });
+            expect(stub.getCall(1).args[0].url).to.eql('http://0.0.0.0:80/alt_path');
+        });
+
+        it('overrides formData', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.sideload({
+                ...options,
+                host: '1.2.3.4',
+                password: 'password',
+                remoteDebug: true,
+                packageUploadOverrides: {
+                    formData: {
+                        remotedebug: null,
+                        newfield: 'here'
+                    }
+                }
+            });
+            expect(stub.getCall(1).args[0].formData).to.include({
+                newfield: 'here'
+            }).and.to.not.haveOwnProperty('remotedebug');
+        });
+
         it('does not delete the archive by default', async () => {
             let zipPath = `${outDir}/${options.outFile}`;
 
@@ -905,6 +937,21 @@ describe('index', () => {
             });
         });
 
+        it('checkRequest handles edge case', () => {
+            function doTest(results, hostValue = undefined) {
+                let error: Error;
+                try {
+                    rokuDeploy['checkRequest'](results);
+                } catch (e) {
+                    error = e as any;
+                }
+                expect(error.message).to.eql(`Unauthorized. Please verify credentials for host '${hostValue}'`);
+            }
+            doTest({ body: 'something', response: { statusCode: 401, request: { host: '1.1.1.1' } } }, '1.1.1.1');
+            doTest({ body: 'something', response: { statusCode: 401, request: { host: undefined } } });
+            doTest({ body: 'something', response: { statusCode: 401, request: undefined } });
+        });
+
         it('rejects when response contains invalid password status code', () => {
             mockDoPostRequest('', 401);
 
@@ -917,7 +964,7 @@ describe('index', () => {
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
-                expect(err.message).to.equal('Unauthorized. Please verify username and password for target Roku.');
+                expect(err.message).to.be.a('string').and.satisfy(msg => msg.startsWith('Unauthorized. Please verify credentials for host'));
                 expect(true).to.be.true;
             });
         });
@@ -1072,7 +1119,92 @@ describe('index', () => {
             }
             assert.fail('Should not have succeeded');
         });
+
+        it('should throw with HPE_INVALID_CONSTANT and then succeed on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"squashfs"...' });
+            try {
+                await rokuDeploy.convertToSquashfs({
+                    ...options,
+                    host: options.host,
+                    password: 'password'
+                });
+            } catch (e) {
+                assert.fail('Should not have throw');
+            }
+        });
+
+        it('should throw and not retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode('Something else');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs({
+                    ...options,
+                    host: options.host,
+                    password: 'password'
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(ErrorWithCode);
+                expect(e['code']).to.be.eql('Something else');
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should throw with HPE_INVALID_CONSTANT and then fail on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().returns({ body: '..."fileType":"zip"...' });
+            try {
+                await rokuDeploy.convertToSquashfs({
+                    ...options,
+                    host: options.host,
+                    password: 'password'
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConvertError);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
+
+        it('should fail with HPE_INVALID_CONSTANT and then throw on retry', async () => {
+            let doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.onFirstCall().throws((params) => {
+                throw new ErrorWithCode();
+            });
+            doPostStub.onSecondCall().throws((params) => {
+                throw new Error('Never seen');
+            });
+            try {
+                await rokuDeploy.convertToSquashfs({
+                    ...options,
+                    host: options.host,
+                    password: 'password'
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(ErrorWithCode);
+                return;
+            }
+            assert.fail('Should not have throw');
+        });
     });
+
+    class ErrorWithCode extends Error {
+        code;
+
+        constructor(code = 'HPE_INVALID_CONSTANT') {
+            super();
+            this.code = code;
+        }
+    }
 
     describe('rekeyDevice', () => {
         beforeEach(() => {
@@ -2245,6 +2377,17 @@ describe('index', () => {
     });
 
     describe('makeZip', () => {
+        //this is mainly done to hit 100% coverage, but why not ensure the errors are handled properly? :D
+        it('rejects the promise when an error occurs', async () => {
+            //zip path doesn't exist
+            await assertThrowsAsync(async () => {
+                sinon.stub(fsExtra, 'writeFile').callsFake(() => {
+                    throw new Error();
+                });
+                await rokuDeploy['makeZip']('source', '.tmp/some/zip/path/that/does/not/exist');
+            });
+        });
+
         it('filters the folders before making the zip', async () => {
             const files = [
                 'components/MainScene.brs',
@@ -3273,6 +3416,19 @@ describe('index', () => {
             rokuDeploy['checkRequest'](results);
             return Promise.resolve(results);
         });
+    }
+
+    async function assertThrowsAsync(fn) {
+        let f = () => { };
+        try {
+            await fn();
+        } catch (e) {
+            f = () => {
+                throw e;
+            };
+        } finally {
+            assert.throws(f);
+        }
     }
 });
 

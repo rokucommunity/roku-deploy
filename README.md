@@ -297,7 +297,8 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
-- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example: 
+`{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
  `{ src: "lib/*.brs", dest: "source/lib"}`

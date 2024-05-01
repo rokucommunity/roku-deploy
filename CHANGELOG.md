@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
 
 
+ 
+## [3.12.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.3...v3.12.0) - 2024-03-01
+### Changed
+ - Support overriding various package upload form data ([#136](https://github.com/rokucommunity/roku-deploy/pull/136))
+
+
+
+## [3.11.3](https://github.com/rokucommunity/roku-deploy/compare/v3.11.2...v3.11.3) - 2024-02-29
+### Fixed
+ - Retry the convertToSquahsfs request to mitigate the HPE_INVALID_CONSTANT error ([#145](https://github.com/rokucommunity/roku-deploy/pull/145))
+
+
+
+## [3.11.2](https://github.com/rokucommunity/roku-deploy/compare/v3.11.1...v3.11.2) - 2023-12-20
+### Changed
+ - Update wrong host password error message ([#134](https://github.com/rokucommunity/roku-deploy/pull/134))
+
+
 
 ## [3.11.1](https://github.com/rokucommunity/roku-deploy/compare/v3.11.0...v3.11.1) - 2023-11-30
 ### Fixed
