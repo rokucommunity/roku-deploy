@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
         with:
-          node-version: "12.22.7"
+          node-version: "14.18.1"
+          architecture: 'x64' # fix for macos-latest
       - run: cd src && cd .. #trying to fix "ENOENT: no such file or directory, uv_cwd" error
       - run: npm ci
       - run: npm run build
@@ -38,7 +39,8 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
         with:
-          node-version: "10.19.0"
+          node-version: "14.18.1"
+          architecture: 'x64' # fix for macos-latest
       - run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ./.npmrc
       - run: npm ci
       - run: npm run build
