@@ -919,9 +919,9 @@ export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
-    'manifest',
     'locale/**/*',
     'fonts/**/*',
+    'manifest',
     '!node_modules',
     '!**/*.{md,DS_Store,db}'
 ];
