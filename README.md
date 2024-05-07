@@ -10,6 +10,19 @@ Publish Roku projects to a Roku device by using Node.js.
 [![npm version](https://img.shields.io/npm/v/roku-deploy.svg?logo=npm)](https://www.npmjs.com/package/roku-deploy)
 [![license](https://img.shields.io/github/license/rokucommunity/roku-deploy.svg)](LICENSE)
 [![Slack](https://img.shields.io/badge/Slack-RokuCommunity-4A154B?logo=slack)](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA)
+
+### Table of Contents
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Upgrading to V4](#upgrading-to-v4)
+- [CLI Usage](#cli-usage)
+- [JavaScript Usage](#javascript-usage)
+- [roku-deploy JSON](#roku-deploy-json)
+- [Files Array](#files-array)
+- [roku-deploy Options](#roku-deploy-options)
+- [Troubleshooting](#troubleshooting)
+- [Changelog](#changelog)
+
 ## Installation
 
     npm install roku-deploy
@@ -33,6 +46,9 @@ sample rokudeploy.json
     "password": "securePassword"
 }
 ```
+
+## Upgrading to V4
+
 ## CLI Usage
 
 ### Deploy a zip package
@@ -200,7 +216,7 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-## roku-deploy.json
+## roku-deploy JSON
 As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
  - if CLI arguments are found, those are used.
  - if `roku-deploy.json` is found, fill in any missing settings.
