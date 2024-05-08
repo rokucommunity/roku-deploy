@@ -92,7 +92,7 @@ Some functions were added which allow for any remote-to-Roku interaction: `keyPr
 
 Previously, functions `deploy()`, `createPackage()`, and `deployAndSignPackage()` were available in the Node API, but have been moved to CLI commands.
 
-Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in a few Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
+Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in some Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
 
 ## CLI Usage
 
