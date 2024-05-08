@@ -49,10 +49,36 @@ sample rokudeploy.json
 }
 ```
 
-## Upgrading to V4
+## Upgrading to v4
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
-The first is that the Node API no longer loads user-specified defaults from the config file. The config file is only used in the CLI commands. This process will only check `roku-deploy.json`, as bsconfig.json is no longer supported. The order of priority goes: if there are arguments in the CLI command, those are used. If some are missing, roku-deploy.json values are used. If there is no JSON or there are some values that are required for the CLI command but not available in the JSON or the CLI arguments, a set of predetermined default values are used. These can be found in the section titled [roku-deploy Options](#roku-deploy-options).
+### JavaScript functions don't load config files from disk
+In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `asdf` before calling the desired rokuDeploy function. Here's an example:
+
+```javascript
+const config = {
+    //get the default options
+    ...rokuDeploy.getOptions(),
+    //override with any values found in
+    ...util.getOptionsFromJson({ cwd: process.cwd() })
+};
+await rokuDeploy.sideload(options);
+```
+
+### Removed support for bsconfig.json
+We've removed support for loading `bsconfig.json` files. This was introduced in v3, but sometimes causes confusion between various systems (like brighterscript, vscode extension, etc). If you need to load values from a `bsconfig.json`, you can explicitly specify the config path. Like this:
+
+```javascript
+const config = {
+    //get the default options
+    ...rokuDeploy.getOptions(),
+    //override with any values found in
+    ...util.getOptionsFromJson({ configPath: './bsconfig.json' })
+};
+//call some rokuDeploy function
+await rokuDeploy.sideload(options);
+```
+
 
 Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
 - `zipPackage()` -> `zip()`
@@ -99,7 +125,7 @@ npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --ti
 
 ### Sideload a build
 ```shell
-npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir'
 ```
 
 ### Convert to SquashFS
@@ -237,13 +263,16 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-## roku-deploy JSON
-As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
- - if CLI arguments are found, those are used.
- - if `roku-deploy.json` is found, fill in any missing settings.
- - Fill in any still missing settings with defaults specified in rokyeDeploy.getOptions().
+## Options priority order
+RokuDeploy can be configured in various ways (cli args, `roku-deploy.json`, parameters, and defaults). Here's the order these options will be loaded:
+**When run from the CLI:**
+ - start with the default set of options from `rokuDeploy.getOptions()`
+ - override with any values found in `roku-deploy.json` or specified config file
+ - override with any values from CLI args
 
-Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json`.
+**When run from javascript:**
+ - start with the default set of options from `rokuDeploy.getOptions()`
+ - override with any values passed in as function arguments
 
 
 ## Files Array
@@ -342,7 +371,7 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
-- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example: 
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
 `{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
