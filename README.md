@@ -50,7 +50,7 @@ sample rokudeploy.json
 ## Upgrading to V4
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
-The first is that the Node API no longer loads user-specified defaults from the config file. The config file is only used in the CLI commands. This process will only check `roku-deploy.json`, as bsconfig.json is no longer supported. The order of priority goes: if there are arguments in the CLI command, those are used. If some are missing, roku-deploy.json values are used. If there is no JSON or there are some values that are required for the CLI command but not available in the JSON or the CLI arguments, a set of predetermined default values are used. These can be found [here](src/RokuDeploy.ts#L700).
+The first is that the Node API no longer loads user-specified defaults from the config file. The config file is only used in the CLI commands. This process will only check `roku-deploy.json`, as bsconfig.json is no longer supported. The order of priority goes: if there are arguments in the CLI command, those are used. If some are missing, roku-deploy.json values are used. If there is no JSON or there are some values that are required for the CLI command but not available in the JSON or the CLI arguments, a set of predetermined default values are used. These can be found in the section titled [roku-deploy Options](#roku-deploy-options).
 
 Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
 - `zipPackage()` -> `zip()`
@@ -271,12 +271,16 @@ If you want to include additonal files, you will need to provide the entire arra
 ```jsonc
 {
     "files": [
-        "source/**/*",
-        "components/**/*",
-        "images/**/*",
-        "manifest"
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}",
         //your folder with other assets
-        "assets/**/*",
+        "assets/**/*"
     ]
 }
 ```
@@ -402,7 +406,11 @@ Here are the available options. The defaults are shown to the right of the optio
         "source/**/*.*",
         "components/**/*.*",
         "images/**/*.*",
-        "manifest"
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}"
     ]
     ```
     An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. Make sure to _exclusively_ use forward slashes ( `/` ) for path separators (even on Windows), as backslashes are reserved for character escaping. You can learn more about this requirement [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
