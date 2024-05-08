@@ -35,6 +35,8 @@ Publish Roku projects to a Roku device by using Node.js.
     images/
     source/
     manifest
+    locale/
+    fonts/
 
 2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible. (**note**: `rokudeploy.json` is jsonc, which means it supports comments).
 
@@ -65,7 +67,6 @@ Some functions were added which allow for any remote-to-Roku interaction: `keyPr
 Previously, functions `deploy()`, `createPackage()`, and `deployAndSignPackage()` were available in the Node API, but have been moved to CLI commands.
 
 Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in a few Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
-
 
 ## CLI Usage
 
@@ -131,7 +132,9 @@ rokuDeploy.stage({
         "source/**/*",
         "components/**/*",
         "images/**/*",
-        "manifest"
+        "manifest",
+        "locale/**/*",
+        "fonts/**/*"
     ],
     //...other options if necessary
 }).then(function(){
@@ -376,26 +379,25 @@ For example, if you have a base project, and then a child project that wants to 
 Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
 
 - **host:** string (*required*)
-    The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`
+    The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`.
 
 - **password:** string (*required*)
-    The password for logging in to the developer portal on the target Roku device
+    The password for logging in to the developer portal on the target Roku device.
 
 - **signingPassword:** string (*required for signing*)
-    The password used for creating signed packages
+    The password used for creating signed packages.
 
 - **rekeySignedPackage:** string (*required for rekeying*)
-    Path to a copy of the signed package you want to use for rekeying
+    Path to a copy of the signed package you want to use for rekeying.
 
 - **devId:** string
-    Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
-
+    Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected.
 
 - **outDir?:** string = `"./out"`
-    A full path to the folder where the zip/pkg package should be placed
+    A full path to the folder where the zip/pkg package should be placed.
 
 - **outFile?:** string = `"roku-deploy"`
-    The base filename the zip/pkg file should be given (excluding the extension)
+    The base filename the zip/pkg file should be given (excluding the extension).
 
 - **rootDir?:** string = `'./'`
     The root path to the folder holding your project. The manifest file should be directly underneath this folder. Use this option when your roku project is in a subdirectory of where roku-deploy is installed.
@@ -451,27 +453,36 @@ Here are the available options. The defaults are shown to the right of the optio
    The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
 
 - **convertToSquashfs?:** boolean = `false`
-   If true we convert to squashfs before creating the pkg file
-
-- **incrementBuildNumber?:** boolean = `false`
-    If true we increment the build number to be a timestamp in the format yymmddHHMM
+   If true we convert to squashfs before creating the pkg file.
 
 - **username?:** string = `"rokudev"`
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
-    just in case roku adds support for custom usernames in the future
+    just in case roku adds support for custom usernames in the future.
 
-- **packagePort?:** string = 80
+- **packagePort?:** number = `80`
     The port used for package-related requests. This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
 
-- **remotePort?:** string = 8060
+- **remotePort?:** number = `8060`
     The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
 
-- **remoteDebug?:** boolean = false
+- **screenshotDir?:** string = `"./tmp/roku-deploy/screenshots/"`
+    The directory where screenshots should be saved. Will use the OS temp directory by default.
+
+- **timeout?:** number = `150000`
+    The number of milliseconds at which point this request should timeout and return a rejected promise.
+
+- **remoteDebug?:** boolean = `false`
      When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. This should always be `false` unless you're creating a plugin for an editor such as VSCode, Atom, Sublime, etc.
      More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
 
-- **deleteInstalledChannel?:** boolean = true
-    If true the previously installed dev channel will be deleted before installing the new one
+- **cwd?:** string = `process.cwd()`
+    The current working directory, which all other paths will be set relative to. If left to default, it will be set as the process.cwd() method, which returns the current working directory of the Node.js process.
+
+- **deleteDevChannel?:** boolean = `true`
+    If true the previously installed dev channel will be deleted before installing the new one.
+
+- **packageUploadOverrides?:**
+    Overrides for values used during the zip upload process. You probably don't need to change these...
 
 
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
