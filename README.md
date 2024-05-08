@@ -427,6 +427,9 @@ Here are the available options. The defaults are shown to the right of the optio
 - **deleteInstalledChannel?:** boolean = true
     If true the previously installed dev channel will be deleted before installing the new one
 
+- **logLevel?:** string = `"error"`
+    The level lof logging information printed in the console. You can read more information [here](https://github.com/rokucommunity/logger)
+
 
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
 

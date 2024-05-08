@@ -52,6 +52,7 @@ export class RokuDeploy {
                 });
             }, 10);
         }));
+        logger.info('Relevant files copied to:', options.stagingDir);
         return options.stagingDir;
     }
 
@@ -72,6 +73,7 @@ export class RokuDeploy {
 
         //create a zip of the staging folder
         await this.makeZip(options.stagingDir, zipFilePath);
+        logger.info('Zip created at:', zipFilePath);
     }
 
     /**
@@ -310,7 +312,8 @@ export class RokuDeploy {
             if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
-            return { message: 'Successful deploy', results: response };
+            logger.info('Successful sideload');
+            return { message: 'Successful sideload', results: response };
         } finally {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
@@ -422,6 +425,7 @@ export class RokuDeploy {
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+        logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
         let manifestPath = path.join(options.stagingDir, 'manifest');
@@ -457,6 +461,7 @@ export class RokuDeploy {
 
             let pkgFilePath = this.getOutputPkgFilePath(options as any);
             await this.downloadFile(requestOptions2, pkgFilePath);
+            logger.info('Signed package created at:', pkgFilePath);
             return pkgFilePath;
         }
 
@@ -757,6 +762,7 @@ export class RokuDeploy {
             zipFileName += '.zip';
         }
         let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
+        logger.debug('Output zip file path:', outZipFilePath);
         return outZipFilePath;
     }
 
@@ -776,6 +782,7 @@ export class RokuDeploy {
         let outFolderPath = path.resolve(options.outDir);
 
         let outPkgFilePath = path.join(outFolderPath, pkgFileName);
+        logger.debug('Output pkg file path:', outPkgFilePath);
         return outPkgFilePath;
     }
 
@@ -823,6 +830,7 @@ export class RokuDeploy {
                 }
                 deviceInfo = result;
             }
+            logger.debug('Device info:', deviceInfo);
             return deviceInfo;
         } catch (e) {
             logger.warn('Error getting device info:', e);
@@ -857,6 +865,7 @@ export class RokuDeploy {
     public async getDevId(options?: GetDevIdOptions) {
         this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
+        logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
         return deviceInfo['keyed-developer-id'];
     }
 
