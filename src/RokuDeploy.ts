@@ -10,20 +10,13 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
-import { Logger, LogLevel } from './Logger';
+import { logger } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
 
 export class RokuDeploy {
-
-    constructor() {
-        this.logger = new Logger();
-    }
-
-    private logger: Logger;
-
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
@@ -323,7 +316,7 @@ export class RokuDeploy {
             try {
                 readStream?.close();
             } catch (e) {
-                this.logger.info('Error closing read stream', e);
+                logger.info('Error closing read stream', e);
             }
         }
     }
@@ -710,12 +703,12 @@ export class RokuDeploy {
             rootDir: './',
             files: [...DefaultFiles],
             username: 'rokudev',
-            logLevel: LogLevel.log,
+            logLevel: 'error',
             screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/'),
             ...options
         };
         options.cwd ??= process.cwd();
-        this.logger.logLevel = options.logLevel; //TODO: Handle logging differently
+        logger.logLevel = options.logLevel;
 
         //fully resolve the folder paths
         options.rootDir = path.resolve(options.cwd, options.rootDir);
