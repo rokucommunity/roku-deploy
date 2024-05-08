@@ -22,6 +22,7 @@ export class RokuDeploy {
      * @param options
      */
     public async stage(options: StageOptions) {
+        logger.info('Beginning to copy files to staging folder');
         options = this.getOptions(options) as any;
 
         //clean the staging directory
@@ -59,6 +60,7 @@ export class RokuDeploy {
      * @param options
      */
     public async zip(options: ZipOptions) {
+        logger.info('Beginning to zip staging folder');
         options = this.getOptions(options) as any;
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
@@ -207,6 +209,7 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
+        logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
@@ -230,6 +233,7 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
+        logger.info('Beggining to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
         //make sure the outDir exists
@@ -316,7 +320,7 @@ export class RokuDeploy {
             try {
                 readStream?.close();
             } catch (e) {
-                logger.info('Error closing read stream', e);
+                logger.warn('Error closing read stream', e);
             }
         }
     }
@@ -354,6 +358,7 @@ export class RokuDeploy {
                         return results;
                     }
                 } catch (e) {
+                    logger.warn('Error converting to squashfs:', error);
                     throw error;
                 }
             } else {
@@ -463,6 +468,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: any, verify = true) {
+        logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             request.post(params, (err, resp, body) => {
                 if (err) {
@@ -482,6 +488,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: requestType.OptionsWithUrl) {
+        logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
             request.get(params, (err, resp, body) => {
                 if (err) {
@@ -605,6 +612,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+        logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
 
@@ -725,6 +733,7 @@ export class RokuDeploy {
             );
         }
 
+        logger.info('Retrieved options:', options);
         return options;
     }
 
@@ -816,6 +825,7 @@ export class RokuDeploy {
             }
             return deviceInfo;
         } catch (e) {
+            logger.warn('Error getting device info:', e);
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
