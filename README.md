@@ -48,6 +48,24 @@ sample rokudeploy.json
 ```
 
 ## Upgrading to V4
+The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
+
+The first is that the Node API no longer loads user-specified defaults from the config file. The config file is only used in the CLI commands. This process will only check `roku-deploy.json`, as bsconfig.json is no longer supported. The order of priority goes: if there are arguments in the CLI command, those are used. If some are missing, roku-deploy.json values are used. If there is no JSON or there are some values that are required for the CLI command but not available in the JSON or the CLI arguments, a set of predetermined default values are used. These can be found [here](src/RokuDeploy.ts#L700).
+
+Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
+- `zipPackage()` -> `zip()`
+- `pressHomeButton()` -> `closeChannel()` which will press home twice in order to cancel instant resume
+- `publish()` -> `sideload()`
+- `signExistingPackage()` -> `createSignedPackage()`
+- `deleteInstalledChannel()` -> `deleteDevChannel()`
+- `takeScreenshot()` -> `captureScreenshot()`
+
+Some functions were added which allow for any remote-to-Roku interaction: `keyPress()`, `keyUp()`, `keyDown()`, and `sendText()`
+
+Previously, functions `deploy()`, `createPackage()`, and `deployAndSignPackage()` were available in the Node API, but have been moved to CLI commands.
+
+Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in a few Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
+
 
 ## CLI Usage
 
@@ -234,10 +252,14 @@ For most standard projects, the default files array should work just fine:
 ```jsonc
 {
     "files": [
-        "source/**/*",
-        "components/**/*",
-        "images/**/*",
-        "manifest"
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}"
     ]
 }
 ```
