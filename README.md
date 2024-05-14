@@ -79,7 +79,7 @@ const config = {
 await rokuDeploy.sideload(options);
 ```
 
-
+### Changed, added, or moved some functions in the main Node API
 Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
 - `zipPackage()` -> `zip()`
 - `pressHomeButton()` -> `closeChannel()` which will press home twice in order to cancel instant resume
@@ -92,6 +92,7 @@ Some functions were added which allow for any remote-to-Roku interaction: `keyPr
 
 Previously, functions `deploy()`, `createPackage()`, and `deployAndSignPackage()` were available in the Node API, but have been moved to CLI commands.
 
+### Default file array changed
 Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in some Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
 
 ## CLI Usage
