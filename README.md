@@ -17,9 +17,9 @@ Publish Roku projects to a Roku device by using Node.js.
 - [Upgrading to V4](#upgrading-to-v4)
 - [CLI Usage](#cli-usage)
 - [JavaScript Usage](#javascript-usage)
-- [Options priority order](#options-priority-order)
+- [Options Priority Order](#options-priority-order)
 - [Files Array](#files-array)
-- [roku-deploy Options](#roku-deploy-options)
+- [Available roku-deploy Options](#available-roku-deploy-options)
 - [Troubleshooting](#troubleshooting)
 - [Changelog](#changelog)
 
@@ -264,7 +264,7 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-## Options priority order
+## Options Priority Order
 RokuDeploy can be configured in various ways (cli args, `roku-deploy.json`, parameters, and defaults). Here's the order these options will be loaded:
 **When run from the CLI:**
  - start with the default set of options from `rokuDeploy.getOptions()`
@@ -405,8 +405,8 @@ For example, if you have a base project, and then a child project that wants to 
 
 
 
-## roku-deploy Options
-Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
+## Available roku-deploy Options
+Here are the available options for customizing to your developer-specific workflows. The defaults are shown to the right of the option name, but all can be overridden:
 
 - **host:** string (*required*)
     The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`.
