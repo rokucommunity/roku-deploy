@@ -88,9 +88,16 @@ Another set of changes are the names and features available in the Node API. Som
 - `deleteInstalledChannel()` -> `deleteDevChannel()`
 - `takeScreenshot()` -> `captureScreenshot()`
 
-Some functions were added which allow for any remote-to-Roku interaction: `keyPress()`, `keyUp()`, `keyDown()`, and `sendText()`
+Some functions were added to help with certain developer usecases. These mostly allow for any remote-to-Roku interaction:
+- `keyPress()`
+- `keyUp()`
+- `keyDown()`
+- `sendText()`
 
-Previously, functions `deploy()`, `createPackage()`, and `deployAndSignPackage()` were available in the Node API, but have been moved to CLI commands.
+Previously, some functions were available in the Node API, but have been moved to CLI commands. These are:
+- `deploy()`
+- `createPackage()`
+- `deployAndSignPackage()`
 
 ### Default file array changed
 Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in some Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
