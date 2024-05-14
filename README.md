@@ -243,23 +243,23 @@ rokuDeploy.createSignedPackage({
 ```
 
 Can't find what you need? Here are all of the public functions:
-- stage
-- zip
-- sideload
-- getFilPaths
-- keyPress
-- keyUp
-- keyDown
-- sendText
-- closeChannel
-- rekeyDevice
-- createSignedPackage
-- deleteDevChannel
-- captureScreenshot
-- getOptions
-- checkRequiredOptions
-- getDeviceInfo
-- getDevId
+- `stage()`
+- `zip()`
+- `sideload()`
+- `getFilPaths()`
+- `keyPress()`
+- `keyUp()`
+- `keyDown()`
+- `sendText()`
+- `closeChannel()`
+- `rekeyDevice()`
+- `createSignedPackage()`
+- `deleteDevChannel()`
+- `captureScreenshot()`
+- `getOptions()`
+- `checkRequiredOptions()`
+- `getDeviceInfo()`
+- `getDevId()`
 
 
 ### running roku-deploy as an npm script
