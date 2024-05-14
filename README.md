@@ -17,7 +17,7 @@ Publish Roku projects to a Roku device by using Node.js.
 - [Upgrading to V4](#upgrading-to-v4)
 - [CLI Usage](#cli-usage)
 - [JavaScript Usage](#javascript-usage)
-- [roku-deploy JSON](#roku-deploy-json)
+- [Options priority order](#options-priority-order)
 - [Files Array](#files-array)
 - [roku-deploy Options](#roku-deploy-options)
 - [Troubleshooting](#troubleshooting)
