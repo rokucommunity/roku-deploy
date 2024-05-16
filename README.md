@@ -243,23 +243,23 @@ rokuDeploy.createSignedPackage({
 ```
 
 Can't find what you need? Here are all of the public functions:
-- `[stage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L31)`
-- `[zip()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L68)`
-- `[getFilePaths()]{https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L124}`
-- `[keyPress()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L179)`
-- `[keyUp()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L187)`
-- `[keyDown()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L194)`
-- `[sendText()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L201)`
-- `[closeChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L226)`
-- `[sideload()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L239)`
-- `[rekeyDevice()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L379)`
-- `[createSignedPackage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L426)`
-- `[deleteDevChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L614)`
-- `[captureScreenshot()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L629)`
-- `[getOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L698)`
-- `[checkRequiredOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L738)`
-- `[getDeviceInfo()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L787)`
-- `[getDevId()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L854)`
+- [stage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L31)
+- [zip()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L68)
+- [getFilePaths()]{https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L124}
+- [keyPress()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L179)
+- [keyUp()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L187)
+- [keyDown()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L194)
+- [sendText()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L201)
+- [closeChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L226)
+- [sideload()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L239)
+- [rekeyDevice()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L379)
+- [createSignedPackage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L426)
+- [deleteDevChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L614)
+- [captureScreenshot()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L629)
+- [getOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L698)
+- [checkRequiredOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L738)
+- [getDeviceInfo()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L787)
+- [getDevId()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L854)
 
 
 ### Running roku-deploy as an npm script
