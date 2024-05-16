@@ -245,7 +245,7 @@ rokuDeploy.createSignedPackage({
 Can't find what you need? Here are all of the public functions:
 - [stage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L31)
 - [zip()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L68)
-- [getFilePaths()]{https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L124}
+- [getFilePaths()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L124)
 - [keyPress()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L179)
 - [keyUp()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L187)
 - [keyDown()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L194)
