@@ -7,11 +7,6 @@ export interface RokuDeployOptions {
     cwd?: string;
 
     /**
-     * Path to a bsconfig.json project file
-     */
-    project?: string;
-
-    /**
      * A full path to the folder where the zip/pkg package should be placed
      * @default './out'
      */

@@ -10,6 +10,19 @@ Publish Roku projects to a Roku device by using Node.js.
 [![npm version](https://img.shields.io/npm/v/roku-deploy.svg?logo=npm)](https://www.npmjs.com/package/roku-deploy)
 [![license](https://img.shields.io/github/license/rokucommunity/roku-deploy.svg)](LICENSE)
 [![Slack](https://img.shields.io/badge/Slack-RokuCommunity-4A154B?logo=slack)](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA)
+
+### Table of Contents
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Upgrading to V4](#upgrading-to-v4)
+- [CLI Usage](#cli-usage)
+- [JavaScript Usage](#javascript-usage)
+- [Options Priority Order](#options-priority-order)
+- [Files Array](#files-array)
+- [Available roku-deploy Options](#available-roku-deploy-options)
+- [Troubleshooting](#troubleshooting)
+- [Changelog](#changelog)
+
 ## Installation
 
     npm install roku-deploy
@@ -22,6 +35,8 @@ Publish Roku projects to a Roku device by using Node.js.
     images/
     source/
     manifest
+    locale/
+    fonts/
 
 2. You should create a rokudeploy.json file at the root of your project that contains all of the overrides to the default options. roku-deploy will auto-detect this file and use it when possible. (**note**: `rokudeploy.json` is jsonc, which means it supports comments).
 
@@ -33,6 +48,60 @@ sample rokudeploy.json
     "password": "securePassword"
 }
 ```
+
+## Upgrading to v4
+The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
+
+### JavaScript functions don't load config files from disk
+In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `asdf` before calling the desired rokuDeploy function. Here's an example:
+
+```javascript
+const config = {
+    //get the default options
+    ...rokuDeploy.getOptions(),
+    //override with any values found in
+    ...util.getOptionsFromJson({ cwd: process.cwd() })
+};
+await rokuDeploy.sideload(options);
+```
+
+### Removed support for bsconfig.json
+We've removed support for loading `bsconfig.json` files. This was introduced in v3, but sometimes causes confusion between various systems (like brighterscript, vscode extension, etc). If you need to load values from a `bsconfig.json`, you can explicitly specify the config path. Like this:
+
+```javascript
+const config = {
+    //get the default options
+    ...rokuDeploy.getOptions(),
+    //override with any values found in
+    ...util.getOptionsFromJson({ configPath: './bsconfig.json' })
+};
+//call some rokuDeploy function
+await rokuDeploy.sideload(options);
+```
+
+### Changed, added, or moved some functions in the main Node API
+Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
+- `zipPackage()` -> `zip()`
+- `pressHomeButton()` -> `closeChannel()` which will press home twice in order to cancel instant resume
+- `publish()` -> `sideload()`
+- `signExistingPackage()` -> `createSignedPackage()`
+- `deleteInstalledChannel()` -> `deleteDevChannel()`
+- `takeScreenshot()` -> `captureScreenshot()`
+
+Some functions were added to help with certain developer usecases. These mostly allow for any remote-to-Roku interaction:
+- `keyPress()`
+- `keyUp()`
+- `keyDown()`
+- `sendText()`
+
+Previously, some functions were available in the Node API, but have been moved to CLI commands. These are:
+- `deploy()`
+- `createPackage()`
+- `deployAndSignPackage()`
+
+### Default file array changed
+Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in some Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
+
 ## CLI Usage
 
 ### Deploy a zip package
@@ -64,7 +133,7 @@ npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --ti
 
 ### Sideload a build
 ```shell
-npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir' 
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir'
 ```
 
 ### Convert to SquashFS
@@ -97,7 +166,9 @@ rokuDeploy.stage({
         "source/**/*",
         "components/**/*",
         "images/**/*",
-        "manifest"
+        "manifest",
+        "locale/**/*",
+        "fonts/**/*"
     ],
     //...other options if necessary
 }).then(function(){
@@ -171,27 +242,27 @@ rokuDeploy.createSignedPackage({
 })
 ```
 
-Can't find what you need? Here are all of the public functions:
-- stage
-- zip
-- sideload
-- getFilPaths
-- keyPress
-- keyUp
-- keyDown
-- sendText
-- closeChannel
-- rekeyDevice
-- createSignedPackage
-- deleteDevChannel
-- captureScreenshot
-- getOptions
-- checkRequiredOptions
-- getDeviceInfo
-- getDevId
+Can't find what you need? We offer a variety of functions available in the [RokuDeploy.ts file](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts). Here are all of the public functions:
+- `stage()`
+- `zip()`
+- `sideload()`
+- `getFilPaths()`
+- `keyPress()`
+- `keyUp()`
+- `keyDown()`
+- `sendText()`
+- `closeChannel()`
+- `rekeyDevice()`
+- `createSignedPackage()`
+- `deleteDevChannel()`
+- `captureScreenshot()`
+- `getOptions()`
+- `checkRequiredOptions()`
+- `getDeviceInfo()`
+- `getDevId()`
 
 
-### running roku-deploy as an npm script
+### Running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
 
     {
@@ -200,13 +271,16 @@ From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at th
         }
     }
 
-## roku-deploy.json
-As stated, many of the config settings are loaded from `roku-deploy.json`. Here is the loading order:
- - if CLI arguments are found, those are used.
- - if `roku-deploy.json` is found, fill in any missing settings.
- - Fill in any still missing settings with defaults specified in rokyeDeploy.getOptions().
+## Options Priority Order
+RokuDeploy can be configured in various ways (cli args, `roku-deploy.json`, parameters, and defaults). Here's the order these options will be loaded:
+**When run from the CLI:**
+ - start with the default set of options from `rokuDeploy.getOptions()`
+ - override with any values found in `roku-deploy.json` or specified config file
+ - override with any values from CLI args
 
-Note that When roku-deploy is called from within a NodeJS script, the options passed into the roku-deploy methods will override any options found in `roku-deploy.json`.
+**When run from javascript:**
+ - start with the default set of options from `rokuDeploy.getOptions()`
+ - override with any values passed in as function arguments
 
 
 ## Files Array
@@ -218,10 +292,14 @@ For most standard projects, the default files array should work just fine:
 ```jsonc
 {
     "files": [
-        "source/**/*",
-        "components/**/*",
-        "images/**/*",
-        "manifest"
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}"
     ]
 }
 ```
@@ -233,12 +311,16 @@ If you want to include additonal files, you will need to provide the entire arra
 ```jsonc
 {
     "files": [
-        "source/**/*",
-        "components/**/*",
-        "images/**/*",
-        "manifest"
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}",
         //your folder with other assets
-        "assets/**/*",
+        "assets/**/*"
     ]
 }
 ```
@@ -297,7 +379,7 @@ The object structure is as follows:
 }
 ```
 #### { src; dest } Object Rules
-- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example: 
+- if `src` is a non-glob path to a single file, then `dest` should include the filename and extension. For example:
 `{ src: "lib/Promise/promise.brs", dest: "source/promise.brs"}`
 
  - if `src` is a glob pattern, then `dest` should be a path to the folder in the output directory. For example:
@@ -330,30 +412,29 @@ For example, if you have a base project, and then a child project that wants to 
 
 
 
-## roku-deploy Options
-Here are the available options. The defaults are shown to the right of the option name, but all can be overridden:
+## Available roku-deploy Options
+Here are the available options for customizing to your developer-specific workflows. The defaults are shown to the right of the option name, but all can be overridden:
 
 - **host:** string (*required*)
-    The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`
+    The IP address or hostname of the target Roku device. Example: `"192.168.1.21"`.
 
 - **password:** string (*required*)
-    The password for logging in to the developer portal on the target Roku device
+    The password for logging in to the developer portal on the target Roku device.
 
 - **signingPassword:** string (*required for signing*)
-    The password used for creating signed packages
+    The password used for creating signed packages.
 
 - **rekeySignedPackage:** string (*required for rekeying*)
-    Path to a copy of the signed package you want to use for rekeying
+    Path to a copy of the signed package you want to use for rekeying.
 
 - **devId:** string
-    Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
-
+    Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected.
 
 - **outDir?:** string = `"./out"`
-    A full path to the folder where the zip/pkg package should be placed
+    A full path to the folder where the zip/pkg package should be placed.
 
 - **outFile?:** string = `"roku-deploy"`
-    The base filename the zip/pkg file should be given (excluding the extension)
+    The base filename the zip/pkg file should be given (excluding the extension).
 
 - **rootDir?:** string = `'./'`
     The root path to the folder holding your project. The manifest file should be directly underneath this folder. Use this option when your roku project is in a subdirectory of where roku-deploy is installed.
@@ -364,7 +445,11 @@ Here are the available options. The defaults are shown to the right of the optio
         "source/**/*.*",
         "components/**/*.*",
         "images/**/*.*",
-        "manifest"
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}"
     ]
     ```
     An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. Make sure to _exclusively_ use forward slashes ( `/` ) for path separators (even on Windows), as backslashes are reserved for character escaping. You can learn more about this requirement [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
@@ -405,33 +490,42 @@ Here are the available options. The defaults are shown to the right of the optio
    The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
 
 - **convertToSquashfs?:** boolean = `false`
-   If true we convert to squashfs before creating the pkg file
-
-- **incrementBuildNumber?:** boolean = `false`
-    If true we increment the build number to be a timestamp in the format yymmddHHMM
+   If true we convert to squashfs before creating the pkg file.
 
 - **username?:** string = `"rokudev"`
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
-    just in case roku adds support for custom usernames in the future
+    just in case roku adds support for custom usernames in the future.
 
-- **packagePort?:** string = 80
+- **packagePort?:** number = `80`
     The port used for package-related requests. This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
 
-- **remotePort?:** string = 8060
+- **remotePort?:** number = `8060`
     The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
 
-- **remoteDebug?:** boolean = false
+- **screenshotDir?:** string = `"./tmp/roku-deploy/screenshots/"`
+    The directory where screenshots should be saved. Will use the OS temp directory by default.
+
+- **timeout?:** number = `150000`
+    The number of milliseconds at which point this request should timeout and return a rejected promise.
+
+- **remoteDebug?:** boolean = `false`
      When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. This should always be `false` unless you're creating a plugin for an editor such as VSCode, Atom, Sublime, etc.
      More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
 
-- **deleteInstalledChannel?:** boolean = true
-    If true the previously installed dev channel will be deleted before installing the new one
+- **cwd?:** string = `process.cwd()`
+    The current working directory, which all other paths will be set relative to. If left to default, it will be set as the process.cwd() method, which returns the current working directory of the Node.js process.
+
+- **deleteDevChannel?:** boolean = `true`
+    If true the previously installed dev channel will be deleted before installing the new one.
+
+- **packageUploadOverrides?:**
+    Overrides for values used during the zip upload process. You probably don't need to change these...
 
 - **logLevel?:** string = `"error"`
     The level lof logging information printed in the console. You can read more information [here](https://github.com/rokucommunity/logger)
 
 
-Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
+Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployOptions.ts) to see the typescript interface for these options
 
 
 ## Troubleshooting
