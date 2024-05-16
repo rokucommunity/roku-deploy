@@ -243,26 +243,26 @@ rokuDeploy.createSignedPackage({
 ```
 
 Can't find what you need? Here are all of the public functions:
-- `stage()`
-- `zip()`
-- `sideload()`
-- `getFilPaths()`
-- `keyPress()`
-- `keyUp()`
-- `keyDown()`
-- `sendText()`
-- `closeChannel()`
-- `rekeyDevice()`
-- `createSignedPackage()`
-- `deleteDevChannel()`
-- `captureScreenshot()`
-- `getOptions()`
-- `checkRequiredOptions()`
-- `getDeviceInfo()`
-- `getDevId()`
+- `[stage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L31)`
+- `[zip()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L68)`
+- `[getFilePaths()]{https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L124}`
+- `[keyPress()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L179)`
+- `[keyUp()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L187)`
+- `[keyDown()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L194)`
+- `[sendText()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L201)`
+- `[closeChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L226)`
+- `[sideload()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L239)`
+- `[rekeyDevice()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L379)`
+- `[createSignedPackage()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L426)`
+- `[deleteDevChannel()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L614)`
+- `[captureScreenshot()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L629)`
+- `[getOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L698)`
+- `[checkRequiredOptions()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L738)`
+- `[getDeviceInfo()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L787)`
+- `[getDevId()](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeploy.ts#L854)`
 
 
-### running roku-deploy as an npm script
+### Running roku-deploy as an npm script
 From an npm script in `package.json`. (Requires `rokudeploy.json` to exist at the root level where this is being run)
 
     {
@@ -522,7 +522,7 @@ Here are the available options for customizing to your developer-specific workfl
     Overrides for values used during the zip upload process. You probably don't need to change these...
 
 
-Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
+Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployOptions.ts) to see the typescript interface for these options
 
 
 ## Troubleshooting
