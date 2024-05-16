@@ -521,6 +521,9 @@ Here are the available options for customizing to your developer-specific workfl
 - **packageUploadOverrides?:**
     Overrides for values used during the zip upload process. You probably don't need to change these...
 
+- **logLevel?:** string = `"error"`
+    The level lof logging information printed in the console. You can read more information [here](https://github.com/rokucommunity/logger)
+
 
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployOptions.ts) to see the typescript interface for these options
 

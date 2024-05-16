@@ -979,7 +979,7 @@ describe('index', () => {
                 failOnCompileError: true,
                 outFile: options.outFile
             }).then((result) => {
-                expect(result.message).to.equal('Successful deploy');
+                expect(result.message).to.equal('Successful sideload');
             }, () => {
                 assert.fail('Should not have rejected the promise');
             });
@@ -997,7 +997,7 @@ describe('index', () => {
                 outFile: options.outFile,
                 deleteDevChannel: false
             }).then((result) => {
-                expect(result.message).to.equal('Successful deploy');
+                expect(result.message).to.equal('Successful sideload');
                 expect(stub.getCall(0).args[0].formData.remotedebug).to.eql('1');
             }, () => {
                 assert.fail('Should not have rejected the promise');
@@ -1017,7 +1017,7 @@ describe('index', () => {
                 outFile: options.outFile,
                 deleteDevChannel: false
             }).then((result) => {
-                expect(result.message).to.equal('Successful deploy');
+                expect(result.message).to.equal('Successful sideload');
                 expect(stub.getCall(0).args[0].formData.remotedebug_connect_early).to.eql('1');
             }, () => {
                 assert.fail('Should not have rejected the promise');

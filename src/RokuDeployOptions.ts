@@ -1,4 +1,4 @@
-import type { LogLevel } from './Logger';
+import type { LogLevel } from '@rokucommunity/logger';
 
 export interface RokuDeployOptions {
     /**
