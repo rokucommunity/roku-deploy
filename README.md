@@ -118,7 +118,7 @@ npx roku-deploy deploy package --host 'ip.of.roku' --password 'password' --signi
 
 ### Stage the root directory
 ```shell
-npx roku-deploy stage --stagingDir './path/to/staging/dir --rootDir './path/to/root/dir'
+npx roku-deploy stage --stagingDir './path/to/staging/dir' --rootDir './path/to/root/dir'
 ```
 
 ### Zip the contents of a given directory
