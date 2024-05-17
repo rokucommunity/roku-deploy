@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.1](https://github.com/rokucommunity/roku-deploy/compare/v4.0.0-alpha.0...v4.0.0-alpha.1) - 2024-05-17
+### Changed
+ - Enhanced logging levels ([#168](https://github.com/rokucommunity/roku-deploy/pull/168))
+ - Update files array ([#164](https://github.com/rokucommunity/roku-deploy/pull/164))
+ - Change documentation ([#162](https://github.com/rokucommunity/roku-deploy/pull/162))
+
+
+
 ## [4.0.0-alpha.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.1...v4.0.0-alpha.0) - 2024-04-16
 ### Added
  - individual interfaces for every rokuDeploy function ([#126](https://github.com/rokucommunity/roku-deploy/pull/126))
@@ -23,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
 
 
- 
+
 ## [3.12.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.3...v3.12.0) - 2024-03-01
 ### Changed
  - Support overriding various package upload form data ([#136](https://github.com/rokucommunity/roku-deploy/pull/136))
