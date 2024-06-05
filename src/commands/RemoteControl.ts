@@ -2,7 +2,7 @@ import * as readline from 'readline';
 import type { RokuKey } from '../index';
 import { rokuDeploy, util } from '../index';
 
-export class Interactive {
+export class RemoteControl {
     run(args) {
         let options = {
             ...util.getOptionsFromJson(args),
