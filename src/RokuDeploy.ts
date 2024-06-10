@@ -200,7 +200,7 @@ export class RokuDeploy {
         for (const char of chars) {
             await this.sendKeyEvent({
                 ...options,
-                key: `lit_${char}`,
+                key: `lit_${encodeURIComponent(char)}`,
                 action: 'keypress'
             });
         }
@@ -991,7 +991,8 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
-type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
+export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
+
 export interface SendKeyEventOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     host: string;
