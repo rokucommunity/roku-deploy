@@ -15,7 +15,7 @@ import { ZipCommand } from './commands/ZipCommand';
 import { KeyPressCommand } from './commands/KeyPressCommand';
 import { KeyUpCommand } from './commands/KeyUpCommand';
 import { KeyDownCommand } from './commands/KeyDownCommand';
-import { RemoteControl } from './commands/RemoteControl';
+import { RemoteControlCommand } from './commands/RemoteControlCommand';
 
 void yargs
 
@@ -154,7 +154,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false });
     }, (args: any) => {
-        return new RemoteControl().run(args);
+        return new RemoteControlCommand().run(args);
     })
 
     .command(['stage', 'prepublishToStaging'], 'Copies all of the referenced files to the staging folder', (builder) => {
