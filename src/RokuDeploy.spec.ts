@@ -3018,7 +3018,7 @@ describe('index', () => {
     });
 
     describe('getDestPath', () => {
-        it.only('handles absolute paths properly', () => {
+        it('handles absolute paths properly', () => {
             expect(
                 rokuDeploy.getDestPath(
                     s`${tempDir}/rootDir/source/main.bs`,
