@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.1](https://github.com/rokucommunity/roku-deploy/compare/v3.12.0...v3.12.1) - 2024-07-19
+### Changed
+ - fix-node14 CI/CD issues ([#165](https://github.com/rokucommunity/roku-deploy/pull/165))
+### Fixed
+ - bug with absolute paths and `getDestPath` ([#171](https://github.com/rokucommunity/roku-deploy/pull/171))
+
+
+
 ## [3.12.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.3...v3.12.0) - 2024-03-01
 ### Changed
  - Support overriding various package upload form data ([#136](https://github.com/rokucommunity/roku-deploy/pull/136))
