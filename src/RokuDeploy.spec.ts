@@ -3018,6 +3018,19 @@ describe('index', () => {
     });
 
     describe('getDestPath', () => {
+        it('handles absolute paths properly', () => {
+            expect(
+                rokuDeploy.getDestPath(
+                    s`${tempDir}/rootDir/source/main.bs`,
+                    [{
+                        src: `${tempDir}/rootDir/source/main.bs`,
+                        dest: 'source/standalone.brs'
+                    }],
+                    `${tempDir}/src/lsp/standalone-project-1`
+                )
+            ).to.equal(s`source/standalone.brs`);
+        });
+
         it('handles unrelated exclusions properly', () => {
             expect(
                 rokuDeploy.getDestPath(

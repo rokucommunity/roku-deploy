@@ -228,13 +228,11 @@ export class RokuDeploy {
 
         function makeGlobAbsolute(pattern: string) {
             return path.resolve(
-                path.posix.join(
-                    rootDir,
-                    //remove leading exclamation point if pattern is negated
-                    pattern
-                    //coerce all slashes to forward
-                )
-            ).replace(/\\/g, '/');
+                rootDir,
+                //remove leading exclamation point if pattern is negated
+                pattern
+                //coerce all slashes to forward
+            ).replace(/\\+/g, '/');
         }
 
         let result: string;
