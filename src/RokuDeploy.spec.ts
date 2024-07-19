@@ -3018,15 +3018,15 @@ describe('index', () => {
     });
 
     describe('getDestPath', () => {
-        it('handles absolute paths properly', () => {
+        it.only('handles absolute paths properly', () => {
             expect(
                 rokuDeploy.getDestPath(
-                    s`c:/projects/roku/local3/brighterscript/.tmp/rootDir/source/main.bs`,
+                    s`${tempDir}/rootDir/source/main.bs`,
                     [{
-                        src: 'c:/projects/roku/local3/brighterscript/.tmp/rootDir/source/main.bs',
+                        src: `${tempDir}/rootDir/source/main.bs`,
                         dest: 'source/standalone.brs'
                     }],
-                    'c:/projects/roku/local3/brighterscript/src/lsp/standalone-project-1'
+                    `${tempDir}/src/lsp/standalone-project-1`
                 )
             ).to.equal(s`source/standalone.brs`);
         });
