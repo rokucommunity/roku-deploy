@@ -53,13 +53,13 @@ sample rokudeploy.json
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
 ### JavaScript functions don't load config files from disk
-In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `asdf` before calling the desired rokuDeploy function. Here's an example:
+In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `util.getOptionsFromJson` before calling the desired rokuDeploy function. Here's an example:
 
 ```javascript
 const config = {
     //get the default options
     ...rokuDeploy.getOptions(),
-    //override with any values found in
+    //override with any values found in the `rokudeploy.json` file
     ...util.getOptionsFromJson({ cwd: process.cwd() })
 };
 await rokuDeploy.sideload(options);
@@ -82,7 +82,7 @@ await rokuDeploy.sideload(options);
 ### Changed, added, or moved some functions in the main Node API
 Another set of changes are the names and features available in the Node API. Some have been renamed and others have been change to be used only as CLI commands in order to organize and simplify what is offered. Renamed functions:
 - `zipPackage()` -> `zip()`
-- `pressHomeButton()` -> `closeChannel()` which will press home twice in order to cancel instant resume
+- `pressHomeButton()` -> `closeChannel()`
 - `publish()` -> `sideload()`
 - `signExistingPackage()` -> `createSignedPackage()`
 - `deleteInstalledChannel()` -> `deleteDevChannel()`
@@ -246,7 +246,7 @@ Can't find what you need? We offer a variety of functions available in the [Roku
 - `stage()`
 - `zip()`
 - `sideload()`
-- `getFilPaths()`
+- `getFilePaths()`
 - `keyPress()`
 - `keyUp()`
 - `keyDown()`
