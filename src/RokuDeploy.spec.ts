@@ -1473,13 +1473,10 @@ describe('index', () => {
         });
 
         it('should return created pkg on success', async () => {
-            let body = `var pkgDiv = document.createElement('div');
-                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
-                        node.appendChild(pkgDiv);`;
-            mockDoPostRequest(body);
+            mockDoPostRequest(fakePluginPackageResponse);
 
             let pkgPath = await rokuDeploy.signExistingPackage(options);
-            expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
+            expect(pkgPath).to.equal('pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
 
         it('should return our fallback error if neither error or package link was detected', async () => {
@@ -3790,3 +3787,39 @@ function getFakeResponseBody(messages: string): string {
         </body>
     </html>`;
 }
+
+const fakePluginPackageResponse = `
+<!--
+(c) 2019-2023 Roku, Inc.  All content herein is protected by U.S.
+copyright and other applicable intellectual property laws and may not be
+copied without the express permission of Roku, Inc., which reserves all
+rights.  Reuse of any of this content for any purpose without the
+permission of Roku, Inc. is strictly prohibited.
+-->
+
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="HandheldFriendly" content="True">
+  <title> Roku Development Kit </title>
+  <link rel="stylesheet" type="text/css" media="screen" href="css/global.css" />
+</head>
+<body>
+  <div id="root" style="background: #fff">
+  </div>
+
+  <div style="display:none">
+</div>
+  <div style="display:none">
+<a href="pkgs//Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg">Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg</a></div>
+
+  <script type="text/javascript" src="css/global.js"></script>
+  <script type="text/javascript" src="js/common.js"></script>
+  <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function (event) {
+      var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"85ad433fddab9079e6cc378e736544c21e1f7123","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"some-package.zip","fileType":"zip","id":"0","location":"sdcard","md5":"da4a98f08d45aea6e14a481ff481ffbe","pkgPath":"pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg","size":"455694"}]}');
+      var hasPackage = params.packages.length > 0;
+  </script>
+</body>
+</html>
+`;

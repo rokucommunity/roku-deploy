@@ -623,7 +623,7 @@ export class RokuDeploy {
             throw new errors.FailedDeviceResponseError(failedSearchMatches[1], results);
         }
 
-        let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
+        let pkgSearchMatches = /"pkgPath"\s*:\s*"([a-zA-Z0-9\\/\_]+\.pkg)"/.exec(results.body);
         if (pkgSearchMatches) {
             return pkgSearchMatches[1];
         }
