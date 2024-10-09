@@ -623,7 +623,13 @@ export class RokuDeploy {
             throw new errors.FailedDeviceResponseError(failedSearchMatches[1], results);
         }
 
-        let pkgSearchMatches = /"pkgPath"\s*:\s*"([a-zA-Z0-9\\/\_]+\.pkg)"/.exec(results.body);
+        //grab the package url from the JSON on the page if it exists (https://regex101.com/r/1HUXgk/1)
+        let pkgSearchMatches = /"pkgPath"\s*:\s*"(.*?)"/.exec(results.body);
+        if (pkgSearchMatches) {
+            return pkgSearchMatches[1];
+        }
+        //for some reason we couldn't find the pkgPath from json, look in the <a> tag
+        pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         if (pkgSearchMatches) {
             return pkgSearchMatches[1];
         }

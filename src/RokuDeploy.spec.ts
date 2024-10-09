@@ -1473,6 +1473,16 @@ describe('index', () => {
         });
 
         it('should return created pkg on success', async () => {
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+
+            let pkgPath = await rokuDeploy.signExistingPackage(options);
+            expect(pkgPath).to.equal('pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
+        });
+
+        it('should return created pkg from SD card on success', async () => {
             mockDoPostRequest(fakePluginPackageResponse);
 
             let pkgPath = await rokuDeploy.signExistingPackage(options);
