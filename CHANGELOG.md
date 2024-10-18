@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.2](https://github.com/rokucommunity/roku-deploy/compare/v3.12.1...v3.12.2) - 2024-10-18
+### Fixed
+ - updated regex to find a signed package on `/plugin_package` page ([#176](https://github.com/rokucommunity/roku-deploy/pull/176))
+
+
+
 ## [3.12.1](https://github.com/rokucommunity/roku-deploy/compare/v3.12.0...v3.12.1) - 2024-07-19
 ### Changed
  - fix-node14 CI/CD issues ([#165](https://github.com/rokucommunity/roku-deploy/pull/165))
