@@ -468,8 +468,16 @@ export class RokuDeploy {
                 if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
                     throw new errors.CompileError('Compile error', replaceError, replaceError.results);
                 } else {
-                    requestOptions.formData.mysubmit = 'Install';
-                    response = await this.doPostRequest(requestOptions);
+                    try {
+                        response = await this.doPostRequest(requestOptions);
+                    } catch (installError: any) {
+                        switch (installError.results.response.statusCode) {
+                            case 577:
+                                throw new errors.DeviceFailedConnectionError();
+                            default:
+                                throw installError;
+                        }
+                    }
                 }
             }
 
