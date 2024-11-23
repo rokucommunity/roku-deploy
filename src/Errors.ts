@@ -61,9 +61,7 @@ export class DeviceFailedConnectionError extends Error {
 
     constructor() {
         super();
-        this.message = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.
-
-https://support.roku.com/article/208755668.`;
+        this.message = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
         this.results = { response: { statusCode: 577 } };
         Object.setPrototypeOf(this, DeviceFailedConnectionError.prototype);
     }
