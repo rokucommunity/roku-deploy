@@ -473,7 +473,7 @@ export class RokuDeploy {
                     } catch (installError: any) {
                         switch (installError.results.response.statusCode) {
                             case 577:
-                                throw new errors.DeviceFailedConnectionError();
+                                throw new errors.UpdateCheckRequiredError(installError);
                             default:
                                 throw installError;
                         }

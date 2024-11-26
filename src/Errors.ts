@@ -56,13 +56,16 @@ export class MissingRequiredOptionError extends Error {
     }
 }
 
-export class DeviceFailedConnectionError extends Error {
+export class UpdateCheckRequiredError extends Error {
     results: any;
 
-    constructor() {
+    cause: Error;
+
+    constructor(originalError: Error) {
         super();
         this.message = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
         this.results = { response: { statusCode: 577 } };
-        Object.setPrototypeOf(this, DeviceFailedConnectionError.prototype);
+        this.cause = originalError;
+        Object.setPrototypeOf(this, UpdateCheckRequiredError.prototype);
     }
 }
