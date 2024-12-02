@@ -468,17 +468,14 @@ export class RokuDeploy {
                 if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
                     throw new errors.CompileError('Compile error', replaceError, replaceError.results);
                 } else {
-                    try {
-                        response = await this.doPostRequest(requestOptions);
-                    } catch (installError: any) {
-                        switch (installError.results.response.statusCode) {
-                            case 577:
-                                throw new errors.UpdateCheckRequiredError(installError);
-                            default:
-                                throw installError;
-                        }
-                    }
+                    requestOptions.formData.mysubmit = 'Install';
+                    response = await this.doPostRequest(requestOptions);
                 }
+            }
+
+            //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
+            if (this.isUpdateCheckRequiredResponse(response.body)) {
+                throw new errors.UpdateCheckRequiredError(response);
             }
 
             if (options.failOnCompileError) {
@@ -510,6 +507,13 @@ export class RokuDeploy {
      */
     private isCompileError(responseHtml: string) {
         return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
+    }
+
+    /**
+     * Does the response look like a compile error
+     */
+    private isUpdateCheckRequiredResponse(responseHtml: string) {
+        return !!/["']\s*Failed\s*to\s*check\s*for\s*software\s*update\s*["']/i.exec(responseHtml);
     }
 
     /**
