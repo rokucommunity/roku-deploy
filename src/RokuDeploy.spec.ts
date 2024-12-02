@@ -1103,17 +1103,18 @@ describe('index', () => {
             });
         });
 
-        it('rejects when response contains invalid password status code', () => {
+        it('rejects when response contains invalid password status code', async () => {
             options.failOnCompileError = true;
-            mockDoPostRequest('', 577);
+            mockDoPostRequest(`'Failed to check for software update'`, 200);
 
-            return rokuDeploy.publish(options).then(() => {
+            try {
+                await rokuDeploy.publish(options);
                 assert.fail('Should not have succeeded due to roku server compilation failure');
-            }, (err) => {
-                expect(err.message).to.be.a('string').and.satisfy(msg => msg.startsWith(`Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.
-
-https://support.roku.com/article/208755668.`));
-            });
+            } catch (err) {
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
         });
 
         it('handles successful deploy', () => {

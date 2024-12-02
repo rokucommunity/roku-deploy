@@ -58,9 +58,11 @@ export class MissingRequiredOptionError extends Error {
 
 export class UpdateCheckRequiredError extends Error {
 
+    static MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
+
     constructor(response: HttpResponse) {
         super();
-        this.message = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
+        this.message = UpdateCheckRequiredError.MESSAGE;
         //this exact structure helps `roku-debug` detect this error by finding this status code and then showing a nice popup
         this.results = { response: { ...response ?? {}, statusCode: 500 } };
         Object.setPrototypeOf(this, UpdateCheckRequiredError.prototype);
