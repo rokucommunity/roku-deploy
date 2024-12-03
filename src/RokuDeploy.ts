@@ -462,20 +462,33 @@ export class RokuDeploy {
             //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {
-                response = await this.doPostRequest(requestOptions);
-            } catch (replaceError: any) {
-                //fail if this is a compile error
-                if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
-                    throw new errors.CompileError('Compile error', replaceError, replaceError.results);
-                } else {
-                    requestOptions.formData.mysubmit = 'Install';
+                try {
                     response = await this.doPostRequest(requestOptions);
+                } catch (replaceError: any) {
+                    //fail if this is a compile error
+                    if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
+                        throw new errors.CompileError('Compile error', replaceError, replaceError.results);
+                    } else {
+                        requestOptions.formData.mysubmit = 'Install';
+                        response = await this.doPostRequest(requestOptions);
+                    }
+                }
+            } catch (e: any) {
+                //if this is a 577 error, we have high confidence that the device needs to do an update check
+                if (e?.results?.response?.statusCode === 577) {
+                    throw new errors.UpdateCheckRequiredError(response, requestOptions, e);
+
+                    //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
+                } else if (e.code === 'ECONNRESET') {
+                    throw new errors.ConnectionResetError(e, requestOptions);
+                } else {
+                    throw e;
                 }
             }
 
             //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
             if (this.isUpdateCheckRequiredResponse(response.body)) {
-                throw new errors.UpdateCheckRequiredError(response);
+                throw new errors.UpdateCheckRequiredError(response, requestOptions);
             }
 
             if (options.failOnCompileError) {

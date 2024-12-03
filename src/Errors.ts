@@ -1,4 +1,5 @@
 import type { HttpResponse, RokuMessages } from './RokuDeploy';
+import type * as requestType from 'request';
 
 export class InvalidDeviceResponseCodeError extends Error {
     constructor(message: string, public results?: any) {
@@ -56,17 +57,45 @@ export class MissingRequiredOptionError extends Error {
     }
 }
 
+/**
+ * This error is thrown when a Roku device refuses to accept connections because it requires the user to check for updates (even if no updates are actually available).
+ */
 export class UpdateCheckRequiredError extends Error {
 
     static MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 
-    constructor(response: HttpResponse) {
+    constructor(
+        public response: HttpResponse,
+        public requestOptions: requestType.OptionsWithUrl,
+        public cause?: Error
+    ) {
         super();
         this.message = UpdateCheckRequiredError.MESSAGE;
-        //this exact structure helps `roku-debug` detect this error by finding this status code and then showing a nice popup
-        this.results = { response: { ...response ?? {}, statusCode: 500 } };
         Object.setPrototypeOf(this, UpdateCheckRequiredError.prototype);
     }
+}
 
-    results: any;
+export function isUpdateCheckRequiredError(e: any): e is UpdateCheckRequiredError {
+    return e?.constructor?.name === 'UpdateCheckRequiredError';
+}
+
+/**
+ * This error is thrown when a Roku device ends the connection unexpectedly, causing an 'ECONNRESET' error. Typically this happens when the device needs to check for updates (even if no updates are available), but it can also happen for other reasons.
+ */
+export class ConnectionResetError extends Error {
+
+    static MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
+
+    constructor(error: Error, requestOptions: requestType.OptionsWithUrl) {
+        super();
+        this.message = ConnectionResetError.MESSAGE;
+        this.cause = error;
+        Object.setPrototypeOf(this, ConnectionResetError.prototype);
+    }
+
+    public cause?: Error;
+}
+
+export function isConnectionResetError(e: any): e is ConnectionResetError {
+    return e?.constructor?.name === 'ConnectionResetError';
 }
