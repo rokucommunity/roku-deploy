@@ -1207,6 +1207,45 @@ describe('index', () => {
             }
             assert.fail('Should not have succeeded');
         });
+
+        it('Should throw an excpetion', async () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest('', 577);
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        class ErrorWithConnectionResetCode extends Error {
+            code;
+
+            constructor(code = 'ECONNRESET') {
+                super();
+                this.code = code;
+            }
+        }
+
+        it('Should throw an excpetion', async () => {
+            options.failOnCompileError = true;
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+                throw new ErrorWithConnectionResetCode();
+            });
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.ConnectionResetError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
     });
 
     describe('convertToSquashfs', () => {
