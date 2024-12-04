@@ -1103,17 +1103,18 @@ describe('index', () => {
             });
         });
 
-        it('rejects when response contains invalid password status code', () => {
+        it('rejects when response contains invalid password status code', async () => {
             options.failOnCompileError = true;
-            mockDoPostRequest('', 577);
+            mockDoPostRequest(`'Failed to check for software update'`, 200);
 
-            return rokuDeploy.publish(options).then(() => {
+            try {
+                await rokuDeploy.publish(options);
                 assert.fail('Should not have succeeded due to roku server compilation failure');
-            }, (err) => {
-                expect(err.message).to.be.a('string').and.satisfy(msg => msg.startsWith(`Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.
-
-https://support.roku.com/article/208755668.`));
-            });
+            } catch (err) {
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
         });
 
         it('handles successful deploy', () => {
@@ -1202,6 +1203,45 @@ https://support.roku.com/article/208755668.`));
                 await rokuDeploy.publish(options);
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        it('Should throw an excpetion', async () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest('', 577);
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        class ErrorWithConnectionResetCode extends Error {
+            code;
+
+            constructor(code = 'ECONNRESET') {
+                super();
+                this.code = code;
+            }
+        }
+
+        it('Should throw an excpetion', async () => {
+            options.failOnCompileError = true;
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+                throw new ErrorWithConnectionResetCode();
+            });
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.ConnectionResetError);
                 return;
             }
             assert.fail('Should not have succeeded');
@@ -3639,6 +3679,22 @@ https://support.roku.com/article/208755668.`));
             let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
             await rokuDeploy.deployAndSignPackage(options);
             expect(stub.getCalls()).to.be.lengthOf(1);
+        });
+    });
+
+    describe('isUpdateCheckRequiredResponse', () => {
+        it('matches on actual response from device', () => {
+            const response = `<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <title> Roku Development Kit </title>\n\n  <link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"css/global.css\" />\n</head>\n<body>\n  <div id=\"root\" style=\"background: #fff\">\n\n  </div>\n\n  <script type=\"text/javascript\" src=\"css/global.js\"></script>\n  <script type=\"text/javascript\">\n  \n      // Include core components and resounce bundle (needed)\n      Shell.resource.set(null, {\n          endpoints: {} \n      });\n      Shell.create('Roku.Event.Key');\n      Shell.create('Roku.Events.Resize');\n      Shell.create('Roku.Events.Scroll');  \n      // Create global navigation and render it\n      var nav = Shell.create('Roku.Nav')\n        .trigger('Enable standalone and utility mode - hide user menu, shopping cart, and etc.')\n        .trigger('Use compact footer')\n        .trigger('Hide footer')\n        .trigger('Render', document.getElementById('root'))\n        .trigger('Remove all feature links from header')\n\n      // Retrieve main content body node\n      var node = nav.invoke('Get main body section mounting node');\n      \n      // Create page container and page header\n      var container = Shell.create('Roku.Nav.Page.Standard').trigger('Render', node);\n      node = container.invoke('Get main body node');\n      container.invoke('Get headline node').innerHTML = 'Failed to check for software update';\n\t  // Cannot reach Software Update Server\n      node.innerHTML = '<p>Please make sure that your Roku device is connected to internet and running most recent software.</p> <p> After connecting to internet, go to system settings and check for software update.</p> ';\n\n      var hrDiv = document.createElement('div');\n      hrDiv.innerHTML = '<hr />';\n      node.appendChild(hrDiv);\n\n      var d = document.createElement('div');\n      d.innerHTML = '<br />';\n      node.appendChild(d);\n\n  </script>\n\n\n  <div style=\"display:none\">\n\n  <font color=\"red\">Please make sure that your Roku device is connected to internet, and running most recent software version (d=953108)</font>\n\n  </div>\n\n</body>\n</html>\n`;
+            expect(
+                rokuDeploy['isUpdateCheckRequiredResponse'](response)
+            ).to.be.true;
+        });
+
+        it('matches with some variations to the message', () => {
+            const response = `"   FAILED    tocheck\tfor softwareupdate"`;
+            expect(
+                rokuDeploy['isUpdateCheckRequiredResponse'](response)
+            ).to.be.true;
         });
     });
 
