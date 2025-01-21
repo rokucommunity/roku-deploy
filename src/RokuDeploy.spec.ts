@@ -3771,6 +3771,46 @@ describe('index', () => {
         });
     });
 
+    describe('isUpdateRequiredError', () => {
+        it('returns true if the status code is 577', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 577 } } })
+            ).to.be.true;
+        });
+
+        it('returns true if the body is an update response from device', () => {
+            const response = `<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <title> Roku Development Kit </title>\n\n  <link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"css/global.css\" />\n</head>\n<body>\n  <div id=\"root\" style=\"background: #fff\">\n\n  </div>\n\n  <script type=\"text/javascript\" src=\"css/global.js\"></script>\n  <script type=\"text/javascript\">\n  \n      // Include core components and resounce bundle (needed)\n      Shell.resource.set(null, {\n          endpoints: {} \n      });\n      Shell.create('Roku.Event.Key');\n      Shell.create('Roku.Events.Resize');\n      Shell.create('Roku.Events.Scroll');  \n      // Create global navigation and render it\n      var nav = Shell.create('Roku.Nav')\n        .trigger('Enable standalone and utility mode - hide user menu, shopping cart, and etc.')\n        .trigger('Use compact footer')\n        .trigger('Hide footer')\n        .trigger('Render', document.getElementById('root'))\n        .trigger('Remove all feature links from header')\n\n      // Retrieve main content body node\n      var node = nav.invoke('Get main body section mounting node');\n      \n      // Create page container and page header\n      var container = Shell.create('Roku.Nav.Page.Standard').trigger('Render', node);\n      node = container.invoke('Get main body node');\n      container.invoke('Get headline node').innerHTML = 'Failed to check for software update';\n\t  // Cannot reach Software Update Server\n      node.innerHTML = '<p>Please make sure that your Roku device is connected to internet and running most recent software.</p> <p> After connecting to internet, go to system settings and check for software update.</p> ';\n\n      var hrDiv = document.createElement('div');\n      hrDiv.innerHTML = '<hr />';\n      node.appendChild(hrDiv);\n\n      var d = document.createElement('div');\n      d.innerHTML = '<br />';\n      node.appendChild(d);\n\n  </script>\n\n\n  <div style=\"display:none\">\n\n  <font color=\"red\">Please make sure that your Roku device is connected to internet, and running most recent software version (d=953108)</font>\n\n  </div>\n\n</body>\n</html>\n`;
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 500 }, body: response } })
+            ).to.be.true;
+        });
+
+        it('returns false on missing results', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ })
+            ).to.be.false;
+        });
+
+        it('returns false on missing response', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: {} })
+            ).to.be.false;
+        });
+
+        it('returns false on missing status code', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: {} } })
+            ).to.be.false;
+        });
+
+        it('returns false on non-string missing body', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 500 }, body: false } })
+            ).to.be.false;
+        });
+
+    });
+
     function mockDoGetRequest(body = '', statusCode = 200) {
         return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
