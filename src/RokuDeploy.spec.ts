@@ -1103,7 +1103,7 @@ describe('index', () => {
             });
         });
 
-        it('rejects when response contains invalid password status code', async () => {
+        it('rejects when response contains update device messaging', async () => {
             options.failOnCompileError = true;
             mockDoPostRequest(`'Failed to check for software update'`, 200);
 
@@ -1111,6 +1111,54 @@ describe('index', () => {
                 await rokuDeploy.publish(options);
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             } catch (err) {
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
+        });
+
+        it('rejects when response contains update device messaging and bad status code on first call', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    results = { response: { statusCode: 500 }, body: `'Failed to check for software update'` };
+                } else {
+                    results = { response: { statusCode: 200 }, body: `` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.publish(options);
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            } catch (err) {
+                expect(spy.callCount).to.eql(1);
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
+        });
+
+        it('rejects when response contains update device messaging and bad status code on second call', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    results = { response: { statusCode: 500 }, body: `` };
+                } else {
+                    results = { response: { statusCode: 500 }, body: `'Failed to check for software update'` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.publish(options);
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            } catch (err) {
+                expect(spy.callCount).to.eql(2);
                 expect((err as any).message).to.eql(
                     errors.UpdateCheckRequiredError.MESSAGE
                 );

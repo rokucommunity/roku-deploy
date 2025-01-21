@@ -477,7 +477,7 @@ export class RokuDeploy {
                 }
             } catch (e: any) {
                 //if this is a 577 error, we have high confidence that the device needs to do an update check
-                if (e.results?.response?.statusCode === 577) {
+                if (e.results?.response?.statusCode === 577 || (typeof e?.results?.body === 'string' && this.isUpdateCheckRequiredResponse(e.results.body))) {
                     throw new errors.UpdateCheckRequiredError(response, requestOptions, e);
 
                     //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
