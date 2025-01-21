@@ -468,6 +468,8 @@ export class RokuDeploy {
                     //fail if this is a compile error
                     if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
                         throw new errors.CompileError('Compile error', replaceError, replaceError.results);
+                    } else if (replaceError?.results?.response?.statusCode === 577 || (typeof replaceError?.results?.body === 'string' && this.isUpdateCheckRequiredResponse(replaceError.results.body))) {
+                        throw replaceError;
                     } else {
                         requestOptions.formData.mysubmit = 'Install';
                         response = await this.doPostRequest(requestOptions);

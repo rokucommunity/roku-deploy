@@ -1208,13 +1208,38 @@ describe('index', () => {
             assert.fail('Should not have succeeded');
         });
 
-        it('Should throw an excpetion', async () => {
+        it('Should throw an exception and call doPost once', async () => {
             options.failOnCompileError = true;
-            mockDoPostRequest('', 577);
+            let spy = mockDoPostRequest('', 577);
 
             try {
                 await rokuDeploy.publish(options);
             } catch (e) {
+                expect(spy.callCount).to.eql(1);
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        it('Should throw an exception and should call doPost twice', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    results = { response: { statusCode: 500 }, body: `'not an update error'` };
+                } else {
+                    results = { response: { statusCode: 577 }, body: `` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.publish(options);
+            } catch (e) {
+                expect(spy.callCount).to.eql(2);
                 assert.ok('Exception was thrown as expected');
                 expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
                 return;
