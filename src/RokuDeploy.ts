@@ -468,6 +468,8 @@ export class RokuDeploy {
                     //fail if this is a compile error
                     if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
                         throw new errors.CompileError('Compile error', replaceError, replaceError.results);
+                    } else if (this.isUpdateRequiredError(replaceError)) {
+                        throw replaceError;
                     } else {
                         requestOptions.formData.mysubmit = 'Install';
                         response = await this.doPostRequest(requestOptions);
@@ -475,7 +477,7 @@ export class RokuDeploy {
                 }
             } catch (e: any) {
                 //if this is a 577 error, we have high confidence that the device needs to do an update check
-                if (e.results?.response?.statusCode === 577) {
+                if (this.isUpdateRequiredError(e)) {
                     throw new errors.UpdateCheckRequiredError(response, requestOptions, e);
 
                     //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
@@ -527,6 +529,13 @@ export class RokuDeploy {
      */
     private isUpdateCheckRequiredResponse(responseHtml: string) {
         return !!/["']\s*Failed\s*to\s*check\s*for\s*software\s*update\s*["']/i.exec(responseHtml);
+    }
+
+    /**
+     * Checks to see if the exception is due to the device needing to check for updates
+     */
+    private isUpdateRequiredError(e: any): boolean {
+        return e.results?.response?.statusCode === 577 || (typeof e.results?.body === 'string' && this.isUpdateCheckRequiredResponse(e.results.body));
     }
 
     /**
