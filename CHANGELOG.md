@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.4](https://github.com/rokucommunity/roku-deploy/compare/v3.12.3...v3.12.4) - 2025-01-22
+### Fixed
+ - fixed an issue with `577` error codes ([#182](https://github.com/rokucommunity/roku-deploy/pull/182))
+
+
+
 ## [3.12.3](https://github.com/rokucommunity/roku-deploy/compare/v3.12.2...v3.12.3) - 2024-12-06
 ### Changed
  - Identify when a 577 error is thrown, send a new developer friendly message ([#180](https://github.com/rokucommunity/roku-deploy/pull/180))
