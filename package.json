@@ -14,7 +14,8 @@
         "test:device": "nyc mocha src/device.spec.ts",
         "test:all": "nyc mocha \"src/**/*.spec.ts\"",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
-        "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
+        "publish-coverage": "nyc report --reporter=text-lcov | coveralls",
+        "package": "npm run build && npm pack"
     },
     "dependencies": {
         "@types/request": "^2.47.0",
