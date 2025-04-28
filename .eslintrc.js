@@ -54,6 +54,7 @@ module.exports = {
             'error',
             'always'
         ],
+        '@typescript-eslint/parameter-properties': 'off',
         '@typescript-eslint/prefer-nullish-coalescing': 'off',
         "@typescript-eslint/prefer-optional-chain": 'off',
         '@typescript-eslint/prefer-readonly': 'off',
