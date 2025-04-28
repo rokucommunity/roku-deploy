@@ -292,15 +292,36 @@ export class RokuDeploy {
             //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {
-                response = await this.doPostRequest(requestOptions);
-            } catch (replaceError: any) {
-                //fail if this is a compile error
-                if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
-                    throw new errors.CompileError('Compile error', replaceError, replaceError.results);
-                } else {
-                    requestOptions.formData.mysubmit = 'Install';
+                try {
+                    console.log('calling once');
                     response = await this.doPostRequest(requestOptions);
+                } catch (replaceError: any) {
+                    //fail if this is a compile error
+                    if (this.isCompileError(replaceError.message) && options.failOnCompileError) {
+                        throw new errors.CompileError('Compile error', replaceError, replaceError.results);
+                    } else if (this.isUpdateRequiredError(replaceError)) {
+                        throw replaceError;
+                    } else {
+                        requestOptions.formData.mysubmit = 'Install';
+                        response = await this.doPostRequest(requestOptions);
+                    }
                 }
+            } catch (e: any) {
+                //if this is a 577 error, we have high confidence that the device needs to do an update check
+                if (this.isUpdateRequiredError(e)) {
+                    throw new errors.UpdateCheckRequiredError(response, requestOptions, e);
+
+                    //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
+                } else if (e.code === 'ECONNRESET') {
+                    throw new errors.ConnectionResetError(e, requestOptions);
+                } else {
+                    throw e;
+                }
+            }
+
+            //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
+            if (this.isUpdateCheckRequiredResponse(response.body)) {
+                throw new errors.UpdateCheckRequiredError(response, requestOptions);
             }
 
             if (options.failOnCompileError) {
@@ -333,6 +354,20 @@ export class RokuDeploy {
      */
     private isCompileError(responseHtml: string) {
         return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
+    }
+
+    /**
+     * Does the response look like a compile error
+     */
+    private isUpdateCheckRequiredResponse(responseHtml: string) {
+        return !!/["']\s*Failed\s*to\s*check\s*for\s*software\s*update\s*["']/i.exec(responseHtml);
+    }
+
+    /**
+     * Checks to see if the exception is due to the device needing to check for updates
+     */
+    private isUpdateRequiredError(e: any): boolean {
+        return e.results?.response?.statusCode === 577 || (typeof e.results?.body === 'string' && this.isUpdateCheckRequiredResponse(e.results.body));
     }
 
     /**
@@ -454,7 +489,13 @@ export class RokuDeploy {
             throw new errors.FailedDeviceResponseError(failedSearchMatches[1], results);
         }
 
-        let pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
+        //grab the package url from the JSON on the page if it exists (https://regex101.com/r/1HUXgk/1)
+        let pkgSearchMatches = /"pkgPath"\s*:\s*"(.*?)"/.exec(results.body);
+        if (pkgSearchMatches) {
+            return pkgSearchMatches[1];
+        }
+        //for some reason we couldn't find the pkgPath from json, look in the <a> tag
+        pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         if (pkgSearchMatches) {
             const url = pkgSearchMatches[1];
             let requestOptions2 = this.generateBaseRequestOptions(url, options);

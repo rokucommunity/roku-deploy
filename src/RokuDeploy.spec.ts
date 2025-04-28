@@ -969,6 +969,93 @@ describe('index', () => {
             });
         });
 
+        it('rejects when response contains update device messaging', async () => {
+            options.failOnCompileError = true;
+            mockDoPostRequest(`'Failed to check for software update'`, 200);
+
+            try {
+                await rokuDeploy.sideload(
+                    {
+                        host: '1.2.3.4',
+                        password: 'password',
+                        outDir: outDir,
+                        outFile: options.outFile
+                    }
+                );
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            } catch (err) {
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
+        });
+
+        it('rejects when response contains update device messaging and bad status code on first call', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    // console.log('returning 500');
+                    results = { response: { statusCode: 500 }, body: `'Failed to check for software update'` };
+                } else {
+                    console.log('returning 200');
+                    results = { response: { statusCode: 200 }, body: `` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.sideload(
+                    {
+                        host: '1.2.3.4',
+                        password: 'password',
+                        outDir: outDir,
+                        outFile: options.outFile,
+                        deleteDevChannel: false
+                    }
+                );
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            } catch (err) {
+                expect(spy.callCount).to.eql(1);
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
+        });
+
+        it('rejects when response contains update device messaging and bad status code on second call', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    results = { response: { statusCode: 500 }, body: `` };
+                } else {
+                    results = { response: { statusCode: 200 }, body: `'Failed to check for software update'` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.sideload(
+                    {
+                        host: '1.2.3.4',
+                        password: 'password',
+                        outDir: outDir,
+                        outFile: options.outFile,
+                        deleteDevChannel: false
+                    }
+                );
+                assert.fail('Should not have succeeded due to roku server compilation failure');
+            } catch (err) {
+                expect(spy.callCount).to.eql(2);
+                expect((err as any).message).to.eql(
+                    errors.UpdateCheckRequiredError.MESSAGE
+                );
+            }
+        });
+
         it('handles successful deploy', () => {
             mockDoPostRequest();
 
@@ -1091,6 +1178,87 @@ describe('index', () => {
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        it('Should throw an exception and call doPost once', async () => {
+            options.failOnCompileError = true;
+            let spy = mockDoPostRequest('', 577);
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    outDir: outDir,
+                    outFile: options.outFile,
+                    deleteDevChannel: false
+                });
+            } catch (e) {
+                expect(spy.callCount).to.eql(1);
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        it('Should throw an exception and should call doPost twice', async () => {
+            options.failOnCompileError = true;
+            let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                let results: any;
+                if (params?.formData['mysubmit'] === 'Replace') {
+                    results = { response: { statusCode: 500 }, body: `'not an update error'` };
+                } else {
+                    results = { response: { statusCode: 577 }, body: `` };
+                }
+                rokuDeploy['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    outDir: outDir,
+                    outFile: options.outFile,
+                    deleteDevChannel: false
+                });
+            } catch (e) {
+                expect(spy.callCount).to.eql(2);
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                return;
+            }
+            assert.fail('Should not have succeeded');
+        });
+
+        class ErrorWithConnectionResetCode extends Error {
+            code;
+
+            constructor(code = 'ECONNRESET') {
+                super();
+                this.code = code;
+            }
+        }
+
+        it('Should throw an exception', async () => {
+            options.failOnCompileError = true;
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
+                throw new ErrorWithConnectionResetCode();
+            });
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    outDir: outDir,
+                    outFile: options.outFile
+                });
+            } catch (e) {
+                assert.ok('Exception was thrown as expected');
+                expect(e).to.be.instanceof(errors.ConnectionResetError);
                 return;
             }
             assert.fail('Should not have succeeded');
@@ -1459,6 +1627,18 @@ describe('index', () => {
             });
             expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
+        });
+
+        it('should return created pkg from SD card on success', async () => {
+            mockDoPostRequest(fakePluginPackageResponse);
+
+            let pkgPath = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                stagingDir: stagingDir
+            });
+            expect(pkgPath).to.equal('pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
 
         it('should return our fallback error if neither error or package link was detected', async () => {
@@ -3402,6 +3582,62 @@ describe('index', () => {
         });
     });
 
+    describe('isUpdateCheckRequiredResponse', () => {
+        it('matches on actual response from device', () => {
+            const response = `<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <title> Roku Development Kit </title>\n\n  <link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"css/global.css\" />\n</head>\n<body>\n  <div id=\"root\" style=\"background: #fff\">\n\n  </div>\n\n  <script type=\"text/javascript\" src=\"css/global.js\"></script>\n  <script type=\"text/javascript\">\n  \n      // Include core components and resounce bundle (needed)\n      Shell.resource.set(null, {\n          endpoints: {} \n      });\n      Shell.create('Roku.Event.Key');\n      Shell.create('Roku.Events.Resize');\n      Shell.create('Roku.Events.Scroll');  \n      // Create global navigation and render it\n      var nav = Shell.create('Roku.Nav')\n        .trigger('Enable standalone and utility mode - hide user menu, shopping cart, and etc.')\n        .trigger('Use compact footer')\n        .trigger('Hide footer')\n        .trigger('Render', document.getElementById('root'))\n        .trigger('Remove all feature links from header')\n\n      // Retrieve main content body node\n      var node = nav.invoke('Get main body section mounting node');\n      \n      // Create page container and page header\n      var container = Shell.create('Roku.Nav.Page.Standard').trigger('Render', node);\n      node = container.invoke('Get main body node');\n      container.invoke('Get headline node').innerHTML = 'Failed to check for software update';\n\t  // Cannot reach Software Update Server\n      node.innerHTML = '<p>Please make sure that your Roku device is connected to internet and running most recent software.</p> <p> After connecting to internet, go to system settings and check for software update.</p> ';\n\n      var hrDiv = document.createElement('div');\n      hrDiv.innerHTML = '<hr />';\n      node.appendChild(hrDiv);\n\n      var d = document.createElement('div');\n      d.innerHTML = '<br />';\n      node.appendChild(d);\n\n  </script>\n\n\n  <div style=\"display:none\">\n\n  <font color=\"red\">Please make sure that your Roku device is connected to internet, and running most recent software version (d=953108)</font>\n\n  </div>\n\n</body>\n</html>\n`;
+            expect(
+                rokuDeploy['isUpdateCheckRequiredResponse'](response)
+            ).to.be.true;
+        });
+
+        it('matches with some variations to the message', () => {
+            const response = `"   FAILED    tocheck\tfor softwareupdate"`;
+            expect(
+                rokuDeploy['isUpdateCheckRequiredResponse'](response)
+            ).to.be.true;
+        });
+    });
+
+    describe('isUpdateRequiredError', () => {
+        it('returns true if the status code is 577', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 577 } } })
+            ).to.be.true;
+        });
+
+        it('returns true if the body is an update response from device', () => {
+            const response = `<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <title> Roku Development Kit </title>\n\n  <link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"css/global.css\" />\n</head>\n<body>\n  <div id=\"root\" style=\"background: #fff\">\n\n  </div>\n\n  <script type=\"text/javascript\" src=\"css/global.js\"></script>\n  <script type=\"text/javascript\">\n  \n      // Include core components and resounce bundle (needed)\n      Shell.resource.set(null, {\n          endpoints: {} \n      });\n      Shell.create('Roku.Event.Key');\n      Shell.create('Roku.Events.Resize');\n      Shell.create('Roku.Events.Scroll');  \n      // Create global navigation and render it\n      var nav = Shell.create('Roku.Nav')\n        .trigger('Enable standalone and utility mode - hide user menu, shopping cart, and etc.')\n        .trigger('Use compact footer')\n        .trigger('Hide footer')\n        .trigger('Render', document.getElementById('root'))\n        .trigger('Remove all feature links from header')\n\n      // Retrieve main content body node\n      var node = nav.invoke('Get main body section mounting node');\n      \n      // Create page container and page header\n      var container = Shell.create('Roku.Nav.Page.Standard').trigger('Render', node);\n      node = container.invoke('Get main body node');\n      container.invoke('Get headline node').innerHTML = 'Failed to check for software update';\n\t  // Cannot reach Software Update Server\n      node.innerHTML = '<p>Please make sure that your Roku device is connected to internet and running most recent software.</p> <p> After connecting to internet, go to system settings and check for software update.</p> ';\n\n      var hrDiv = document.createElement('div');\n      hrDiv.innerHTML = '<hr />';\n      node.appendChild(hrDiv);\n\n      var d = document.createElement('div');\n      d.innerHTML = '<br />';\n      node.appendChild(d);\n\n  </script>\n\n\n  <div style=\"display:none\">\n\n  <font color=\"red\">Please make sure that your Roku device is connected to internet, and running most recent software version (d=953108)</font>\n\n  </div>\n\n</body>\n</html>\n`;
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 500 }, body: response } })
+            ).to.be.true;
+        });
+
+        it('returns false on missing results', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ })
+            ).to.be.false;
+        });
+
+        it('returns false on missing response', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: {} })
+            ).to.be.false;
+        });
+
+        it('returns false on missing status code', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: {} } })
+            ).to.be.false;
+        });
+
+        it('returns false on non-string missing body', () => {
+            expect(
+                rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 500 }, body: false } })
+            ).to.be.false;
+        });
+
+    });
+
     function mockDoGetRequest(body = '', statusCode = 200) {
         return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
             let results = { response: { statusCode: statusCode }, body: body };
@@ -3570,3 +3806,39 @@ function getFakeResponseBody(messages: string): string {
         </body>
     </html>`;
 }
+
+const fakePluginPackageResponse = `
+<!--
+(c) 2019-2023 Roku, Inc.  All content herein is protected by U.S.
+copyright and other applicable intellectual property laws and may not be
+copied without the express permission of Roku, Inc., which reserves all
+rights.  Reuse of any of this content for any purpose without the
+permission of Roku, Inc. is strictly prohibited.
+-->
+
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="HandheldFriendly" content="True">
+  <title> Roku Development Kit </title>
+  <link rel="stylesheet" type="text/css" media="screen" href="css/global.css" />
+</head>
+<body>
+  <div id="root" style="background: #fff">
+  </div>
+
+  <div style="display:none">
+</div>
+  <div style="display:none">
+<a href="pkgs//Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg">Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg</a></div>
+
+  <script type="text/javascript" src="css/global.js"></script>
+  <script type="text/javascript" src="js/common.js"></script>
+  <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function (event) {
+      var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"85ad433fddab9079e6cc378e736544c21e1f7123","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"some-package.zip","fileType":"zip","id":"0","location":"sdcard","md5":"da4a98f08d45aea6e14a481ff481ffbe","pkgPath":"pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg","size":"455694"}]}');
+      var hasPackage = params.packages.length > 0;
+  </script>
+</body>
+</html>
+`;
