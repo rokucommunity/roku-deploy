@@ -17,7 +17,7 @@
         "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
     },
     "dependencies": {
-        "@rokucommunity/logger": "^0.3.7",
+        "@rokucommunity/logger": "^0.3.10",
         "@types/request": "^2.47.0",
         "chalk": "^2.4.2",
         "dateformat": "^3.0.3",
