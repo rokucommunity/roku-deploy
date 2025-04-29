@@ -32,6 +32,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.4](https://github.com/rokucommunity/roku-deploy/compare/v3.12.3...v3.12.4) - 2025-01-22
+### Fixed
+ - fixed an issue with `577` error codes ([#182](https://github.com/rokucommunity/roku-deploy/pull/182))
+
+
+
+## [3.12.3](https://github.com/rokucommunity/roku-deploy/compare/v3.12.2...v3.12.3) - 2024-12-06
+### Changed
+ - Identify when a 577 error is thrown, send a new developer friendly message ([#180](https://github.com/rokucommunity/roku-deploy/pull/180))
+### Fixed
+ - issues with detecting "check for updates required" ([#181](https://github.com/rokucommunity/roku-deploy/pull/181))
+
+
+
+## [3.12.2](https://github.com/rokucommunity/roku-deploy/compare/v3.12.1...v3.12.2) - 2024-10-18
+### Fixed
+ - updated regex to find a signed package on `/plugin_package` page ([#176](https://github.com/rokucommunity/roku-deploy/pull/176))
+
+
+
+## [3.12.1](https://github.com/rokucommunity/roku-deploy/compare/v3.12.0...v3.12.1) - 2024-07-19
+### Changed
+ - fix-node14 CI/CD issues ([#165](https://github.com/rokucommunity/roku-deploy/pull/165))
+### Fixed
+ - bug with absolute paths and `getDestPath` ([#171](https://github.com/rokucommunity/roku-deploy/pull/171))
+
+
+
 ## [3.12.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.3...v3.12.0) - 2024-03-01
 ### Changed
  - Support overriding various package upload form data ([#136](https://github.com/rokucommunity/roku-deploy/pull/136))
