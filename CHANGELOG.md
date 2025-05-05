@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.5](https://github.com/rokucommunity/roku-deploy/compare/3.12.4...v3.12.5) - 2025-05-05
+### Changed
+ - Add missing template workflows for shared ci ([#189](https://github.com/rokucommunity/roku-deploy/pull/189))
+ - Shared CI Support Prerelease ([#185](https://github.com/rokucommunity/roku-deploy/pull/185))
+
+
+
 ## [3.12.4](https://github.com/rokucommunity/roku-deploy/compare/v3.12.3...v3.12.4) - 2025-01-22
 ### Fixed
  - fixed an issue with `577` error codes ([#182](https://github.com/rokucommunity/roku-deploy/pull/182))
