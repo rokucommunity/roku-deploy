@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.12.5](https://github.com/rokucommunity/roku-deploy/compare/3.12.4...v3.12.5) - 2025-05-05
 ### Changed
- - Add missing template workflows for shared ci ([#189](https://github.com/rokucommunity/roku-deploy/pull/189))
- - Shared CI Support Prerelease ([#185](https://github.com/rokucommunity/roku-deploy/pull/185))
+ - (chore) Add missing template workflows for shared ci ([#189](https://github.com/rokucommunity/roku-deploy/pull/189))
+ - (chore) Shared CI Support Prerelease ([#185](https://github.com/rokucommunity/roku-deploy/pull/185))
 
 
 
