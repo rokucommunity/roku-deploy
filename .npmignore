@@ -1,5 +1,6 @@
 .vscode
 .git
+.github
 .nyc_output
 coverage
 dist/*.spec.*
@@ -12,3 +13,4 @@ rokudeploy.json
 tsconfig.json
 .eslintrc.js
 *.tgz
+*.map
