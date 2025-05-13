@@ -23,4 +23,3 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: if [ "${{ needs.run.result }}" = "failure" ]; then exit 1; fi
-
