@@ -170,15 +170,17 @@ void yargs
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        args.zip = path.resolve(args.cwd, args.zip);
+        args.outDir = path.dirname(args.zip);
+        args.outFile = path.basename(args.zip);
         return new SideloadCommand().run(args);
     })
 
@@ -209,10 +211,15 @@ void yargs
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
+            .option('out', { type: 'string', description: 'The location where the signed package will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.out) {
+            args.out = path.resolve(args.cwd, args.out);
+            args.outDir = path.dirname(args.out);
+            args.outFile = path.basename(args.out);
+        }
         return new CreateSignedPackageCommand().run(args);
     })
 
