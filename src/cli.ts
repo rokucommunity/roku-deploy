@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as yargs from 'yargs';
+import * as path from 'path';
 import { ExecCommand } from './commands/ExecCommand';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
@@ -252,11 +253,15 @@ void yargs
 
     .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
         return builder
-            .option('stagingDir', { type: 'string', description: 'The folder that should be zipped', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The path to the zip that will be created. Must be .zip file name', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false, alias: ['stagingDir', 'stagingdir'] })
+            .option('zip', { type: 'string', description: 'the path to the zip file that will be created', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.zip) {
+            args.zip = path.resolve(args.cwd, args.zip);
+            args.outDir = path.dirname(args.zip);
+            args.outFile = path.basename(args.zip);
+        }
         return new ZipCommand().run(args);
     })
 
