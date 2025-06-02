@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
+### Added
+ - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
+
+
+
 ## [4.0.0-alpha.1](https://github.com/rokucommunity/roku-deploy/compare/v4.0.0-alpha.0...v4.0.0-alpha.1) - 2024-05-17
 ### Changed
  - Enhanced logging levels ([#168](https://github.com/rokucommunity/roku-deploy/pull/168))
