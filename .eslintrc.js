@@ -34,11 +34,10 @@ module.exports = {
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-extra-parens': 'off',
         '@typescript-eslint/no-floating-promises': 'error',
+        '@typescript-eslint/no-invalid-void-type': 'off',
         '@typescript-eslint/no-magic-numbers': 'off',
         '@typescript-eslint/no-parameter-properties': 'off',
         '@typescript-eslint/no-this-alias': 'off',
-        //possibly disable this once we have converted all throw statements to actual errors
-        '@typescript-eslint/no-throw-literal': 'off',
         '@typescript-eslint/no-type-alias': 'off',
         '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'off',
         '@typescript-eslint/no-unnecessary-condition': 'off',
