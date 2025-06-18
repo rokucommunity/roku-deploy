@@ -1,6 +1,6 @@
 import * as fsExtra from 'fs-extra';
 import { cwd, rootDir, tempDir, writeFiles } from './testUtils.spec';
-import * as dedent from 'dedent';
+import undent from 'undent';
 
 //these tests are run against an actual roku device. These cannot be enabled when run on the CI server
 describe('device', function device() {
@@ -11,7 +11,7 @@ describe('device', function device() {
         process.chdir(rootDir);
 
         writeFiles(rootDir, [
-            ['manifest', dedent`
+            ['manifest', undent`
                 title=RokuDeployTestChannel
                 major_version=1
                 minor_version=0
@@ -21,7 +21,7 @@ describe('device', function device() {
                 bs_const=IS_DEV_BUILD=false
                 splash_color=#000000
             `],
-            ['source/main.brs', dedent`
+            ['source/main.brs', undent`
                 Sub RunUserInterface()
                     screen = CreateObject("roSGScreen")
                     m.scene = screen.CreateScene("HomeScene")
