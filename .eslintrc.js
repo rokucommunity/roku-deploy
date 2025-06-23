@@ -10,7 +10,8 @@ module.exports = {
         project: './tsconfig.json'
     },
     plugins: [
-        '@typescript-eslint'
+        '@typescript-eslint',
+        'import'
     ],
     extends: [
         'eslint:all',
@@ -23,6 +24,7 @@ module.exports = {
         '@typescript-eslint/explicit-member-accessibility': 'off',
         '@typescript-eslint/explicit-module-boundary-types': 'off',
         '@typescript-eslint/init-declarations': 'off',
+        '@typescript-eslint/lines-around-comment': 'off',
         '@typescript-eslint/member-ordering': 'off',
         "@typescript-eslint/naming-convention": 'off',
         '@typescript-eslint/no-base-to-string': 'off',
@@ -51,6 +53,9 @@ module.exports = {
             'error',
             'always'
         ],
+        '@typescript-eslint/parameter-properties': 'off',
+        '@typescript-eslint/prefer-nullish-coalescing': 'off',
+        "@typescript-eslint/prefer-optional-chain": 'off',
         '@typescript-eslint/prefer-readonly': 'off',
         '@typescript-eslint/prefer-readonly-parameter-types': 'off',
         '@typescript-eslint/promise-function-async': 'off',
@@ -89,11 +94,11 @@ module.exports = {
         'function-paren-newline': 'off',
         'guard-for-in': 'off',
         'id-length': 'off',
+        'import/no-duplicates': 'error',
         'indent': 'off',
         'init-declarations': 'off',
         'line-comment-position': 'off',
         'linebreak-style': 'off',
-        'lines-around-comment': 'off',
         'lines-between-class-members': 'off',
         'max-classes-per-file': 'off',
         'max-depth': 'off',
@@ -111,6 +116,7 @@ module.exports = {
         'no-constant-condition': 'off',
         'no-console': 'off',
         'no-continue': 'off',
+        'no-duplicate-imports': 'off',
         'no-else-return': 'off',
         'no-empty': 'off',
         'no-implicit-coercion': 'off',

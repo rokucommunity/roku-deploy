@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
+### Added
+ - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
+
+
+
+## [4.0.0-alpha.1](https://github.com/rokucommunity/roku-deploy/compare/v4.0.0-alpha.0...v4.0.0-alpha.1) - 2024-05-17
+### Changed
+ - Enhanced logging levels ([#168](https://github.com/rokucommunity/roku-deploy/pull/168))
+ - Update files array ([#164](https://github.com/rokucommunity/roku-deploy/pull/164))
+ - Change documentation ([#162](https://github.com/rokucommunity/roku-deploy/pull/162))
+
+
+
+## [4.0.0-alpha.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.1...v4.0.0-alpha.0) - 2024-04-16
+### Added
+ - individual interfaces for every rokuDeploy function ([#126](https://github.com/rokucommunity/roku-deploy/pull/126))
+ - cli commands ([#139](https://github.com/rokucommunity/roku-deploy/pull/139))
+ - cli commands and rename roku-deploy functions, reorganize functions ([#142](https://github.com/rokucommunity/roku-deploy/pull/142))
+ - cwd option ([#158](https://github.com/rokucommunity/roku-deploy/pull/158))
+### Changed
+ - don't normalize file patterns ([#131](https://github.com/rokucommunity/roku-deploy/pull/131))
+ - Throw exceptions on missing options ([#156](https://github.com/rokucommunity/roku-deploy/pull/156))
+ - upgrade typescript & other packages ([#157](https://github.com/rokucommunity/roku-deploy/pull/157))
+### Fixed
+ - bug with `{src;dest}` object handling ([#135](https://github.com/rokucommunity/roku-deploy/pull/135))
+### Removed
+ - removed deprecated `retainStagingFolder` property ([#130](https://github.com/rokucommunity/roku-deploy/pull/130))
+ - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
+
+
+
 ## [3.12.6](https://github.com/rokucommunity/roku-deploy/compare/3.12.5...v3.12.6) - 2025-06-03
 ### Changed
  - chore: upgrade to the `undent` package instead of `dedent` ([#192](https://github.com/rokucommunity/roku-deploy/pull/196))
