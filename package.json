@@ -1,6 +1,6 @@
 {
     "name": "roku-deploy",
-    "version": "4.0.0-alpha.1",
+    "version": "4.0.0-alpha.2",
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
@@ -14,7 +14,8 @@
         "test:device": "nyc mocha src/device.spec.ts",
         "test:all": "nyc mocha \"src/**/*.spec.ts\"",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
-        "publish-coverage": "nyc report --reporter=text-lcov | coveralls"
+        "publish-coverage": "nyc report --reporter=text-lcov | coveralls",
+        "package": "npm run build && npm pack"
     },
     "dependencies": {
         "@rokucommunity/logger": "^0.3.10",
@@ -52,7 +53,6 @@
         "@typescript-eslint/parser": "^5.59.11",
         "chai": "^4.3.4",
         "coveralls-next": "^4.2.0",
-        "dedent": "^0.7.0",
         "eslint": "^8.56.0",
         "eslint-plugin-import": "^2.29.1",
         "mocha": "^10.3.0",
@@ -63,7 +63,8 @@
         "source-map-support": "^0.5.21",
         "ts-node": "^10.9.2",
         "typescript": "^5.4.3",
-        "typescript-eslint": "^7.4.0"
+        "typescript-eslint": "^7.4.0",
+        "undent": "^1.0.0"
     },
     "mocha": {
         "require": [

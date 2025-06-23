@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
+### Added
+ - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
+
+
+
 ## [4.0.0-alpha.1](https://github.com/rokucommunity/roku-deploy/compare/v4.0.0-alpha.0...v4.0.0-alpha.1) - 2024-05-17
 ### Changed
  - Enhanced logging levels ([#168](https://github.com/rokucommunity/roku-deploy/pull/168))
@@ -29,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
  - removed deprecated `retainStagingFolder` property ([#130](https://github.com/rokucommunity/roku-deploy/pull/130))
  - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
+
+
+
+## [3.12.6](https://github.com/rokucommunity/roku-deploy/compare/3.12.5...v3.12.6) - 2025-06-03
+### Changed
+ - chore: upgrade to the `undent` package instead of `dedent` ([#192](https://github.com/rokucommunity/roku-deploy/pull/196))
+
+
+
+## [3.12.5](https://github.com/rokucommunity/roku-deploy/compare/3.12.4...v3.12.5) - 2025-05-05
+### Changed
+ - (chore) Add missing template workflows for shared ci ([#189](https://github.com/rokucommunity/roku-deploy/pull/189))
+ - (chore) Shared CI Support Prerelease ([#185](https://github.com/rokucommunity/roku-deploy/pull/185))
 
 
 
