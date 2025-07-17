@@ -19,6 +19,14 @@ export interface RokuDeployOptions {
     outFile?: string;
 
     /**
+     * The path to the zip file that will be created. Can be relative or absolute.
+     * If provided, this takes precedence over outDir and outFile.
+     * @example './dist/my-app.zip'
+     * @example '/absolute/path/to/my-app.zip'
+     */
+    zipPath?: string;
+
+    /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */

@@ -1034,6 +1034,17 @@ export class RokuDeploy {
     public getOutputZipFilePath(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
+        // If zipPath is provided, use it directly
+        if (options.zipPath) {
+            let zipFilePath = path.resolve(options.zipPath);
+            // Ensure the path has a .zip extension if it doesn't already have .zip or .squashfs
+            if (!zipFilePath.toLowerCase().endsWith('.zip') && !zipFilePath.toLowerCase().endsWith('.squashfs')) {
+                zipFilePath += '.zip';
+            }
+            return zipFilePath;
+        }
+
+        // Fall back to original logic using outDir and outFile
         let zipFileName = options.outFile;
         if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
