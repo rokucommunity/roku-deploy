@@ -1,7 +1,7 @@
 import { util, standardizePath as s } from './util';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
-import { tempDir } from './testUtils.spec';
+import { cwd, tempDir, rootDir } from './testUtils.spec';
 import * as path from 'path';
 import * as dns from 'dns';
 import { createSandbox } from 'sinon';
@@ -14,6 +14,7 @@ describe('util', () => {
     });
 
     afterEach(() => {
+        fsExtra.emptyDirSync(tempDir);
         sinon.restore();
     });
 
@@ -26,14 +27,16 @@ describe('util', () => {
         });
     });
 
-    describe('toForwardSlashes', () => {
-        it('returns original value for non-strings', () => {
-            expect(util.toForwardSlashes(undefined)).to.be.undefined;
-            expect(util.toForwardSlashes(<any>false)).to.be.false;
+    describe('standardizePathPosix', () => {
+        it('returns falsey value back unchanged', () => {
+            expect(util.standardizePathPosix(null)).to.eql(null);
+            expect(util.standardizePathPosix(undefined)).to.eql(undefined);
+            expect(util.standardizePathPosix(false as any)).to.eql(false);
+            expect(util.standardizePathPosix(0 as any)).to.eql(0);
         });
 
-        it('converts mixed slashes to forward', () => {
-            expect(util.toForwardSlashes('a\\b/c\\d/e')).to.eql('a/b/c/d/e');
+        it('always returns forward slashes', () => {
+            expect(util.standardizePathPosix('C:\\projects/some\\folder')).to.eql('C:/projects/some/folder');
         });
     });
 
@@ -107,10 +110,10 @@ describe('util', () => {
     });
 
     describe('globAllByIndex', () => {
-        function writeFiles(filePaths: string[], cwd = tempDir) {
+        function writeFiles(filePaths: string[], dir = tempDir) {
             for (const filePath of filePaths) {
                 fsExtra.outputFileSync(
-                    path.resolve(cwd, filePath),
+                    path.resolve(dir, filePath),
                     ''
                 );
             }
@@ -275,6 +278,15 @@ describe('util', () => {
         });
     });
 
+    describe('fileExistsCaseInsensitive', () => {
+        it('detects when a file does not exist inside a dir that does exist', async () => {
+            fsExtra.ensureDirSync(tempDir);
+            expect(
+                await util.fileExistsCaseInsensitive(s`${tempDir}/not-there`)
+            ).to.be.false;
+        });
+    });
+
     describe('decodeHtmlEntities', () => {
         it('decodes values properly', () => {
             expect(util.decodeHtmlEntities('&nbsp;')).to.eql(' ');
@@ -283,6 +295,235 @@ describe('util', () => {
             expect(util.decodeHtmlEntities('&lt;')).to.eql('<');
             expect(util.decodeHtmlEntities('&gt;')).to.eql('>');
             expect(util.decodeHtmlEntities('&#39;')).to.eql(`'`);
+        });
+    });
+
+    describe('objectToTableString', () => {
+        it('should print an object to a table', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': 'abcd'
+            };
+
+            const result = util.objectToTableString(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     abcd              '
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
+
+        it('should still print a table when a value is null', () => {
+            const deviceInfo = {
+                'device-id': '1234',
+                'serial-number': null
+            };
+
+            const result = util.objectToTableString(deviceInfo);
+
+            const expectedOutput = [
+                'Name              Value             ',
+                '---------------------------',
+                'device-id         1234              ',
+                'serial-number     undefined'
+            ].join('\n');
+
+            expect(result).to.eql(expectedOutput);
+        });
+    });
+
+    describe('normalizeRootDir', () => {
+        it('handles falsey values', () => {
+            expect(util.normalizeRootDir(null)).to.equal(cwd);
+            expect(util.normalizeRootDir(undefined)).to.equal(cwd);
+            expect(util.normalizeRootDir('')).to.equal(cwd);
+            expect(util.normalizeRootDir(' ')).to.equal(cwd);
+            expect(util.normalizeRootDir('\t')).to.equal(cwd);
+        });
+
+        it('handles non-falsey values', () => {
+            expect(util.normalizeRootDir(cwd)).to.equal(cwd);
+            expect(util.normalizeRootDir('./')).to.equal(cwd);
+            expect(util.normalizeRootDir('./testProject')).to.equal(path.join(cwd, 'testProject'));
+        });
+    });
+
+    describe('getDestPath', () => {
+        it('handles unrelated exclusions properly', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    [
+                        '**/*',
+                        '!exclude.me'
+                    ],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('finds dest path for top-level path', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/components/comp1/comp1.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.equal(s`components/comp1/comp1.brs`);
+        });
+
+        it('does not find dest path for non-matched top-level path', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    ['components/**/*'],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        '!source/main.brs'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes file from non-rootdir top-level pattern', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../externalDir/source/main.brs`,
+                    [
+                        '!../externalDir/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('excludes a file that is negated in src;dest;', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/source/main.brs`,
+                    [
+                        'source/**/*',
+                        {
+                            src: '!source/main.brs'
+                        }
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+
+        it('works for brighterscript files', () => {
+            let destPath = util.getDestPath(
+                util.standardizePath(`${cwd}/src/source/main.bs`),
+                [
+                    'manifest',
+                    'source/**/*.bs'
+                ],
+                s`${cwd}/src`
+            );
+            expect(s`${destPath}`).to.equal(s`source/main.bs`);
+        });
+
+        it('excludes a file found outside the root dir', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../source/main.brs`,
+                    [
+                        '../source/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.be.undefined;
+        });
+    });
+
+    describe('getOptionsFromJson', () => {
+        it('should fill in options from rokudeploy.json', () => {
+            fsExtra.outputJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
+            expect(
+                util.getOptionsFromJson({ cwd: rootDir })
+            ).to.eql({
+                password: 'password'
+            });
+        });
+
+        it(`loads cwd from process`, () => {
+            try {
+                fsExtra.outputJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+                expect(
+                    util.getOptionsFromJson()
+                ).to.eql({
+                    host: '1.2.3.4'
+                });
+            } finally {
+                fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
+            }
+        });
+
+        it('catches invalid json with jsonc parser', () => {
+            fsExtra.writeJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "rootDir": "src"
+            `);
+            let ex;
+            try {
+                util.getOptionsFromJson();
+            } catch (e) {
+                console.log(e);
+                ex = e;
+            }
+            expect(ex).to.exist;
+            expect(ex.message.startsWith('Error parsing')).to.be.true;
+            fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
+        });
+
+        it('works when loading stagingDir from rokudeploy.json', () => {
+            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                return true;
+            });
+            sinon.stub(fsExtra, 'readFileSync').returns(`
+                {
+                    "stagingDir": "./staging-dir"
+                }
+            `);
+            let options = util.getOptionsFromJson();
+            expect(options.stagingDir.endsWith('staging-dir')).to.be.true;
+        });
+
+        it('supports jsonc for rokudeploy.json', () => {
+            fsExtra.writeFileSync(s`${tempDir}/rokudeploy.json`, `
+                //leading comment
+                {
+                    //inner comment
+                    "rootDir": "src" //trailing comment
+                }
+                //trailing comment
+            `);
+            let options = util.getOptionsFromJson({ cwd: tempDir });
+            expect(options.rootDir).to.equal('src');
+        });
+    });
+
+    describe('computeFileDestPath', () => {
+        it('treats {src;dest} without dest as a top-level string', () => {
+            expect(
+                util['computeFileDestPath'](s`${rootDir}/source/main.brs`, { src: s`source/main.brs` } as any, rootDir)
+            ).to.eql(s`source/main.brs`);
         });
     });
 });
