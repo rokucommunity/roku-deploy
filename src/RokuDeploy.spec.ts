@@ -114,25 +114,25 @@ describe('index', () => {
 
         it('should use zipPath when provided', () => {
             options.zipPath = './dist/my-app.zip';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.resolve('./dist/my-app.zip'));
         });
 
         it('should use absolute zipPath when provided', () => {
             options.zipPath = '/absolute/path/to/my-app.zip';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.resolve('/absolute/path/to/my-app.zip'));
         });
 
         it('should add .zip extension to zipPath if missing', () => {
             options.zipPath = './dist/my-app';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.resolve('./dist/my-app.zip'));
         });
 
         it('should not add .zip extension to zipPath if .squashfs extension exists', () => {
             options.zipPath = './dist/my-app.squashfs';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.resolve('./dist/my-app.squashfs'));
         });
 
@@ -140,14 +140,14 @@ describe('index', () => {
             options.outDir = './out';
             options.outFile = 'roku-deploy';
             options.zipPath = './dist/my-app.zip';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.resolve('./dist/my-app.zip'));
         });
 
         it('should fall back to outDir and outFile when zipPath is not provided', () => {
             options.outDir = './out';
             options.outFile = 'roku-deploy';
-            let outputPath = rokuDeploy.getOutputZipFilePath(options);
+            let outputPath = rokuDeploy['getOutputZipFilePath'](options);
             expect(outputPath).to.equal(path.join(path.resolve('./out'), 'roku-deploy.zip'));
         });
     });
@@ -684,7 +684,7 @@ describe('index', () => {
             fsExtra.ensureDirSync(stagingDir);
             fsExtra.writeFileSync(path.join(stagingDir, 'manifest'), '');
 
-            await rokuDeploy.zipPackage(options);
+            await rokuDeploy.zip(options);
 
             // Check that zip was created at zipPath location
             expectPathExists(testZipPath);
@@ -703,7 +703,7 @@ describe('index', () => {
             fsExtra.ensureDirSync(stagingDir);
             fsExtra.writeFileSync(path.join(stagingDir, 'manifest'), '');
 
-            await rokuDeploy.zipPackage(options);
+            await rokuDeploy.zip(options);
 
             // Check that zip was created at resolved relative path
             expectPathExists(path.resolve(testZipPath));

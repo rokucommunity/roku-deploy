@@ -1157,6 +1157,7 @@ export interface DeleteDevChannelOptions {
 export interface GetOutputZipFilePathOptions {
     outFile?: string;
     outDir?: string;
+    zipPath?: string;
     cwd?: string;
 }
 
