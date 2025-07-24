@@ -1393,7 +1393,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } catch (e) {
@@ -1414,7 +1413,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: s`../notReal.pkg`,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } finally {
@@ -1432,7 +1430,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: s`${tempDir}/testSignedPackage.pkg`,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: options.devId
             });
         });
@@ -1447,7 +1444,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: options.devId
             });
         });
@@ -1462,7 +1458,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: undefined
             });
         });
@@ -1475,7 +1470,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } catch (e) {
@@ -1516,7 +1510,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: '45fdc2019903ac333ff624b0b2cddd2c733c3e74'
                 });
             } catch (e) {
