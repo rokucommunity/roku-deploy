@@ -685,11 +685,49 @@ export class RokuDeploy {
     }
 
     /**
+     * Set the `User-Agent` header if missing from the request params, ensuring it's included in all requests made by roku-deploy
+     * @param params
+     * @returns
+     */
+    private setUserAgentIfMissing(params: requestType.OptionsWithUrl) {
+        if (!params) {
+            params = {} as requestType.OptionsWithUrl;
+        }
+        if (!params.headers) {
+            params.headers = {};
+        }
+        if (!params.headers['User-Agent']) {
+            params.headers['User-Agent'] = this.getUserAgent();
+        }
+        return params;
+    }
+
+    /**
+     * Get the user-agent string used for HTTP requests sent by this package
+     * @returns
+     */
+    private getUserAgent() {
+        try {
+            if (this._packageVersion === undefined) {
+                this._packageVersion = _fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
+            }
+        } catch (e) {
+            this._packageVersion = null;
+        }
+        return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
+    }
+
+    private _packageVersion: string;
+
+    /**
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: any, verify = true) {
+    private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+
+            this.setUserAgentIfMissing(params);
+
             request.post(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
@@ -709,6 +747,9 @@ export class RokuDeploy {
      */
     private async doGetRequest(params: requestType.OptionsWithUrl) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+
+            this.setUserAgentIfMissing(params);
+
             request.get(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
@@ -1084,10 +1125,7 @@ export class RokuDeploy {
 
         let response = await this.doGetRequest({
             url: url,
-            timeout: options.timeout,
-            headers: {
-                'User-Agent': 'https://github.com/RokuCommunity/roku-deploy'
-            }
+            timeout: options.timeout
         });
         try {
             const parsedContent = await xml2js.parseStringPromise(response.body, {
