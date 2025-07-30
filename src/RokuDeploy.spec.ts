@@ -1407,16 +1407,16 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             try {
-                fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
+                fsExtra.writeFileSync(s`${outDir}/notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: s`../notReal.pkg`,
+                    rekeySignedPackage: s`${outDir}/notReal.pkg`,
                     signingPassword: options.signingPassword,
                     devId: options.devId
                 });
             } finally {
-                fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
+                fsExtra.removeSync(s`${outDir}/notReal.pkg`);
             }
         });
 

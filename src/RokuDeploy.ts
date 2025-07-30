@@ -418,7 +418,7 @@ export class RokuDeploy {
 
         let rekeySignedPackagePath = options.rekeySignedPackage;
         if (!path.isAbsolute(options.rekeySignedPackage)) {
-            rekeySignedPackagePath = path.resolve(options.cwd, options.rekeySignedPackage);
+            rekeySignedPackagePath = path.resolve(options.outDir, options.rekeySignedPackage);
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
@@ -1118,6 +1118,7 @@ export interface ConvertToSquashfsOptions {
 export interface RekeyDeviceOptions {
     host: string;
     password: string;
+    outDir?: string;
     rekeySignedPackage: string;
     signingPassword: string;
     devId: string;
