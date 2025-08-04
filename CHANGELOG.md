@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.12.7](https://github.com/rokucommunity/roku-deploy/compare/3.12.6...v3.12.7) - 2025-08-04
+### Added
+ - Add standards-compliant User-Agent header ([#203](https://github.com/rokucommunity/roku-deploy/pull/203))
+
+
+
 ## [3.12.6](https://github.com/rokucommunity/roku-deploy/compare/3.12.5...v3.12.6) - 2025-06-03
 ### Changed
  - chore: upgrade to the `undent` package instead of `dedent` ([#192](https://github.com/rokucommunity/roku-deploy/pull/196))
