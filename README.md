@@ -388,8 +388,22 @@ Here are the available options. The defaults are shown to the right of the optio
     If true the previously installed dev channel will be deleted before installing the new one
 
 
-Click [here](https://github.com/rokucommunity/roku-deploy/blob/8e1cbdfcccb38dad4a1361277bdaf5484f1c2bcd/src/RokuDeploy.ts#L897) to see the typescript interface for these options
+Click [here](https://github.com/rokucommunity/roku-deploy/blob/master/src/RokuDeployOptions.ts) to see the typescript interface for these options
 
+
+## User-agent
+roku-deploy includes a User-Agent header to help you filter out unwanted network traffic from your network monitoring software of choice. The User-Agent header will be the name of the tool (`roku-deploy`) followed by the full version of the tool. If you're using a prerelease or temporary testing version, that information will also be included. Here are some examples:
+```
+User-Agent: roku-deploy/3.12.6
+User-Agent: roku-deploy/4.0.0-alpha.12
+User-Agent: roku-deploy/3.12.7-some-branch-name-123.3958293294854
+
+```
+
+If for some strange reason we were unable to find the version number, then the `User-Agent` will be:
+```
+User-Agent: roku-deploy/unknown
+```
 
 ## Troubleshooting
  - if you see a `ESOCKETTIMEDOUT` error during deployment, this can be caused by an antivirus blocking network traffic, so consider adding a special exclusion for your Roku device.
