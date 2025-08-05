@@ -201,12 +201,12 @@ void yargs
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('pkg', { type: 'string', description: 'The absolute path to the signed package to be used for rekeying', demandOption: false })
+            .option('pkg', { type: 'string', description: 'The path to thesigned package to be used for rekeying, relative to cwd', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        args.rekeySignedPackage = args.pkg;
+        args.rekeySignedPackage = path.resolve(args.cwd, args.pkg);
         return new RekeyDeviceCommand().run(args);
     })
 
