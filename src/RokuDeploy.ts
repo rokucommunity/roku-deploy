@@ -1118,7 +1118,6 @@ export interface ConvertToSquashfsOptions {
 export interface RekeyDeviceOptions {
     host: string;
     password: string;
-    outDir?: string;
     rekeySignedPackage: string;
     signingPassword: string;
     rootDir?: string;
