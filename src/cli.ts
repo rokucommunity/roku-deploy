@@ -56,6 +56,7 @@ void yargs
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('outZip', { type: 'string', description: 'The output path to the zip file. The zip file is deleted unless this is specified.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
@@ -69,6 +70,10 @@ void yargs
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.outZip) {
+            args.outZip = path.resolve(args.cwd, args.outZip);
+        }
+
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
         }
@@ -266,7 +271,7 @@ void yargs
     .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
         return builder
             .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
-            .option('out', { type: 'string', description: 'the path to the zip file that will be created, relative to cwd', demandOption: false })
+            .option('out', { type: 'string', description: 'the path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         if (args.out) {
