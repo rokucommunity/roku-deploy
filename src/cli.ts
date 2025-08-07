@@ -43,7 +43,8 @@ void yargs
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
@@ -53,6 +54,9 @@ void yargs
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new ExecCommand(
             'stage|zip|close|sideload',
             args
@@ -65,7 +69,7 @@ void yargs
             .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
@@ -77,6 +81,9 @@ void yargs
             .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new ExecCommand(
             'close|rekey|stage|zip|close|sideload|squash|sign',
             args
@@ -95,7 +102,7 @@ void yargs
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })
-            .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
             .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
@@ -107,6 +114,9 @@ void yargs
                 'Stages the contents of rootDir and then zips the staged files into outDir - Will fail if there is no manifest in the staging folder'
             );
     }, (args: any) => {
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new ExecCommand(args.actions, args).run();
     })
 
@@ -114,10 +124,12 @@ void yargs
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('port', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
-        args.remotePort = args.port;
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new KeyPressCommand().run(args);
     })
 
@@ -125,10 +137,12 @@ void yargs
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('port', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
-        args.remotePort = args.port;
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new KeyUpCommand().run(args);
     })
 
@@ -136,10 +150,12 @@ void yargs
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('port', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
-        args.remotePort = args.port;
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new KeyDownCommand().run(args);
     })
 
@@ -147,19 +163,23 @@ void yargs
         return builder
             .option('text', { type: 'string', description: 'The text to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('port', { type: 'number', description: 'The port to use for remote', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
     }, (args: any) => {
-        args.remotePort = args.port;
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new SendTextCommand().run(args);
     })
 
     .command(['remote-control', 'rc'], 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('port', { type: 'number', description: 'The port to use for remote', demandOption: false });
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false });
     }, (args: any) => {
-        args.remotePort = args.port;
+        if (args.ecpPort) {
+            args.remotePort = args.ecpPort;
+        }
         return new RemoteControlCommand().run(args);
     })
 
@@ -177,6 +197,7 @@ void yargs
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
             .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
