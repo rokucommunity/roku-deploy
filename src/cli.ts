@@ -20,47 +20,35 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 
 void yargs
 
-    .command('bundle', 'execute build actions for bundling app', (builder) => {
+    .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
         return builder
-            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('out', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
-    }, (args: any) => {
-        if (args.out) {
-            args.out = path.resolve(args.cwd, args.out);
-            args.outDir = path.dirname(args.out);
-            args.outFile = path.basename(args.out);
-        }
-        return new ExecCommand(
-            'stage|zip',
-            args
-        ).run();
-    })
-
-    .command('deploy', 'execute build actions for deploying app', (builder) => {
-        return builder
-            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The root folder to be copied', demandOption: false })
+            .option('outZip', { type: 'string', description: 'The output path to the zip file. The zip file is deleted unless this is specified.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
+            .option('noclose', { type: 'boolean', description: 'Should the command not close the channel before sideloading', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
-            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        args.zip = path.resolve(args.cwd, args.zip);
+        args.outDir = path.dirname(args.zip);
+        args.outFile = path.basename(args.zip);
+
+        if (args.outZip) {
+            args.outZip = path.resolve(args.cwd, args.outZip);
+        }
+
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
         }
-        return new ExecCommand(
-            'stage|zip|close|sideload',
-            args
-        ).run();
+        return new SideloadCommand().run(args);
     })
 
     .command('package', 'execute build actions for packaging app', (builder) => {
@@ -191,25 +179,6 @@ void yargs
             .option('out', { type: 'string', description: 'The selected staging folder where all files will be copied to', demandOption: false });
     }, (args: any) => {
         return new StageCommand().run(args);
-    })
-
-    .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
-        return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
-            .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
-            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
-            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
-            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
-            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
-            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
-    }, (args: any) => {
-        args.zip = path.resolve(args.cwd, args.zip);
-        args.outDir = path.dirname(args.zip);
-        args.outFile = path.basename(args.zip);
-        return new SideloadCommand().run(args);
     })
 
     .command(['squash', 'convertToSquashfs'], 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {

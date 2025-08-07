@@ -37,11 +37,6 @@ describe('cli', () => {
         sinon.restore();
     });
 
-    it('Successfully bundles an app', () => {
-        execSync(`node ${cwd}/dist/cli.js bundle --rootDir ${rootDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
     it('Successfully runs stage', () => {
         //make the files
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
