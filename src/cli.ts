@@ -40,8 +40,7 @@ void yargs
     .command('deploy', 'execute build actions for deploying app', (builder) => {
         return builder
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'number', description: 'The output directory', demandOption: false })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
@@ -63,8 +62,7 @@ void yargs
     .command('package', 'execute build actions for packaging app', (builder) => {
         return builder
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'number', description: 'The output directory', demandOption: false })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
+            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('remotePort', { type: 'number', description: 'The port to use for remote', demandOption: false })
