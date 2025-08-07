@@ -215,7 +215,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
-            .option('dir', { type: 'string', description: 'The selected staging folder, relative to cwd', demandOption: false, alias: ['stagingDir', 'stagingdir'] })
+            .option('dir', { type: 'string', description: 'The selected staging folder, relative to cwd', demandOption: false })
             .option('out', { type: 'string', description: 'The location where the signed package will be saved, relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
@@ -270,7 +270,7 @@ void yargs
 
     .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
         return builder
-            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false, alias: ['stagingDir', 'stagingdir'] })
+            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
             .option('out', { type: 'string', description: 'the path to the zip file that will be created, relative to cwd', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
