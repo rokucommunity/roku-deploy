@@ -251,6 +251,9 @@ void yargs
             args.outDir = path.dirname(args.out);
             args.outFile = path.basename(args.out);
         }
+        if (args.dir) {
+            args.stagingDir = path.resolve(args.cwd, args.dir);
+        }
         return new CreateSignedPackageCommand().run(args);
     })
 
@@ -301,6 +304,9 @@ void yargs
             args.out = path.resolve(args.cwd, args.out);
             args.outDir = path.dirname(args.out);
             args.outFile = path.basename(args.out);
+        }
+        if (args.dir) {
+            args.stagingDir = path.resolve(args.cwd, args.dir);
         }
         return new ZipCommand().run(args);
     })
