@@ -23,10 +23,14 @@ void yargs
     .command('bundle', 'execute build actions for bundling app', (builder) => {
         return builder
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
+            .option('out', { type: 'string', description: 'The output directory', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
+        if (args.out) {
+            args.out = path.resolve(args.cwd, args.out);
+            args.outDir = path.dirname(args.out);
+            args.outFile = path.basename(args.out);
+        }
         return new ExecCommand(
             'stage|zip',
             args
