@@ -110,30 +110,29 @@ Deploy a .zip package of your project to a roku device
 npx roku-deploy deploy --host 'ip.of.roku' --password 'password of device' --rootDir '.' --outDir './out'
 ```
 
-
 ### Create a signed package of your project
 ```shell
-npx roku-deploy deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
+npx roku-deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
 ```
 
 ### Stage the root directory
 ```shell
-npx roku-deploy stage --stagingDir './path/to/staging/dir' --rootDir './path/to/root/dir'
+npx roku-deploy stage --out './path/to/staging/dir' --rootDir './path/to/root/dir'
 ```
 
 ### Zip the contents of a given directory
 ```shell
-npx roku-deploy zip --stagingDir './path/to/root/dir' --outDir './path/to/out/dir'
+npx roku-deploy zip --dir './path/to/root/dir' --out './path/to/out/dir'
 ```
 
 ### Press the Home key
 ```shell
-npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --remotePort 1234 --timeout 5000
+npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --ecpPort 1234 --timeout 5000
 ```
 
 ### Sideload a build
 ```shell
-npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --outDir './path/to/out/dir'
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
 ```
 
 ### Convert to SquashFS
@@ -143,7 +142,22 @@ npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 
 ### Create a signed package
 ```shell
-npx roku-deploy sign --host 'ip.of.roku' --password 'password'
+npx roku-deploy sign --host 'ip.of.roku' --password 'password' --dir './path/to/staging/directory'
+```
+
+### Send text to device
+```shell
+npx roku-deploy sendText --text 'Hello World' --host 'ip.of.roku'
+```
+
+### Take a screenshot
+```shell
+npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot.jpg'
+```
+
+### Rekey a device
+```shell
+npx roku-deploy rekey --host 'ip.of.roku' --password 'password' --pkg './path/to/signed.pkg'
 ```
 
 You can view the full list of commands by running:
@@ -151,7 +165,6 @@ You can view the full list of commands by running:
 ```shell
 npx roku-deploy --help
 ```
-
 
 ## JavaScript Usage
 
@@ -238,6 +251,36 @@ rokuDeploy.createSignedPackage({
     password: 'password',
     signingPassword: 'signing password',
     stagingDir: './path/to/staging/directory'
+    //...other options if necessary
+})
+```
+
+### Send text to device
+```typescript
+rokuDeploy.sendText({
+    text: 'Hello World',
+    host: 'ip-of-roku'
+    //...other options if necessary
+})
+```
+
+### Take a screenshot
+```typescript
+rokuDeploy.captureScreenshot({
+    host: 'ip-of-roku',
+    password: 'password',
+    screenshotDir: './screenshots/',
+    screenshotFile: 'screenshot.jpg'
+    //...other options if necessary
+})
+```
+
+### Rekey a device
+```typescript
+rokuDeploy.rekeyDevice({
+    host: 'ip-of-roku',
+    password: 'password',
+    rekeySignedPackage: './path/to/signed.pkg'
     //...other options if necessary
 })
 ```
