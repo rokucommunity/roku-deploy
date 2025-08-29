@@ -7,9 +7,19 @@ export class SideloadCommand {
             ...util.getOptionsFromJson(args),
             ...args
         };
-        await rokuDeploy.sideload(options);
         if (args.noclose !== true) {
             await rokuDeploy.closeChannel(options as CloseChannelOptions);
+        }
+
+        if (args.zip) {
+            args.retainDeploymentArchive = true;
+            await rokuDeploy.sideload(options);
+        }
+
+        if (args.rootDir) {
+            await rokuDeploy.zip(options);
+            args.retainDeploymentArchive = false;
+            await rokuDeploy.sideload(options);
         }
     }
 }
