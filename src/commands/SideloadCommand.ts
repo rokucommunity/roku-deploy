@@ -1,4 +1,5 @@
 import { rokuDeploy, util } from '../index';
+import type { CloseChannelOptions } from '../RokuDeploy';
 
 export class SideloadCommand {
     async run(args) {
@@ -7,5 +8,8 @@ export class SideloadCommand {
             ...args
         };
         await rokuDeploy.sideload(options);
+        if (args.noclose !== true) {
+            await rokuDeploy.closeChannel(options as CloseChannelOptions);
+        }
     }
 }
