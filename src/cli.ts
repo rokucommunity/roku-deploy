@@ -51,66 +51,27 @@ void yargs
         return new SideloadCommand().run(args);
     })
 
-    .command('package', 'execute build actions for packaging app', (builder) => {
+    .command('package', 'Create a signed package from an existing sideloaded dev channel', (builder) => {
         return builder
-            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('outZip', { type: 'string', description: 'The output path to the zip file. The zip file is deleted unless this is specified.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
-            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
-            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
-            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
-            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the deployment archive be retained', demandOption: false })
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
-            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
+            .option('appTitle', { type: 'string', description: 'The title of the app to be signed', demandOption: false })
+            .option('appVersion', { type: 'string', description: 'The version of the app to be signed', demandOption: false })
+            .option('manifestPath', { type: 'string', description: 'The path to the manifest file, relative to cwd', demandOption: false })
+            .option('out', { type: 'string', description: 'The location where the signed package will be saved, relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
+            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        if (args.outZip) {
-            args.outZip = path.resolve(args.cwd, args.outZip);
+        if (args.out) {
+            if (!args.out.endsWith('.pkg')) {
+                throw new Error('Out must end with a .pkg');
+            }
+            args.out = path.resolve(args.cwd, args.out);
+            args.outDir = path.dirname(args.out);
+            args.outFile = path.basename(args.out);
         }
-
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
-        return new ExecCommand(
-            'close|rekey|stage|zip|close|sideload|squash|sign',
-            args
-        ).run();
-    })
-
-    .command('exec', 'larger command for handling a series of smaller commands', (builder) => {
-        return builder
-            .option('actions', { type: 'string', description: 'The actions to be executed, separated by |', demandOption: true })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('outDir', { type: 'string', description: 'The output directory', demandOption: false }) //TODO finish this. Are all of these necessary?
-            .option('outFile', { type: 'string', description: 'The output file', demandOption: false })
-            .option('stagingDir', { type: 'string', description: 'The selected staging folder', demandOption: false })
-            .option('retainedStagingDir', { type: 'boolean', description: 'Should the staging folder be retained after the command is complete', demandOption: false })
-            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
-            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
-            .option('packagePort', { type: 'number', description: 'The port to use for packaging', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
-            .option('rootDir', { type: 'string', description: 'The root directory', demandOption: false })
-            .option('files', { type: 'array', description: 'The files to be included in the package', demandOption: false })
-            .option('username', { type: 'string', description: 'The username for the Roku', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .usage(`Usage: npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`)
-            .example(
-                `npx ts-node ./src/cli.ts exec --actions 'stage|zip' --rootDir . --outDir ./out`,
-                'Stages the contents of rootDir and then zips the staged files into outDir - Will fail if there is no manifest in the staging folder'
-            );
-    }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
-        return new ExecCommand(args.actions, args).run();
+        return new CreateSignedPackageCommand().run(args);
     })
 
     .command('keyPress', 'send keypress command', (builder) => {
@@ -205,30 +166,6 @@ void yargs
     }, (args: any) => {
         args.rekeySignedPackage = path.resolve(args.cwd, args.pkg);
         return new RekeyDeviceCommand().run(args);
-    })
-
-    .command(['createSignedPackage', 'sign'], 'Sign a package', (builder) => {
-        return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
-            .option('dir', { type: 'string', description: 'The selected staging folder, relative to cwd', demandOption: false })
-            .option('out', { type: 'string', description: 'The location where the signed package will be saved, relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
-            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
-    }, (args: any) => {
-        if (args.out) {
-            if (!args.out.endsWith('.pkg')) {
-                throw new Error('Out must end with a .pkg');
-            }
-            args.out = path.resolve(args.cwd, args.out);
-            args.outDir = path.dirname(args.out);
-            args.outFile = path.basename(args.out);
-        }
-        if (args.dir) {
-            args.stagingDir = path.resolve(args.cwd, args.dir);
-        }
-        return new CreateSignedPackageCommand().run(args);
     })
 
     .command('deleteDevChannel', 'Delete an installed channel', (builder) => {
