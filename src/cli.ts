@@ -165,7 +165,7 @@ void yargs
         return new SendTextCommand().run(args);
     })
 
-    .command(['remote-control', 'rc'], 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
+    .command('remote-control', 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false });
@@ -176,7 +176,7 @@ void yargs
         return new RemoteControlCommand().run(args);
     })
 
-    .command(['stage', 'prepublishToStaging'], 'Copies all of the referenced files to the staging folder', (builder) => {
+    .command('stage', 'Copies all of the referenced files to the staging folder', (builder) => {
         return builder
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
@@ -186,7 +186,7 @@ void yargs
         return new StageCommand().run(args);
     })
 
-    .command(['squash', 'convertToSquashfs'], 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {
+    .command('squash', 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
@@ -194,7 +194,7 @@ void yargs
         return new ConvertToSquashfsCommand().run(args);
     })
 
-    .command(['rekey', 'rekeyDevice'], 'Rekey a device', (builder) => {
+    .command('rekey', 'Rekey a device', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
@@ -231,7 +231,7 @@ void yargs
         return new CreateSignedPackageCommand().run(args);
     })
 
-    .command(['deleteDevChannel', 'deleteInstalledChannel', 'rmdev', 'delete'], 'Delete an installed channel', (builder) => {
+    .command('deleteDevChannel', 'Delete an installed channel', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
@@ -239,7 +239,7 @@ void yargs
         return new DeleteDevChannelCommand().run(args);
     })
 
-    .command(['screenshot', 'captureScreenshot'], 'Take a screenshot', (builder) => {
+    .command('screenshot', 'Take a screenshot', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
@@ -254,14 +254,14 @@ void yargs
         return new CaptureScreenshotCommand().run(args);
     })
 
-    .command(['getDeviceInfo', 'deviceinfo'], 'Get the `device-info` response from a Roku device', (builder) => {
+    .command('getDeviceInfo', 'Get the `device-info` response from a Roku device', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false });
     }, (args: any) => {
         return new GetDeviceInfoCommand().run(args);
     })
 
-    .command(['getDevId', 'devid'], 'Get Dev ID', (builder) => {
+    .command('getDevId', 'Get Dev ID', (builder) => {
         return builder
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false });
     }, (args: any) => {
