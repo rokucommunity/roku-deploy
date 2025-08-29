@@ -23,7 +23,7 @@ void yargs
     .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
         return builder
             .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
-            .option('rootDir', { type: 'string', description: 'The root folder to be copied', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded, if no zip provided', demandOption: false })
             .option('outZip', { type: 'string', description: 'The output path to the zip file. The zip file is deleted unless this is specified.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
