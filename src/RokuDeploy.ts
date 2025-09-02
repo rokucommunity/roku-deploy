@@ -464,7 +464,7 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
 
-        // Prcoess options for app title and app version
+        // Process options for app title and app version
         if (options.appTitle || options.appVersion) {
             if (!options.appTitle || !options.appVersion) {
                 throw new Error('Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.');
@@ -1148,10 +1148,9 @@ export interface CreateSignedPackageOptions {
     host: string;
     password: string;
     signingPassword: string;
-    appTitle: string;
-    appVersion: string;
-    manifestPath: string;
-    stagingDir?: string;
+    appTitle?: string;
+    appVersion?: string;
+    manifestPath?: string;
     outDir?: string;
     /**
      * If specified, signing will fail if the device's devId is different than this value
