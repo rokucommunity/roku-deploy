@@ -470,7 +470,7 @@ export class RokuDeploy {
                 throw new Error('Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.');
             }
         } else if (options.manifestPath) {
-            let manifestPath = path.join(options.stagingDir, options.manifestPath);
+            let manifestPath = path.resolve(options.cwd, options.manifestPath);
             let parsedManifest = await this.parseManifest(manifestPath);
             if (parsedManifest.major_version === undefined || parsedManifest.minor_version === undefined) {
                 throw new Error('Either major or minor version is missing from the manifest');
