@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import * as yargs from 'yargs';
 import * as path from 'path';
-import { ExecCommand } from './commands/ExecCommand';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
 import { SideloadCommand } from './commands/SideloadCommand';
