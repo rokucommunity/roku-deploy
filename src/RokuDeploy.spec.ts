@@ -1734,7 +1734,6 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir,
                     manifestPath: s`${tempDir}/manifest`
                 });
             } catch (e) {
@@ -1760,7 +1759,6 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'aaaa',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir,
                     manifestPath: s`${tempDir}/manifest`
                 }),
                 'Some error'
