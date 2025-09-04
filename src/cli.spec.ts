@@ -53,7 +53,7 @@ describe('cli', () => {
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
-    it('Publish passes proper options', async () => {
+    it('SideloadCommand passes proper options', async () => {
         const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
                 message: 'Publish successful',
@@ -66,7 +66,8 @@ describe('cli', () => {
             host: '1.2.3.4',
             password: '5536',
             outDir: outDir,
-            outFile: 'rokudeploy-outfile'
+            outFile: 'rokudeploy-outfile',
+            zip: 'test.zip'
         });
 
         expect(
@@ -75,8 +76,56 @@ describe('cli', () => {
             host: '1.2.3.4',
             password: '5536',
             outDir: outDir,
-            outFile: 'rokudeploy-outfile'
+            outFile: 'rokudeploy-outfile',
+            zip: 'test.zip',
+            retainDeploymentArchive: true
         });
+    });
+
+    it('SideloadCommand passes proper options when rootDir is provided', async () => {
+        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+            return Promise.resolve({
+                message: 'Publish successful',
+                results: {}
+            });
+        });
+
+        const command = new SideloadCommand();
+        await command.run({
+            host: '1.2.3.4',
+            password: '5536',
+            outDir: outDir,
+            outFile: 'rokudeploy-outfile',
+            rootDir: rootDir,
+            retainDeploymentArchive: false
+        });
+
+        expect(
+            stub.getCall(0).args[0]
+        ).to.eql({
+            host: '1.2.3.4',
+            password: '5536',
+            outDir: outDir,
+            outFile: 'rokudeploy-outfile',
+            rootDir: rootDir,
+            retainDeploymentArchive: false
+        });
+    });
+
+
+    });
+    it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
+        const command = new SideloadCommand();
+        
+        try {
+            await command.run({
+                host: '1.2.3.4',
+                password: '5536'
+            });
+            expect.fail('Expected an error to be thrown');
+        } catch (error) {
+            expect(error.message).to.equal('Either zip or rootDir must be provided for sideload command');
+        }
     });
 
     it('Converts to squashfs', async () => {

@@ -14,12 +14,12 @@ export class SideloadCommand {
         if (args.zip) {
             args.retainDeploymentArchive = true;
             await rokuDeploy.sideload(options);
-        }
-
-        if (args.rootDir) {
+        } else if (args.rootDir) {
             await rokuDeploy.zip(options);
             args.retainDeploymentArchive = false;
             await rokuDeploy.sideload(options);
+        } else {
+            throw new Error('Either zip or rootDir must be provided for sideload command');
         }
     }
 }
