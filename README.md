@@ -53,16 +53,16 @@ sample rokudeploy.json
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
 ### JavaScript functions don't load config files from disk
-In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `util.getOptionsFromJson` before calling the desired rokuDeploy function. Here's an example:
+In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `util.getOptionsFromJson` before calling the desired rokuDeploy function. This will default to load from `rokudeploy.json`. Here's an example:
 
 ```javascript
 const config = {
     //get the default options
     ...rokuDeploy.getOptions(),
-    //override with any values found in the `rokudeploy.json` file
+    //override with any values found in the `rokudeploy.json` file. You can specify current working directory here.
     ...util.getOptionsFromJson({ cwd: process.cwd() })
 };
-await rokuDeploy.sideload(options);
+await rokuDeploy.sideload(config);
 ```
 
 ### Removed support for bsconfig.json
@@ -72,11 +72,11 @@ We've removed support for loading `bsconfig.json` files. This was introduced in 
 const config = {
     //get the default options
     ...rokuDeploy.getOptions(),
-    //override with any values found in
+    //override with any values found in config file
     ...util.getOptionsFromJson({ configPath: './bsconfig.json' })
 };
 //call some rokuDeploy function
-await rokuDeploy.sideload(options);
+await rokuDeploy.sideload(config);
 ```
 
 ### Changed, added, or moved some functions in the main Node API
@@ -104,63 +104,77 @@ Lastly, the default files array has changed. node modules and static analysis fi
 
 ## CLI Usage
 
-### Deploy a zip package
-Deploy a .zip package of your project to a roku device
+### Sideload a project to your Roku device
+Sideload a .zip package or directory to a roku device:
 ```shell
-npx roku-deploy deploy --host 'ip.of.roku' --password 'password of device' --rootDir '.' --outDir './out'
-```
-
-### Create a signed package of your project
-```shell
-npx roku-deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password'
-```
-
-### Stage the root directory
-```shell
-npx roku-deploy stage --out './path/to/staging/dir' --rootDir './path/to/root/dir'
-```
-
-### Zip the contents of a given directory
-```shell
-npx roku-deploy zip --dir './path/to/root/dir' --out './path/to/out/dir'
-```
-
-### Press the Home key
-```shell
-npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku' --ecpPort 1234 --timeout 5000
-```
-
-### Sideload a build
-```shell
+# Sideload a zip file
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
+
+# Sideload from a directory (will be zipped first automatically)
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --rootDir './path/to/your/project'
+```
+
+### Create a signed package from an existing dev channel
+```shell
+npx roku-deploy package --host 'ip.of.roku' --password 'password' --signingPassword 'signing password' --out './out/my-app.pkg'
+```
+
+### Stage files to a directory
+Copy your project files to a staging directory:
+```shell
+npx roku-deploy stage --rootDir './path/to/root/dir' --out './path/to/staging/dir'
+```
+
+### Zip a directory
+Create a zip file from a directory:
+```shell
+npx roku-deploy zip --dir './path/to/directory' --out './path/to/output.zip'
+```
+
+### Remote control commands
+Send key presses to your Roku:
+```shell
+# Press a key
+npx roku-deploy keyPress --key 'Home' --host 'ip.of.roku'
+
+# Hold a key down
+npx roku-deploy keyDown --key 'Up' --host 'ip.of.roku'
+
+# Release a key
+npx roku-deploy keyUp --key 'Up' --host 'ip.of.roku'
+
+# Send text to the device
+npx roku-deploy sendText --text 'Hello World' --host 'ip.of.roku'
+
+# Interactive remote control mode
+npx roku-deploy remote-control --host 'ip.of.roku'
 ```
 
 ### Convert to SquashFS
+Convert your dev channel to SquashFS format:
 ```shell
 npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 ```
 
-### Create a signed package
+### Device management
 ```shell
-npx roku-deploy sign --host 'ip.of.roku' --password 'password' --dir './path/to/staging/directory'
-```
-
-### Send text to device
-```shell
-npx roku-deploy sendText --text 'Hello World' --host 'ip.of.roku'
-```
-
-### Take a screenshot
-```shell
+# Take a screenshot
 npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot.jpg'
+
+# Rekey a device with a signed package
+npx roku-deploy rekey --host 'ip.of.roku' --password 'password' --pkg './path/to/signed.pkg' --signingPassword 'signing password'
+
+# Delete the dev channel
+npx roku-deploy deleteDevChannel --host 'ip.of.roku' --password 'password'
+
+# Get device information
+npx roku-deploy getDeviceInfo --host 'ip.of.roku'
+
+# Get device ID
+npx roku-deploy getDevId --host 'ip.of.roku'
 ```
 
-### Rekey a device
-```shell
-npx roku-deploy rekey --host 'ip.of.roku' --password 'password' --pkg './path/to/signed.pkg'
-```
-
-You can view the full list of commands by running:
+You can view the full list of commands and their options by running:
 
 ```shell
 npx roku-deploy --help
@@ -299,10 +313,11 @@ Can't find what you need? We offer a variety of functions available in the [Roku
 - `createSignedPackage()`
 - `deleteDevChannel()`
 - `captureScreenshot()`
-- `getOptions()`
-- `checkRequiredOptions()`
+- `convertToSquashfs()`
 - `getDeviceInfo()`
 - `getDevId()`
+- `getOptions()`
+- `checkRequiredOptions()`
 
 
 ### Running roku-deploy as an npm script
