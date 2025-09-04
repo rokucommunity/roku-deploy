@@ -444,7 +444,7 @@ export class Util {
      * A function to fill in any missing arguments with JSON values
      * Only run when CLI commands are used
      */
-    public getOptionsFromJson(options?: { cwd?: string, configPath?: string }) {
+    public getOptionsFromJson(options?: { cwd?: string; configPath?: string }) {
         let fileOptions: RokuDeployOptions = {};
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
