@@ -53,10 +53,13 @@ describe('cli', () => {
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
-    it('SideloadCommand passes proper options', async () => {
-        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+    it('SideloadCommand passes proper options when zip is provided', async () => {
+        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
-                message: 'Publish successful',
+                message: 'Successful sideload',
                 results: {}
             });
         });
@@ -65,27 +68,31 @@ describe('cli', () => {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile',
             zip: 'test.zip'
         });
 
         expect(
-            stub.getCall(0).args[0]
+            sideloadStub.getCall(0).args[0]
         ).to.eql({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile',
+            outDir: cwd,
+            outFile: 'test.zip',
             zip: 'test.zip',
             retainDeploymentArchive: true
         });
     });
 
     it('SideloadCommand passes proper options when rootDir is provided', async () => {
-        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        sinon.stub(rokuDeploy, 'zip').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
-                message: 'Publish successful',
+                message: 'Successful sideload',
                 results: {}
             });
         });
@@ -94,38 +101,66 @@ describe('cli', () => {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile',
-            rootDir: rootDir,
-            retainDeploymentArchive: false
+            rootDir: rootDir
         });
 
         expect(
-            stub.getCall(0).args[0]
+            sideloadStub.getCall(0).args[0]
         ).to.eql({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile',
             rootDir: rootDir,
             retainDeploymentArchive: false
         });
     });
 
-
-    });
     it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
         const command = new SideloadCommand();
         
         try {
             await command.run({
                 host: '1.2.3.4',
-                password: '5536'
+                password: '5536',
+                noclose: true
             });
             expect.fail('Expected an error to be thrown');
         } catch (error) {
-            expect(error.message).to.equal('Either zip or rootDir must be provided for sideload command');
+            expect((error as Error).message).to.equal('Either zip or rootDir must be provided for sideload command');
         }
+    });
+
+    it('SideloadCommand calls the proper methods when noclose is provided', async () => {
+        const closeChannelStub = sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+            return Promise.resolve({
+                message: 'Successful sideload',
+                results: {}
+            });
+        });
+
+        const command = new SideloadCommand();
+        await command.run({
+            host: '1.2.3.4',
+            password: '5536',
+            zip: 'test.zip',
+            noclose: true
+        });
+
+        expect(closeChannelStub.callCount).to.equal(0);
+
+        expect(
+            sideloadStub.getCall(0).args[0]
+        ).to.eql({
+            host: '1.2.3.4',
+            password: '5536',
+            noclose: true,
+            outDir: cwd,
+            outFile: 'test.zip',
+            retainDeploymentArchive: true,
+            zip: 'test.zip'
+        });
     });
 
     it('Converts to squashfs', async () => {
