@@ -101,7 +101,7 @@ void yargs
         return new KeyDownCommand().run(args);
     })
 
-    .command(['sendText', 'text'], 'Send text command', (builder) => {
+    .command('sendText', 'Send text command', (builder) => {
         return builder
             .option('text', { type: 'string', description: 'The text to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
