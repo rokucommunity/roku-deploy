@@ -24,6 +24,8 @@ export interface RokuDeployOptions {
      */
     rootDir?: string;
 
+    appType?: string;
+
     /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
      * where the source files are and where they should be placed
