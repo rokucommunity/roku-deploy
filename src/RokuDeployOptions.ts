@@ -24,7 +24,7 @@ export interface RokuDeployOptions {
      */
     rootDir?: string;
 
-    appType?: string;
+    appType?: "channel" | "dcl" | "others";
 
     /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
