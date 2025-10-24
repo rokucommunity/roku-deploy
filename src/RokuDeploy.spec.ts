@@ -2130,6 +2130,24 @@ describe('index', () => {
         });
     });
 
+    describe.only('plugin_swup', () => {
+        it('should send a request to the plugin_swup endpoint for a reboot', async () => {
+            let stub = mockDoPostRequest();
+            let result = await rokuDeploy.rebootDevice(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
+            expect(stub.args[0][0].formData.mysubmit).to.include('Reboot');
+        });
+
+        it('should send a request to the plugin_swup endpoint to check for update', async () => {
+            let stub = mockDoPostRequest();
+            let result = await rokuDeploy.checkForUpdate(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
+            expect(stub.args[0][0].formData.mysubmit).to.include('CheckUpdate');
+        });
+    });
+
     describe('deleteInstalledChannel', () => {
         it('attempts to delete any installed dev channel on the device', async () => {
             mockDoPostRequest();

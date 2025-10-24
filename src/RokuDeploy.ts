@@ -1260,6 +1260,26 @@ export class RokuDeploy {
         const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
         return this.fsExtra.outputFile(zipFilePath, content);
     }
+
+    public async rebootDevice(options: RokuDeployOptions) {
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options),
+            formData: {
+                mysubmit: 'Reboot',
+                archive: ''
+            }
+        });
+    }
+
+    public async checkForUpdate(options: RokuDeployOptions) {
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options),
+            formData: {
+                mysubmit: 'CheckUpdate',
+                archive: ''
+            }
+        });
+    }
 }
 
 export interface ManifestData {
