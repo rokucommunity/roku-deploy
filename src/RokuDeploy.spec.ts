@@ -2130,7 +2130,7 @@ describe('index', () => {
         });
     });
 
-    describe.only('plugin_swup', () => {
+    describe('plugin_swup', () => {
         it('should send a request to the plugin_swup endpoint for a reboot', async () => {
             let stub = mockDoPostRequest();
             let result = await rokuDeploy.rebootDevice(options);
