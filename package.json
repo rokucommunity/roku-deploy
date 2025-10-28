@@ -32,6 +32,7 @@
         "moment": "^2.29.1",
         "parse-ms": "^2.1.0",
         "postman-request": "^2.88.1-postman.40",
+        "semver": "^7.7.3",
         "temp-dir": "^2.0.0",
         "xml2js": "^0.5.0"
     },
@@ -44,6 +45,7 @@
         "@types/mocha": "^9.0.0",
         "@types/node": "^16.11.3",
         "@types/q": "^1.5.8",
+        "@types/semver": "^7.7.1",
         "@types/sinon": "^10.0.4",
         "@types/xml2js": "^0.4.5",
         "@typescript-eslint/eslint-plugin": "5.1.0",

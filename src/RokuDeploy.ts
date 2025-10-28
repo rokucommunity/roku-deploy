@@ -18,6 +18,7 @@ import * as tempDir from 'temp-dir';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
+import * as semver from 'semver';
 
 export class RokuDeploy {
 
@@ -1259,6 +1260,48 @@ export class RokuDeploy {
         // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
         const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
         return this.fsExtra.outputFile(zipFilePath, content);
+    }
+
+    public async rebootDevice(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options as any);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new Error(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`);
+        }
+
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options),
+            formData: {
+                mysubmit: 'Reboot',
+                archive: ''
+            }
+        });
+    }
+
+    public async checkForUpdate(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options as any);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new Error(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`);
+        }
+
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options),
+            formData: {
+                mysubmit: 'CheckUpdate',
+                archive: ''
+            }
+        });
     }
 }
 
