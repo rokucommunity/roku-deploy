@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.14.0](https://github.com/rokucommunity/roku-deploy/compare/3.13.0...v3.14.0) - 2025-10-28
+### Added
+ - Add 'rebootDevice' and 'checkForUpdate' functionality for supported OS versions ([#208](https://github.com/rokucommunity/roku-deploy/pull/208))
+
+
+
 ## [3.13.0](https://github.com/rokucommunity/roku-deploy/compare/3.12.6...v3.13.0) - 2025-08-04
 ### Added
  - Add standards-compliant User-Agent header ([#203](https://github.com/rokucommunity/roku-deploy/pull/203))
