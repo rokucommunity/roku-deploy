@@ -20,7 +20,7 @@ jobs:
     uses: rokucommunity/workflows/.github/workflows/publish-release.yml@master
     permissions:
       id-token: write
-      contents: read
+      contents: write
     with:
       release-type: "npm" # or "vsce"
       ref: ${{ github.event.inputs.tag || github.event.pull_request.merge_commit_sha }}
