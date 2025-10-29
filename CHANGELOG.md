@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.14.1](https://github.com/rokucommunity/roku-deploy/compare/3.14.0...v3.14.1) - 2025-10-29
-### Added
- - Add the OIDC permissions to the dispatching workflow ([#211](https://github.com/rokucommunity/roku-deploy/pull/211))
+### Changed
+ - chore: add OIDC permissions to the dispatching workflow ([#211](https://github.com/rokucommunity/roku-deploy/pull/211))
 
 
 
@@ -496,3 +496,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0](https://github.com/RokuCommunity/roku-deploy/compare/v0.2.1...v1.0.0) - 2018-12-18
 ### Added
  - support for negated globs
+
