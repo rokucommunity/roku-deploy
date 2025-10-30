@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.14.2](https://github.com/rokucommunity/roku-deploy/compare/3.14.1...v3.14.2) - 2025-10-30
+### Added
+ - Add pull-request write permissions ([#214](https://github.com/rokucommunity/roku-deploy/pull/214))
+
+
+
 ## [3.14.1](https://github.com/rokucommunity/roku-deploy/compare/3.14.0...v3.14.1) - 2025-10-29
 ### Changed
  - chore: add OIDC permissions to the dispatching workflow ([#211](https://github.com/rokucommunity/roku-deploy/pull/211))
