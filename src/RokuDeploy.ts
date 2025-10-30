@@ -1271,7 +1271,7 @@ export class RokuDeploy {
 
         // Check if device version is at least 15.0.4
         if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new Error(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`);
+            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`);
         }
 
         return this.doPostRequest({
@@ -1292,7 +1292,7 @@ export class RokuDeploy {
 
         // Check if device version is at least 15.0.4
         if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new Error(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`);
+            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`);
         }
 
         return this.doPostRequest({

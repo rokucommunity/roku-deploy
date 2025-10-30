@@ -57,6 +57,13 @@ export class MissingRequiredOptionError extends Error {
     }
 }
 
+export class UnsupportedFirmwareVersionError extends Error {
+    constructor(message: string) {
+        super(message);
+        Object.setPrototypeOf(this, UnsupportedFirmwareVersionError.prototype);
+    }
+}
+
 /**
  * This error is thrown when a Roku device refuses to accept connections because it requires the user to check for updates (even if no updates are actually available).
  */
