@@ -21,6 +21,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      pull-requests: write
     with:
       release-type: "npm" # or "vsce"
       ref: ${{ github.event.inputs.tag || github.event.pull_request.merge_commit_sha }}
