@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.14.4](https://github.com/rokucommunity/roku-deploy/compare/3.14.3...v3.14.4) - 2025-10-30
+### Changed
+chore: Update package.json repository to support provenance (#218)
+
+
+
 ## [3.14.3](https://github.com/rokucommunity/roku-deploy/compare/3.14.2...v3.14.3) - 2025-10-30
 ### Added
  - Add specific error classes for reboot and check for updates functions ([#216](https://github.com/rokucommunity/roku-deploy/pull/216))
@@ -508,5 +514,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0](https://github.com/RokuCommunity/roku-deploy/compare/v0.2.1...v1.0.0) - 2018-12-18
 ### Added
  - support for negated globs
+
 
 
