@@ -24,7 +24,7 @@ export interface RokuDeployOptions {
      */
     rootDir?: string;
 
-    appType?: "channel" | "dcl" | "others";
+    appType?: 'dcl' | 'app'; // values accepted by the FW
 
     /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
@@ -176,6 +176,13 @@ export interface RokuDeployOptions {
          */
         formData?: Record<string, any>;
     };
+
+    /**
+     * Should the main library and component libraries be hosted synchronously. This is for when certain libraries like "DCL" require it
+     * if not set the default is false unless one of the libraries requires it
+     * @default true
+     */
+    prepareProjectFilesSynchronously?: boolean;
 }
 
 export type FileEntry = (string | { src: string | string[]; dest?: string });

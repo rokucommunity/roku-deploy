@@ -432,11 +432,10 @@ export class RokuDeploy {
             });
 
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
-            const appType = options?.appType ?? 'channel';
-
+            const rokuAppType = options?.appType ?? 'app';
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
-                appType: appType,
+                app_type: rokuAppType, // app_type key required by request
                 archive: readStream
             });
 
