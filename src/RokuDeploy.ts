@@ -432,11 +432,10 @@ export class RokuDeploy {
             });
 
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
-            const rokuAppType = options?.appType ?? 'app';
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
-                app_type: rokuAppType, // app_type key required by request
-                archive: readStream
+                archive: readStream,
+                ...(options?.appType ? { app_type: options.appType } : {}) // app_type key accepted by request
             });
 
             //attach the remotedebug flag if configured
