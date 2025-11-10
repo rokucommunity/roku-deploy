@@ -432,10 +432,11 @@ export class RokuDeploy {
             });
 
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
+
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
                 archive: readStream,
-                ...(options?.appType ? { app_type: options.appType } : {}) // app_type key accepted by request
+                ...(options?.appType ? { app_type: options.appType } : {}) // eslint-disable-line camelcase (app_type key required by FW)
             });
 
             //attach the remotedebug flag if configured
