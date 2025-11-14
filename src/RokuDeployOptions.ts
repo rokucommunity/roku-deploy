@@ -25,6 +25,12 @@ export interface RokuDeployOptions {
     rootDir?: string;
 
     /**
+      * What type of app is being sideloaded? `'channel'` is for applications, and `'dcl'` is for installing component libraries on device for use in channels.
+      * @default 'channel'
+     */
+    appType?: 'channel' | 'dcl';
+
+    /**
      * An array of source file paths, source file globs, or {src,dest} objects indicating
      * where the source files are and where they should be placed
      * in the output directory
