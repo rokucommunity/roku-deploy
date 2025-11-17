@@ -436,7 +436,8 @@ export class RokuDeploy {
 
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
-                archive: readStream
+                archive: readStream,
+                ...(options.appType ? { 'app_type': options.appType } : {})
             });
 
             //attach the remotedebug flag if configured
@@ -869,6 +870,30 @@ export class RokuDeploy {
     }
 
     /**
+     * Parse out the list of packages that are currently installed on the device by looking for the JSON in the response body
+     * @param body
+     * @returns
+     */
+    private getPackagesFromResponseBody(body: string): RokuPackage[] {
+        let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
+        let jsonMatch: RegExpExecArray;
+
+        while ((jsonMatch = jsonParseRegex.exec(body))) {
+            let [, jsonString] = jsonMatch;
+            let jsonObject = parseJsonc(jsonString);
+            if (typeof jsonObject === 'object' && !Array.isArray(jsonObject) && jsonObject !== null) {
+                let packages = jsonObject.packages;
+
+                if (!Array.isArray(packages)) {
+                    continue;
+                }
+                return packages;
+            }
+        }
+        return [];
+    }
+
+    /**
      * Create a zip of the project, and then publish to the target Roku device
      * @param options
      */
@@ -899,6 +924,53 @@ export class RokuDeploy {
             archive: ''
         };
         return this.doPostRequest(deleteOptions);
+    }
+
+    /**
+     * Delete the component library with the specified filename from the device
+     */
+    public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
+        options = this.getOptions(options) as any;
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'Delete',
+            'app_type': 'dcl',
+            fileName: options.fileName
+        };
+        deleteOptions.qs ??= {};
+        // eslint-disable-next-line camelcase
+        deleteOptions.qs.dcl_enabled = '1';
+        await this.doPostRequest(deleteOptions);
+    }
+
+    /**
+     * Delete all component libraries from the device
+     */
+    public async deleteAllComponentLibraries(options: { host: string; password: string; username?: string }) {
+        const packages = await this.getInstalledPackages(options);
+        for (const pkg of packages) {
+            if (pkg.appType === 'dcl') {
+                await this.deleteComponentLibrary({
+                    ...options,
+                    fileName: pkg.archiveFileName
+                });
+            }
+        }
+    }
+
+    /**
+     * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
+     */
+    private async getInstalledPackages(options: { host: string; password: string; username?: string }): Promise<RokuPackage[]> {
+        options = this.getOptions(options) as any;
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.qs ??= {};
+        // eslint-disable-next-line camelcase
+        deleteOptions.qs.dcl_enabled = '1';
+        const result = await this.doGetRequest(deleteOptions);
+        const packages = this.getPackagesFromResponseBody(result.body);
+        return packages;
     }
 
     /**
@@ -1250,7 +1322,7 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data, {
+                zip.file(file.dest.replace(/[\\/]/g, '/'), data as any, {
                     compression: compression
                 });
             });
@@ -1341,6 +1413,17 @@ export interface RokuMessages {
     errors: string[];
     infos: string[];
     successes: string[];
+}
+
+export interface RokuPackage {
+    appType: 'channel' | 'dcl';
+    archiveFileName: string;
+    fileType: string;
+    id: number;
+    location: string;
+    md5: string;
+    pkgPath: string;
+    size: string;
 }
 
 enum RokuMessageType {
