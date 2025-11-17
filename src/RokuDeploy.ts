@@ -437,7 +437,7 @@ export class RokuDeploy {
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
                 archive: readStream,
-                ...(options?.appType ? { 'app_type': options.appType } : {})
+                ...(options.appType ? { 'app_type': options.appType } : {})
             });
 
             //attach the remotedebug flag if configured

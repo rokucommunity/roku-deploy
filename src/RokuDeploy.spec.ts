@@ -721,7 +721,7 @@ describe('index', () => {
             options.files = files;
             await rokuDeploy.createPackage(options);
             const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             for (const file of files) {
                 const zipFileContents = await zip.file(file.toString()).async('string');
@@ -745,7 +745,7 @@ describe('index', () => {
             });
 
             const data = fsExtra.readFileSync(rokuDeploy.getOutputZipFilePath(options));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             for (const file of filePaths) {
                 const zipFileContents = await zip.file(file.toString())?.async('string');
@@ -1201,6 +1201,42 @@ describe('index', () => {
             }, () => {
                 assert.fail('Should not have rejected the promise');
             });
+        });
+
+        it('does not set appType if not explicitly defined', async () => {
+            delete options.appType;
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.publish(options);
+            expect(result.message).to.equal('Successful deploy');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('does not set appType if not appType is set to null or undefined', async () => {
+            options.appType = null;
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.publish(options);
+            expect(result.message).to.equal('Successful deploy');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('sets appType="channel" when defined', async () => {
+            options.appType = 'channel';
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.publish(options);
+            expect(result.message).to.equal('Successful deploy');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('channel');
+        });
+
+        it('sets appType="channel" when defined', async () => {
+            options.appType = 'dcl';
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.publish(options);
+            expect(result.message).to.equal('Successful deploy');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('dcl');
         });
 
         it('Does not reject when response contains compile error wording but config is set to ignore compile warnings', () => {
@@ -2482,7 +2518,7 @@ describe('index', () => {
             });
 
             const data = fsExtra.readFileSync(outputZipPath);
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
             for (const file of files) {
                 const zipFileContents = await zip.file(file.toString()).async('string');
                 const sourcePath = path.join(options.rootDir, file);
@@ -2510,7 +2546,7 @@ describe('index', () => {
             await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, ['**/*', '!**/*.map']);
 
             const data = fsExtra.readFileSync(outputZipPath);
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
             //the .map files should be missing
             expect(
                 Object.keys(zip.files).sort()
@@ -3927,8 +3963,214 @@ describe('index', () => {
                 rokuDeploy['isUpdateRequiredError']({ results: { response: { statusCode: 500 }, body: false } })
             ).to.be.false;
         });
-
     });
+
+    describe('getInstalledPackages', () => {
+        it('sends the dcl_enabled qs flag', async () => {
+            const stub = mockDoGetRequest();
+            sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
+            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
+            expect(result).to.eql([]);
+        });
+
+        it('augments if qs is already defined', async () => {
+            sinon.stub(rokuDeploy as any, 'generateBaseRequestOptions').returns({
+                qs: {
+                    existing: 'value'
+                }
+            } as any);
+            const stub = mockDoGetRequest();
+            sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
+            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            expect(stub.getCall(0).args[0].qs).to.eql({
+                existing: 'value',
+                dcl_enabled: '1'
+            });
+            expect(result).to.eql([]);
+        });
+
+        it('properly parses the response', async () => {
+            const stub = mockDoGetRequest(`
+                var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
+            `);
+            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
+            expect(result).to.eql([{
+                appType: 'channel',
+                archiveFileName: 'roku-deploy.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: 'a8d2f9974e2736174c1033b8a7183288',
+                pkgPath: '',
+                size: '2267547'
+            }]);
+        });
+
+        it('handles when packages is not an array', async () => {
+            mockDoGetRequest(`
+                var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
+            `);
+            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            expect(result).to.eql([]);
+        });
+
+        it('handles when the item is not an object', async () => {
+            mockDoGetRequest(`
+                var params = JSON.parse('123');
+            `);
+            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            expect(result).to.eql([]);
+        });
+    });
+
+    describe('deleteComponentLibrary', () => {
+        it('does not crash if qs is undefined', async () => {
+            const stub = mockDoPostRequest();
+
+            sinon.stub(rokuDeploy as any, 'generateBaseRequestOptions').returns({} as any);
+            await rokuDeploy.deleteComponentLibrary({} as any);
+
+            expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
+        });
+
+        it('augments if qs is already defined', async () => {
+            sinon.stub(rokuDeploy as any, 'generateBaseRequestOptions').returns({
+                qs: {
+                    existing: 'value'
+                }
+            } as any);
+            const stub = mockDoPostRequest();
+
+            await rokuDeploy.deleteComponentLibrary({} as any);
+
+            expect(stub.getCall(0).args[0].qs).to.eql({
+                existing: 'value',
+                dcl_enabled: '1'
+            });
+        });
+
+        it('deletes the component library', async () => {
+            options.failOnCompileError = true;
+            options.remoteDebug = true;
+            options.remoteDebugConnectEarly = true;
+            const stub = mockDoPostRequest();
+
+            await rokuDeploy.deleteComponentLibrary({
+                host: '0.0.0.0',
+                password: 'aaaa',
+                fileName: 'fakeFile.zip'
+            });
+
+            //ensure we're sending the correct form inputs
+            expect(stub.getCall(0).args[0].formData).to.eql({
+                mysubmit: 'Delete',
+                app_type: 'dcl',
+                fileName: 'fakeFile.zip'
+            });
+            //also set the query string parameter that enables DCL behaviors (this seems to be important as well for some reason...)
+            expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
+        });
+    });
+
+    describe('deleteAllComponentLibraries', () => {
+        it('sends no requests if there are no DCLs to delete', async () => {
+            //return 0 packages
+            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([]));
+            const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
+            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            expect(stub.called).to.be.false;
+        });
+
+        it('sends no requests if there are no DCLs to delete', async () => {
+            //return 1 channel package
+            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+                appType: 'channel',
+                archiveFileName: 'roku-deploy.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: 'a8d2f9974e2736174c1033b8a7183288',
+                pkgPath: '',
+                size: '2267547'
+            }]));
+            const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
+            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            expect(stub.called).to.be.false;
+        });
+
+        it('sends single request if only have one DCL to delete', async () => {
+            //return 1 channel package
+            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+                appType: 'channel',
+                archiveFileName: 'roku-deploy.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: 'a8d2f9974e2736174c1033b8a7183288',
+                pkgPath: '',
+                size: '2267547'
+            }, {
+                appType: 'dcl',
+                archiveFileName: 'lib.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: '7221a9bfb63be42f4fc6b0de22584af6',
+                pkgPath: '',
+                size: '1231'
+            }]));
+            const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
+            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            expect(stub.getCall(0).args[0]).to.eql({
+                fileName: 'lib.zip'
+            });
+        });
+
+        it('sends one request for each DCL', async () => {
+            //return 1 channel package
+            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+                appType: 'dcl',
+                archiveFileName: 'lib1.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: '7221a9bfb63be42f4fc6b0de22584af6',
+                pkgPath: '',
+                size: '1231'
+            }, {
+                appType: 'channel',
+                archiveFileName: 'roku-deploy.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: 'a8d2f9974e2736174c1033b8a7183288',
+                pkgPath: '',
+                size: '226754'
+            }, {
+                appType: 'dcl',
+                archiveFileName: 'lib2.zip',
+                fileType: 'zip',
+                id: '0',
+                location: 'nvram',
+                md5: '7221a9bfb63be42f4fc6b0de22584af6',
+                pkgPath: '',
+                size: '1231'
+            }]));
+            const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
+            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            expect(stub.getCalls().map(x => x.args)).to.eql([
+                [{
+                    fileName: 'lib1.zip'
+                }],
+                [{
+                    fileName: 'lib2.zip'
+                }]
+            ]);
+        });
+    });
+
 
     function mockDoGetRequest(body = '', statusCode = 200) {
         return sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake((params) => {
