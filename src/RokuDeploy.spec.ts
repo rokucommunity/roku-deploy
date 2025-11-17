@@ -1488,12 +1488,10 @@ describe('RokuDeploy', () => {
             </div>`;
             mockDoPostRequest(body);
             options.rekeySignedPackage = s`../notReal.pkg`;
-            try {
-                fsExtra.outputFileSync(s`${tempDir}/notReal.pkg`, '');
-                await rokuDeploy.rekeyDevice(options);
-            } finally {
-                fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
-            }
+            fsExtra.outputFileSync(s`${tempDir}/notReal.pkg`, '<file-contents>');
+            //small sleep to ensure the file exists (hack for testing!)
+            await util.sleep(10);
+            await rokuDeploy.rekeyDevice(options);
         });
 
         it('should work with absolute path', async () => {
