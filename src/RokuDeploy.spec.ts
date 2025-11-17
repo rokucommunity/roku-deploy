@@ -1484,7 +1484,7 @@ describe('index', () => {
             mockDoPostRequest(body);
             options.rekeySignedPackage = s`../notReal.pkg`;
             try {
-                fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
+                fsExtra.outputFileSync(s`${tempDir}/notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice(options);
             } finally {
                 fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
@@ -1948,11 +1948,11 @@ describe('index', () => {
 
             symlinkIt('copies files from subdirs of symlinked folders', async () => {
                 fsExtra.ensureDirSync(s`${tempDir}/baseProject/source/lib/promise`);
-                fsExtra.writeFileSync(s`${tempDir}/baseProject/source/lib/lib.brs`, `'lib.brs`);
-                fsExtra.writeFileSync(s`${tempDir}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
+                fsExtra.outputFileSync(s`${tempDir}/baseProject/source/lib/lib.brs`, `'lib.brs`);
+                fsExtra.outputFileSync(s`${tempDir}/baseProject/source/lib/promise/promise.brs`, `'q.brs`);
 
                 fsExtra.ensureDirSync(s`${tempDir}/mainProject/source`);
-                fsExtra.writeFileSync(s`${tempDir}/mainProject/source/main.brs`, `'main.brs`);
+                fsExtra.outputFileSync(s`${tempDir}/mainProject/source/main.brs`, `'main.brs`);
 
                 //symlink the baseProject lib folder into the mainProject
                 fsExtra.symlinkSync(s`${tempDir}/baseProject/source/lib`, s`${tempDir}/mainProject/source/lib`);
@@ -3202,10 +3202,10 @@ describe('index', () => {
                 fsExtra.ensureDirSync(s`${thisRootDir}/components`);
                 fsExtra.ensureDirSync(s`${thisRootDir}/../.tmp`);
 
-                fsExtra.writeFileSync(s`${thisRootDir}/source/main.brs`, '');
-                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.brs`, '');
-                fsExtra.writeFileSync(s`${thisRootDir}/components/MainScene.xml`, '');
-                fsExtra.writeFileSync(s`${thisRootDir}/../.tmp/MainScene.brs`, '');
+                fsExtra.outputFileSync(s`${thisRootDir}/source/main.brs`, '');
+                fsExtra.outputFileSync(s`${thisRootDir}/components/MainScene.brs`, '');
+                fsExtra.outputFileSync(s`${thisRootDir}/components/MainScene.xml`, '');
+                fsExtra.outputFileSync(s`${thisRootDir}/../.tmp/MainScene.brs`, '');
 
                 let files = [
                     '**/*.xml',
