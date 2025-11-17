@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.15.0](https://github.com/rokucommunity/roku-deploy/compare/3.14.4...v3.15.0) - 2025-11-17
+### Changed
+ - Support installing and deleting component libraries ([#220](https://github.com/rokucommunity/roku-deploy/pull/220))
+
+
+
 ## [3.14.4](https://github.com/rokucommunity/roku-deploy/compare/3.14.3...v3.14.4) - 2025-10-30
 ### Changed
 chore: Update package.json repository to support provenance (#218)
