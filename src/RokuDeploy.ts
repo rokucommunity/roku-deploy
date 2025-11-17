@@ -890,8 +890,7 @@ export class RokuDeploy {
                 return packages;
             }
         }
-
-        return result;
+        return [];
     }
 
     /**
