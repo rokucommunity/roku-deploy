@@ -21,15 +21,15 @@ void yargs
 
     .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
         return builder
-            .option('zip', { type: 'string', description: 'The file to be sideloaded, relative to cwd.', demandOption: false })
-            .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded, instead of a zip file, relative to cwd.', demandOption: false })
+            .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
             .option('outZip', { type: 'string', description: 'The output path to the zip file.', demandOption: false })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
             .option('noclose', { type: 'boolean', description: 'Should the command not close the channel before sideloading', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
@@ -41,8 +41,8 @@ void yargs
 
     .command('package', 'Create a signed package from an existing sideloaded dev channel', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('appTitle', { type: 'string', description: 'The title of the app to be signed', demandOption: false })
             .option('appVersion', { type: 'string', description: 'The version of the app to be signed', demandOption: false })
@@ -65,9 +65,9 @@ void yargs
     .command('keyPress', 'send keypress command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
@@ -78,9 +78,9 @@ void yargs
     .command('keyUp', 'send keyup command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
@@ -91,9 +91,9 @@ void yargs
     .command('keyDown', 'send keydown command', (builder) => {
         return builder
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
@@ -104,9 +104,9 @@ void yargs
     .command('sendText', 'Send text command', (builder) => {
         return builder
             .option('text', { type: 'string', description: 'The text to send', demandOption: true })
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false })
-            .option('timeout', { type: 'number', description: 'The timeout for the command', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
@@ -116,8 +116,8 @@ void yargs
 
     .command('remote-control', 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote keypresses', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false });
     }, (args: any) => {
         if (args.ecpPort) {
             args.remotePort = args.ecpPort;
@@ -137,17 +137,17 @@ void yargs
 
     .command('squash', 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false });
     }, (args: any) => {
         return new ConvertToSquashfsCommand().run(args);
     })
 
     .command('rekey', 'Rekey a device', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
-            .option('pkg', { type: 'string', description: 'The path to thesigned package to be used for rekeying, relative to cwd', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('pkg', { type: 'string', description: 'The path to the signed package to be used for rekeying, relative to cwd', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
@@ -158,16 +158,16 @@ void yargs
 
     .command('deleteDevChannel', 'Delete an installed channel', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false });
     }, (args: any) => {
         return new DeleteDevChannelCommand().run(args);
     })
 
     .command('screenshot', 'Take a screenshot', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false })
-            .option('password', { type: 'string', description: 'The password of the host Roku', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('out', { type: 'string', description: 'The location where the screenshot will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.jpg' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
@@ -181,14 +181,14 @@ void yargs
 
     .command('getDeviceInfo', 'Get the `device-info` response from a Roku device', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false });
     }, (args: any) => {
         return new GetDeviceInfoCommand().run(args);
     })
 
     .command('getDevId', 'Get Dev ID', (builder) => {
         return builder
-            .option('host', { type: 'string', description: 'The IP Address of the host Roku', demandOption: false });
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false });
     }, (args: any) => {
         return new GetDevIdCommand().run(args);
     })
