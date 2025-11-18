@@ -12,7 +12,6 @@ import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
-import { ExecCommand } from './commands/ExecCommand';
 
 const sinon = createSandbox();
 
@@ -37,11 +36,6 @@ describe('cli', () => {
         sinon.restore();
     });
 
-    it('Successfully bundles an app', () => {
-        execSync(`node ${cwd}/dist/cli.js bundle --rootDir ${rootDir} --outDir ${outDir}`);
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
     it('Successfully runs stage', () => {
         //make the files
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
@@ -59,10 +53,13 @@ describe('cli', () => {
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
-    it('Publish passes proper options', async () => {
-        const stub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+    it('SideloadCommand passes proper options when zip is provided', async () => {
+        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
             return Promise.resolve({
-                message: 'Publish successful',
+                message: 'Successful sideload',
                 results: {}
             });
         });
@@ -71,17 +68,98 @@ describe('cli', () => {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile'
+            zip: 'test.zip'
         });
 
         expect(
-            stub.getCall(0).args[0]
+            sideloadStub.getCall(0).args[0]
         ).to.eql({
             host: '1.2.3.4',
             password: '5536',
-            outDir: outDir,
-            outFile: 'rokudeploy-outfile'
+            outDir: cwd,
+            outFile: 'test.zip',
+            zip: 'test.zip',
+            retainDeploymentArchive: true
+        });
+    });
+
+    it('SideloadCommand passes proper options when rootDir is provided', async () => {
+        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        sinon.stub(rokuDeploy, 'zip').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+            return Promise.resolve({
+                message: 'Successful sideload',
+                results: {}
+            });
+        });
+
+        const command = new SideloadCommand();
+        await command.run({
+            host: '1.2.3.4',
+            password: '5536',
+            rootDir: rootDir
+        });
+
+        expect(
+            sideloadStub.getCall(0).args[0]
+        ).to.eql({
+            host: '1.2.3.4',
+            password: '5536',
+            rootDir: rootDir,
+            retainDeploymentArchive: false
+        });
+    });
+
+    it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
+        const command = new SideloadCommand();
+        
+        try {
+            await command.run({
+                host: '1.2.3.4',
+                password: '5536',
+                noclose: true
+            });
+            expect.fail('Expected an error to be thrown');
+        } catch (error) {
+            expect((error as Error).message).to.equal('Either zip or rootDir must be provided for sideload command');
+        }
+    });
+
+    it('SideloadCommand calls the proper methods when noclose is provided', async () => {
+        const closeChannelStub = sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
+            return Promise.resolve();
+        });
+        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
+            return Promise.resolve({
+                message: 'Successful sideload',
+                results: {}
+            });
+        });
+
+        const command = new SideloadCommand();
+        await command.run({
+            host: '1.2.3.4',
+            password: '5536',
+            zip: 'test.zip',
+            noclose: true
+        });
+
+        expect(closeChannelStub.callCount).to.equal(0);
+
+        expect(
+            sideloadStub.getCall(0).args[0]
+        ).to.eql({
+            host: '1.2.3.4',
+            password: '5536',
+            noclose: true,
+            outDir: cwd,
+            outFile: 'test.zip',
+            retainDeploymentArchive: true,
+            zip: 'test.zip'
         });
     });
 
@@ -261,109 +339,5 @@ describe('cli', () => {
         execSync(`node ${cwd}/dist/cli.js zip --stagingDir ${rootDir} --outDir ${outDir}`);
 
         expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-});
-
-describe('ExecCommand', () => {
-    beforeEach(() => {
-        fsExtra.emptyDirSync(tempDir);
-        //most tests depend on a manifest file existing, so write an empty one
-        fsExtra.outputFileSync(`${rootDir}/manifest`, '');
-        sinon.restore();
-    });
-    afterEach(() => {
-        fsExtra.removeSync(tempDir);
-        sinon.restore();
-    });
-    function mockDoPostRequest(body = '', statusCode = 200) {
-        return sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params) => {
-            let results = { response: { statusCode: statusCode }, body: body };
-            rokuDeploy['checkRequest'](results);
-            return Promise.resolve(results);
-        });
-    }
-
-    it('does the whole migration', async () => {
-        const mock = mockDoPostRequest();
-
-        const options = {
-            host: '1.2.3.4',
-            password: 'abcd',
-            rootDir: rootDir,
-            stagingDir: stagingDir,
-            outDir: outDir
-        };
-        await new ExecCommand('stage|zip|close|sideload', options).run();
-
-        expect(mock.getCall(2).args[0].url).to.equal('http://1.2.3.4:80/plugin_install');
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
-    it('continues with deploy if deleteDevChannel fails', async () => {
-        sinon.stub(rokuDeploy, 'deleteDevChannel').returns(
-            Promise.reject(
-                new Error('failed')
-            )
-        );
-        const mock = mockDoPostRequest();
-        const options = {
-            host: '1.2.3.4',
-            password: 'abcd',
-            rootDir: rootDir,
-            stagingDir: stagingDir,
-            outDir: outDir
-        };
-        await new ExecCommand('stage|zip|close|sideload', options).run();
-        expect(mock.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/home');
-        expectPathExists(`${outDir}/roku-deploy.zip`);
-    });
-
-    it('should delete installed channel if requested', async () => {
-        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
-        mockDoPostRequest();
-        const options = {
-            host: '1.2.3.4',
-            password: 'abcd',
-            rootDir: rootDir,
-            stagingDir: stagingDir,
-            outDir: outDir,
-            deleteDevChannel: true
-        };
-
-        await new ExecCommand('stage|zip|close|sideload', options).run();
-        expect(spy.called).to.equal(true);
-    });
-
-    it('should not delete installed channel if not requested', async () => {
-        const spy = sinon.spy(rokuDeploy, 'deleteDevChannel');
-        mockDoPostRequest();
-
-        const options = {
-            host: '1.2.3.4',
-            password: 'abcd',
-            rootDir: rootDir,
-            stagingDir: stagingDir,
-            outDir: outDir,
-            deleteDevChannel: false
-        };
-
-        await new ExecCommand('stage|zip|close|sideload', options).run();
-        expect(spy.notCalled).to.equal(true);
-    });
-
-    it('converts to squashfs if we request it to', async () => {
-        let stub = sinon.stub(rokuDeploy, 'convertToSquashfs').returns(Promise.resolve<any>(null));
-        mockDoPostRequest();
-        const options = {
-            host: '1.2.3.4',
-            password: 'abcd',
-            rootDir: rootDir,
-            stagingDir: stagingDir,
-            outDir: outDir,
-            deleteDevChannel: false
-        };
-
-        await new ExecCommand('close|stage|zip|close|sideload|squash', options).run();
-        expect(stub.getCalls()).to.be.lengthOf(1);
     });
 });

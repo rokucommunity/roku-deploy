@@ -1393,7 +1393,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } catch (e) {
@@ -1408,17 +1407,16 @@ describe('index', () => {
             </div>`;
             mockDoPostRequest(body);
             try {
-                fsExtra.writeFileSync(s`${tempDir}/notReal.pkg`, '');
+                fsExtra.writeFileSync(s`notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: s`../notReal.pkg`,
+                    rekeySignedPackage: s`notReal.pkg`,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } finally {
-                fsExtra.removeSync(s`${tempDir}/notReal.pkg`);
+                fsExtra.removeSync(s`notReal.pkg`);
             }
         });
 
@@ -1432,7 +1430,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: s`${tempDir}/testSignedPackage.pkg`,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: options.devId
             });
         });
@@ -1447,7 +1444,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: options.devId
             });
         });
@@ -1462,7 +1458,6 @@ describe('index', () => {
                 password: 'password',
                 rekeySignedPackage: options.rekeySignedPackage,
                 signingPassword: options.signingPassword,
-                rootDir: options.rootDir,
                 devId: undefined
             });
         });
@@ -1475,7 +1470,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: options.devId
                 });
             } catch (e) {
@@ -1516,7 +1510,6 @@ describe('index', () => {
                     password: 'password',
                     rekeySignedPackage: options.rekeySignedPackage,
                     signingPassword: options.signingPassword,
-                    rootDir: options.rootDir,
                     devId: '45fdc2019903ac333ff624b0b2cddd2c733c3e74'
                 });
             } catch (e) {
@@ -1530,7 +1523,10 @@ describe('index', () => {
     describe('createSignedPackage', () => {
         let onHandler: any;
         beforeEach(() => {
-            fsExtra.outputFileSync(`${stagingDir}/manifest`, ``);
+            fsExtra.outputFileSync(`${tempDir}/manifest`, `
+                title=RokuDeployTestChannel
+                major_version=1
+                minor_version=0`);
             sinon.stub(fsExtra, 'ensureDir').callsFake(((pth: string, callback: (err: Error) => void) => {
                 //do nothing, assume the dir gets created
             }) as any);
@@ -1567,7 +1563,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 });
             } catch (e) {
                 expect(e).to.equal(error);
@@ -1583,7 +1579,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
@@ -1604,7 +1600,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 }),
                 'Invalid Password.'
             );
@@ -1622,8 +1618,8 @@ describe('index', () => {
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
-                stagingDir: stagingDir,
-                outDir: outDir
+                outDir: outDir,
+                manifestPath: s`${tempDir}/manifest`
             });
             expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
@@ -1636,7 +1632,7 @@ describe('index', () => {
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
-                stagingDir: stagingDir
+                manifestPath: s`${tempDir}/manifest`
             });
             expect(pkgPath).to.equal('pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
@@ -1648,7 +1644,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 }),
                 'Unknown error signing package'
             );
@@ -1665,10 +1661,50 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir,
-                    devId: '123'
+                    devId: '123',
+                    manifestPath: s`${tempDir}/manifest`
                 }),
                 `Package signing cancelled: provided devId '123' does not match on-device devId '789'`
+            );
+        });
+
+        it('should return error if neither manifestPath nor appTitle and appVersion are provided', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    devId: '123'
+                }),
+                `Either appTitle and appVersion or manifestPath must be provided`
+            );
+        });
+
+        it('should return error if major or minor version is missing from manifest', async () => {
+            fsExtra.outputFileSync(`${tempDir}/manifest`, `title=AwesomeApp`);
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    devId: '123',
+                    manifestPath: s`${tempDir}/manifest`
+                }),
+                `Either major or minor version is missing from the manifest`
+            );
+        });
+
+        it('should return error if value for appTitle is missing from manifest', async () => {
+            fsExtra.outputFileSync(`${tempDir}/manifest`, `major_version=1\nminor_version=0`);
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    devId: '123',
+                    manifestPath: s`${tempDir}/manifest`
+                }),
+                `Value for appTitle is missing from the manifest`
             );
         });
 
@@ -1698,7 +1734,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 });
             } catch (e) {
                 error = e as any;
@@ -1723,7 +1759,7 @@ describe('index', () => {
                     host: '1.2.3.4',
                     password: 'aaaa',
                     signingPassword: options.signingPassword,
-                    stagingDir: stagingDir
+                    manifestPath: s`${tempDir}/manifest`
                 }),
                 'Some error'
             );

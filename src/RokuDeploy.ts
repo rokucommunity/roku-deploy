@@ -463,9 +463,28 @@ export class RokuDeploy {
         logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
-        let manifestPath = path.join(options.stagingDir, 'manifest');
-        let parsedManifest = await this.parseManifest(manifestPath);
-        let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
+
+        // Process options for app title and app version
+        if (options.appTitle || options.appVersion) {
+            if (!options.appTitle || !options.appVersion) {
+                throw new Error('Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.');
+            }
+        } else if (options.manifestPath) {
+            let manifestPath = path.resolve(options.cwd, options.manifestPath);
+            let parsedManifest = await this.parseManifest(manifestPath);
+            if (parsedManifest.major_version === undefined || parsedManifest.minor_version === undefined) {
+                throw new Error('Either major or minor version is missing from the manifest');
+            }
+            options.appVersion = parsedManifest.major_version + '.' + parsedManifest.minor_version;
+            options.appTitle = parsedManifest.title;
+            if (!options.appTitle) {
+                throw new Error('Value for appTitle is missing from the manifest');
+            }
+        } else {
+            throw new Error('Either appTitle and appVersion or manifestPath must be provided');
+        }
+        
+        let appName = options.appTitle + '/' + options.appVersion;
 
         //prevent devId mismatch (if devId is specified)
         if (options.devId) {
@@ -1129,7 +1148,9 @@ export interface CreateSignedPackageOptions {
     host: string;
     password: string;
     signingPassword: string;
-    stagingDir?: string;
+    appTitle?: string;
+    appVersion?: string;
+    manifestPath?: string;
     outDir?: string;
     /**
      * If specified, signing will fail if the device's devId is different than this value
