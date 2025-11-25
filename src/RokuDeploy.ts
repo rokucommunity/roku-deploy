@@ -1196,10 +1196,18 @@ export class RokuDeploy {
 
         const url = `http://${options.host}:${options.remotePort}/query/device-info`;
 
-        let response = await this.doGetRequest({
-            url: url,
-            timeout: options.timeout
-        });
+        let response;
+        try {
+            response = await this.doGetRequest({
+                url: url,
+                timeout: options.timeout
+            });
+        } catch (e) {
+            if ((e as any)?.results?.response?.headers.server?.includes('Roku')) {
+                throw new errors.ECPSettingModeDisabledError('ECP Device Info request failed. ECP setting mode is disabled.', response);
+            }
+            throw e;
+        }
         try {
             const parsedContent = await xml2js.parseStringPromise(response.body, {
                 explicitArray: false
@@ -1221,6 +1229,30 @@ export class RokuDeploy {
         } catch (e) {
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
+    }
+
+    /**
+     * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
+     * the device accepts remote control commands via the ECP API.
+     *
+     * @param options - Configuration options including host, remotePort, timeout, etc.
+     * @returns The ECP setting mode:
+     *   - 'enabled': fully enabled and accepting commands
+     *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
+     *   - 'limited': Restricted functionality, text and movement commands only
+     *   - 'permissive': Full access for internal networks
+     */
+    public async getECPSetting(options: GetDeviceInfoOptions): Promise<'enabled' | 'disabled' | 'limited' | 'permissive'> {
+        try {
+            const deviceInfo = await this.getDeviceInfo(options);
+            return deviceInfo.ecpSettingMode;
+        } catch (e) {
+            if ((e as any)?.results?.response?.headers.server?.includes('Roku')) {
+                return 'disabled';
+            }
+            throw new errors.UnknownDeviceResponseError('Could not retrieve device ECP setting');
+        }
+
     }
 
     /**

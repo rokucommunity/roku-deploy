@@ -15,6 +15,13 @@ export class UnauthorizedDeviceResponseError extends Error {
     }
 }
 
+export class ECPSettingModeDisabledError extends Error {
+    constructor(message: string, public results?: any) {
+        super(message);
+        Object.setPrototypeOf(this, ECPSettingModeDisabledError.prototype);
+    }
+}
+
 export class UnparsableDeviceResponseError extends Error {
     constructor(message: string, public results?: any) {
         super(message);
