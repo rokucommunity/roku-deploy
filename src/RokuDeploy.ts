@@ -1204,7 +1204,7 @@ export class RokuDeploy {
             });
         } catch (e) {
             if ((e as any)?.results?.response?.headers.server?.includes('Roku')) {
-                throw new errors.ECPNetworkAccessDisabledError('ECP Device Info request failed. ECP setting mode is disabled.', response);
+                throw new errors.EcpNetworkAccessDisabledError('ECP Device Info request failed. ECP setting mode is disabled.', response);
             }
             throw e;
         }
