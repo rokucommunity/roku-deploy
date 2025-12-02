@@ -1204,7 +1204,7 @@ export class RokuDeploy {
             });
         } catch (e) {
             if ((e as any)?.results?.response?.headers.server?.includes('Roku')) {
-                throw new errors.ECPSettingModeDisabledError('ECP Device Info request failed. ECP setting mode is disabled.', response);
+                throw new errors.ECPNetworkAccessDisabledError('ECP Device Info request failed. ECP setting mode is disabled.', response);
             }
             throw e;
         }
@@ -1242,7 +1242,7 @@ export class RokuDeploy {
      *   - 'limited': Restricted functionality, text and movement commands only
      *   - 'permissive': Full access for internal networks
      */
-    public async getECPSetting(options: GetDeviceInfoOptions): Promise<'enabled' | 'disabled' | 'limited' | 'permissive'> {
+    public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         try {
             const deviceInfo = await this.getDeviceInfo(options);
             return deviceInfo.ecpSettingMode;
@@ -1520,3 +1520,5 @@ export interface GetDeviceInfoOptions {
      */
     enhance?: boolean;
 }
+
+export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';
