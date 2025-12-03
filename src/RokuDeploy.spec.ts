@@ -563,6 +563,80 @@ describe('RokuDeploy', () => {
             }
             assert.fail('Exception should have been thrown');
         });
+
+        it('throws EcpNetworkAccessDisabledError when response has Roku server header', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').rejects({
+                results: { response: { headers: { server: 'Roku' } } }
+            });
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.EcpNetworkAccessDisabledError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('rethrows error when server header is not Roku', async () => {
+            const err = { results: { response: { headers: { server: 'Apache' } } } };
+            sinon.stub(rokuDeploy as any, 'doGetRequest').rejects(err);
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                expect(e).to.equal(err);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('rethrows null error', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => Promise.reject(null));
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                expect(e).to.be.null;
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+    });
+
+    describe('getEcpNetworkAccessMode', () => {
+        it('returns ecpSettingMode from device info', async () => {
+            sinon.stub(rokuDeploy, 'getDeviceInfo').resolves({ ecpSettingMode: 'enabled' });
+            const result = await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+            expect(result).to.equal('enabled');
+        });
+
+        it('returns disabled when error has Roku server header', async () => {
+            sinon.stub(rokuDeploy, 'getDeviceInfo').rejects({
+                results: { response: { headers: { server: 'Roku' } } }
+            });
+            const result = await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+            expect(result).to.equal('disabled');
+        });
+
+        it('throws UnknownDeviceResponseError when error has no Roku server header', async () => {
+            sinon.stub(rokuDeploy, 'getDeviceInfo').rejects(new Error('Network error'));
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
+
+        it('throws UnknownDeviceResponseError on null error', async () => {
+            sinon.stub(rokuDeploy, 'getDeviceInfo').callsFake(() => Promise.reject(null));
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+                return;
+            }
+            assert.fail('Exception should have been thrown');
+        });
     });
 
     describe('normalizeDeviceInfoFieldValue', () => {
