@@ -564,29 +564,82 @@ describe('RokuDeploy', () => {
             assert.fail('Exception should have been thrown');
         });
 
-        it('throws EcpNetworkAccessDisabledError when response has Roku server header', async () => {
-            sinon.stub(rokuDeploy as any, 'doGetRequest').rejects({
-                results: { response: { headers: { server: 'Roku' } } }
-            });
+        it('handles all error scenarios in catch block', async () => {
+            const doGetRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
+
+            doGetRequestStub.rejects({ results: { response: { headers: { server: 'Roku' } } } });
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.be.instanceof(errors.EcpNetworkAccessDisabledError);
-                return;
             }
-            assert.fail('Exception should have been thrown');
-        });
 
-        it('rethrows error when server header is not Roku', async () => {
-            const err = { results: { response: { headers: { server: 'Apache' } } } };
-            sinon.stub(rokuDeploy as any, 'doGetRequest').rejects(err);
+            doGetRequestStub.rejects({ results: { response: { headers: { server: 'Apache' } } } });
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results.response.headers.server).to.equal('Apache');
+            }
+
+            doGetRequestStub.rejects({ results: { response: { headers: {} } } });
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results.response.headers.server).to.be.undefined;
+            }
+
+            doGetRequestStub.rejects({ results: { response: { headers: { server: null } } } });
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results.response.headers.server).to.be.null;
+            }
+
+            doGetRequestStub.rejects({ results: { response: {} } });
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results.response.headers).to.be.undefined;
+            }
+
+            doGetRequestStub.rejects({ results: {} });
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results.response).to.be.undefined;
+            }
+
+            doGetRequestStub.rejects({});
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect((e as any).results).to.be.undefined;
+            }
+
+            const err = new Error('Network error');
+            doGetRequestStub.rejects(err);
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.equal(err);
-                return;
             }
-            assert.fail('Exception should have been thrown');
+
+            // eslint-disable-next-line prefer-promise-reject-errors
+            doGetRequestStub.callsFake(() => Promise.reject(null));
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.null;
+            }
         });
     });
 
@@ -597,23 +650,76 @@ describe('RokuDeploy', () => {
             expect(result).to.equal('enabled');
         });
 
-        it('returns disabled when error has Roku server header', async () => {
-            sinon.stub(rokuDeploy, 'getDeviceInfo').rejects({
-                results: { response: { headers: { server: 'Roku' } } }
-            });
-            const result = await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
-            expect(result).to.equal('disabled');
-        });
+        it('handles all error scenarios in catch block', async () => {
+            const getDeviceInfoStub = sinon.stub(rokuDeploy, 'getDeviceInfo');
 
-        it('throws UnknownDeviceResponseError when error has no Roku server header', async () => {
-            sinon.stub(rokuDeploy, 'getDeviceInfo').rejects(new Error('Network error'));
+            getDeviceInfoStub.rejects({ results: { response: { headers: { server: 'Roku' } } } });
+            expect(await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' })).to.equal('disabled');
+
+            getDeviceInfoStub.rejects({ results: { response: { headers: { server: 'Apache' } } } });
             try {
                 await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
-                return;
             }
-            assert.fail('Exception should have been thrown');
+
+            getDeviceInfoStub.rejects({ results: { response: { headers: {} } } });
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            getDeviceInfoStub.rejects({ results: { response: { headers: { server: null } } } });
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            getDeviceInfoStub.rejects({ results: { response: {} } });
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            getDeviceInfoStub.rejects({ results: {} });
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            getDeviceInfoStub.rejects({});
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            getDeviceInfoStub.rejects(new Error('Network error'));
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
+
+            // eslint-disable-next-line prefer-promise-reject-errors
+            getDeviceInfoStub.callsFake(() => Promise.reject(null));
+            try {
+                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                assert.fail('Exception should have been thrown');
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
+            }
         });
     });
 
