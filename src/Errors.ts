@@ -15,10 +15,10 @@ export class UnauthorizedDeviceResponseError extends Error {
     }
 }
 
-export class EcpNetworkAccessDisabledError extends Error {
+export class EcpNetworkAccessModeDisabledError extends Error {
     constructor(message: string, public results?: any) {
         super(message);
-        Object.setPrototypeOf(this, EcpNetworkAccessDisabledError.prototype);
+        Object.setPrototypeOf(this, EcpNetworkAccessModeDisabledError.prototype);
     }
 }
 

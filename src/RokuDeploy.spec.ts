@@ -572,7 +572,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect(e).to.be.instanceof(errors.EcpNetworkAccessDisabledError);
+                expect(e).to.be.instanceof(errors.EcpNetworkAccessModeDisabledError);
             }
 
             doGetRequestStub.rejects({ results: { response: { headers: { server: 'Apache' } } } });
