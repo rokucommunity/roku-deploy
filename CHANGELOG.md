@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.16.1](https://github.com/rokucommunity/roku-deploy/compare/3.16.0...v3.16.1) - 2025-12-05
+### Added
+ - Add ecpSettingMode to device-info interface ([#225](https://github.com/rokucommunity/roku-deploy/pull/225))
+
+
+
 ## [3.16.0](https://github.com/rokucommunity/roku-deploy/compare/3.15.0...v3.16.0) - 2025-12-05
 ### Added
  - Add support for detecting ecpNetworkAccessMode ([#223](https://github.com/rokucommunity/roku-deploy/pull/223))
