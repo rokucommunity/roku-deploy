@@ -15,6 +15,7 @@ import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
+import * as semver from 'semver';
 
 export class RokuDeploy {
     /**
@@ -265,7 +266,8 @@ export class RokuDeploy {
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
-                archive: readStream
+                archive: readStream,
+                ...(options.appType ? { 'app_type': options.appType } : {})
             });
 
             //attach the remotedebug flag if configured
@@ -529,12 +531,50 @@ export class RokuDeploy {
     }
 
     /**
+     * Set the `User-Agent` header if missing from the request params, ensuring it's included in all requests made by roku-deploy
+     * @param params
+     * @returns
+     */
+    private setUserAgentIfMissing(params: requestType.OptionsWithUrl) {
+        if (!params) {
+            params = {} as requestType.OptionsWithUrl;
+        }
+        if (!params.headers) {
+            params.headers = {};
+        }
+        if (!params.headers['User-Agent']) {
+            params.headers['User-Agent'] = this.getUserAgent();
+        }
+        return params;
+    }
+
+    /**
+     * Get the user-agent string used for HTTP requests sent by this package
+     * @returns
+     */
+    private getUserAgent() {
+        try {
+            if (this._packageVersion === undefined) {
+                this._packageVersion = fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
+            }
+        } catch (e) {
+            this._packageVersion = null;
+        }
+        return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
+    }
+
+    private _packageVersion: string;
+
+    /**
      * Centralized function for handling POST http requests
      * @param params
      */
     private async doPostRequest(params: any, verify = true) {
         logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+
+            this.setUserAgentIfMissing(params);
+
             request.post(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
@@ -555,6 +595,9 @@ export class RokuDeploy {
     private async doGetRequest(params: requestType.OptionsWithUrl) {
         logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+
+            this.setUserAgentIfMissing(params);
+
             request.get(params, (err, resp, body) => {
                 if (err) {
                     return reject(err);
@@ -673,6 +716,30 @@ export class RokuDeploy {
     }
 
     /**
+     * Parse out the list of packages that are currently installed on the device by looking for the JSON in the response body
+     * @param body
+     * @returns
+     */
+    private getPackagesFromResponseBody(body: string): RokuPackage[] {
+        let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
+        let jsonMatch: RegExpExecArray;
+
+        while ((jsonMatch = jsonParseRegex.exec(body))) {
+            let [, jsonString] = jsonMatch;
+            let jsonObject = parseJsonc(jsonString);
+            if (typeof jsonObject === 'object' && !Array.isArray(jsonObject) && jsonObject !== null) {
+                let packages = jsonObject.packages;
+
+                if (!Array.isArray(packages)) {
+                    continue;
+                }
+                return packages;
+            }
+        }
+        return [];
+    }
+
+    /**
      * Deletes any installed dev channel on the target Roku device
      * @param options
      */
@@ -687,6 +754,53 @@ export class RokuDeploy {
             archive: ''
         };
         return this.doPostRequest(deleteOptions);
+    }
+
+    /**
+     * Delete the component library with the specified filename from the device
+     */
+    public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
+        options = this.getOptions(options) as any;
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'Delete',
+            'app_type': 'dcl',
+            fileName: options.fileName
+        };
+        deleteOptions.qs ??= {};
+        // eslint-disable-next-line camelcase
+        deleteOptions.qs.dcl_enabled = '1';
+        await this.doPostRequest(deleteOptions);
+    }
+
+    /**
+     * Delete all component libraries from the device
+     */
+    public async deleteAllComponentLibraries(options: { host: string; password: string; username?: string }) {
+        const packages = await this.getInstalledPackages(options);
+        for (const pkg of packages) {
+            if (pkg.appType === 'dcl') {
+                await this.deleteComponentLibrary({
+                    ...options,
+                    fileName: pkg.archiveFileName
+                });
+            }
+        }
+    }
+
+    /**
+     * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
+     */
+    private async getInstalledPackages(options: { host: string; password: string; username?: string }): Promise<RokuPackage[]> {
+        options = this.getOptions(options) as any;
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.qs ??= {};
+        // eslint-disable-next-line camelcase
+        deleteOptions.qs.dcl_enabled = '1';
+        const result = await this.doGetRequest(deleteOptions);
+        const packages = this.getPackagesFromResponseBody(result.body);
+        return packages;
     }
 
     /**
@@ -866,13 +980,18 @@ export class RokuDeploy {
 
         const url = `http://${options.host}:${options.remotePort}/query/device-info`;
 
-        let response = await this.doGetRequest({
-            url: url,
-            timeout: options.timeout,
-            headers: {
-                'User-Agent': 'https://github.com/RokuCommunity/roku-deploy'
+        let response;
+        try {
+            response = await this.doGetRequest({
+                url: url,
+                timeout: options.timeout
+            });
+        } catch (e) {
+            if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
+                throw new errors.EcpNetworkAccessModeDisabledError(`Unable to access device-info because ecp-setting-mode is 'disabled'`, response);
             }
-        });
+            throw e;
+        }
         try {
             const parsedContent = await xml2js.parseStringPromise(response.body, {
                 explicitArray: false
@@ -896,6 +1015,30 @@ export class RokuDeploy {
             logger.warn('Error getting device info:', e);
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
+    }
+
+    /**
+     * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
+     * the device accepts remote control commands via the ECP API.
+     *
+     * @param options - Configuration options including host, remotePort, timeout, etc.
+     * @returns The ECP setting mode:
+     *   - 'enabled': fully enabled and accepting commands
+     *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
+     *   - 'limited': Restricted functionality, text and movement commands only
+     *   - 'permissive': Full access for internal networks
+     */
+    public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
+        try {
+            const deviceInfo = await this.getDeviceInfo(options);
+            return deviceInfo.ecpSettingMode;
+        } catch (e) {
+            if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
+                return 'disabled';
+            }
+            throw new errors.UnknownDeviceResponseError('Could not retrieve device ECP setting');
+        }
+
     }
 
     /**
@@ -954,6 +1097,48 @@ export class RokuDeploy {
 
         return manifestData;
     }
+
+    public async rebootDevice(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options as any);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`);
+        }
+
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options as any),
+            formData: {
+                mysubmit: 'Reboot',
+                archive: ''
+            }
+        });
+    }
+
+    public async checkForUpdate(options: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options as any);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`);
+        }
+
+        return this.doPostRequest({
+            ...this.generateBaseRequestOptions('plugin_swup', options as any),
+            formData: {
+                mysubmit: 'CheckUpdate',
+                archive: ''
+            }
+        });
+    }
 }
 
 export interface ManifestData {
@@ -977,6 +1162,17 @@ export interface RokuMessages {
     errors: string[];
     infos: string[];
     successes: string[];
+}
+
+export interface RokuPackage {
+    appType: 'channel' | 'dcl';
+    archiveFileName: string;
+    fileType: string;
+    id: number;
+    location: string;
+    md5: string;
+    pkgPath: string;
+    size: string;
 }
 
 enum RokuMessageType {
@@ -1103,6 +1299,7 @@ export interface ZipOptions {
 }
 
 export interface SideloadOptions {
+    appType?: 'channel' | 'dcl';
     host: string;
     password: string;
     remoteDebug?: boolean;
@@ -1202,3 +1399,4 @@ export interface GetDevIdOptions {
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 export const rokuDeploy = new RokuDeploy();
+export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';

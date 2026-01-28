@@ -1,5 +1,7 @@
 //there are 2 copies of this interface in here. If you add a new field, be sure to add it to both
 
+import type { EcpNetworkAccessMode } from './RokuDeploy';
+
 export interface DeviceInfo {
     udn?: string;
     serialNumber?: string;
@@ -31,6 +33,7 @@ export interface DeviceInfo {
     softwareVersion?: string;
     softwareBuild?: number;
     secureDevice?: boolean;
+    ecpSettingMode?: EcpNetworkAccessMode;
     language?: string;
     country?: string;
     locale?: string;
@@ -104,6 +107,7 @@ export interface DeviceInfoRaw {
     'software-version'?: string;
     'software-build'?: string;
     'secure-device'?: string;
+    'ecp-setting-mode'?: EcpNetworkAccessMode;
     'language'?: string;
     'country'?: string;
     'locale'?: string;

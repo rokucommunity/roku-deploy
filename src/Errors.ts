@@ -19,6 +19,13 @@ export class UnauthorizedDeviceResponseError extends Error {
     }
 }
 
+export class EcpNetworkAccessModeDisabledError extends Error {
+    constructor(message: string, public results?: any) {
+        super(message);
+        Object.setPrototypeOf(this, EcpNetworkAccessModeDisabledError.prototype);
+    }
+}
+
 export class UnparsableDeviceResponseError extends Error {
     constructor(message: string, results?: any) {
         super(message);
@@ -58,6 +65,13 @@ export class MissingRequiredOptionError extends Error {
     constructor(message: string) {
         super(message);
         Object.setPrototypeOf(this, MissingRequiredOptionError.prototype);
+    }
+}
+
+export class UnsupportedFirmwareVersionError extends Error {
+    constructor(message: string) {
+        super(message);
+        Object.setPrototypeOf(this, UnsupportedFirmwareVersionError.prototype);
     }
 }
 

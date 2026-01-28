@@ -179,7 +179,8 @@ module.exports = {
                 'camelcase': 'off',
                 'dot-notation': 'off',
                 'new-cap': 'off',
-                'no-shadow': 'off'
+                'no-shadow': 'off',
+                'prefer-promise-reject-errors': 'off'
             }
         }
     ],
