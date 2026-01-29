@@ -69,6 +69,7 @@ module.exports = {
         '@typescript-eslint/require-array-sort-compare': 'off',
         '@typescript-eslint/restrict-plus-operands': 'off',
         '@typescript-eslint/restrict-template-expressions': 'off',
+        '@typescript-eslint/sort-type-constituents': 'off',
         '@typescript-eslint/sort-type-union-intersection-members': 'off',
         '@typescript-eslint/space-before-function-paren': 'off',
         '@typescript-eslint/strict-boolean-expressions': 'off',
@@ -179,7 +180,8 @@ module.exports = {
                 'camelcase': 'off',
                 'dot-notation': 'off',
                 'new-cap': 'off',
-                'no-shadow': 'off'
+                'no-shadow': 'off',
+                'prefer-promise-reject-errors': 'off'
             }
         }
     ],

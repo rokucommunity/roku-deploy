@@ -37,6 +37,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
 
 
+ 
+## [3.16.1](https://github.com/rokucommunity/roku-deploy/compare/3.16.0...v3.16.1) - 2025-12-05
+### Added
+ - Add ecpSettingMode to device-info interface ([#225](https://github.com/rokucommunity/roku-deploy/pull/225))
+
+
+
+## [3.16.0](https://github.com/rokucommunity/roku-deploy/compare/3.15.0...v3.16.0) - 2025-12-05
+### Added
+ - Add support for detecting ecpNetworkAccessMode ([#223](https://github.com/rokucommunity/roku-deploy/pull/223))
+
+
+
+## [3.15.0](https://github.com/rokucommunity/roku-deploy/compare/3.14.4...v3.15.0) - 2025-11-17
+### Added
+ - Support installing and deleting component libraries ([#220](https://github.com/rokucommunity/roku-deploy/pull/220))
+
+
+
+## [3.14.4](https://github.com/rokucommunity/roku-deploy/compare/3.14.3...v3.14.4) - 2025-10-30
+### Changed
+chore: Update package.json repository to support provenance (#218)
+
+
+
+## [3.14.3](https://github.com/rokucommunity/roku-deploy/compare/3.14.2...v3.14.3) - 2025-10-30
+### Added
+ - Add specific error classes for reboot and check for updates functions ([#216](https://github.com/rokucommunity/roku-deploy/pull/216))
+
+
+
+## [3.14.2](https://github.com/rokucommunity/roku-deploy/compare/3.14.1...v3.14.2) - 2025-10-30
+### Changed
+ - chore: add pull-request write permissions ([#214](https://github.com/rokucommunity/roku-deploy/pull/214))
+
+
+
+## [3.14.1](https://github.com/rokucommunity/roku-deploy/compare/3.14.0...v3.14.1) - 2025-10-29
+### Changed
+ - chore: add OIDC permissions to the dispatching workflow ([#211](https://github.com/rokucommunity/roku-deploy/pull/211))
+
+
+
+## [3.14.0](https://github.com/rokucommunity/roku-deploy/compare/3.13.0...v3.14.0) - 2025-10-28
+### Added
+ - Add 'rebootDevice' and 'checkForUpdate' functionality for supported OS versions ([#208](https://github.com/rokucommunity/roku-deploy/pull/208))
+
+
+
+## [3.13.0](https://github.com/rokucommunity/roku-deploy/compare/3.12.6...v3.13.0) - 2025-08-04
+### Added
+ - Add standards-compliant User-Agent header ([#203](https://github.com/rokucommunity/roku-deploy/pull/203))
+
+
 
 ## [3.12.6](https://github.com/rokucommunity/roku-deploy/compare/3.12.5...v3.12.6) - 2025-06-03
 ### Changed
@@ -510,3 +564,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0](https://github.com/RokuCommunity/roku-deploy/compare/v0.2.1...v1.0.0) - 2018-12-18
 ### Added
  - support for negated globs
+
+
+
+
