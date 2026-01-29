@@ -97,7 +97,7 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data, {
+                zip.file(file.dest.replace(/[\\/]/g, '/'), data as Uint8Array, {
                     compression: compression
                 });
             });
@@ -485,7 +485,7 @@ export class RokuDeploy {
         } else {
             throw new Error('Either appTitle and appVersion or manifestPath must be provided');
         }
-        
+
         let appName = options.appTitle + '/' + options.appVersion;
 
         //prevent devId mismatch (if devId is specified)
