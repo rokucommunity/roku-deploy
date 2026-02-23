@@ -21,7 +21,7 @@
   "include": [
     "src/**/*.ts",
     "device.spec.ts"
-  ],
+, "src/cli.ts"  ],
   "ts-node": {
     "transpileOnly": true
   }

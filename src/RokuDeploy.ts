@@ -1,118 +1,71 @@
 import * as path from 'path';
-import * as _fsExtra from 'fs-extra';
+import * as fsExtra from 'fs-extra';
+import type { WriteStream, ReadStream } from 'fs-extra';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
 const request = r as typeof requestType;
 import * as JSZip from 'jszip';
-import * as dateformat from 'dateformat';
 import * as errors from './Errors';
-import * as isGlob from 'is-glob';
-import * as picomatch from 'picomatch';
 import * as xml2js from 'xml2js';
-import type { ParseError } from 'jsonc-parser';
-import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
-import { Logger, LogLevel } from './Logger';
-import * as tempDir from 'temp-dir';
+import { logger } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
+import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
 
 export class RokuDeploy {
-
-    constructor() {
-        this.logger = new Logger();
-    }
-
-    private logger: Logger;
-    //store the import on the class to make testing easier
-
-    public fsExtra = _fsExtra;
-
-    public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
-
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    public async prepublishToStaging(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async stage(options: StageOptions) {
+        logger.info('Beginning to copy files to staging folder');
+        options = this.getOptions(options) as any;
 
         //clean the staging directory
-        await this.fsExtra.remove(options.stagingDir);
+        await fsExtra.remove(options.stagingDir);
 
         //make sure the staging folder exists
-        await this.fsExtra.ensureDir(options.stagingDir);
-        await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
-        return options.stagingDir;
-    }
+        await fsExtra.ensureDir(options.stagingDir);
 
-    /**
-     * Given an array of `FilesType`, normalize them each into a `StandardizedFileEntry`.
-     * Each entry in the array or inner `src` array will be extracted out into its own object.
-     * This makes it easier to reason about later on in the process.
-     * @param files
-     */
-    public normalizeFilesArray(files: FileEntry[]) {
-        const result: Array<string | StandardizedFileEntry> = [];
-
-        for (let i = 0; i < files.length; i++) {
-            let entry = files[i];
-            //skip falsey and blank entries
-            if (!entry) {
-                continue;
-
-                //string entries
-            } else if (typeof entry === 'string') {
-                result.push(entry);
-
-                //objects with src: (string | string[])
-            } else if ('src' in entry) {
-                //validate dest
-                if (entry.dest !== undefined && entry.dest !== null && typeof entry.dest !== 'string') {
-                    throw new Error(`Invalid type for "dest" at index ${i} of files array`);
-                }
-
-                //objects with src: string
-                if (typeof entry.src === 'string') {
-                    result.push({
-                        src: util.standardizePath(entry.src),
-                        dest: util.standardizePath(entry.dest)
-                    });
-
-                    //objects with src:string[]
-                } else if ('src' in entry && Array.isArray(entry.src)) {
-                    //create a distinct entry for each item in the src array
-                    for (let srcEntry of entry.src) {
-                        result.push({
-                            src: util.standardizePath(srcEntry),
-                            dest: util.standardizePath(entry.dest)
-                        });
-                    }
-                } else {
-                    throw new Error(`Invalid type for "src" at index ${i} of files array`);
-                }
-            } else {
-                throw new Error(`Invalid entry at index ${i} in files array`);
-            }
+        if (!await fsExtra.pathExists(options.rootDir)) {
+            throw new Error(`rootDir does not exist at "${options.rootDir}"`);
         }
 
-        return result;
+        let fileObjects = await this.getFilePaths(options.files, options.rootDir);
+        //copy all of the files
+        await Promise.all(fileObjects.map(async (fileObject) => {
+            let destFilePath = util.standardizePath(`${options.stagingDir}/${fileObject.dest}`);
+
+            //make sure the containing folder exists
+            await fsExtra.ensureDir(path.dirname(destFilePath));
+
+            //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
+            await util.tryRepeatAsync(async () => {
+                //copy the src item using the filesystem
+                await fsExtra.copy(fileObject.src, destFilePath, {
+                    //copy the actual files that symlinks point to, not the symlinks themselves
+                    dereference: true
+                });
+            }, 10);
+        }));
+        logger.info('Relevant files copied to:', options.stagingDir);
+        return options.stagingDir;
     }
 
     /**
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zipPackage(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async zip(options: ZipOptions) {
+        logger.info('Beginning to zip staging folder');
+        options = this.getOptions(options) as any;
 
-        //make sure the output folder exists
-        await this.fsExtra.ensureDir(options.outDir);
-
-        let zipFilePath = this.getOutputZipFilePath(options);
+        let zipFilePath = this.getOutputZipFilePath(options as any);
 
         //ensure the manifest file exists in the staging folder
         if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
@@ -120,55 +73,45 @@ export class RokuDeploy {
         }
 
         //create a zip of the staging folder
-        await this.zipFolder(options.stagingDir, zipFilePath);
-
-        //delete the staging folder unless told to retain it.
-        if (options.retainStagingDir !== true) {
-            await this.fsExtra.remove(options.stagingDir);
-        }
+        await this.makeZip(options.stagingDir, zipFilePath);
+        logger.info('Zip created at:', zipFilePath);
     }
 
     /**
-     * Create a zip folder containing all of the specified roku project files.
-     * @param options
+     * Given a path to a folder, zip up that folder and all of its contents
+     * @param srcFolder the folder that should be zipped
+     * @param zipFilePath the path to the zip that will be created
+     * @param files a files array used to filter the files from `srcFolder`
      */
-    public async createPackage(options: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => Promise<void> | void) {
-        options = this.getOptions(options);
+    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
+        const filePaths = await this.getFilePaths(files, srcFolder);
 
-        await this.prepublishToStaging(options);
+        const zip = new JSZip();
+        // Allows us to wait until all are done before we build the zip
+        const promises = [];
+        for (const file of filePaths) {
+            const promise = fsExtra.readFile(file.src).then((data) => {
+                const ext = path.extname(file.dest).toLowerCase();
+                let compression: 'DEFLATE' | 'STORE' = 'DEFLATE';
 
-        let manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
-        let parsedManifest = await this.parseManifest(manifestPath);
-
-        if (options.incrementBuildNumber) {
-            let timestamp = dateformat(new Date(), 'yymmddHHMM');
-            parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
-            await this.fsExtra.outputFile(manifestPath, this.stringifyManifest(parsedManifest));
+                if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
+                    compression = 'STORE';
+                }
+                zip.file(file.dest.replace(/[\\/]/g, '/'), data as Uint8Array, {
+                    compression: compression
+                });
+            });
+            promises.push(promise);
         }
+        await Promise.all(promises);
 
-        if (beforeZipCallback) {
-            let info: BeforeZipCallbackInfo = {
-                manifestData: parsedManifest,
-                stagingFolderPath: options.stagingDir,
-                stagingDir: options.stagingDir
-            };
-
-            await Promise.resolve(beforeZipCallback(info));
-        }
-        await this.zipPackage(options);
-    }
-
-    /**
-     * Given a root directory, normalize it to a full path.
-     * Fall back to cwd if not specified
-     * @param rootDir
-     */
-    public normalizeRootDir(rootDir: string) {
-        if (!rootDir || (typeof rootDir === 'string' && rootDir.trim().length === 0)) {
-            return process.cwd();
-        } else {
-            return path.resolve(rootDir);
-        }
+        //ensure the outDir exists
+        await fsExtra.ensureDir(
+            path.dirname(zipFilePath)
+        );
+        // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
+        const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
+        return fsExtra.writeFile(zipFilePath, content);
     }
 
     /**
@@ -181,7 +124,7 @@ export class RokuDeploy {
         if (path.isAbsolute(rootDir) === false) {
             rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
         }
-        const entries = this.normalizeFilesArray(files);
+        const entries = util.normalizeFilesArray(files);
         const srcPathsByIndex = await util.globAllByIndex(
             entries.map(x => {
                 return typeof x === 'string' ? x : x.src;
@@ -202,7 +145,7 @@ export class RokuDeploy {
                 for (let srcPath of srcPaths) {
                     srcPath = util.standardizePath(srcPath);
 
-                    const dest = this.computeFileDestPath(srcPath, entry, rootDir);
+                    const dest = util.computeFileDestPath(srcPath, entry, rootDir);
                     //the last file with this `dest` will win, so just replace any existing entry with this one.
                     result.set(dest, {
                         src: srcPath,
@@ -214,167 +157,8 @@ export class RokuDeploy {
         return [...result.values()];
     }
 
-    /**
-     * Given a full path to a file, determine its dest path
-     * @param srcPath the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
-     * @param files the files array
-     * @param rootDir the absolute path to the root dir
-     * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
-     * @returns the RELATIVE path to the dest location for the file.
-     */
-    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
-        srcPathAbsolute = util.standardizePath(srcPathAbsolute);
-        rootDir = rootDir.replace(/\\+/g, '/');
-        const entries = this.normalizeFilesArray(files);
-
-        function makeGlobAbsolute(pattern: string) {
-            return path.resolve(
-                rootDir,
-                //remove leading exclamation point if pattern is negated
-                pattern
-                //coerce all slashes to forward
-            ).replace(/\\+/g, '/');
-        }
-
-        let result: string;
-
-        //add the file into every matching cache bucket
-        for (let entry of entries) {
-            const pattern = (typeof entry === 'string' ? entry : entry.src);
-            //filter previous paths
-            if (pattern.startsWith('!')) {
-                const keepFile = picomatch('!' + makeGlobAbsolute(pattern.replace(/^!/, '')));
-                if (!keepFile(srcPathAbsolute)) {
-                    result = undefined;
-                }
-            } else {
-                const keepFile = picomatch(makeGlobAbsolute(pattern));
-                if (keepFile(srcPathAbsolute)) {
-                    try {
-                        result = this.computeFileDestPath(
-                            srcPathAbsolute,
-                            entry,
-                            util.standardizePath(rootDir)
-                        );
-                    } catch {
-                        //ignore errors...the file just has no dest path
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Compute the `dest` path. This accounts for magic globstars in the pattern,
-     * as well as relative paths based on the dest. This is only used internally.
-     * @param src an absolute, normalized path for a file
-     * @param dest the `dest` entry for this file. If omitted, files will derive their paths relative to rootDir.
-     * @param pattern the glob pattern originally used to find this file
-     * @param rootDir absolute normalized path to the rootDir
-     */
-    private computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
-        let result: string;
-        let globstarIdx: number;
-        //files under rootDir with no specified dest
-        if (typeof entry === 'string') {
-            if (util.isParentOfPath(rootDir, srcPath, false)) {
-                //files that are actually relative to rootDir
-                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
-            } else {
-                // result = util.stringReplaceInsensitive(srcPath, rootDir, '');
-                throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
-            }
-
-            //non-glob-pattern explicit file reference
-        } else if (!isGlob(entry.src.replace(/\\/g, '/'), { strict: false })) {
-            let isEntrySrcAbsolute = path.isAbsolute(entry.src);
-            let entrySrcPathAbsolute = isEntrySrcAbsolute ? entry.src : util.standardizePath(`${rootDir}/${entry.src}`);
-
-            let isSrcChildOfRootDir = util.isParentOfPath(rootDir, entrySrcPathAbsolute, false);
-
-            let fileNameAndExtension = path.basename(entrySrcPathAbsolute);
-
-            //no dest
-            if (entry.dest === null || entry.dest === undefined) {
-                //no dest, absolute path or file outside of rootDir
-                if (isEntrySrcAbsolute || isSrcChildOfRootDir === false) {
-                    //copy file to root of staging folder
-                    result = fileNameAndExtension;
-
-                    //no dest, relative path, lives INSIDE rootDir
-                } else {
-                    //copy relative file structure to root of staging folder
-                    let srcPathRelative = util.stringReplaceInsensitive(entrySrcPathAbsolute, rootDir, '');
-                    result = srcPathRelative;
-                }
-
-                //assume entry.dest is the relative path to the folder AND file if applicable
-            } else if (entry.dest === '') {
-                result = fileNameAndExtension;
-            } else {
-                result = entry.dest;
-            }
-            //has a globstar
-        } else if ((globstarIdx = entry.src.indexOf('**')) > -1) {
-            const rootGlobstarPath = path.resolve(rootDir, entry.src.substring(0, globstarIdx)) + path.sep;
-            const srcPathRelative = util.stringReplaceInsensitive(srcPath, rootGlobstarPath, '');
-            if (entry.dest) {
-                result = `${entry.dest}/${srcPathRelative}`;
-            } else {
-                result = srcPathRelative;
-            }
-
-            //`pattern` is some other glob magic
-        } else {
-            const fileNameAndExtension = path.basename(srcPath);
-            result = util.standardizePath(`${entry.dest ?? ''}/${fileNameAndExtension}`);
-        }
-
-        result = util.standardizePath(
-            //remove leading slashes
-            result.replace(/^[\/\\]+/, '')
-        );
-        return result;
-    }
-
-    /**
-     * Copy all of the files to the staging directory
-     * @param fileGlobs
-     * @param stagingPath
-     */
-    private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
-        if (!stagingPath) {
-            throw new Error('stagingPath is required');
-        }
-        if (!rootDir) {
-            throw new Error('rootDir is required');
-        }
-        if (!await this.fsExtra.pathExists(rootDir)) {
-            throw new Error(`rootDir does not exist at "${rootDir}"`);
-        }
-
-        let fileObjects = await this.getFilePaths(files, rootDir);
-        //copy all of the files
-        await Promise.all(fileObjects.map(async (fileObject) => {
-            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
-
-            //make sure the containing folder exists
-            await this.fsExtra.ensureDir(path.dirname(destFilePath));
-
-            //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
-            await util.tryRepeatAsync(async () => {
-                //copy the src item using the filesystem
-                await this.fsExtra.copy(fileObject.src, destFilePath, {
-                    //copy the actual files that symlinks point to, not the symlinks themselves
-                    dereference: true
-                });
-            }, 10);
-        }));
-    }
-
-    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): requestType.OptionsWithUrl {
-        options = this.getOptions(options);
+    private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
+        options = this.getOptions(options) as any;
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
@@ -390,50 +174,96 @@ export class RokuDeploy {
         return baseRequestOptions;
     }
 
+    public async keyPress(options: KeyPressOptions) {
+        return this.sendKeyEvent({
+            ...options,
+            key: options.key,
+            action: 'keypress'
+        });
+    }
+
+    public async keyUp(options: KeyUpOptions) {
+        return this.sendKeyEvent({
+            ...options,
+            action: 'keyup'
+        });
+    }
+
+    public async keyDown(options: KeyDownOptions) {
+        return this.sendKeyEvent({
+            ...options,
+            action: 'keydown'
+        });
+    }
+
+    public async sendText(options: SendTextOptions) {
+        const chars = options.text.split('');
+        for (const char of chars) {
+            await this.sendKeyEvent({
+                ...options,
+                key: `lit_${encodeURIComponent(char)}`,
+                action: 'keypress'
+            });
+        }
+    }
+
     /**
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
-     * @param host - the host
-     * @param port - the port that should be used for the request. defaults to 8060
-     * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
-    public async pressHomeButton(host, port?: number, timeout?: number) {
-        let options = this.getOptions();
-        port = port ? port : options.remotePort;
-        timeout = timeout ? timeout : options.timeout;
+    private async sendKeyEvent(options: SendKeyEventOptions) {
+        logger.info('Sending key event:', options.key);
+        this.checkRequiredOptions(options, ['host', 'key']);
+        let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
-            url: `http://${host}:${port}/keypress/Home`,
-            timeout: timeout
+            url: `http://${filledOptions.host}:${filledOptions.remotePort}/${filledOptions.action}/${filledOptions.key}`,
+            timeout: filledOptions.timeout
         }, false);
+    }
+
+    public async closeChannel(options: CloseChannelOptions) {
+        // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
+        await this.sendKeyEvent({
+            ...options,
+            action: 'keypress',
+            key: 'home'
+        });
     }
 
     /**
      * Publish a pre-existing packaged zip file to a remote Roku.
      * @param options
      */
-    public async publish(options: RokuDeployOptions): Promise<{ message: string; results: any }> {
-        options = this.getOptions(options);
-        if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
-        }
+    public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
+        logger.info('Beggining to sideload package');
+        this.checkRequiredOptions(options, ['host', 'password']);
+        options = this.getOptions(options) as any;
         //make sure the outDir exists
-        await this.fsExtra.ensureDir(options.outDir);
+        await fsExtra.ensureDir(options.outDir);
 
-        let zipFilePath = this.getOutputZipFilePath(options);
-        let readStream: _fsExtra.ReadStream;
-        try {
-            if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
-                throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
+        let zipFilePath = this.getOutputZipFilePath(options as any);
+
+        if (options.deleteDevChannel) {
+            try {
+                await this.deleteDevChannel(options);
+            } catch (e) {
+                // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
             }
-            readStream = this.fsExtra.createReadStream(zipFilePath);
+        }
+
+        let readStream: ReadStream;
+        try {
+            if ((await fsExtra.pathExists(zipFilePath)) === false) {
+                throw new Error(`Cannot sideload because file does not exist at '${zipFilePath}'`);
+            }
+            readStream = fsExtra.createReadStream(zipFilePath);
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
             });
 
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
-
             let requestOptions = this.generateBaseRequestOptions(route, options, {
                 mysubmit: 'Replace',
                 archive: readStream,
@@ -465,6 +295,7 @@ export class RokuDeploy {
             let response: HttpResponse;
             try {
                 try {
+                    console.log('calling once');
                     response = await this.doPostRequest(requestOptions);
                 } catch (replaceError: any) {
                     //fail if this is a compile error
@@ -504,17 +335,18 @@ export class RokuDeploy {
             if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
-            return { message: 'Successful deploy', results: response };
+            logger.info('Successful sideload');
+            return { message: 'Successful sideload', results: response };
         } finally {
             //delete the zip file only if configured to do so
             if (options.retainDeploymentArchive === false) {
-                await this.fsExtra.remove(zipFilePath);
+                await fsExtra.remove(zipFilePath);
             }
             //try to close the read stream to prevent files becoming locked
             try {
                 readStream?.close();
             } catch (e) {
-                this.logger.info('Error closing read stream', e);
+                logger.warn('Error closing read stream', e);
             }
         }
     }
@@ -541,15 +373,13 @@ export class RokuDeploy {
     }
 
     /**
-     * Converts existing loaded package to squashfs for faster loading packages
+     * Converts the currently sideloaded dev app to squashfs for faster loading packages
      * @param options
      */
-    public async convertToSquashfs(options: RokuDeployOptions) {
-        options = this.getOptions(options);
-        if (!options.host) {
-            throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
-        }
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
+    public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
+        options = this.getOptions(options) as any;
+        let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
@@ -568,6 +398,7 @@ export class RokuDeploy {
                         return results;
                     }
                 } catch (e) {
+                    logger.warn('Error converting to squashfs:', error);
                     throw error;
                 }
             } else {
@@ -583,29 +414,23 @@ export class RokuDeploy {
      * resign Roku Device with supplied pkg and
      * @param options
      */
-    public async rekeyDevice(options: RokuDeployOptions) {
-        options = this.getOptions(options);
-        if (!options.rekeySignedPackage) {
-            throw new errors.MissingRequiredOptionError('Must supply rekeySignedPackage');
-        }
-
-        if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
-        }
+    public async rekeyDevice(options: RekeyDeviceOptions) {
+        this.checkRequiredOptions(options, ['host', 'password', 'rekeySignedPackage', 'signingPassword']);
+        options = this.getOptions(options) as any;
 
         let rekeySignedPackagePath = options.rekeySignedPackage;
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options, {
+        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
             passwd: options.signingPassword,
-            archive: null as _fsExtra.ReadStream
+            archive: null as ReadStream
         });
 
         let results: HttpResponse;
         try {
-            requestOptions.formData.archive = this.fsExtra.createReadStream(rekeySignedPackagePath);
+            requestOptions.formData.archive = fsExtra.createReadStream(rekeySignedPackagePath);
             results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
@@ -636,16 +461,42 @@ export class RokuDeploy {
      * Sign a pre-existing package using Roku and return path to retrieve it
      * @param options
      */
-    public async signExistingPackage(options: RokuDeployOptions): Promise<string> {
-        options = this.getOptions(options);
-        if (!options.signingPassword) {
-            throw new errors.MissingRequiredOptionError('Must supply signingPassword');
-        }
-        let manifestPath = path.join(options.stagingDir, 'manifest');
-        let parsedManifest = await this.parseManifest(manifestPath);
-        let appName = parsedManifest.title + '/' + parsedManifest.major_version + '.' + parsedManifest.minor_version;
+    public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+        logger.info('Creating signed package');
+        this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
+        options = this.getOptions(options) as any;
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', options, {
+        // Process options for app title and app version
+        if (options.appTitle || options.appVersion) {
+            if (!options.appTitle || !options.appVersion) {
+                throw new Error('Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.');
+            }
+        } else if (options.manifestPath) {
+            let manifestPath = path.resolve(options.cwd, options.manifestPath);
+            let parsedManifest = await this.parseManifest(manifestPath);
+            if (parsedManifest.major_version === undefined || parsedManifest.minor_version === undefined) {
+                throw new Error('Either major or minor version is missing from the manifest');
+            }
+            options.appVersion = parsedManifest.major_version + '.' + parsedManifest.minor_version;
+            options.appTitle = parsedManifest.title;
+            if (!options.appTitle) {
+                throw new Error('Value for appTitle is missing from the manifest');
+            }
+        } else {
+            throw new Error('Either appTitle and appVersion or manifestPath must be provided');
+        }
+
+        let appName = options.appTitle + '/' + options.appVersion;
+
+        //prevent devId mismatch (if devId is specified)
+        if (options.devId) {
+            const deviceDevId = await this.getDevId(options);
+            if (options.devId !== deviceDevId) {
+                throw new Error(`Package signing cancelled: provided devId '${options.devId}' does not match on-device devId '${deviceDevId}'`);
+            }
+        }
+
+        let requestOptions = this.generateBaseRequestOptions('plugin_package', options as any, {
             mysubmit: 'Package',
             pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
             passwd: options.signingPassword,
@@ -667,23 +518,16 @@ export class RokuDeploy {
         //for some reason we couldn't find the pkgPath from json, look in the <a> tag
         pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         if (pkgSearchMatches) {
-            return pkgSearchMatches[1];
+            const url = pkgSearchMatches[1];
+            let requestOptions2 = this.generateBaseRequestOptions(url, options);
+
+            let pkgFilePath = this.getOutputPkgFilePath(options as any);
+            await this.downloadFile(requestOptions2, pkgFilePath);
+            logger.info('Signed package created at:', pkgFilePath);
+            return pkgFilePath;
         }
 
         throw new errors.UnknownDeviceResponseError('Unknown error signing package', results);
-    }
-
-    /**
-     * Sign a pre-existing package using Roku and return path to retrieve it
-     * @param pkgPath
-     * @param options
-     */
-    public async retrieveSignedPackage(pkgPath: string, options: RokuDeployOptions): Promise<string> {
-        options = this.getOptions(options);
-        let requestOptions = this.generateBaseRequestOptions(pkgPath, options);
-
-        let pkgFilePath = this.getOutputPkgFilePath(options);
-        return this.getToFile(requestOptions, pkgFilePath);
     }
 
     /**
@@ -711,7 +555,7 @@ export class RokuDeploy {
     private getUserAgent() {
         try {
             if (this._packageVersion === undefined) {
-                this._packageVersion = _fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
+                this._packageVersion = fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
             }
         } catch (e) {
             this._packageVersion = null;
@@ -726,6 +570,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
+        logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -748,6 +593,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: requestType.OptionsWithUrl) {
+        logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -894,31 +740,15 @@ export class RokuDeploy {
     }
 
     /**
-     * Create a zip of the project, and then publish to the target Roku device
-     * @param options
-     */
-    public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
-        options = this.getOptions(options);
-        await this.createPackage(options, beforeZipCallback);
-        if (options.deleteInstalledChannel) {
-            try {
-                await this.deleteInstalledChannel(options);
-            } catch (e) {
-                // note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
-            }
-        }
-        let result = await this.publish(options);
-        return result;
-    }
-
-    /**
      * Deletes any installed dev channel on the target Roku device
      * @param options
      */
-    public async deleteInstalledChannel(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+        logger.info('Deleting dev channel...');
+        this.checkRequiredOptions(options, ['host', 'password']);
+        options = this.getOptions(options) as any;
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options as any);
         deleteOptions.formData = {
             mysubmit: 'Delete',
             archive: ''
@@ -976,14 +806,15 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async takeScreenshot(options: TakeScreenshotOptions) {
-        options.outDir = options.outDir ?? this.screenshotDir;
-        options.outFile = options.outFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
+    public async captureScreenshot(options: CaptureScreenshotOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
+        options = this.getOptions(options);
+        options.screenshotFile ??= `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_inspect', options),
+            ...this.generateBaseRequestOptions('plugin_inspect', options as any),
             formData: {
                 mysubmit: 'Screenshot',
                 archive: ''
@@ -994,22 +825,22 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            saveFilePath = util.standardizePath(path.join(options.outDir, options.outFile + imageExt));
-            await this.getToFile(
+            saveFilePath = util.standardizePath(path.join(options.screenshotDir, options.screenshotFile + imageExt));
+            await this.downloadFile(
                 this.generateBaseRequestOptions(imageUrlOnDevice, options),
                 saveFilePath
             );
         } else {
-            throw new Error('No screen shot url returned from device');
+            throw new Error('No screenshot url returned from device');
         }
         return saveFilePath;
     }
 
-    private async getToFile(requestParams: any, filePath: string) {
-        let writeStream: _fsExtra.WriteStream;
-        await this.fsExtra.ensureFile(filePath);
+    private async downloadFile(requestParams: any, filePath: string) {
+        let writeStream: WriteStream;
+        await fsExtra.ensureFile(filePath);
         return new Promise<string>((resolve, reject) => {
-            writeStream = this.fsExtra.createWriteStream(filePath, {
+            writeStream = fsExtra.createWriteStream(filePath, {
                 flags: 'w'
             });
             if (!writeStream) {
@@ -1041,120 +872,71 @@ export class RokuDeploy {
     }
 
     /**
-     * executes sames steps as deploy and signs the package and stores it in the out folder
+     * Get an options with all overridden values, and then defaults for missing values
      * @param options
      */
-    public async deployAndSignPackage(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void): Promise<string> {
-        options = this.getOptions(options);
-        let retainStagingDirInitialValue = options.retainStagingDir;
-        options.retainStagingDir = true;
-        await this.deploy(options, beforeZipCallback);
-
-        if (options.convertToSquashfs) {
-            await this.convertToSquashfs(options);
-        }
-
-        let remotePkgPath = await this.signExistingPackage(options);
-        let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
-        if (retainStagingDirInitialValue !== true) {
-            await this.fsExtra.remove(options.stagingDir);
-        }
-        return localPkgFilePath;
-    }
-
-    /**
-     * Get an options with all overridden vaues, and then defaults for missing values
-     * @param options
-     */
-    public getOptions(options: RokuDeployOptions = {}) {
-        let fileOptions: RokuDeployOptions = {};
-        const fileNames = ['rokudeploy.json', 'bsconfig.json'];
-        if (options.project) {
-            fileNames.unshift(options.project);
-        }
-
-        for (const fileName of fileNames) {
-            if (this.fsExtra.existsSync(fileName)) {
-                let configFileText = this.fsExtra.readFileSync(fileName).toString();
-                let parseErrors = [] as ParseError[];
-                fileOptions = parseJsonc(configFileText, parseErrors, {
-                    allowEmptyContent: true,
-                    allowTrailingComma: true,
-                    disallowComments: false
-                });
-                if (parseErrors.length > 0) {
-                    throw new Error(`Error parsing "${path.resolve(fileName)}": ` + JSON.stringify(
-                        parseErrors.map(x => {
-                            return {
-                                message: printParseErrorCode(x.error),
-                                offset: x.offset,
-                                length: x.length
-                            };
-                        })
-                    ));
-                }
-                break;
-            }
-        }
-
-        let defaultOptions = <RokuDeployOptions>{
+    public getOptions<T = RokuDeployOptions>(options: RokuDeployOptions & T = {} as any): RokuDeployOptions & T {
+        // Fill in default options for any missing values
+        options = {
+            cwd: process.cwd(),
             outDir: './out',
             outFile: 'roku-deploy',
             retainDeploymentArchive: true,
-            incrementBuildNumber: false,
             failOnCompileError: true,
-            deleteInstalledChannel: true,
+            deleteDevChannel: true,
             packagePort: 80,
             remotePort: 8060,
             timeout: 150000,
             rootDir: './',
             files: [...DefaultFiles],
             username: 'rokudev',
-            logLevel: LogLevel.log
+            logLevel: 'error',
+            screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/'),
+            ...options
         };
-
-        //override the defaults with any found or provided options
-        let finalOptions = { ...defaultOptions, ...fileOptions, ...options };
-        this.logger.logLevel = finalOptions.logLevel;
+        options.cwd ??= process.cwd();
+        logger.logLevel = options.logLevel;
 
         //fully resolve the folder paths
-        finalOptions.rootDir = path.resolve(process.cwd(), finalOptions.rootDir);
-        finalOptions.outDir = path.resolve(process.cwd(), finalOptions.outDir);
-        finalOptions.retainStagingDir = (finalOptions.retainStagingDir !== undefined) ? finalOptions.retainStagingDir : finalOptions.retainStagingFolder;
-        //sync the new option with the old one (for back-compat)
-        finalOptions.retainStagingFolder = finalOptions.retainStagingDir;
-
-        let stagingDir = finalOptions.stagingDir || finalOptions.stagingFolderPath;
+        options.rootDir = path.resolve(options.cwd, options.rootDir);
+        options.outDir = path.resolve(options.cwd, options.outDir);
+        options.screenshotDir = path.resolve(options.cwd, options.screenshotDir);
 
         //stagingDir
-        if (stagingDir) {
-            finalOptions.stagingDir = path.resolve(process.cwd(), stagingDir);
+        if (options.stagingDir) {
+            options.stagingDir = path.resolve(options.cwd, options.stagingDir);
         } else {
-            finalOptions.stagingDir = path.resolve(
-                process.cwd(),
-                util.standardizePath(`${finalOptions.outDir}/.roku-deploy-staging`)
+            options.stagingDir = path.resolve(
+                options.cwd,
+                util.standardizePath(`${options.outDir}/.roku-deploy-staging`)
             );
         }
-        //sync the new option with the old one (for back-compat)
-        finalOptions.stagingFolderPath = finalOptions.stagingDir;
 
-        return finalOptions;
+        logger.info('Retrieved options:', options);
+        return options;
+    }
+
+    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
+        for (let opt of requiredOptions as string[]) {
+            if (options[opt] === undefined) {
+                throw new Error('Missing required option: ' + opt);
+            }
+        }
     }
 
     /**
      * Centralizes getting output zip file path based on passed in options
      * @param options
      */
-    public getOutputZipFilePath(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    private getOutputZipFilePath(options?: GetOutputZipFilePathOptions) {
+        options = this.getOptions(options) as any;
 
         let zipFileName = options.outFile;
         if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
-        let outFolderPath = path.resolve(options.outDir);
-
-        let outZipFilePath = path.join(outFolderPath, zipFileName);
+        let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
+        logger.debug('Output zip file path:', outZipFilePath);
         return outZipFilePath;
     }
 
@@ -1162,8 +944,8 @@ export class RokuDeploy {
      * Centralizes getting output pkg file path based on passed in options
      * @param options
      */
-    public getOutputPkgFilePath(options?: RokuDeployOptions) {
-        options = this.getOptions(options);
+    private getOutputPkgFilePath(options?: GetOutputPkgFilePathOptions) {
+        options = this.getOptions(options) as any;
 
         let pkgFileName = options.outFile;
         if (pkgFileName.toLowerCase().endsWith('.zip')) {
@@ -1174,6 +956,7 @@ export class RokuDeploy {
         let outFolderPath = path.resolve(options.outDir);
 
         let outPkgFilePath = path.join(outFolderPath, pkgFileName);
+        logger.debug('Output pkg file path:', outPkgFilePath);
         return outPkgFilePath;
     }
 
@@ -1182,9 +965,10 @@ export class RokuDeploy {
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
      */
-    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
+    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        this.checkRequiredOptions(options, ['host']);
         options = this.getOptions(options) as any;
 
         //if the host is a DNS name, look up the IP address
@@ -1225,8 +1009,10 @@ export class RokuDeploy {
                 }
                 deviceInfo = result;
             }
+            logger.debug('Device info:', deviceInfo);
             return deviceInfo;
         } catch (e) {
+            logger.warn('Error getting device info:', e);
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
@@ -1260,7 +1046,7 @@ export class RokuDeploy {
      * decoding HtmlEntities, etc.
      * @param deviceInfo
      */
-    public normalizeDeviceInfoFieldValue(value: any) {
+    private normalizeDeviceInfoFieldValue(value: any) {
         let num: number;
         // convert 'true' and 'false' string values to boolean
         if (value === 'true') {
@@ -1274,21 +1060,28 @@ export class RokuDeploy {
         }
     }
 
-    public async getDevId(options?: RokuDeployOptions) {
-        const deviceInfo = await this.getDeviceInfo(options as any);
+    /**
+     * Get the developer ID from the device-info response
+     * @param options
+     * @returns
+     */
+    public async getDevId(options?: GetDevIdOptions) {
+        this.checkRequiredOptions(options, ['host']);
+        const deviceInfo = await this.getDeviceInfo(options);
+        logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
         return deviceInfo['keyed-developer-id'];
     }
 
-    public async parseManifest(manifestPath: string): Promise<ManifestData> {
-        if (!await this.fsExtra.pathExists(manifestPath)) {
+    private async parseManifest(manifestPath: string): Promise<ManifestData> {
+        if (!await fsExtra.pathExists(manifestPath)) {
             throw new Error(manifestPath + ' does not exist');
         }
 
-        let manifestContents = await this.fsExtra.readFile(manifestPath, 'utf-8');
+        let manifestContents = await fsExtra.readFile(manifestPath, 'utf-8');
         return this.parseManifestFromString(manifestContents);
     }
 
-    public parseManifestFromString(manifestContents: string): ManifestData {
+    private parseManifestFromString(manifestContents: string): ManifestData {
         let manifestLines = manifestContents.split('\n');
         let manifestData: ManifestData = {};
         manifestData.keyIndexes = {};
@@ -1305,67 +1098,6 @@ export class RokuDeploy {
         return manifestData;
     }
 
-    public stringifyManifest(manifestData: ManifestData): string {
-        let output = [];
-
-        if (manifestData.keyIndexes && manifestData.lineCount) {
-            output.fill('', 0, manifestData.lineCount);
-
-            let key;
-            for (key in manifestData) {
-                if (key === 'lineCount' || key === 'keyIndexes') {
-                    continue;
-                }
-
-                let index = manifestData.keyIndexes[key];
-                output[index] = `${key}=${manifestData[key]}`;
-            }
-        } else {
-            output = Object.keys(manifestData).map((key) => {
-                return `${key}=${manifestData[key]}`;
-            });
-        }
-
-        return output.join('\n');
-    }
-
-    /**
-     * Given a path to a folder, zip up that folder and all of its contents
-     * @param srcFolder the folder that should be zipped
-     * @param zipFilePath the path to the zip that will be created
-     * @param preZipCallback a function to call right before every file gets added to the zip
-     * @param files a files array used to filter the files from `srcFolder`
-     */
-    public async zipFolder(srcFolder: string, zipFilePath: string, preFileZipCallback?: (file: StandardizedFileEntry, data: Buffer) => Buffer, files: FileEntry[] = ['**/*']) {
-        const filePaths = await this.getFilePaths(files, srcFolder);
-
-        const zip = new JSZip();
-        // Allows us to wait until all are done before we build the zip
-        const promises = [];
-        for (const file of filePaths) {
-            const promise = this.fsExtra.readFile(file.src).then((data) => {
-                if (preFileZipCallback) {
-                    data = preFileZipCallback(file, data);
-                }
-
-                const ext = path.extname(file.dest).toLowerCase();
-                let compression = 'DEFLATE';
-
-                if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
-                    compression = 'STORE';
-                }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data as any, {
-                    compression: compression
-                });
-            });
-            promises.push(promise);
-        }
-        await Promise.all(promises);
-        // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
-        const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
-        return this.fsExtra.outputFile(zipFilePath, content);
-    }
-
     public async rebootDevice(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
@@ -1379,7 +1111,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', options),
+            ...this.generateBaseRequestOptions('plugin_swup', options as any),
             formData: {
                 mysubmit: 'Reboot',
                 archive: ''
@@ -1400,7 +1132,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', options),
+            ...this.generateBaseRequestOptions('plugin_swup', options as any),
             formData: {
                 mysubmit: 'CheckUpdate',
                 archive: ''
@@ -1413,21 +1145,6 @@ export interface ManifestData {
     [key: string]: any;
     keyIndexes?: Record<string, number>;
     lineCount?: number;
-}
-
-export interface BeforeZipCallbackInfo {
-    /**
-     * Contains an associative array of the parsed values in the manifest
-     */
-    manifestData: ManifestData;
-    /**
-     * @deprecated since 3.9.0. use `stagingDir` instead
-     */
-    stagingFolderPath: string;
-    /**
-     * The directory where the files were staged
-     */
-    stagingDir: string;
 }
 
 export interface StandardizedFileEntry {
@@ -1468,7 +1185,11 @@ export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
-    'manifest'
+    'locale/**/*',
+    'fonts/**/*',
+    'manifest',
+    '!node_modules',
+    '!**/*.{md,DS_Store,db}'
 ];
 
 export interface HttpResponse {
@@ -1476,7 +1197,7 @@ export interface HttpResponse {
     body: any;
 }
 
-export interface TakeScreenshotOptions {
+export interface CaptureScreenshotOptions {
     /**
      * The IP address or hostname of the target Roku device.
      * @example '192.168.1.21'
@@ -1492,13 +1213,18 @@ export interface TakeScreenshotOptions {
      * A full path to the folder where the screenshots should be saved.
      * Will use the OS temp directory by default
      */
-    outDir?: string;
+    screenshotDir?: string;
 
     /**
      * The base filename the image file should be given (excluding the extension)
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
-    outFile?: string;
+    screenshotFile?: string;
+
+    /**
+     * The current working directory to use for relative paths
+     */
+    cwd?: string;
 }
 
 export interface GetDeviceInfoOptions {
@@ -1521,4 +1247,156 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
+export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
+
+export interface SendKeyEventOptions {
+    action?: 'keydown' | 'keypress' | 'keyup';
+    host: string;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RokuKey | string;
+    remotePort?: number;
+    timeout?: number;
+}
+
+export interface KeyUpOptions extends SendKeyEventOptions {
+    action?: 'keyup';
+    key: RokuKey;
+}
+
+export interface KeyDownOptions extends SendKeyEventOptions {
+    action?: 'keydown';
+    key: RokuKey;
+}
+
+export interface KeyPressOptions extends SendKeyEventOptions {
+    action?: 'keypress';
+    key: RokuKey;
+}
+
+export interface SendTextOptions extends SendKeyEventOptions {
+    action?: 'keypress';
+    text: string;
+}
+
+export interface CloseChannelOptions {
+    host: string;
+    remotePort?: number;
+    timeout?: number;
+
+}
+export interface StageOptions {
+    rootDir?: string;
+    files?: FileEntry[];
+    stagingDir?: string;
+    cwd?: string;
+}
+
+export interface ZipOptions {
+    stagingDir?: string;
+    outDir?: string;
+    outFile?: string;
+    cwd?: string;
+}
+
+export interface SideloadOptions {
+    appType?: 'channel' | 'dcl';
+    host: string;
+    password: string;
+    remoteDebug?: boolean;
+    remoteDebugConnectEarly?: boolean;
+    failOnCompileError?: boolean;
+    retainDeploymentArchive?: boolean;
+    outDir?: string;
+    outFile?: string;
+    deleteDevChannel?: boolean;
+    cwd?: string;
+    packageUploadOverrides?: PackageUploadOverridesOptions;
+}
+
+export interface PackageUploadOverridesOptions {
+    route?: string;
+    formData?: Record<string, any>;
+}
+
+export interface BaseRequestOptions {
+    host: string;
+    packagePort?: number;
+    timeout?: number;
+    username?: string;
+    password: string;
+}
+
+export interface ConvertToSquashfsOptions {
+    host: string;
+    password: string;
+}
+
+export interface RekeyDeviceOptions {
+    host: string;
+    password: string;
+    rekeySignedPackage: string;
+    signingPassword: string;
+    rootDir?: string;
+    devId: string;
+    cwd?: string;
+}
+
+export interface CreateSignedPackageOptions {
+    host: string;
+    password: string;
+    signingPassword: string;
+    appTitle?: string;
+    appVersion?: string;
+    manifestPath?: string;
+    outDir?: string;
+    /**
+     * If specified, signing will fail if the device's devId is different than this value
+     */
+    devId?: string;
+    cwd?: string;
+}
+
+export interface DeleteDevChannelOptions {
+    host: string;
+    password: string;
+}
+
+export interface GetOutputZipFilePathOptions {
+    outFile?: string;
+    outDir?: string;
+    cwd?: string;
+}
+
+export interface DeployOptions {
+    host: string;
+    password: string;
+    files?: FileEntry[];
+    rootDir?: string;
+    stagingDir?: string;
+    deleteDevChannel?: boolean;
+    outFile?: string;
+    outDir?: string;
+    cwd?: string;
+}
+
+export interface GetOutputPkgFilePathOptions {
+    outFile?: string;
+    outDir?: string;
+    cwd?: string;
+}
+
+export interface GetDevIdOptions {
+    host: string;
+    /**
+     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
+     */
+    remotePort?: number;
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
+    timeout?: number;
+}
+
+//create a new static instance of RokuDeploy, and export those functions for backwards compatibility
+export const rokuDeploy = new RokuDeploy();
 export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';

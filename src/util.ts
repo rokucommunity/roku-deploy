@@ -5,6 +5,11 @@ import * as dns from 'dns';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { StandardizedFileEntry } from './RokuDeploy';
+import * as isGlob from 'is-glob';
+import * as picomatch from 'picomatch';
+import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 
 export class Util {
     /**
@@ -46,21 +51,20 @@ export class Util {
         if (!thePath) {
             return thePath;
         }
-        return path.normalize(
-            thePath.replace(/[\/\\]+/g, path.sep)
-        );
+        return path.normalize(thePath).replace(/[\/\\]+/g, path.sep);
     }
 
     /**
-     * Convert all slashes to forward slashes
+     * Normalize path and replace all directory separators with current OS separators
+     * @param thePath
      */
-    public toForwardSlashes(thePath: string) {
-        if (typeof thePath === 'string') {
-            return thePath.replace(/[\/\\]+/g, '/');
-        } else {
+    public standardizePathPosix(thePath: string) {
+        if (!thePath) {
             return thePath;
         }
+        return path.normalize(thePath).replace(/[\/\\]+/g, '/');
     }
+
 
     /**
      * Do a case-insensitive string replacement
@@ -140,8 +144,6 @@ export class Util {
         cwd = cwd.replace(/\\/g, '/');
 
         const globResults = patterns.map(async (pattern) => {
-            //force all windows-style slashes to unix style
-            pattern = pattern.replace(/\\/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
@@ -228,6 +230,247 @@ export class Util {
         });
     }
 
+    /**
+     * Given an array of `FilesType`, normalize them each into a `StandardizedFileEntry`.
+     * Each entry in the array or inner `src` array will be extracted out into its own object.
+     * This makes it easier to reason about later on in the process.
+     * @param files
+     */
+    public normalizeFilesArray(files: FileEntry[]) {
+        const result: Array<StandardizedFileEntry | string> = [];
+
+        for (let i = 0; i < files.length; i++) {
+            let entry = files[i];
+            //skip falsey and blank entries
+            if (!entry) {
+                continue;
+
+                //string entries
+            } else if (typeof entry === 'string') {
+                result.push(entry);
+
+                //objects with src: (string | string[])
+            } else if ('src' in entry) {
+                //validate dest
+                if (entry.dest !== undefined && entry.dest !== null && typeof entry.dest !== 'string') {
+                    throw new Error(`Invalid type for "dest" at index ${i} of files array`);
+                }
+
+                //objects with src: string
+                if (typeof entry.src === 'string') {
+                    result.push({
+                        src: entry.src,
+                        dest: util.standardizePath(entry.dest)
+                    });
+
+                    //objects with src:string[]
+                } else if ('src' in entry && Array.isArray(entry.src)) {
+                    //create a distinct entry for each item in the src array
+                    for (let srcEntry of entry.src) {
+                        result.push({
+                            src: srcEntry,
+                            dest: util.standardizePath(entry.dest)
+                        });
+                    }
+                } else {
+                    throw new Error(`Invalid type for "src" at index ${i} of files array`);
+                }
+            } else {
+                throw new Error(`Invalid entry at index ${i} in files array`);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Given a full path to a file, determine its dest path
+     * @param srcPath the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+     * @param files the files array
+     * @param rootDir the absolute path to the root dir
+     * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
+     * @returns the RELATIVE path to the dest location for the file.
+     */
+    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
+        srcPathAbsolute = util.standardizePath(srcPathAbsolute);
+        rootDir = rootDir.replace(/\\+/g, '/');
+        const entries = util.normalizeFilesArray(files);
+
+        function makeGlobAbsolute(pattern: string) {
+            return path.resolve(
+                path.posix.join(
+                    rootDir,
+                    //remove leading exclamation point if pattern is negated
+                    pattern
+                    //coerce all slashes to forward
+                )
+            ).replace(/\\/g, '/');
+        }
+
+        let result: string;
+
+        //add the file into every matching cache bucket
+        for (let entry of entries) {
+            const pattern = (typeof entry === 'string' ? entry : entry.src);
+            //filter previous paths
+            if (pattern.startsWith('!')) {
+                const keepFile = picomatch('!' + makeGlobAbsolute(pattern.replace(/^!/, '')));
+                if (!keepFile(srcPathAbsolute)) {
+                    result = undefined;
+                }
+            } else {
+                const keepFile = picomatch(makeGlobAbsolute(pattern));
+                if (keepFile(srcPathAbsolute)) {
+                    try {
+                        result = this.computeFileDestPath(
+                            srcPathAbsolute,
+                            entry,
+                            util.standardizePath(rootDir)
+                        );
+                    } catch {
+                        //ignore errors...the file just has no dest path
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Compute the `dest` path. This accounts for magic globstars in the pattern,
+     * as well as relative paths based on the dest. This is only used internally.
+     * @param src an absolute, normalized path for a file
+     * @param dest the `dest` entry for this file. If omitted, files will derive their paths relative to rootDir.
+     * @param pattern the glob pattern originally used to find this file
+     * @param rootDir absolute normalized path to the rootDir
+     */
+    public computeFileDestPath(srcPath: string, entry: StandardizedFileEntry | string, rootDir: string) {
+        let result: string;
+        let globstarIdx: number;
+        //files under rootDir with no specified dest
+        if (typeof entry === 'string') {
+            if (util.isParentOfPath(rootDir, srcPath, false)) {
+                //files that are actually relative to rootDir
+                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            } else {
+                // result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+                throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+            }
+
+            //non-glob-pattern explicit file reference
+        } else if (!isGlob(entry.src.replace(/\\/g, '/'), { strict: false })) {
+            let isEntrySrcAbsolute = path.isAbsolute(entry.src);
+            let entrySrcPathAbsolute = isEntrySrcAbsolute ? entry.src : util.standardizePath(`${rootDir}/${entry.src}`);
+
+            let isSrcChildOfRootDir = util.isParentOfPath(rootDir, entrySrcPathAbsolute, false);
+
+            let fileNameAndExtension = path.basename(entrySrcPathAbsolute);
+
+            //no dest
+            if (entry.dest === null || entry.dest === undefined) {
+                //no dest, absolute path or file outside of rootDir
+                if (isEntrySrcAbsolute || isSrcChildOfRootDir === false) {
+                    //copy file to root of staging folder
+                    result = fileNameAndExtension;
+
+                    //no dest, relative path, lives INSIDE rootDir
+                } else {
+                    //copy relative file structure to root of staging folder
+                    let srcPathRelative = util.stringReplaceInsensitive(entrySrcPathAbsolute, rootDir, '');
+                    result = srcPathRelative;
+                }
+
+                //assume entry.dest is the relative path to the folder AND file if applicable
+            } else if (entry.dest === '') {
+                result = fileNameAndExtension;
+            } else {
+                result = entry.dest;
+            }
+            //has a globstar
+        } else if ((globstarIdx = entry.src.indexOf('**')) > -1) {
+            const rootGlobstarPath = path.resolve(rootDir, entry.src.substring(0, globstarIdx)) + path.sep;
+            const srcPathRelative = util.stringReplaceInsensitive(srcPath, rootGlobstarPath, '');
+            if (entry.dest) {
+                result = `${entry.dest}/${srcPathRelative}`;
+            } else {
+                result = srcPathRelative;
+            }
+
+            //`pattern` is some other glob magic
+        } else {
+            const fileNameAndExtension = path.basename(srcPath);
+            if (entry.dest) {
+                result = util.standardizePath(`${entry.dest}/${fileNameAndExtension}`);
+            } else {
+                result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            }
+        }
+
+        result = util.standardizePath(
+            //remove leading slashes
+            result.replace(/^[\/\\]+/, '')
+        );
+        return result;
+    }
+
+    /**
+     * Given a root directory, normalize it to a full path.
+     * Fall back to cwd if not specified
+     * @param rootDir
+     */
+    public normalizeRootDir(rootDir: string) {
+        if (!rootDir || (typeof rootDir === 'string' && rootDir.trim().length === 0)) {
+            return process.cwd();
+        } else {
+            return path.resolve(rootDir);
+        }
+    }
+
+    public objectToTableString(deviceInfo: Record<string, any>) {
+        const margin = 5;
+        const keyWidth = Math.max(...Object.keys(deviceInfo).map(x => x.length)) + margin;
+        const valueWidth = Math.max(...Object.values(deviceInfo).map(x => (x ?? '').toString().length)) + margin;
+        let table = [];
+        table.push('Name'.padEnd(keyWidth, ' ') + 'Value'.padEnd(keyWidth, ' '));
+        table.push('-'.repeat(keyWidth + valueWidth));
+        for (const [key, value] of Object.entries(deviceInfo)) {
+            table.push(key.padEnd(keyWidth, ' ') + value?.toString().padEnd(keyWidth, ' '));
+        }
+
+        return table.join('\n');
+    }
+
+    /**
+     * A function to fill in any missing arguments with JSON values
+     * Only run when CLI commands are used
+     */
+    public getOptionsFromJson(options?: { cwd?: string; configPath?: string }) {
+        let fileOptions: RokuDeployOptions = {};
+        const cwd = options?.cwd ?? process.cwd();
+        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
+
+        if (fsExtra.existsSync(configPath)) {
+            let configFileText = fsExtra.readFileSync(configPath).toString();
+            let parseErrors = [] as ParseError[];
+            fileOptions = parseJsonc(configFileText, parseErrors, {
+                allowEmptyContent: true,
+                allowTrailingComma: true,
+                disallowComments: false
+            });
+            if (parseErrors.length > 0) {
+                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                    parseErrors.map(x => {
+                        return {
+                            message: printParseErrorCode(x.error),
+                            offset: x.offset,
+                            length: x.length
+                        };
+                    })
+                ));
+            }
+        }
+        return fileOptions;
+    }
 }
 
 export let util = new Util();
@@ -242,6 +485,19 @@ export function standardizePath(stringParts, ...expressions: any[]) {
         result.push(stringParts[i], expressions[i]);
     }
     return util.standardizePath(
+        result.join('')
+    );
+}
+
+/**
+ * A tagged template literal function for standardizing the path and making all path separators forward slashes
+ */
+export function standardizePathPosix(stringParts, ...expressions: any[]) {
+    let result = [];
+    for (let i = 0; i < stringParts.length; i++) {
+        result.push(stringParts[i], expressions[i]);
+    }
+    return util.standardizePathPosix(
         result.join('')
     );
 }
