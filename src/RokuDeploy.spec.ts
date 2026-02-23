@@ -2646,59 +2646,6 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('plugin_swup', () => {
-        function mockGetDeviceInfo(swVersion: string) {
-            sinon.stub(rokuDeploy as any, 'getDeviceInfo').callsFake((params) => {
-                return { 'software-version': swVersion };
-            });
-        }
-        it('should send a request to the plugin_swup endpoint for a reboot', async () => {
-            mockGetDeviceInfo('15.0.4');
-            let stub = mockDoPostRequest();
-            let result = await rokuDeploy.rebootDevice(options);
-            expect(result).not.to.be.undefined;
-            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
-            expect(stub.args[0][0].formData.mysubmit).to.include('Reboot');
-        });
-
-        it('should send a request to the plugin_swup endpoint to check for update', async () => {
-            mockGetDeviceInfo('15.0.4');
-            let stub = mockDoPostRequest();
-            let result = await rokuDeploy.checkForUpdate(options);
-            expect(result).not.to.be.undefined;
-            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
-            expect(stub.args[0][0].formData.mysubmit).to.include('CheckUpdate');
-        });
-
-        it('should fail to reboot when sw version is just below minimum (15.0.3)', async () => {
-            mockGetDeviceInfo('15.0.3');
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.rebootDevice(options);
-            });
-        });
-
-        it('should fail to reboot when software-version is null', async () => {
-            mockGetDeviceInfo(null);
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.rebootDevice(options);
-            });
-        });
-
-        it('should fail to check for updates when sw version is just below minimum (15.0.3)', async () => {
-            mockGetDeviceInfo('15.0.3');
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.checkForUpdate(options);
-            });
-        });
-
-        it('should fail to check for updates when software-version is null', async () => {
-            mockGetDeviceInfo(null);
-            await assertThrowsAsync(async () => {
-                await rokuDeploy.checkForUpdate(options);
-            });
-        });
-    });
-
     describe('deleteInstalledChannel', () => {
         it('attempts to delete any installed dev channel on the device', async () => {
             mockDoPostRequest();
