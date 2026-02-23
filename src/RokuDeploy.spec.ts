@@ -1244,9 +1244,13 @@ describe('RokuDeploy', () => {
             delete options.appType;
             const stub = mockDoPostRequest();
 
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
+
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
                 deleteDevChannel: false
             });
             expect(result.message).to.equal('Successful sideload');
@@ -1255,10 +1259,13 @@ describe('RokuDeploy', () => {
 
         it('does not set appType if not appType is set to null or undefined', async () => {
             const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
 
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
                 deleteDevChannel: false,
                 appType: null
             });
@@ -1268,10 +1275,13 @@ describe('RokuDeploy', () => {
 
         it('sets appType="channel" when defined', async () => {
             const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
 
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
                 deleteDevChannel: false,
                 appType: 'channel'
             });
@@ -1281,10 +1291,13 @@ describe('RokuDeploy', () => {
 
         it('sets appType="dcl" when defined', async () => {
             const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
 
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
                 password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
                 deleteDevChannel: false,
                 appType: 'dcl'
             });
