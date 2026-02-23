@@ -1241,7 +1241,73 @@ describe('RokuDeploy', () => {
         });
 
         it('does not set appType if not explicitly defined', async () => {
+            delete options.appType;
             const stub = mockDoPostRequest();
+
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
+                deleteDevChannel: false
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('does not set appType if not appType is set to null or undefined', async () => {
+            const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
+                deleteDevChannel: false,
+                appType: null
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('sets appType="channel" when defined', async () => {
+            const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
+                deleteDevChannel: false,
+                appType: 'channel'
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('channel');
+        });
+
+        it('sets appType="dcl" when defined', async () => {
+            const stub = mockDoPostRequest();
+            fsExtra.outputFileSync(`${outDir}/${options.outFile}`, 'asdf');
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                outDir: outDir,
+                outFile: options.outFile,
+                deleteDevChannel: false,
+                appType: 'dcl'
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('dcl');
+        });
+
+        it('Does not reject when response contains compile error wording but config is set to ignore compile warnings', async () => {
+            const stub = mockDoPostRequest();
+            options.failOnCompileError = false;
 
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
@@ -1606,6 +1672,7 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
+
             try {
                 fsExtra.writeFileSync(s`notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice({
@@ -2906,7 +2973,7 @@ describe('RokuDeploy', () => {
                 outDir: outDir
             });
             const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             const files = ['manifest'];
             for (const file of files) {
@@ -2934,7 +3001,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.zip(options);
 
             const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             for (const file of filePaths) {
                 const zipFileContents = await zip.file(file.toString())?.async('string');
@@ -3117,10 +3184,11 @@ describe('RokuDeploy', () => {
 
             it('Finds folder using square brackets glob pattern', async () => {
                 fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
-                expect(await getFilePaths([
-                    '[test]/*'
-                ],
-                rootDir
+                expect(await getFilePaths(
+                    [
+                        '[test]/*'
+                    ],
+                    rootDir
                 )).to.eql([{
                     src: s`${rootDir}/e/file.brs`,
                     dest: s`e/file.brs`
@@ -3130,10 +3198,11 @@ describe('RokuDeploy', () => {
             it('Finds folder with escaped square brackets glob pattern as name', async () => {
                 fsExtra.outputFileSync(`${rootDir}/[test]/file.brs`, '');
                 fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
-                expect(await getFilePaths([
-                    '\\[test\\]/*'
-                ],
-                rootDir
+                expect(await getFilePaths(
+                    [
+                        '\\[test\\]/*'
+                    ],
+                    rootDir
                 )).to.eql([{
                     src: s`${rootDir}/[test]/file.brs`,
                     dest: s`[test]/file.brs`

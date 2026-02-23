@@ -569,7 +569,7 @@ export class RokuDeploy {
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: any, verify = true) {
+    private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
         logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 

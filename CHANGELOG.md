@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
 
 
- 
+
 ## [3.16.1](https://github.com/rokucommunity/roku-deploy/compare/3.16.0...v3.16.1) - 2025-12-05
 ### Added
  - Add ecpSettingMode to device-info interface ([#225](https://github.com/rokucommunity/roku-deploy/pull/225))
@@ -564,7 +564,3 @@ chore: Update package.json repository to support provenance (#218)
 ## [1.0.0](https://github.com/RokuCommunity/roku-deploy/compare/v0.2.1...v1.0.0) - 2018-12-18
 ### Added
  - support for negated globs
-
-
-
-
