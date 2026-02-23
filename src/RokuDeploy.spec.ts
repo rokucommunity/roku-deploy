@@ -1241,7 +1241,60 @@ describe('RokuDeploy', () => {
         });
 
         it('does not set appType if not explicitly defined', async () => {
+            delete options.appType;
             const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                deleteDevChannel: false
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('does not set appType if not appType is set to null or undefined', async () => {
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                deleteDevChannel: false,
+                appType: null
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
+        });
+
+        it('sets appType="channel" when defined', async () => {
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                deleteDevChannel: false,
+                appType: 'channel'
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('channel');
+        });
+
+        it('sets appType="dcl" when defined', async () => {
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                deleteDevChannel: false,
+                appType: 'dcl'
+            });
+            expect(result.message).to.equal('Successful sideload');
+            expect(stub.getCall(0).args[0].formData.app_type).to.eql('dcl');
+        });
+
+        it('Does not reject when response contains compile error wording but config is set to ignore compile warnings', async () => {
+            const stub = mockDoPostRequest();
+            options.failOnCompileError = false;
 
             const result = await rokuDeploy.sideload({
                 host: '1.2.3.4',
@@ -1606,6 +1659,13 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
+
+            // options.rekeySignedPackage = s`../notReal.pkg`;
+            // fsExtra.outputFileSync(s`${tempDir}/notReal.pkg`, '<file-contents>');
+            // //small sleep to ensure the file exists (hack for testing!)
+            // await util.sleep(10);
+            // await rokuDeploy.rekeyDevice(options);
+
             try {
                 fsExtra.writeFileSync(s`notReal.pkg`, '');
                 await rokuDeploy.rekeyDevice({
@@ -2586,6 +2646,59 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('plugin_swup', () => {
+        function mockGetDeviceInfo(swVersion: string) {
+            sinon.stub(rokuDeploy as any, 'getDeviceInfo').callsFake((params) => {
+                return { 'software-version': swVersion };
+            });
+        }
+        it('should send a request to the plugin_swup endpoint for a reboot', async () => {
+            mockGetDeviceInfo('15.0.4');
+            let stub = mockDoPostRequest();
+            let result = await rokuDeploy.rebootDevice(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
+            expect(stub.args[0][0].formData.mysubmit).to.include('Reboot');
+        });
+
+        it('should send a request to the plugin_swup endpoint to check for update', async () => {
+            mockGetDeviceInfo('15.0.4');
+            let stub = mockDoPostRequest();
+            let result = await rokuDeploy.checkForUpdate(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.args[0][0].url).to.include(`/plugin_swup`);
+            expect(stub.args[0][0].formData.mysubmit).to.include('CheckUpdate');
+        });
+
+        it('should fail to reboot when sw version is just below minimum (15.0.3)', async () => {
+            mockGetDeviceInfo('15.0.3');
+            await assertThrowsAsync(async () => {
+                await rokuDeploy.rebootDevice(options);
+            });
+        });
+
+        it('should fail to reboot when software-version is null', async () => {
+            mockGetDeviceInfo(null);
+            await assertThrowsAsync(async () => {
+                await rokuDeploy.rebootDevice(options);
+            });
+        });
+
+        it('should fail to check for updates when sw version is just below minimum (15.0.3)', async () => {
+            mockGetDeviceInfo('15.0.3');
+            await assertThrowsAsync(async () => {
+                await rokuDeploy.checkForUpdate(options);
+            });
+        });
+
+        it('should fail to check for updates when software-version is null', async () => {
+            mockGetDeviceInfo(null);
+            await assertThrowsAsync(async () => {
+                await rokuDeploy.checkForUpdate(options);
+            });
+        });
+    });
+
     describe('deleteInstalledChannel', () => {
         it('attempts to delete any installed dev channel on the device', async () => {
             mockDoPostRequest();
@@ -2906,7 +3019,7 @@ describe('RokuDeploy', () => {
                 outDir: outDir
             });
             const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             const files = ['manifest'];
             for (const file of files) {
@@ -2934,7 +3047,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.zip(options);
 
             const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
-            const zip = await JSZip.loadAsync(data);
+            const zip = await JSZip.loadAsync(data as any);
 
             for (const file of filePaths) {
                 const zipFileContents = await zip.file(file.toString())?.async('string');
@@ -3117,10 +3230,11 @@ describe('RokuDeploy', () => {
 
             it('Finds folder using square brackets glob pattern', async () => {
                 fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
-                expect(await getFilePaths([
-                    '[test]/*'
-                ],
-                rootDir
+                expect(await getFilePaths(
+                    [
+                        '[test]/*'
+                    ],
+                    rootDir
                 )).to.eql([{
                     src: s`${rootDir}/e/file.brs`,
                     dest: s`e/file.brs`
@@ -3130,10 +3244,11 @@ describe('RokuDeploy', () => {
             it('Finds folder with escaped square brackets glob pattern as name', async () => {
                 fsExtra.outputFileSync(`${rootDir}/[test]/file.brs`, '');
                 fsExtra.outputFileSync(`${rootDir}/e/file.brs`, '');
-                expect(await getFilePaths([
-                    '\\[test\\]/*'
-                ],
-                rootDir
+                expect(await getFilePaths(
+                    [
+                        '\\[test\\]/*'
+                    ],
+                    rootDir
                 )).to.eql([{
                     src: s`${rootDir}/[test]/file.brs`,
                     dest: s`[test]/file.brs`
@@ -3868,6 +3983,72 @@ describe('RokuDeploy', () => {
 
             await finalPromise;
             expect(downloadFileIsResolved).to.be.true;
+        });
+    });
+
+    describe('setUserAgentIfMissing', () => {
+        const currentVersion = fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
+
+        it('getUserAgent caches package version', () => {
+            const spy = sinon.spy(fsExtra, 'readJsonSync');
+            rokuDeploy['_packageVersion'] = undefined;
+            expect(rokuDeploy['getUserAgent']()).to.eql(`roku-deploy/${currentVersion}`);
+            expect(rokuDeploy['getUserAgent']()).to.eql(`roku-deploy/${currentVersion}`);
+
+            expect(spy.callCount).to.equal(1);
+        });
+
+        it('getUserAgent caches failed package.json read', () => {
+            const stub = sinon.stub(fsExtra, 'readJsonSync').throws(new Error('Unable to read package.json'));
+            rokuDeploy['_packageVersion'] = undefined;
+            expect(rokuDeploy['getUserAgent']()).to.eql(`roku-deploy/unknown`);
+            expect(rokuDeploy['getUserAgent']()).to.eql(`roku-deploy/unknown`);
+
+            expect(stub.callCount).to.equal(1);
+            rokuDeploy['_packageVersion'] = null;
+        });
+
+        it('currentVersion is valid', () => {
+            expect(currentVersion).to.exist.and.to.match(/^\d+\.\d+\.\d+.*/);
+        });
+
+        it('works when params is undefined', () => {
+            //undefined
+            expect(
+                rokuDeploy['setUserAgentIfMissing'](undefined)
+            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        });
+
+        it('works when params has no header container', () => {
+            expect(
+                rokuDeploy['setUserAgentIfMissing']({} as any)
+            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        });
+
+        it('works when params has empty header container', () => {
+            expect(
+                rokuDeploy['setUserAgentIfMissing']({} as any)
+            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        });
+
+        it('works when params has existing header container with no user agent', () => {
+            expect(
+                rokuDeploy['setUserAgentIfMissing']({ headers: {} } as any)
+            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        });
+
+        it('works when params has existing header container with user agent', () => {
+            expect(
+                rokuDeploy['setUserAgentIfMissing']({ headers: { 'User-Agent': 'some-other-user-agent' } } as any)
+            ).to.eql({ headers: { 'User-Agent': 'some-other-user-agent' } });
+        });
+
+        it('works when we fail to load package version', () => {
+            sinon.stub(fsExtra, 'readJsonSync').throws(new Error('Unable to read package.json'));
+            rokuDeploy['_packageVersion'] = undefined;
+            expect(
+                rokuDeploy['setUserAgentIfMissing']({} as any)
+            ).to.eql({ headers: { 'User-Agent': 'roku-deploy/unknown' } });
         });
     });
 
