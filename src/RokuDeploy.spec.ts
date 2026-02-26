@@ -39,7 +39,7 @@ describe('RokuDeploy', () => {
             stagingDir: stagingDir,
             signingPassword: '12345',
             host: 'localhost',
-            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`
+            pkg: `${tempDir}/testSignedPackage.pkg`
         });
         options.rootDir = rootDir;
         fsExtra.emptyDirSync(tempDir);
@@ -1646,7 +1646,7 @@ describe('RokuDeploy', () => {
                 <keyed-developer-id>${options.devId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
-            fsExtra.outputFileSync(path.resolve(rootDir, options.rekeySignedPackage), '');
+            fsExtra.outputFileSync(path.resolve(rootDir, options.pkg), '');
         });
 
         it('does not crash when archive is undefined', async () => {
@@ -1657,7 +1657,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
+                    pkg: options.pkg,
                     signingPassword: options.signingPassword,
                     devId: options.devId
                 });
@@ -1678,7 +1678,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: s`notReal.pkg`,
+                    pkg: s`notReal.pkg`,
                     signingPassword: options.signingPassword,
                     devId: options.devId
                 });
@@ -1695,7 +1695,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.rekeyDevice({
                 host: '1.2.3.4',
                 password: 'password',
-                rekeySignedPackage: s`${tempDir}/testSignedPackage.pkg`,
+                pkg: s`${tempDir}/testSignedPackage.pkg`,
                 signingPassword: options.signingPassword,
                 devId: options.devId
             });
@@ -1709,7 +1709,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.rekeyDevice({
                 host: '1.2.3.4',
                 password: 'password',
-                rekeySignedPackage: options.rekeySignedPackage,
+                pkg: options.pkg,
                 signingPassword: options.signingPassword,
                 devId: options.devId
             });
@@ -1723,7 +1723,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.rekeyDevice({
                 host: '1.2.3.4',
                 password: 'password',
-                rekeySignedPackage: options.rekeySignedPackage,
+                pkg: options.pkg,
                 signingPassword: options.signingPassword,
                 devId: undefined
             });
@@ -1735,7 +1735,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
+                    pkg: options.pkg,
                     signingPassword: options.signingPassword,
                     devId: options.devId
                 });
@@ -1755,7 +1755,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
+                    pkg: options.pkg,
                     signingPassword: options.signingPassword,
                     devId: options.devId
                 });
@@ -1775,7 +1775,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.rekeyDevice({
                     host: '1.2.3.4',
                     password: 'password',
-                    rekeySignedPackage: options.rekeySignedPackage,
+                    pkg: options.pkg,
                     signingPassword: options.signingPassword,
                     devId: '45fdc2019903ac333ff624b0b2cddd2c733c3e74'
                 });
@@ -3857,10 +3857,10 @@ describe('RokuDeploy', () => {
         });
 
         it('throws error when rekeyDevice is missing required options', async () => {
-            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', rekeySignedPackage: 'abcd', signingPassword: 'abcd' };
+            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', pkg: 'abcd', signingPassword: 'abcd' };
             await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'rekeySignedPackage');
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'pkg');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'signingPassword');
         });
 
