@@ -28,7 +28,7 @@ void yargs
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
-            .option('noclose', { type: 'boolean', description: 'Should the command not close the channel before sideloading', demandOption: false })
+            .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })

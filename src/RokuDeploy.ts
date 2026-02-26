@@ -236,9 +236,32 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
-        logger.info('Beggining to sideload package');
+        logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
+
+        // Resolve zip/rootDir before getOptions so outDir/outFile are set correctly
+        if (options.zip) {
+            options.zip = path.resolve(options.cwd ?? process.cwd(), options.zip);
+            options.outDir = path.dirname(options.zip);
+            options.outFile = path.basename(options.zip);
+            options.retainDeploymentArchive = true;
+        } else if (options.rootDir) {
+            options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
+        }
+
         options = this.getOptions(options) as any;
+
+        // Close the channel before sideloading unless explicitly disabled
+        if (options.close !== false) {
+            await this.closeChannel(options as CloseChannelOptions);
+        }
+
+        // If rootDir was provided (and no zip), zip it first then sideload
+        if (!options.zip && options.rootDir) {
+            await this.zip({ stagingDir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
+            options.retainDeploymentArchive = false;
+        }
+
         //make sure the outDir exists
         await fsExtra.ensureDir(options.outDir);
 
@@ -411,16 +434,16 @@ export class RokuDeploy {
     }
 
     /**
-     * resign Roku Device with supplied pkg and
+     * resign Roku Device with a supplied signed pkg and
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
-        this.checkRequiredOptions(options, ['host', 'password', 'rekeySignedPackage', 'signingPassword']);
+        this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
         options = this.getOptions(options) as any;
 
-        let rekeySignedPackagePath = options.rekeySignedPackage;
-        if (!path.isAbsolute(options.rekeySignedPackage)) {
-            rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
+        let pkgPath = options.pkg;
+        if (!path.isAbsolute(options.pkg)) {
+            pkgPath = path.join(options.rootDir, options.pkg);
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
@@ -430,7 +453,7 @@ export class RokuDeploy {
 
         let results: HttpResponse;
         try {
-            requestOptions.formData.archive = fsExtra.createReadStream(rekeySignedPackagePath);
+            requestOptions.formData.archive = fsExtra.createReadStream(pkgPath);
             results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
@@ -1302,6 +1325,19 @@ export interface SideloadOptions {
     appType?: 'channel' | 'dcl';
     host: string;
     password: string;
+    /**
+     * The path to an existing zip file to sideload. Takes precedence over `rootDir`.
+     */
+    zip?: string;
+    /**
+     * The root folder to zip and then sideload. Used when `zip` is not provided.
+     */
+    rootDir?: string;
+    /**
+     * Close the channel before sideloading. Defaults to true.
+     * Set to false to skip closing the channel.
+     */
+    close?: boolean;
     remoteDebug?: boolean;
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
@@ -1309,6 +1345,8 @@ export interface SideloadOptions {
     outDir?: string;
     outFile?: string;
     deleteDevChannel?: boolean;
+    remotePort?: number;
+    timeout?: number;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 }
@@ -1334,7 +1372,7 @@ export interface ConvertToSquashfsOptions {
 export interface RekeyDeviceOptions {
     host: string;
     password: string;
-    rekeySignedPackage: string;
+    pkg: string;
     signingPassword: string;
     rootDir?: string;
     devId: string;

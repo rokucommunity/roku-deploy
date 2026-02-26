@@ -118,7 +118,7 @@ export interface RokuDeployOptions {
     /**
      * Path to a copy of the signed package you want to use for rekeying
      */
-    rekeySignedPackage?: string;
+    pkg?: string;
 
     /**
      * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
