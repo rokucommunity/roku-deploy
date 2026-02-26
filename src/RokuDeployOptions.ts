@@ -84,7 +84,7 @@ export interface RokuDeployOptions {
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
      */
-    remotePort?: number;
+    ecpPort?: number;
 
     /**
      * The directory where screenshots should be saved. Will use the OS temp directory by default

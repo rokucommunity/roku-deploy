@@ -416,7 +416,7 @@ describe('RokuDeploy', () => {
 
         it('should use given port if provided', async () => {
             const stub = mockDoGetRequest(body);
-            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', remotePort: 9999 });
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', ecpPort: 9999 });
             expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:9999/query/device-info');
         });
 
@@ -427,7 +427,7 @@ describe('RokuDeploy', () => {
                     <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
                 </device-info>
                 `);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
             expect(result.isStick).not.to.exist;
         });
 
@@ -443,7 +443,7 @@ describe('RokuDeploy', () => {
 
         it('should sanitize additional data when the host+param+format signature is triggered', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
             expect(result).to.include({
                 // make sure the number fields are turned into numbers
                 softwareBuild: 4170,
@@ -482,7 +482,7 @@ describe('RokuDeploy', () => {
 
         it('converts keys to camel case when enabled', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
             const props = [
                 'udn',
                 'serialNumber',
@@ -742,7 +742,7 @@ describe('RokuDeploy', () => {
             try {
                 fsExtra.ensureDirSync(options.stagingDir);
                 await rokuDeploy.zip({
-                    stagingDir: s`${tempDir}/path/to/nowhere`,
+                    dir: s`${tempDir}/path/to/nowhere`,
                     outDir: outDir
                 });
             } catch (e) {
@@ -755,7 +755,7 @@ describe('RokuDeploy', () => {
             let err;
             try {
                 await rokuDeploy.zip({
-                    stagingDir: s`${tempDir}/path/to/nowhere`,
+                    dir: s`${tempDir}/path/to/nowhere`,
                     outDir: outDir
                 });
             } catch (e) {
@@ -816,7 +816,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', remotePort: 987, key: 'home' });
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', ecpPort: 987, key: 'home' });
             await promise;
         });
 
@@ -841,7 +841,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', remotePort: 987, key: 'home', timeout: 1000 });
+            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', ecpPort: 987, key: 'home', timeout: 1000 });
             await promise;
         });
     });
@@ -2969,7 +2969,7 @@ describe('RokuDeploy', () => {
             });
 
             await rokuDeploy.zip({
-                stagingDir: stagingDir,
+                dir: stagingDir,
                 outDir: outDir
             });
             const data = fsExtra.readFileSync(rokuDeploy['getOutputZipFilePath']({ outDir: outDir }));
@@ -3762,13 +3762,13 @@ describe('RokuDeploy', () => {
 
         });
 
-        describe('remotePort', () => {
+        describe('ecpPort', () => {
             it('defaults to 8060', () => {
-                expect(rokuDeploy.getOptions({}).remotePort).to.equal(8060);
+                expect(rokuDeploy.getOptions({}).ecpPort).to.equal(8060);
             });
 
             it('can be overridden', () => {
-                expect(rokuDeploy.getOptions({ remotePort: 1234 }).remotePort).to.equal(1234);
+                expect(rokuDeploy.getOptions({ ecpPort: 1234 }).ecpPort).to.equal(1234);
             });
         });
 

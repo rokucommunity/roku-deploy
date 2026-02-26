@@ -105,13 +105,16 @@ Lastly, the default files array has changed. node modules and static analysis fi
 ## CLI Usage
 
 ### Sideload a project to your Roku device
-Sideload a .zip package or directory to a roku device:
+Sideload a .zip package or directory to a roku device. By default, the channel is closed before sideloading. Use `--no-close` to skip.
 ```shell
 # Sideload a zip file
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
 
 # Sideload from a directory (will be zipped first automatically)
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --rootDir './path/to/your/project'
+
+# Sideload without closing the channel first
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip' --no-close
 ```
 
 ### Create a signed package from an existing dev channel
@@ -212,7 +215,7 @@ Use this logic if you'd like to create a zip from your application folder.
 //create a signed package of your project
 rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
-    stagingDir: 'path/to/files/to/zip',
+    dir: 'path/to/files/to/zip',
     outFile: 'filename-of-your-app.zip'
     //...other options if necessary
 }).then(function(){
@@ -232,14 +235,26 @@ rokuDeploy.keyPress({
 ```
 
 ### Sideloading a project
-If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
+Sideload a zip file, a directory, or a pre-built zip at the default `outDir`/`outFile` location. The current dev channel is closed before sideloading by default; pass `close: false` to skip.
 ```typescript
-//sideload a package onto a specified Roku
+// Sideload a zip file
 rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
-    outDir: 'folder/where/your/zip/resides/',
-    outFile: 'filename-of-your-app.zip'
+    zip: './path/to/your/app.zip'
+    //...other options if necessary
+}).then(function(){
+    //the app has been sideloaded
+}, function(error) {
+    //it failed
+    console.error(error);
+});
+
+// Sideload from a source directory (will be zipped automatically)
+rokuDeploy.sideload({
+    host: 'ip-of-roku',
+    password: 'password for roku dev admin portal',
+    rootDir: './path/to/your/project'
     //...other options if necessary
 }).then(function(){
     //the app has been sideloaded
@@ -263,8 +278,7 @@ rokuDeploy.convertToSquashfs({
 rokuDeploy.createSignedPackage({
     host: '1.2.3.4',
     password: 'password',
-    signingPassword: 'signing password',
-    stagingDir: './path/to/staging/directory'
+    signingPassword: 'signing password'
     //...other options if necessary
 })
 ```
@@ -294,7 +308,7 @@ rokuDeploy.captureScreenshot({
 rokuDeploy.rekeyDevice({
     host: 'ip-of-roku',
     password: 'password',
-    rekeySignedPackage: './path/to/signed.pkg'
+    pkg: './path/to/signed.pkg'
     //...other options if necessary
 })
 ```
@@ -482,7 +496,7 @@ Here are the available options for customizing to your developer-specific workfl
 - **signingPassword:** string (*required for signing*)
     The password used for creating signed packages.
 
-- **rekeySignedPackage:** string (*required for rekeying*)
+- **pkg:** string (*required for rekeying*)
     Path to a copy of the signed package you want to use for rekeying.
 
 - **devId:** string
@@ -555,10 +569,10 @@ Here are the available options for customizing to your developer-specific workfl
     just in case roku adds support for custom usernames in the future.
 
 - **packagePort?:** number = `80`
-    The port used for package-related requests. This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
+    The port used for package-related requests. This is mainly used when your roku is behind a firewall with a port-forward.
 
-- **remotePort?:** number = `8060`
-    The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
+- **ecpPort?:** number = `8060`
+    The port used for sending ECP/remote control commands (like key presses). This is mainly used when your roku is behind a firewall with a port-forward.
 
 - **screenshotDir?:** string = `"./tmp/roku-deploy/screenshots/"`
     The directory where screenshots should be saved. Will use the OS temp directory by default.

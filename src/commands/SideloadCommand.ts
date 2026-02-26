@@ -19,10 +19,6 @@ export class SideloadCommand {
         if (args.outZip) {
             options.outZip = path.resolve(args.cwd, args.outZip);
         }
-        if (args.ecpPort) {
-            options.remotePort = args.ecpPort;
-        }
-
         await rokuDeploy.sideload(options);
     }
 }

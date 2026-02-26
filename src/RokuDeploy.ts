@@ -62,18 +62,24 @@ export class RokuDeploy {
      * @param options
      */
     public async zip(options: ZipOptions) {
-        logger.info('Beginning to zip staging folder');
+        logger.info('Beginning to zip folder');
         options = this.getOptions(options) as any;
+
+        if (options.dir) {
+            options.dir = path.resolve((options as any).cwd, options.dir);
+        } else {
+            options.dir = (options as any).stagingDir;
+        }
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
-        //ensure the manifest file exists in the staging folder
-        if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
-            throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
+        //ensure the manifest file exists in the folder to be zipped
+        if (!await util.fileExistsCaseInsensitive(`${options.dir}/manifest`)) {
+            throw new Error(`Cannot zip package: missing manifest file in "${options.dir}"`);
         }
 
-        //create a zip of the staging folder
-        await this.makeZip(options.stagingDir, zipFilePath);
+        //create a zip of the folder
+        await this.makeZip(options.dir, zipFilePath);
         logger.info('Zip created at:', zipFilePath);
     }
 
@@ -217,7 +223,7 @@ export class RokuDeploy {
         let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
-            url: `http://${filledOptions.host}:${filledOptions.remotePort}/${filledOptions.action}/${filledOptions.key}`,
+            url: `http://${filledOptions.host}:${filledOptions.ecpPort}/${filledOptions.action}/${filledOptions.key}`,
             timeout: filledOptions.timeout
         }, false);
     }
@@ -258,7 +264,7 @@ export class RokuDeploy {
 
         // If rootDir was provided (and no zip), zip it first then sideload
         if (!options.zip && options.rootDir) {
-            await this.zip({ stagingDir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
+            await this.zip({ dir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
             options.retainDeploymentArchive = false;
         }
 
@@ -908,7 +914,7 @@ export class RokuDeploy {
             failOnCompileError: true,
             deleteDevChannel: true,
             packagePort: 80,
-            remotePort: 8060,
+            ecpPort: 8060,
             timeout: 150000,
             rootDir: './',
             files: [...DefaultFiles],
@@ -1001,7 +1007,7 @@ export class RokuDeploy {
             //try using the host as-is (it'll probably fail...)
         }
 
-        const url = `http://${options.host}:${options.remotePort}/query/device-info`;
+        const url = `http://${options.host}:${options.ecpPort}/query/device-info`;
 
         let response;
         try {
@@ -1044,7 +1050,7 @@ export class RokuDeploy {
      * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
      * the device accepts remote control commands via the ECP API.
      *
-     * @param options - Configuration options including host, remotePort, timeout, etc.
+     * @param options - Configuration options including host, ecpPort, timeout, etc.
      * @returns The ECP setting mode:
      *   - 'enabled': fully enabled and accepting commands
      *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
@@ -1258,7 +1264,7 @@ export interface GetDeviceInfoOptions {
     /**
      * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
      */
-    remotePort?: number;
+    ecpPort?: number;
     /**
      * The number of milliseconds at which point this request should timeout and return a rejected promise
      */
@@ -1277,7 +1283,7 @@ export interface SendKeyEventOptions {
     host: string;
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RokuKey | string;
-    remotePort?: number;
+    ecpPort?: number;
     timeout?: number;
 }
 
@@ -1303,7 +1309,7 @@ export interface SendTextOptions extends SendKeyEventOptions {
 
 export interface CloseChannelOptions {
     host: string;
-    remotePort?: number;
+    ecpPort?: number;
     timeout?: number;
 
 }
@@ -1315,7 +1321,7 @@ export interface StageOptions {
 }
 
 export interface ZipOptions {
-    stagingDir?: string;
+    dir?: string;
     outDir?: string;
     outFile?: string;
     cwd?: string;
@@ -1345,7 +1351,7 @@ export interface SideloadOptions {
     outDir?: string;
     outFile?: string;
     deleteDevChannel?: boolean;
-    remotePort?: number;
+    ecpPort?: number;
     timeout?: number;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
@@ -1428,7 +1434,7 @@ export interface GetDevIdOptions {
     /**
      * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
      */
-    remotePort?: number;
+    ecpPort?: number;
     /**
      * The number of milliseconds at which point this request should timeout and return a rejected promise
      */
