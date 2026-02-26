@@ -6,6 +6,9 @@ export class StageCommand {
             ...util.getOptionsFromJson(args),
             ...args
         };
+        if (options.out) {
+            options.stagingDir = options.out;
+        }
         await rokuDeploy.stage(options);
     }
 }
