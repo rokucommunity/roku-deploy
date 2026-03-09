@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.16.2](https://github.com/rokucommunity/roku-deploy/compare/3.16.1...v3.16.2) - 2026-03-09
+### Changed
+ - Bump minimatch from 3.1.2 to 3.1.5 ([#234](https://github.com/rokucommunity/roku-deploy/pull/234))
+ - Bump ajv from 6.12.6 to 6.14.0 ([#232](https://github.com/rokucommunity/roku-deploy/pull/232))
+ - Bump lodash from 4.17.21 to 4.17.23 ([#227](https://github.com/rokucommunity/roku-deploy/pull/227))
+
+
+
 ## [3.16.1](https://github.com/rokucommunity/roku-deploy/compare/3.16.0...v3.16.1) - 2025-12-05
 ### Added
  - Add ecpSettingMode to device-info interface ([#225](https://github.com/rokucommunity/roku-deploy/pull/225))
