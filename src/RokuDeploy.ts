@@ -1468,6 +1468,8 @@ export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
+    'fonts/**/*.*',
+    'locale/**/*.*',
     'manifest'
 ];
 

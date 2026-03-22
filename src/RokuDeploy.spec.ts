@@ -9,7 +9,7 @@ import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
 import type { BeforeZipCallbackInfo } from './RokuDeploy';
-import { RokuDeploy } from './RokuDeploy';
+import { DefaultFiles, RokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -3355,6 +3355,36 @@ describe('RokuDeploy', () => {
                 //clean up
                 await fsExtra.remove(s`${thisRootDir}/../`);
             }
+        });
+
+        it('DefaultFiles includes standard Roku directories and excludes non-app files', async () => {
+            const projectDir = s`${tempDir}/defaultFilesProject`;
+            writeFiles(projectDir, [
+                'manifest',
+                'source/main.brs',
+                'source/lib.brs',
+                'components/MainScene.xml',
+                'components/MainScene.brs',
+                'images/splash_hd.jpg',
+                'fonts/custom.ttf',
+                'locale/en_US/translations.xml',
+                'locale/es_ES/translations.xml',
+                // these should NOT be included
+                'README.md',
+                'bsconfig.json',
+                '.vscode/settings.json'
+            ]);
+            expect(await getFilePaths(DefaultFiles, projectDir)).to.eql([
+                { src: s`${projectDir}/components/MainScene.brs`, dest: s`components/MainScene.brs` },
+                { src: s`${projectDir}/components/MainScene.xml`, dest: s`components/MainScene.xml` },
+                { src: s`${projectDir}/fonts/custom.ttf`, dest: s`fonts/custom.ttf` },
+                { src: s`${projectDir}/images/splash_hd.jpg`, dest: s`images/splash_hd.jpg` },
+                { src: s`${projectDir}/locale/en_US/translations.xml`, dest: s`locale/en_US/translations.xml` },
+                { src: s`${projectDir}/locale/es_ES/translations.xml`, dest: s`locale/es_ES/translations.xml` },
+                { src: s`${projectDir}/manifest`, dest: s`manifest` },
+                { src: s`${projectDir}/source/lib.brs`, dest: s`source/lib.brs` },
+                { src: s`${projectDir}/source/main.brs`, dest: s`source/main.brs` }
+            ]);
         });
     });
 
