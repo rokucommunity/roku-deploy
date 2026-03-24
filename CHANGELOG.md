@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.16.3](https://github.com/rokucommunity/roku-deploy/compare/3.16.2...v3.16.3) - 2026-03-24
+### Changed
+ - chore: Bump flatted from 3.2.2 to 3.4.2 ([#236](https://github.com/rokucommunity/roku-deploy/pull/236))
+
+
+
 ## [3.16.2](https://github.com/rokucommunity/roku-deploy/compare/3.16.1...v3.16.2) - 2026-03-09
 ### Changed
  - Bump minimatch from 3.1.2 to 3.1.5 ([#234](https://github.com/rokucommunity/roku-deploy/pull/234))
