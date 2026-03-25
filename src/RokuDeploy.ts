@@ -1466,9 +1466,14 @@ enum RokuMessageType {
 
 export const DefaultFiles = [
     'source/**/*.*',
+    'componentLibraries/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
-    'manifest'
+    'locale/**/*',
+    'fonts/**/*',
+    'manifest',
+    '!node_modules',
+    '!**/*.{md,DS_Store,db}'
 ];
 
 export interface HttpResponse {
