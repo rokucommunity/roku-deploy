@@ -3372,7 +3372,10 @@ describe('RokuDeploy', () => {
                 // these should NOT be included
                 'README.md',
                 'bsconfig.json',
-                '.vscode/settings.json'
+                '.vscode/settings.json',
+                'node_modules/some-package/index.js',
+                'source/data.db',
+                'components/.DS_Store'
             ]);
             expect(await getFilePaths(DefaultFiles, projectDir)).to.eql([
                 { src: s`${projectDir}/components/MainScene.brs`, dest: s`components/MainScene.brs` },
