@@ -3365,6 +3365,8 @@ describe('RokuDeploy', () => {
                 'source/lib.brs',
                 'components/MainScene.xml',
                 'components/MainScene.brs',
+                'componentLibraries/myLib/myLib.brs',
+                'componentLibraries/myLib/myLib.xml',
                 'images/splash_hd.jpg',
                 'fonts/custom.ttf',
                 'locale/en_US/translations.xml',
@@ -3378,6 +3380,8 @@ describe('RokuDeploy', () => {
                 'components/.DS_Store'
             ]);
             expect(await getFilePaths(DefaultFiles, projectDir)).to.eql([
+                { src: s`${projectDir}/componentLibraries/myLib/myLib.brs`, dest: s`componentLibraries/myLib/myLib.brs` },
+                { src: s`${projectDir}/componentLibraries/myLib/myLib.xml`, dest: s`componentLibraries/myLib/myLib.xml` },
                 { src: s`${projectDir}/components/MainScene.brs`, dest: s`components/MainScene.brs` },
                 { src: s`${projectDir}/components/MainScene.xml`, dest: s`components/MainScene.xml` },
                 { src: s`${projectDir}/fonts/custom.ttf`, dest: s`fonts/custom.ttf` },

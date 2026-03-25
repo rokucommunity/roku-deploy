@@ -1466,6 +1466,7 @@ enum RokuMessageType {
 
 export const DefaultFiles = [
     'source/**/*.*',
+    'componentLibraries/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
     'locale/**/*',
