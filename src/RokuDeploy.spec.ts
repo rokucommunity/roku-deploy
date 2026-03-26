@@ -1632,13 +1632,17 @@ describe('index', () => {
         it('should return created pkg from SD card on success', async () => {
             mockDoPostRequest(fakePluginPackageResponse);
 
+            const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
             let pkgPath = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
-                stagingDir: stagingDir
+                stagingDir: stagingDir,
+                outDir: outDir
             });
-            expect(pkgPath).to.equal('pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
+            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
 
         it('should return our fallback error if neither error or package link was detected', async () => {

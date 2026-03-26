@@ -491,15 +491,13 @@ export class RokuDeploy {
 
         //grab the package url from the JSON on the page if it exists (https://regex101.com/r/1HUXgk/1)
         let pkgSearchMatches = /"pkgPath"\s*:\s*"(.*?)"/.exec(results.body);
-        if (pkgSearchMatches) {
-            return pkgSearchMatches[1];
+        if (!pkgSearchMatches) {
+            //for some reason we couldn't find the pkgPath from json, look in the <a> tag
+            pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         }
-        //for some reason we couldn't find the pkgPath from json, look in the <a> tag
-        pkgSearchMatches = /<a href="(pkgs\/[^\.]+\.pkg)">/.exec(results.body);
         if (pkgSearchMatches) {
             const url = pkgSearchMatches[1];
             let requestOptions2 = this.generateBaseRequestOptions(url, options);
-
             let pkgFilePath = this.getOutputPkgFilePath(options as any);
             await this.downloadFile(requestOptions2, pkgFilePath);
             logger.info('Signed package created at:', pkgFilePath);
