@@ -854,7 +854,8 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            saveFilePath = util.standardizePath(path.join(options.screenshotDir, options.screenshotFile + imageExt));
+            const screenshotFile = path.extname(options.screenshotFile) ? options.screenshotFile : options.screenshotFile + imageExt;
+            saveFilePath = util.standardizePath(path.join(options.screenshotDir, screenshotFile));
             await this.downloadFile(
                 this.generateBaseRequestOptions(imageUrlOnDevice, options),
                 saveFilePath
