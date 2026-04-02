@@ -907,7 +907,9 @@ describe('RokuDeploy', () => {
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             });
             //the file should still exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
@@ -924,7 +926,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 retainDeploymentArchive: false,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             });
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
@@ -955,7 +959,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 retainDeploymentArchive: false,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             });
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
@@ -963,18 +969,16 @@ describe('RokuDeploy', () => {
         });
 
         it('fails when the zip file is missing', async () => {
+            const missingZip = `${outDir}/fileThatDoesNotExist.zip`;
             await expectThrowsAsync(async () => {
                 await rokuDeploy.sideload({
                     host: '1.2.3.4',
                     password: 'password',
-                    outDir: outDir,
-                    outFile: 'fileThatDoesNotExist.zip',
-                    deleteDevChannel: false
+                    zip: missingZip,
+                    deleteDevChannel: false,
+                    close: false
                 });
-            }, `Cannot sideload because file does not exist at '${rokuDeploy['getOutputZipFilePath']({
-                outFile: 'fileThatDoesNotExist.zip',
-                outDir: outDir
-            })}'`);
+            }, `Cannot sideload because file does not exist at '${missingZip}'`);
         });
 
         it('fails when no host is provided', () => {
@@ -983,7 +987,8 @@ describe('RokuDeploy', () => {
                 host: undefined,
                 password: 'password',
                 outDir: outDir,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir
             }).then(() => {
                 assert.fail('Should not have succeeded');
             }, () => {
@@ -1009,7 +1014,9 @@ describe('RokuDeploy', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
-                    outFile: options.outFile
+                    outFile: options.outFile,
+                    rootDir: rootDir,
+                    close: false
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
@@ -1029,7 +1036,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1048,7 +1057,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1065,7 +1076,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1097,7 +1110,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then(() => {
                 assert.fail('Should not have succeeded due to roku server compilation failure');
             }, (err) => {
@@ -1116,7 +1131,9 @@ describe('RokuDeploy', () => {
                         host: '1.2.3.4',
                         password: 'password',
                         outDir: outDir,
-                        outFile: options.outFile
+                        outFile: options.outFile,
+                        rootDir: rootDir,
+                        close: false
                     }
                 );
                 assert.fail('Should not have succeeded due to roku server compilation failure');
@@ -1132,10 +1149,8 @@ describe('RokuDeploy', () => {
             let spy = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
                 let results: any;
                 if (params?.formData['mysubmit'] === 'Replace') {
-                    // console.log('returning 500');
                     results = { response: { statusCode: 500 }, body: `'Failed to check for software update'` };
                 } else {
-                    console.log('returning 200');
                     results = { response: { statusCode: 200 }, body: `` };
                 }
                 rokuDeploy['checkRequest'](results);
@@ -1149,7 +1164,9 @@ describe('RokuDeploy', () => {
                         password: 'password',
                         outDir: outDir,
                         outFile: options.outFile,
-                        deleteDevChannel: false
+                        rootDir: rootDir,
+                        deleteDevChannel: false,
+                        close: false
                     }
                 );
                 assert.fail('Should not have succeeded due to roku server compilation failure');
@@ -1181,7 +1198,9 @@ describe('RokuDeploy', () => {
                         password: 'password',
                         outDir: outDir,
                         outFile: options.outFile,
-                        deleteDevChannel: false
+                        rootDir: rootDir,
+                        deleteDevChannel: false,
+                        close: false
                     }
                 );
                 assert.fail('Should not have succeeded due to roku server compilation failure');
@@ -1201,7 +1220,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: true,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then((result) => {
                 expect(result.message).to.equal('Successful sideload');
             }, () => {
@@ -1219,7 +1240,9 @@ describe('RokuDeploy', () => {
                 failOnCompileError: true,
                 remoteDebug: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             }).then((result) => {
                 expect(result.message).to.equal('Successful sideload');
                 expect(stub.getCall(0).args[0].formData.remotedebug).to.eql('1');
@@ -1239,7 +1262,9 @@ describe('RokuDeploy', () => {
                 remoteDebug: true,
                 remoteDebugConnectEarly: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             }).then((result) => {
                 expect(result.message).to.equal('Successful sideload');
                 expect(stub.getCall(0).args[0].formData.remotedebug_connect_early).to.eql('1');
@@ -1259,7 +1284,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             });
             expect(result.message).to.equal('Successful sideload');
             expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
@@ -1274,7 +1301,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 outFile: options.outFile,
+                rootDir: rootDir,
                 deleteDevChannel: false,
+                close: false,
                 appType: null
             });
             expect(result.message).to.equal('Successful sideload');
@@ -1290,7 +1319,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 outFile: options.outFile,
+                rootDir: rootDir,
                 deleteDevChannel: false,
+                close: false,
                 appType: 'channel'
             });
             expect(result.message).to.equal('Successful sideload');
@@ -1306,7 +1337,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 outFile: options.outFile,
+                rootDir: rootDir,
                 deleteDevChannel: false,
+                close: false,
                 appType: 'dcl'
             });
             expect(result.message).to.equal('Successful sideload');
@@ -1325,7 +1358,9 @@ describe('RokuDeploy', () => {
                 remoteDebug: true,
                 remoteDebugConnectEarly: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             });
             expect(result.message).to.equal('Successful sideload');
             expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
@@ -1343,7 +1378,9 @@ describe('RokuDeploy', () => {
                 remoteDebug: true,
                 remoteDebugConnectEarly: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             });
             expect(result.message).to.equal('Successful sideload');
             expect(stub.getCall(0).args[0].formData.app_type).to.be.undefined;
@@ -1361,13 +1398,15 @@ describe('RokuDeploy', () => {
                 remoteDebug: true,
                 remoteDebugConnectEarly: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             });
             expect(result.message).to.equal('Successful sideload');
             expect(stub.getCall(0).args[0].formData.app_type).to.eql('channel');
         });
 
-        it('sets appType="channel" when defined', async () => {
+        it('sets appType="dcl" when defined', async () => {
             const stub = mockDoPostRequest();
 
             const result = await rokuDeploy.sideload({
@@ -1379,7 +1418,9 @@ describe('RokuDeploy', () => {
                 remoteDebug: true,
                 remoteDebugConnectEarly: true,
                 outFile: options.outFile,
-                deleteDevChannel: false
+                rootDir: rootDir,
+                deleteDevChannel: false,
+                close: false
             });
             expect(result.message).to.equal('Successful sideload');
             expect(stub.getCall(0).args[0].formData.app_type).to.eql('dcl');
@@ -1394,7 +1435,9 @@ describe('RokuDeploy', () => {
                 password: 'password',
                 outDir: outDir,
                 failOnCompileError: false,
-                outFile: options.outFile
+                outFile: options.outFile,
+                rootDir: rootDir,
+                close: false
             }).then((result) => {
                 expect(result.results.body).to.equal(body);
             }, () => {
@@ -1412,7 +1455,9 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
-                    outFile: options.outFile
+                    outFile: options.outFile,
+                    rootDir: rootDir,
+                    close: false
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
@@ -1430,7 +1475,9 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
-                    outFile: options.outFile
+                    outFile: options.outFile,
+                    rootDir: rootDir,
+                    close: false
                 });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnauthorizedDeviceResponseError);
@@ -1448,7 +1495,9 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     outDir: outDir,
                     failOnCompileError: true,
-                    outFile: options.outFile
+                    outFile: options.outFile,
+                    rootDir: rootDir,
+                    close: false
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');
@@ -1467,7 +1516,9 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     outDir: outDir,
                     outFile: options.outFile,
-                    deleteDevChannel: false
+                    rootDir: rootDir,
+                    deleteDevChannel: false,
+                    close: false
                 });
             } catch (e) {
                 expect(spy.callCount).to.eql(1);
@@ -1497,7 +1548,9 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     outDir: outDir,
                     outFile: options.outFile,
-                    deleteDevChannel: false
+                    rootDir: rootDir,
+                    deleteDevChannel: false,
+                    close: false
                 });
             } catch (e) {
                 expect(spy.callCount).to.eql(2);
@@ -1528,7 +1581,9 @@ describe('RokuDeploy', () => {
                     host: '1.2.3.4',
                     password: 'password',
                     outDir: outDir,
-                    outFile: options.outFile
+                    outFile: options.outFile,
+                    rootDir: rootDir,
+                    close: false
                 });
             } catch (e) {
                 assert.ok('Exception was thrown as expected');

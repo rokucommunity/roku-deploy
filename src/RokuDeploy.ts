@@ -238,7 +238,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Publish a pre-existing packaged zip file to a remote Roku.
+     * Sideload a zip to a remote Roku. Either `zip` (path to a pre-built zip) or `rootDir` (directory
+     * to zip on-the-fly) must be provided. If neither are provided, we default to the current directory.
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
@@ -324,7 +325,6 @@ export class RokuDeploy {
             let response: HttpResponse;
             try {
                 try {
-                    console.log('calling once');
                     response = await this.doPostRequest(requestOptions);
                 } catch (replaceError: any) {
                     //fail if this is a compile error
