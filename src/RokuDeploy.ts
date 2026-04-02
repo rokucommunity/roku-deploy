@@ -854,7 +854,7 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            const userExt = path.extname(options.screenshotFile);
+            const userExt = ['.jpg', '.png'].includes(path.extname(options.screenshotFile).toLowerCase()) ? path.extname(options.screenshotFile) : undefined;
             if (userExt && userExt.toLowerCase() !== imageExt.toLowerCase()) {
                 console.warn(`Warning: Provided screenshot file extension "${userExt}" does not match the device's format "${imageExt}". The file was saved with "${userExt}".`);
             }
