@@ -98,6 +98,14 @@ describe('RokuDeploy', () => {
             });
             expect(outputPath).to.equal(path.join(path.resolve(outDir), 'roku-deploy.pkg'));
         });
+
+        it('should not double-add .pkg if outFile already ends in .pkg', () => {
+            let outputPath = rokuDeploy['getOutputPkgFilePath']({
+                outFile: 'roku-deploy.pkg',
+                outDir: outDir
+            });
+            expect(outputPath).to.equal(path.join(path.resolve(outDir), 'roku-deploy.pkg'));
+        });
     });
 
     describe('getOutputZipFilePath', () => {
