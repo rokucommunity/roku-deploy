@@ -487,7 +487,7 @@ export class RokuDeploy {
     }
 
     /**
-     * Sign a pre-existing package using Roku and return path to retrieve it
+     * Sign a pre-existing package using Roku and return path to it locally
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
@@ -984,7 +984,7 @@ export class RokuDeploy {
         let pkgFileName = options.outFile;
         if (pkgFileName.toLowerCase().endsWith('.zip')) {
             pkgFileName = pkgFileName.replace('.zip', '.pkg');
-        } else {
+        } else if (!pkgFileName.toLowerCase().endsWith('.pkg')) {
             pkgFileName += '.pkg';
         }
         let outFolderPath = path.resolve(options.outDir);
