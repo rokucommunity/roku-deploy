@@ -1908,7 +1908,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
 
-        it('should return created pkg a JSON', async () => {
+        it('should return created pkg from a JSON', async () => {
             let body = `var params = JSON.parse('{"messages":[{"text":"Success.","text_type":"text","type":"success"}],"metadata":{"dev_key":true,"voice_sdk":false},
                         "packages":[{"appType":"channel","fileType":"zip",
                         "pkgPath":"pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg"}]}')`;
