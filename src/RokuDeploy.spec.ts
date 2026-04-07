@@ -809,6 +809,25 @@ describe('RokuDeploy', () => {
             // whereas the old `${stagingDir}/${absoluteDest}` would produce a doubled path
             expect(copyPaths[0].dest).to.equal(absoluteDest);
         });
+
+        it('copies to stagingDir root when dest is undefined', async () => {
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').returns(Promise.resolve() as any);
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src as string, dest: dest as string });
+                return Promise.resolve();
+            });
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: undefined
+                }])
+            );
+
+            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+
+            expect(copyPaths[0].dest).to.equal(s`${stagingDir}`);
+        });
     });
 
     describe('zipPackage', () => {
