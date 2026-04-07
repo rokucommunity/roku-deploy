@@ -7,10 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.16.4](https://github.com/rokucommunity/roku-deploy/compare/3.16.3...v3.16.4) - 2026-04-07
-### Changed
- - Bump picomatch from 2.3.1 to 2.3.2 ([#242](https://github.com/rokucommunity/roku-deploy/pull/242))
 ### Fixed
- - Fix `zipFolder` bug that wasn't properly handling absolute stagingDir path ([#245](https://github.com/rokucommunity/roku-deploy/pull/245))
+ - Fix `zipFolder` bug that wasn't properly handling absolute `stagingDir` path ([#245](https://github.com/rokucommunity/roku-deploy/pull/245))
 
 
 
