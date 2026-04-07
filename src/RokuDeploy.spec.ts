@@ -761,10 +761,10 @@ describe('RokuDeploy', () => {
                 Promise.resolve([
                     {
                         src: s`${rootDir}/source/main.brs`,
-                        dest: '/source/main.brs'
+                        dest: 'source/main.brs'
                     }, {
                         src: s`${rootDir}/components/a/b/c/comp1.xml`,
-                        dest: '/components/a/b/c/comp1.xml'
+                        dest: 'components/a/b/c/comp1.xml'
                     }
                 ])
             );
@@ -785,6 +785,29 @@ describe('RokuDeploy', () => {
                     dest: s`${stagingDir}/components/a/b/c/comp1.xml`
                 }
             ]);
+        });
+
+        it('does not double-up the path when dest is absolute', async () => {
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').returns(Promise.resolve() as any);
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src as string, dest: dest as string });
+                return Promise.resolve();
+            });
+
+            const absoluteDest = s`${stagingDir}/source/main.brs`;
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: absoluteDest
+                }])
+            );
+
+            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+
+            // path.resolve(stagingDir, absoluteDest) returns absoluteDest unchanged,
+            // whereas the old `${stagingDir}/${absoluteDest}` would produce a doubled path
+            expect(copyPaths[0].dest).to.equal(absoluteDest);
         });
     });
 
@@ -3363,6 +3386,20 @@ describe('RokuDeploy', () => {
             expect(
                 rokuDeploy['computeFileDestPath'](s`${rootDir}/source/main.brs`, { src: s`source/main.brs` } as any, rootDir)
             ).to.eql(s`source/main.brs`);
+        });
+    });
+
+    describe('zipFolder absolute dest', () => {
+        it('does not create absolute-path entries in the zip when dest is absolute', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: s`${stagingDir}/source/main.brs`
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            const zipPaths = Object.keys(zip.files);
+            expect(zipPaths.every(p => !path.isAbsolute(p))).to.be.true;
         });
     });
 

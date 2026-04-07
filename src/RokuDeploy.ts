@@ -357,7 +357,9 @@ export class RokuDeploy {
         let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
-            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
+            let destFilePath = util.standardizePath(
+                path.resolve(stagingPath, fileObject.dest ?? '')
+            );
 
             //make sure the containing folder exists
             await this.fsExtra.ensureDir(path.dirname(destFilePath));
@@ -1354,7 +1356,7 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data as any, {
+                zip.file(path.relative(srcFolder, path.resolve(srcFolder, file.dest)).replace(/[\\/]/g, '/'), data as any, {
                     compression: compression
                 });
             });

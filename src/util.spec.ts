@@ -238,6 +238,40 @@ describe('util', () => {
             //shouldn't crash
             util['filterPaths']('*', [], '', 2);
         });
+
+        it('does not double-up the path when the negation pattern is absolute', () => {
+            const absoluteFile = s`${tempDir}/source/main.brs`;
+            const filesByIndex = [[absoluteFile]];
+            // pattern is an absolute negation like `!C:/tempDir/source/main.brs`
+            util['filterPaths'](`!${absoluteFile}`, filesByIndex, s`${tempDir}`, 0);
+            // file should be filtered out — if path was doubled it would never match and the file would remain
+            expect(filesByIndex[0]).to.eql([]);
+        });
+    });
+
+    describe('globAllByIndex absolute patterns', () => {
+        function writeFiles(filePaths: string[], cwd = tempDir) {
+            for (const filePath of filePaths) {
+                fsExtra.outputFileSync(path.resolve(cwd, filePath), '');
+            }
+        }
+
+        it('does not double-up path when pattern is absolute', async () => {
+            writeFiles(['source/main.brs']);
+            const absolutePattern = s`${tempDir}/source/main.brs`;
+            const results = await util.globAllByIndex([absolutePattern], tempDir);
+            expect(results[0]?.map(x => s(x))).to.eql([absolutePattern]);
+        });
+
+        it('correctly filters files when negation pattern is absolute', async () => {
+            writeFiles(['source/main.brs', 'source/lib.brs']);
+            const results = await util.globAllByIndex([
+                '**/*.brs',
+                `!${s`${tempDir}/source/main.brs`}`
+            ], tempDir);
+            // main.brs should be filtered out; lib.brs should remain
+            expect(results[0]?.map(x => s(x)).sort()).to.eql([s`${tempDir}/source/lib.brs`]);
+        });
     });
 
     describe('dnsLookup', () => {
