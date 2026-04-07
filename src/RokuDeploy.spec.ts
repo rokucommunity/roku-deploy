@@ -3389,6 +3389,44 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('zipFolder {src;dest} entries', () => {
+        it('places file at relative dest path', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: 'source/main.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/main.brs')).to.exist;
+        });
+
+        it('places file at redirected relative dest path', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: 'out/renamed.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('out/renamed.brs')).to.exist;
+            expect(zip.file('source/main.brs')).not.to.exist;
+        });
+
+        it('places file from outside srcFolder at specified dest', async () => {
+            const otherDir = s`${tempDir}/other`;
+            writeFiles(otherDir, ['lib.brs']);
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${otherDir}/lib.brs`,
+                dest: 'source/lib.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/lib.brs')).to.exist;
+        });
+    });
+
     describe('zipFolder absolute dest', () => {
         it('does not create absolute-path entries in the zip when dest is absolute', async () => {
             writeFiles(stagingDir, ['source/main.brs']);
