@@ -1999,13 +1999,36 @@ describe('RokuDeploy', () => {
         it('should return created pkg from SD card on success', async () => {
             mockDoPostRequest(fakePluginPackageResponse);
 
+            const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
             let pkgPath = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
-                manifestPath: s`${tempDir}/manifest`
+                manifestPath: s`${tempDir}/manifest`,
+                outDir: outDir
             });
-            expect(pkgPath).to.equal('pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
+            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
+        });
+
+        it('should return created pkg from a JSON', async () => {
+            let body = `var params = JSON.parse('{"messages":[{"text":"Success.","text_type":"text","type":"success"}],"metadata":{"dev_key":true,"voice_sdk":false},
+                        "packages":[{"appType":"channel","fileType":"zip",
+                        "pkgPath":"pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg"}]}')`;
+            mockDoPostRequest(body);
+    
+            const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
+            let pkgPath = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                manifestPath: s`${tempDir}/manifest`,
+                outDir: outDir
+            });
+            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg');
         });
 
         it('should return our fallback error if neither error or package link was detected', async () => {
