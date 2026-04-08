@@ -266,7 +266,7 @@ export class RokuDeploy {
         // If rootDir was provided (and no zip), zip it first then sideload
         if (!options.zip && options.rootDir) {
             await this.zip({ dir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
-            options.retainDeploymentArchive = false;
+            options.retainDeploymentArchive ??= false;
         }
 
         //make sure the outDir exists

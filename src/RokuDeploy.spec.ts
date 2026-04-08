@@ -870,6 +870,7 @@ describe('RokuDeploy', () => {
                 ...options,
                 host: '0.0.0.0',
                 password: 'password',
+                close: false,
                 packageUploadOverrides: {
                     route: 'alt_path'
                 }
@@ -884,6 +885,7 @@ describe('RokuDeploy', () => {
                 host: '1.2.3.4',
                 password: 'password',
                 remoteDebug: true,
+                close: false,
                 packageUploadOverrides: {
                     formData: {
                         remotedebug: null,
@@ -1591,6 +1593,45 @@ describe('RokuDeploy', () => {
                 return;
             }
             assert.fail('Should not have succeeded');
+        });
+
+        it('succeeds when using a pre-built zip', async () => {
+            mockDoPostRequest();
+            const zipPath = `${outDir}/myapp.zip`;
+            fsExtra.outputFileSync(zipPath, 'zip contents');
+
+            const result = await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                zip: zipPath,
+                close: false
+            });
+            expect(result.message).to.equal('Successful sideload');
+        });
+
+        it('calls closeChannel before sideloading by default', async () => {
+            mockDoPostRequest();
+            const closeChannelStub = sinon.stub(rokuDeploy, 'closeChannel').resolves();
+            const zipPath = `${outDir}/myapp.zip`;
+            fsExtra.outputFileSync(zipPath, 'zip contents');
+
+            await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                zip: zipPath
+            });
+            expect(closeChannelStub.callCount).to.eql(1);
+        });
+
+        it('fails when no password is provided', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: undefined,
+                    outDir: outDir,
+                    outFile: options.outFile
+                });
+            }, 'Missing required option: password');
         });
     });
 

@@ -105,7 +105,7 @@ Lastly, the default files array has changed. node modules and static analysis fi
 ## CLI Usage
 
 ### Sideload a project to your Roku device
-Sideload a .zip package or directory to a roku device. By default, the channel is closed before sideloading. Use `--no-close` to skip.
+Sideload a .zip package or directory to a roku device. By default, the channel is closed before sideloading. Use `--no-close` to skip this.
 ```shell
 # Sideload a zip file
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
