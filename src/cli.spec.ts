@@ -40,14 +40,14 @@ describe('cli', () => {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
         expect(() => {
-            execSync(`node ${cwd}/dist/cli.js stage --stagingDir ${stagingDir} --rootDir ${rootDir}`);
+            execSync(`node ${cwd}/dist/cli.js stage --out ${stagingDir} --rootDir ${rootDir}`);
         }).to.not.throw();
     });
 
     it('Successfully copies rootDir folder to staging folder', () => {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
-        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --stagingDir ${stagingDir}`);
+        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
@@ -80,7 +80,7 @@ describe('cli', () => {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`,
+            pkg: `${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
             rootDir: rootDir,
             devId: 'abcde'
@@ -91,7 +91,7 @@ describe('cli', () => {
         ).to.eql({
             host: '1.2.3.4',
             password: '5536',
-            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`,
+            pkg: `${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
             rootDir: rootDir,
             devId: 'abcde'
