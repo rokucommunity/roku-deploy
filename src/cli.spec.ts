@@ -89,6 +89,7 @@ describe('cli', () => {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
             pkg: `${tempDir}/testSignedPackage.pkg`,
@@ -114,6 +115,7 @@ describe('cli', () => {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
             signingPassword: undefined,
@@ -154,6 +156,7 @@ describe('cli', () => {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
