@@ -251,7 +251,7 @@ export class RokuDeploy {
             options.zip = path.resolve(options.cwd ?? process.cwd(), options.zip);
             options.outDir = path.dirname(options.zip);
             options.outFile = path.basename(options.zip);
-            options.retainDeploymentArchive = true;
+            options.retainDeploymentArchive ??= true;
         } else if (options.rootDir) {
             options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
         }
