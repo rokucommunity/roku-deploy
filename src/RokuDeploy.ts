@@ -10,7 +10,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
-import { logger } from '@rokucommunity/logger';
+import { logger, type LogLevel } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
@@ -217,7 +217,7 @@ export class RokuDeploy {
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
      */
-    private async sendKeyEvent(options: SendKeyEventOptions) {
+    private async sendKeyEvent(options: Partial<SendKeyEventOptions>) {
         logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         let filledOptions = this.getOptions(options);
@@ -1237,18 +1237,7 @@ export interface HttpResponse {
     body: any;
 }
 
-export interface CaptureScreenshotOptions {
-    /**
-     * The IP address or hostname of the target Roku device.
-     * @example '192.168.1.21'
-     */
-    host: string;
-
-    /**
-     * The password for logging in to the developer portal on the target Roku device
-     */
-    password: string;
-
+export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
      * A full path to the folder where the screenshots should be saved.
      * Will use the OS temp directory by default
@@ -1283,22 +1272,22 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
     key: RokuKey | string;
 }
 
-export interface KeyUpOptions extends SendKeyEventOptions {
+export interface KeyUpOptions extends Partial<SendKeyEventOptions> {
     action?: 'keyup';
     key: RokuKey;
 }
 
-export interface KeyDownOptions extends SendKeyEventOptions {
+export interface KeyDownOptions extends Partial<SendKeyEventOptions> {
     action?: 'keydown';
     key: RokuKey;
 }
 
-export interface KeyPressOptions extends SendKeyEventOptions {
+export interface KeyPressOptions extends Partial<SendKeyEventOptions> {
     action?: 'keypress';
     key: RokuKey;
 }
 
-export interface SendTextOptions extends SendKeyEventOptions {
+export interface SendTextOptions extends Partial<SendKeyEventOptions> {
     action?: 'keypress';
     text: string;
 }
@@ -1356,6 +1345,7 @@ export interface BaseRequestOptions {
     password: string;
     packagePort?: number;
     timeout?: number;
+    logLevel?: LogLevel;
 }
 
 export interface BaseEcpOptions {
@@ -1364,14 +1354,9 @@ export interface BaseEcpOptions {
     timeout?: number;
 }
 
-export interface ConvertToSquashfsOptions {
-    host: string;
-    password: string;
-}
+export type ConvertToSquashfsOptions = BaseRequestOptions;
 
-export interface RekeyDeviceOptions {
-    host: string;
-    password: string;
+export interface RekeyDeviceOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
     rootDir?: string;
@@ -1379,9 +1364,7 @@ export interface RekeyDeviceOptions {
     cwd?: string;
 }
 
-export interface CreateSignedPackageOptions {
-    host: string;
-    password: string;
+export interface CreateSignedPackageOptions extends BaseRequestOptions {
     signingPassword: string;
     appTitle?: string;
     appVersion?: string;
@@ -1394,10 +1377,7 @@ export interface CreateSignedPackageOptions {
     cwd?: string;
 }
 
-export interface DeleteDevChannelOptions {
-    host: string;
-    password: string;
-}
+export type DeleteDevChannelOptions = BaseRequestOptions;
 
 export interface GetOutputZipFilePathOptions {
     outFile?: string;
@@ -1405,9 +1385,7 @@ export interface GetOutputZipFilePathOptions {
     cwd?: string;
 }
 
-export interface DeployOptions {
-    host: string;
-    password: string;
+export interface DeployOptions extends BaseRequestOptions {
     files?: FileEntry[];
     rootDir?: string;
     stagingDir?: string;
