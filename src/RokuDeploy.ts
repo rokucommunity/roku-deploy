@@ -1071,7 +1071,7 @@ export class RokuDeploy {
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         try {
             const deviceInfo = await this.getDeviceInfo(options);
-            return deviceInfo.ecpSettingMode;
+            return deviceInfo['ecp-setting-mode'];
         } catch (e) {
             if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
                 return 'disabled';
