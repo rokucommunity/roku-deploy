@@ -484,7 +484,6 @@ describe('util', () => {
             try {
                 util.getOptionsFromJson();
             } catch (e) {
-                console.log(e);
                 ex = e;
             }
             expect(ex).to.exist;
