@@ -18,11 +18,11 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 
 void yargs
 
-    .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
+    .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
-            .option('outZip', { type: 'string', description: 'The output path to the zip file.', demandOption: false })
+            .option('outZip', { type: 'string', description: 'The output path to the zip file that is created when sideloading rootDir.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
@@ -33,6 +33,8 @@ void yargs
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the generated zip be retained after sideloading', demandOption: false })
+            .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new SideloadCommand().run(args);

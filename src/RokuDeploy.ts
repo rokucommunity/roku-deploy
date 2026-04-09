@@ -254,6 +254,10 @@ export class RokuDeploy {
             options.retainDeploymentArchive ??= true;
         } else if (options.rootDir) {
             options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
+            if (options.outZip) {
+                options.outDir = path.dirname(options.outZip);
+                options.outFile = path.basename(options.outZip);
+            }
         }
 
         options = this.getOptions(options) as any;
@@ -1263,19 +1267,7 @@ export interface CaptureScreenshotOptions {
     cwd?: string;
 }
 
-export interface GetDeviceInfoOptions {
-    /**
-     * The hostname or IP address to use for the device-info URL
-     */
-    host: string;
-    /**
-     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
-     */
-    ecpPort?: number;
-    /**
-     * The number of milliseconds at which point this request should timeout and return a rejected promise
-     */
-    timeout?: number;
+export interface GetDeviceInfoOptions extends BaseEcpOptions {
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
      * @default false
@@ -1285,13 +1277,10 @@ export interface GetDeviceInfoOptions {
 
 export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
 
-export interface SendKeyEventOptions {
+export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
-    host: string;
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RokuKey | string;
-    ecpPort?: number;
-    timeout?: number;
 }
 
 export interface KeyUpOptions extends SendKeyEventOptions {
@@ -1314,12 +1303,7 @@ export interface SendTextOptions extends SendKeyEventOptions {
     text: string;
 }
 
-export interface CloseChannelOptions {
-    host: string;
-    ecpPort?: number;
-    timeout?: number;
-
-}
+export type CloseChannelOptions = BaseEcpOptions;
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
@@ -1334,10 +1318,8 @@ export interface ZipOptions {
     cwd?: string;
 }
 
-export interface SideloadOptions {
+export interface SideloadOptions extends BaseRequestOptions, BaseEcpOptions {
     appType?: 'channel' | 'dcl';
-    host: string;
-    password: string;
     /**
      * The path to an existing zip file to sideload. Takes precedence over `rootDir`.
      */
@@ -1357,9 +1339,8 @@ export interface SideloadOptions {
     retainDeploymentArchive?: boolean;
     outDir?: string;
     outFile?: string;
+    outZip?: string;
     deleteDevChannel?: boolean;
-    ecpPort?: number;
-    timeout?: number;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 }
@@ -1371,10 +1352,16 @@ export interface PackageUploadOverridesOptions {
 
 export interface BaseRequestOptions {
     host: string;
-    packagePort?: number;
-    timeout?: number;
     username?: string;
     password: string;
+    packagePort?: number;
+    timeout?: number;
+}
+
+export interface BaseEcpOptions {
+    host: string;
+    ecpPort?: number;
+    timeout?: number;
 }
 
 export interface ConvertToSquashfsOptions {
@@ -1436,17 +1423,7 @@ export interface GetOutputPkgFilePathOptions {
     cwd?: string;
 }
 
-export interface GetDevIdOptions {
-    host: string;
-    /**
-     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
-     */
-    ecpPort?: number;
-    /**
-     * The number of milliseconds at which point this request should timeout and return a rejected promise
-     */
-    timeout?: number;
-}
+export type GetDevIdOptions = BaseEcpOptions;
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 export const rokuDeploy = new RokuDeploy();
