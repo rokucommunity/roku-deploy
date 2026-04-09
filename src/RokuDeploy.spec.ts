@@ -971,7 +971,7 @@ describe('RokuDeploy', () => {
         });
 
         it('fails when the zip file is missing', async () => {
-            const missingZip = `${outDir}/fileThatDoesNotExist.zip`;
+            const missingZip = s`${outDir}/fileThatDoesNotExist.zip`;
             await expectThrowsAsync(async () => {
                 await rokuDeploy.sideload({
                     host: '1.2.3.4',
@@ -2017,7 +2017,7 @@ describe('RokuDeploy', () => {
                         "packages":[{"appType":"channel","fileType":"zip",
                         "pkgPath":"pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg"}]}')`;
             mockDoPostRequest(body);
-    
+
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let pkgPath = await rokuDeploy.createSignedPackage({

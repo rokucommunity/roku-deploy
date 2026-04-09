@@ -14,5 +14,6 @@
         "**/bower_components": true,
         "**/*.code-search": true,
         "**/dist": true
-    }
+    },
+    "js/ts.tsdk.path": "node_modules\\typescript\\lib",
 }

@@ -11,6 +11,7 @@ import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
+import { standardizePath as s } from './util';
 
 const sinon = createSandbox();
 
@@ -92,7 +93,7 @@ describe('cli', () => {
             cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
-            pkg: `${tempDir}/testSignedPackage.pkg`,
+            pkg: s`${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
             rootDir: rootDir,
             devId: 'abcde'

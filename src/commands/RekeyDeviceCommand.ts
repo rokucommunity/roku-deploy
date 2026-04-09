@@ -10,7 +10,9 @@ export class RekeyDeviceCommand {
             ...args
         };
         if (args.pkg) {
-            options.pkg = path.resolve(args.cwd, args.pkg);
+            options.pkg = util.standardizePath(
+                path.resolve(args.cwd, args.pkg)
+            );
         }
         await rokuDeploy.rekeyDevice(options);
     }

@@ -967,7 +967,9 @@ export class RokuDeploy {
         if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
-        let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
+        let outZipFilePath = util.standardizePath(
+            path.resolve(options.cwd, options.outDir, zipFileName)
+        );
         logger.debug('Output zip file path:', outZipFilePath);
         return outZipFilePath;
     }
@@ -985,7 +987,9 @@ export class RokuDeploy {
         } else if (!pkgFileName.toLowerCase().endsWith('.pkg')) {
             pkgFileName += '.pkg';
         }
-        let outFolderPath = path.resolve(options.outDir);
+        let outFolderPath = util.standardizePath(
+            path.resolve(options.outDir)
+        );
 
         let outPkgFilePath = path.join(outFolderPath, pkgFileName);
         logger.debug('Output pkg file path:', outPkgFilePath);
