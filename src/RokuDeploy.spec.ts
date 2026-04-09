@@ -662,7 +662,7 @@ describe('RokuDeploy', () => {
 
     describe('getEcpNetworkAccessMode', () => {
         it('returns ecpSettingMode from device info', async () => {
-            sinon.stub(rokuDeploy, 'getDeviceInfo').resolves({ ecpSettingMode: 'enabled' });
+            sinon.stub(rokuDeploy, 'getDeviceInfo').resolves({ 'ecp-setting-mode': 'enabled' } as any);
             const result = await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
             expect(result).to.equal('enabled');
         });
