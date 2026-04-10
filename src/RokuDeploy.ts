@@ -239,7 +239,7 @@ export class RokuDeploy {
                     srcPath = util.standardizePath(srcPath);
 
                     let dest = this.computeFileDestPath(srcPath, entry, rootDir);
-                    let destAbsolute = path.resolve(rootDir, dest);
+                    let destAbsolute = util.standardizePath(path.resolve(rootDir, dest));
 
                     //the last file with this `dest` will win, so just replace any existing entry with this one.
                     result.set(dest, {
