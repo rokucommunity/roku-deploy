@@ -77,7 +77,7 @@ export class RokuDeploy {
     private ensureFilesArrayIsResolved(files: FileEntry[]) {
         //ensure the is no glob magic in any of the patterns
         for (let fileEntry of files as StandardizedFileEntry[]) {
-            if (!path.isAbsolute(fileEntry?.src) || !path.isAbsolute(fileEntry?.dest)) {
+            if (!fileEntry || typeof fileEntry.src !== 'string' || !path.isAbsolute(fileEntry.src) || typeof fileEntry.dest !== 'string' || !path.isAbsolute(fileEntry.dest)) {
                 throw new Error('When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths');
             }
         }

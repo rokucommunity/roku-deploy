@@ -3737,6 +3737,14 @@ describe('RokuDeploy', () => {
     });
 
     describe('prepublishToStaging', () => {
+        it('throws when rootDir is empty after getOptions', async () => {
+            sinon.stub(rokuDeploy, 'getOptions').returns({ rootDir: '', stagingDir: stagingDir } as any);
+            await expectThrowsAsync(
+                rokuDeploy.prepublishToStaging({}),
+                'rootDir is required'
+            );
+        });
+
         it('is resilient to file system errors', async () => {
             let copy = rokuDeploy.fsExtra.copy;
             let count = 0;
@@ -3844,6 +3852,30 @@ describe('RokuDeploy', () => {
                             src: s`${rootDir}/source/main.brs`,
                             dest: 'source/main.brs'
                         }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry is null', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [null]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry has a missing dest', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{ src: s`${rootDir}/source/main.brs`, dest: undefined }]
                     } as any),
                     'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
                 );
