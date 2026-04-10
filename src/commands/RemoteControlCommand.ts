@@ -9,10 +9,7 @@ export class RemoteControlCommand {
             ...args
         };
 
-        if (!options.host) {
-            console.error('Host is required and neither supplied via --host or in your rokudeploy.json file');
-            return;
-        }
+        rokuDeploy.checkRequiredOptions(options, ['host']);
 
         readline.emitKeypressEvents(process.stdin);
         process.stdin.setRawMode(true);

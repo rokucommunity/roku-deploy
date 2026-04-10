@@ -203,6 +203,7 @@ export class RokuDeploy {
     }
 
     public async sendText(options: SendTextOptions) {
+        this.checkRequiredOptions(options, ['host', 'text']);
         const chars = options.text.split('');
         for (const char of chars) {
             await this.sendKeyEvent({
