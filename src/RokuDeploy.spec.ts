@@ -47,6 +47,8 @@ describe('RokuDeploy', () => {
         fsExtra.ensureDirSync(stagingDir);
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+        //create the default rekeySignedPackage so createReadStream doesn't leave an open stream to a missing file
+        fsExtra.outputFileSync(`${tempDir}/testSignedPackage.pkg`, '');
 
         writeStreamDeferred = q.defer<WriteStream>() as any;
         writeStreamPromise = writeStreamDeferred.promise as any;
