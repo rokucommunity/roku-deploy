@@ -915,7 +915,7 @@ describe('RokuDeploy', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
         });
 
-        it('deletes generated archive by default when using rootDir', async () => {
+        it('deletes the generated archive by default when using rootDir', async () => {
             const zipPath = `${outDir}/${options.outFile}`;
 
             mockDoPostRequest();
