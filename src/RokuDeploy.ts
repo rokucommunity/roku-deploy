@@ -357,9 +357,16 @@ export class RokuDeploy {
         let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
-            let destFilePath = util.standardizePath(
-                path.resolve(stagingPath, fileObject.dest ?? '')
-            );
+            let dest = fileObject.dest ?? '';
+            let destFilePath: string;
+            if (path.isAbsolute(dest) && util.isParentOfPath(stagingPath, dest)) {
+                //dest is already an absolute path under stagingPath — use as-is
+                destFilePath = util.standardizePath(dest);
+            } else {
+                //strip leading slashes so path.join doesn't treat dest as absolute
+                dest = dest.replace(/^[\/\\]+/, '');
+                destFilePath = util.standardizePath(path.join(stagingPath, dest));
+            }
 
             //make sure the containing folder exists
             await this.fsExtra.ensureDir(path.dirname(destFilePath));
@@ -1356,7 +1363,19 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(path.relative(srcFolder, path.resolve(srcFolder, file.dest)).replace(/[\\/]/g, '/'), data as any, {
+                let destForZip: string;
+                if (path.isAbsolute(file.dest)) {
+                    if (util.isParentOfPath(srcFolder, file.dest)) {
+                        //absolute path under srcFolder — make it relative
+                        destForZip = path.relative(srcFolder, file.dest);
+                    } else {
+                        //absolute path not under srcFolder — strip leading slashes
+                        destForZip = file.dest.replace(/^[\/\\]+/, '');
+                    }
+                } else {
+                    destForZip = file.dest;
+                }
+                zip.file(destForZip.replace(/[\\/]/g, '/'), data as any, {
                     compression: compression
                 });
             });

@@ -828,6 +828,41 @@ describe('RokuDeploy', () => {
 
             expect(copyPaths[0].dest).to.equal(s`${stagingDir}`);
         });
+
+        it('handles dest with leading slash without escaping staging dir', async () => {
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').returns(Promise.resolve() as any);
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src as string, dest: dest as string });
+                return Promise.resolve();
+            });
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: '/source/main.brs'
+                }])
+            );
+
+            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+
+            expect(copyPaths[0].dest).to.equal(s`${stagingDir}/source/main.brs`);
+        });
+
+        it('full pipeline with leading-slash dest copies to staging correctly', async () => {
+            writeFiles(rootDir, ['source/main.brs', 'components/comp.xml']);
+
+            await rokuDeploy['copyToStaging'](
+                [
+                    { src: 'source/**/*', dest: '/source' },
+                    { src: 'components/**/*', dest: '/components' }
+                ],
+                stagingDir,
+                rootDir
+            );
+
+            expectPathExists(s`${stagingDir}/source/main.brs`);
+            expectPathExists(s`${stagingDir}/components/comp.xml`);
+        });
     });
 
     describe('zipPackage', () => {
@@ -3455,6 +3490,50 @@ describe('RokuDeploy', () => {
                 dest: s`${stagingDir}/source/main.brs`
             }]);
             const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            const zipPaths = Object.keys(zip.files);
+            expect(zipPaths.every(p => !path.isAbsolute(p))).to.be.true;
+        });
+
+        it('handles dest with leading slash producing relative zip entries', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: '/source/main.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/main.brs')).to.exist;
+            const zipPaths = Object.keys(zip.files);
+            expect(zipPaths.every(p => !path.isAbsolute(p))).to.be.true;
+        });
+
+        it('makes absolute dest under srcFolder relative in zip entry', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            const absoluteDest = s`${stagingDir}/source/main.brs`;
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([{
+                    src: s`${stagingDir}/source/main.brs`,
+                    dest: absoluteDest
+                }])
+            );
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/main.brs')).to.exist;
+        });
+
+        it('strips leading slash from absolute dest not under srcFolder in zip entry', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            sinon.stub(rokuDeploy, 'getFilePaths').returns(
+                Promise.resolve([{
+                    src: s`${stagingDir}/source/main.brs`,
+                    dest: '/source/main.brs'
+                }])
+            );
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/main.brs')).to.exist;
             const zipPaths = Object.keys(zip.files);
             expect(zipPaths.every(p => !path.isAbsolute(p))).to.be.true;
         });
