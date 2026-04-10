@@ -898,12 +898,29 @@ describe('RokuDeploy', () => {
             }).and.to.not.haveOwnProperty('remotedebug');
         });
 
-        it('does not delete the archive by default', async () => {
-            let zipPath = `${outDir}/${options.outFile}`;
+        it('does not delete a pre-built zip by default', async () => {
+            const zipPath = `${outDir}/${options.outFile}`;
 
             mockDoPostRequest();
 
             //the file should exist
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                zip: zipPath,
+                close: false
+            });
+            //the file should still exist (pre-built zips are retained by default)
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+        });
+
+        it('deletes generated archive by default when using rootDir', async () => {
+            const zipPath = `${outDir}/${options.outFile}`;
+
+            mockDoPostRequest();
+
+            //the file should exist (created in beforeEach)
             expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
             await rokuDeploy.sideload({
                 host: '1.2.3.4',
@@ -913,8 +930,8 @@ describe('RokuDeploy', () => {
                 rootDir: rootDir,
                 close: false
             });
-            //the file should still exist
-            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
+            //the generated archive should be deleted by default
+            expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
         });
 
         it('deletes the archive when configured', async () => {
@@ -1621,6 +1638,36 @@ describe('RokuDeploy', () => {
                 zip: zipPath
             });
             expect(closeChannelStub.callCount).to.eql(1);
+        });
+
+        it('skips closeChannel when close is false', async () => {
+            mockDoPostRequest();
+            const closeChannelStub = sinon.stub(rokuDeploy, 'closeChannel').resolves();
+            const zipPath = `${outDir}/myapp.zip`;
+            fsExtra.outputFileSync(zipPath, 'zip contents');
+
+            await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                zip: zipPath,
+                close: false
+            });
+            expect(closeChannelStub.callCount).to.eql(0);
+        });
+
+        it('triggers zip when rootDir is provided', async () => {
+            mockDoPostRequest();
+            const zipStub = sinon.stub(rokuDeploy, 'zip').resolves();
+            sinon.stub(rokuDeploy, 'closeChannel').resolves();
+
+            await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                rootDir: rootDir,
+                outDir: outDir,
+                outFile: options.outFile
+            });
+            expect(zipStub.callCount).to.eql(1);
         });
 
         it('fails when no password is provided', async () => {

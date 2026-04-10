@@ -255,6 +255,8 @@ export class RokuDeploy {
             options.retainDeploymentArchive ??= true;
         } else if (options.rootDir) {
             options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
+            // Generated zips are temporary, so default to deleting them after sideload
+            options.retainDeploymentArchive ??= false;
             if (options.outZip) {
                 options.outDir = path.dirname(options.outZip);
                 options.outFile = path.basename(options.outZip);
@@ -271,7 +273,6 @@ export class RokuDeploy {
         // If rootDir was provided (and no zip), zip it first then sideload
         if (!options.zip && options.rootDir) {
             await this.zip({ dir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
-            options.retainDeploymentArchive ??= false;
         }
 
         //make sure the outDir exists
@@ -1371,6 +1372,7 @@ export interface CreateSignedPackageOptions extends BaseRequestOptions {
     appVersion?: string;
     manifestPath?: string;
     outDir?: string;
+    outFile?: string;
     /**
      * If specified, signing will fail if the device's devId is different than this value
      */
