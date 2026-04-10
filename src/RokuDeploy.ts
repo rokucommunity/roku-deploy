@@ -211,12 +211,19 @@ export class RokuDeploy {
     * @param files
     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
     * @param asAbsolute - if true, all returned file paths will be absolute. If false, all returned dest paths will be relative (default: false)
+    * @param stagingDir - the absolute path to the staging dir, used for computing absolute dest paths if `asAbsolute` is true
     */
-    public async getFilePaths(files: FileEntry[], rootDir: string, asAbsolute = false): Promise<StandardizedFileEntry[]> {
+    public async getFilePaths(files: FileEntry[], rootDir: string, asAbsolute = false, stagingDir?: string): Promise<StandardizedFileEntry[]> {
+        const options = this.getOptions({
+            rootDir: rootDir,
+            stagingDir: stagingDir
+        });
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
-            rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
+            rootDir = options.rootDir;
         }
+        stagingDir = options.stagingDir;
+
         const entries = this.normalizeFilesArray(files);
         const srcPathsByIndex = await util.globAllByIndex(
             entries.map(x => {
@@ -239,12 +246,13 @@ export class RokuDeploy {
                     srcPath = util.standardizePath(srcPath);
 
                     let dest = this.computeFileDestPath(srcPath, entry, rootDir);
-                    let destAbsolute = util.standardizePath(path.resolve(rootDir, dest));
 
                     //the last file with this `dest` will win, so just replace any existing entry with this one.
                     result.set(dest, {
                         src: srcPath,
-                        dest: asAbsolute ? destAbsolute : dest
+                        dest: asAbsolute
+                            ? util.standardizePath(path.resolve(stagingDir, dest))
+                            : dest
                     });
                 }
             }

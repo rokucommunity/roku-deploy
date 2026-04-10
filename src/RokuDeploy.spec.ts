@@ -3386,10 +3386,10 @@ describe('RokuDeploy', () => {
             });
 
             it('returns absolute dest paths when asAbsolute is true', async () => {
-                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, true);
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, true, stagingDir);
                 expect(paths).to.eql([{
                     src: s`${rootDir}/source/main.brs`,
-                    dest: s`${rootDir}/source/main.brs`
+                    dest: s`${stagingDir}/source/main.brs`
                 }]);
             });
 
@@ -3401,26 +3401,26 @@ describe('RokuDeploy', () => {
                 }]);
             });
 
-            it('resolves absolute dest against rootDir for glob patterns', async () => {
-                const paths = (await rokuDeploy.getFilePaths(['source/**/*'], rootDir, true))
+            it('resolves absolute dest against stagingDir for glob patterns', async () => {
+                const paths = (await rokuDeploy.getFilePaths(['source/**/*'], rootDir, true, stagingDir))
                     .sort((a, b) => a.src.localeCompare(b.src));
                 expect(paths).to.eql([{
                     src: s`${rootDir}/source/lib.brs`,
-                    dest: s`${rootDir}/source/lib.brs`
+                    dest: s`${stagingDir}/source/lib.brs`
                 }, {
                     src: s`${rootDir}/source/main.brs`,
-                    dest: s`${rootDir}/source/main.brs`
+                    dest: s`${stagingDir}/source/main.brs`
                 }]);
             });
 
-            it('resolves absolute dest against rootDir for {src;dest} with custom dest', async () => {
+            it('resolves absolute dest against stagingDir for {src;dest} with custom dest', async () => {
                 const paths = await rokuDeploy.getFilePaths([{
                     src: 'source/main.brs',
                     dest: 'renamed/main.brs'
-                }], rootDir, true);
+                }], rootDir, true, stagingDir);
                 expect(paths).to.eql([{
                     src: s`${rootDir}/source/main.brs`,
-                    dest: s`${rootDir}/renamed/main.brs`
+                    dest: s`${stagingDir}/renamed/main.brs`
                 }]);
             });
 
@@ -3429,10 +3429,10 @@ describe('RokuDeploy', () => {
                 const paths = await rokuDeploy.getFilePaths([{
                     src: `${otherProjectDir}/source/thirdPartyLib.brs`,
                     dest: 'lib/thirdPartyLib.brs'
-                }], rootDir, true);
+                }], rootDir, true, stagingDir);
                 expect(paths).to.eql([{
                     src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
-                    dest: s`${rootDir}/lib/thirdPartyLib.brs`
+                    dest: s`${stagingDir}/lib/thirdPartyLib.brs`
                 }]);
             });
 
@@ -3443,10 +3443,10 @@ describe('RokuDeploy', () => {
                 }, {
                     src: `${rootDir}/source/main.brs`,
                     dest: 'comp.brs'
-                }], rootDir, true);
+                }], rootDir, true, stagingDir);
                 expect(paths).to.be.lengthOf(1);
                 expect(paths[0].src).to.equal(s`${rootDir}/source/main.brs`);
-                expect(paths[0].dest).to.equal(s`${rootDir}/comp.brs`);
+                expect(paths[0].dest).to.equal(s`${stagingDir}/comp.brs`);
             });
         });
     });
@@ -3869,6 +3869,104 @@ describe('RokuDeploy', () => {
                     }),
                     `rootDir does not exist at "${missingRootDir}"`
                 );
+            });
+        });
+
+        describe('absolute src+dest file list (end-to-end)', () => {
+            it('copies multiple files to correct locations in stagingDir', async () => {
+                writeFiles(rootDir, [
+                    'source/main.brs',
+                    'components/Widget.xml',
+                    'components/Widget.brs'
+                ]);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${rootDir}/components/Widget.xml`, dest: s`${stagingDir}/components/Widget.xml` },
+                        { src: s`${rootDir}/components/Widget.brs`, dest: s`${stagingDir}/components/Widget.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/components/Widget.xml`);
+                expectPathExists(s`${stagingDir}/components/Widget.brs`);
+            });
+
+            it('copies file to a remapped dest path', async () => {
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/renamed/entry.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/renamed/entry.brs`);
+                expectPathNotExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('copies files from outside rootDir', async () => {
+                const externalDir = s`${tempDir}/externalLib`;
+                writeFiles(externalDir, ['source/thirdParty.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${externalDir}/source/thirdParty.brs`, dest: s`${stagingDir}/source/thirdParty.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/source/thirdParty.brs`);
+            });
+
+            it('last entry wins when two files map to the same dest', async () => {
+                writeFiles(rootDir, ['source/main.brs', 'source/override.brs']);
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, 'original');
+                fsExtra.outputFileSync(`${rootDir}/source/override.brs`, 'override');
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/entry.brs` },
+                        { src: s`${rootDir}/source/override.brs`, dest: s`${stagingDir}/source/entry.brs` }
+                    ]
+                } as any);
+
+                // both copies run (copyToStaging doesn't deduplicate), last write wins on disk
+                expectPathExists(s`${stagingDir}/source/entry.brs`);
+                expect(fsExtra.readFileSync(s`${stagingDir}/source/entry.brs`, 'utf8')).to.equal('override');
+            });
+
+            it('clears stagingDir before copying', async () => {
+                // pre-populate stagingDir with a stale file
+                writeFiles(stagingDir, ['stale/old.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` }
+                    ]
+                } as any);
+
+                expectPathNotExists(s`${stagingDir}/stale/old.brs`);
+                expectPathExists(s`${stagingDir}/source/main.brs`);
             });
         });
     });
