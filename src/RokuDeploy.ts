@@ -37,16 +37,51 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    public async prepublishToStaging(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async prepublishToStaging(options: RokuDeployOptions & { resolveFilesArray?: boolean }) {
+        options = this.getOptions(options) as any;
+        options.resolveFilesArray ??= true;
+
+        if (!options.rootDir) {
+            throw new Error('rootDir is required');
+        }
+        if (!await this.fsExtra.pathExists(options.rootDir)) {
+            throw new Error(`rootDir does not exist at "${options.rootDir}"`);
+        }
 
         //clean the staging directory
-        await this.fsExtra.remove(options.stagingDir);
+        await this.fsExtra.emptyDir(options.stagingDir);
 
-        //make sure the staging folder exists
-        await this.fsExtra.ensureDir(options.stagingDir);
-        await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
+        let fileObjects: StandardizedFileEntry[];
+        //if we are supposed to resolve the files array, do it
+        if (options.resolveFilesArray) {
+            fileObjects = await this.getFilePaths(options.files, options.rootDir);
+
+            //do not resolve the files array. (user likely build the list themselves earlier and wants to skip re-globbing the whole list)
+        } else {
+            this.ensureFilesArrayIsResolved(options.files);
+            fileObjects = options.files as StandardizedFileEntry[];
+        }
+
+        await this.copyToStaging(fileObjects, options.stagingDir);
         return options.stagingDir;
+    }
+
+    /**
+     * Ensures that all entries in the files array are in the form of {src:string, dest:string}.
+     *
+     * Assumes all src and dest entries are absolute paths, but may add additional checks or relax this in the future.
+     *
+     * Will throw an exception on the first occurance that was not in the correct format
+     * @param files
+     */
+    private ensureFilesArrayIsResolved(files: FileEntry[]) {
+        //ensure the is no glob magic in any of the patterns
+        for (let fileEntry of files as StandardizedFileEntry[]) {
+            if (!fileEntry || typeof fileEntry.src !== 'string' || !path.isAbsolute(fileEntry.src) || typeof fileEntry.dest !== 'string' || !path.isAbsolute(fileEntry.dest)) {
+                throw new Error('When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths');
+            }
+        }
+        return true;
     }
 
     /**
@@ -175,12 +210,20 @@ export class RokuDeploy {
     * Get all file paths for the specified options
     * @param files
     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
+    * @param asAbsolute - if true, all returned file paths will be absolute. If false, all returned dest paths will be relative (default: false)
+    * @param stagingDir - the absolute path to the staging dir, used for computing absolute dest paths if `asAbsolute` is true
     */
-    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
+    public async getFilePaths(files: FileEntry[], rootDir: string, asAbsolute = false, stagingDir?: string): Promise<StandardizedFileEntry[]> {
+        const options = this.getOptions({
+            rootDir: rootDir,
+            stagingDir: stagingDir
+        });
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
-            rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
+            rootDir = options.rootDir;
         }
+        stagingDir = options.stagingDir;
+
         const entries = this.normalizeFilesArray(files);
         const srcPathsByIndex = await util.globAllByIndex(
             entries.map(x => {
@@ -202,11 +245,14 @@ export class RokuDeploy {
                 for (let srcPath of srcPaths) {
                     srcPath = util.standardizePath(srcPath);
 
-                    const dest = this.computeFileDestPath(srcPath, entry, rootDir);
+                    let dest = this.computeFileDestPath(srcPath, entry, rootDir);
+
                     //the last file with this `dest` will win, so just replace any existing entry with this one.
                     result.set(dest, {
                         src: srcPath,
-                        dest: dest
+                        dest: asAbsolute
+                            ? util.standardizePath(path.resolve(stagingDir, dest))
+                            : dest
                     });
                 }
             }
@@ -343,22 +389,15 @@ export class RokuDeploy {
      * @param fileGlobs
      * @param stagingPath
      */
-    private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
-        if (!stagingPath) {
+    private async copyToStaging(files: StandardizedFileEntry[], stagingDir: string) {
+        if (!stagingDir) {
             throw new Error('stagingPath is required');
         }
-        if (!rootDir) {
-            throw new Error('rootDir is required');
-        }
-        if (!await this.fsExtra.pathExists(rootDir)) {
-            throw new Error(`rootDir does not exist at "${rootDir}"`);
-        }
 
-        let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files
-        await Promise.all(fileObjects.map(async (fileObject) => {
+        await Promise.all(files.map(async (fileObject) => {
             let destFilePath = util.standardizePath(
-                path.resolve(stagingPath, fileObject.dest ?? '')
+                path.resolve(stagingDir, fileObject.dest ?? '')
             );
 
             //make sure the containing folder exists
