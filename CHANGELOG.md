@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.16.5](https://github.com/rokucommunity/roku-deploy/compare/3.16.4...v3.16.5) - 2026-04-13
+### Fixed
+ - Resolve files array staging option ([#249](https://github.com/rokucommunity/roku-deploy/pull/249))
+
+
+
 ## [3.16.4](https://github.com/rokucommunity/roku-deploy/compare/3.16.3...v3.16.4) - 2026-04-07
 ### Fixed
  - Fix `zipFolder` bug that wasn't properly handling absolute `stagingDir` path ([#245](https://github.com/rokucommunity/roku-deploy/pull/245))
