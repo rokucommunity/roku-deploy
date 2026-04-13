@@ -47,6 +47,8 @@ describe('RokuDeploy', () => {
         fsExtra.ensureDirSync(stagingDir);
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+        //create the default rekeySignedPackage so createReadStream doesn't leave an open stream to a missing file
+        fsExtra.outputFileSync(`${tempDir}/testSignedPackage.pkg`, '');
 
         writeStreamDeferred = q.defer<WriteStream>() as any;
         writeStreamPromise = writeStreamDeferred.promise as any;
@@ -727,21 +729,9 @@ describe('RokuDeploy', () => {
     });
 
     describe('copyToStaging', () => {
-        it('throws exceptions when rootDir does not exist', async () => {
-            await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], 'staging', 'folder_does_not_exist')
-            );
-        });
-
         it('throws exceptions on missing stagingPath', async () => {
             await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], undefined, undefined)
-            );
-        });
-
-        it('throws exceptions on missing rootDir', async () => {
-            await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], 'asdf', undefined)
+                rokuDeploy['copyToStaging']([], undefined)
             );
         });
 
@@ -757,19 +747,15 @@ describe('RokuDeploy', () => {
                 return Promise.resolve();
             });
 
-            sinon.stub(rokuDeploy, 'getFilePaths').returns(
-                Promise.resolve([
-                    {
-                        src: s`${rootDir}/source/main.brs`,
-                        dest: 'source/main.brs'
-                    }, {
-                        src: s`${rootDir}/components/a/b/c/comp1.xml`,
-                        dest: 'components/a/b/c/comp1.xml'
-                    }
-                ])
-            );
-
-            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+            await rokuDeploy['copyToStaging']([
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: 'source/main.brs'
+                }, {
+                    src: s`${rootDir}/components/a/b/c/comp1.xml`,
+                    dest: 'components/a/b/c/comp1.xml'
+                }
+            ], stagingDir);
 
             expect(ensureDirPaths).to.eql([
                 s`${stagingDir}/source`,
@@ -796,14 +782,10 @@ describe('RokuDeploy', () => {
             });
 
             const absoluteDest = s`${stagingDir}/source/main.brs`;
-            sinon.stub(rokuDeploy, 'getFilePaths').returns(
-                Promise.resolve([{
-                    src: s`${rootDir}/source/main.brs`,
-                    dest: absoluteDest
-                }])
-            );
-
-            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+            await rokuDeploy['copyToStaging']([{
+                src: s`${rootDir}/source/main.brs`,
+                dest: absoluteDest
+            }], stagingDir);
 
             // path.resolve(stagingDir, absoluteDest) returns absoluteDest unchanged,
             // whereas the old `${stagingDir}/${absoluteDest}` would produce a doubled path
@@ -817,14 +799,11 @@ describe('RokuDeploy', () => {
                 copyPaths.push({ src: src as string, dest: dest as string });
                 return Promise.resolve();
             });
-            sinon.stub(rokuDeploy, 'getFilePaths').returns(
-                Promise.resolve([{
-                    src: s`${rootDir}/source/main.brs`,
-                    dest: undefined
-                }])
-            );
 
-            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+            await rokuDeploy['copyToStaging']([{
+                src: s`${rootDir}/source/main.brs`,
+                dest: undefined
+            }], stagingDir);
 
             expect(copyPaths[0].dest).to.equal(s`${stagingDir}`);
         });
@@ -3398,6 +3377,80 @@ describe('RokuDeploy', () => {
                 await fsExtra.remove(s`${thisRootDir}/../`);
             }
         });
+
+        describe('asAbsolute', () => {
+            it('returns relative dest paths by default', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('returns absolute dest paths when asAbsolute is true', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/source/main.brs`
+                }]);
+            });
+
+            it('returns relative dest paths when asAbsolute is false', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, false);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest against stagingDir for glob patterns', async () => {
+                const paths = (await rokuDeploy.getFilePaths(['source/**/*'], rootDir, true, stagingDir))
+                    .sort((a, b) => a.src.localeCompare(b.src));
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`${stagingDir}/source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/source/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest against stagingDir for {src;dest} with custom dest', async () => {
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: 'source/main.brs',
+                    dest: 'renamed/main.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/renamed/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest for file from outside rootDir when asAbsolute is true', async () => {
+                writeFiles(otherProjectDir, ['source/thirdPartyLib.brs']);
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: `${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: 'lib/thirdPartyLib.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`${stagingDir}/lib/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('last-entry-wins deduplication still applies when asAbsolute is true', async () => {
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: `${rootDir}/components/component1.brs`,
+                    dest: 'comp.brs'
+                }, {
+                    src: `${rootDir}/source/main.brs`,
+                    dest: 'comp.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.be.lengthOf(1);
+                expect(paths[0].src).to.equal(s`${rootDir}/source/main.brs`);
+                expect(paths[0].dest).to.equal(s`${stagingDir}/comp.brs`);
+            });
+        });
     });
 
     describe('computeFileDestPath', () => {
@@ -3686,6 +3739,14 @@ describe('RokuDeploy', () => {
     });
 
     describe('prepublishToStaging', () => {
+        it('throws when rootDir is empty after getOptions', async () => {
+            sinon.stub(rokuDeploy, 'getOptions').returns({ rootDir: '', stagingDir: stagingDir } as any);
+            await expectThrowsAsync(
+                rokuDeploy.prepublishToStaging({}),
+                'rootDir is required'
+            );
+        });
+
         it('is resilient to file system errors', async () => {
             let copy = rokuDeploy.fsExtra.copy;
             let count = 0;
@@ -3751,6 +3812,194 @@ describe('RokuDeploy', () => {
                 }),
                 'fake error thrown as part of the unit test'
             );
+        });
+
+        describe('resolveFilesArray', () => {
+            it('copies pre-resolved absolute file entries when resolveFilesArray is false', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [{
+                        src: s`${rootDir}/source/main.brs`,
+                        dest: s`${stagingDir}/source/main.brs`
+                    }]
+                } as any);
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('throws when resolveFilesArray is false and src is not absolute', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{
+                            src: 'source/main.brs',
+                            dest: s`${stagingDir}/source/main.brs`
+                        }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and dest is not absolute', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{
+                            src: s`${rootDir}/source/main.brs`,
+                            dest: 'source/main.brs'
+                        }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry is null', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [null]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry has a missing dest', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{ src: s`${rootDir}/source/main.brs`, dest: undefined }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('resolves files array via globbing by default (resolveFilesArray defaults to true)', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    files: ['source/main.brs']
+                });
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('throws when rootDir does not exist', async () => {
+                const missingRootDir = s`${rootDir}/does-not-exist`;
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: missingRootDir,
+                        stagingDir: stagingDir,
+                        files: ['source/main.brs']
+                    }),
+                    `rootDir does not exist at "${missingRootDir}"`
+                );
+            });
+        });
+
+        describe('absolute src+dest file list (end-to-end)', () => {
+            it('copies multiple files to correct locations in stagingDir', async () => {
+                writeFiles(rootDir, [
+                    'source/main.brs',
+                    'components/Widget.xml',
+                    'components/Widget.brs'
+                ]);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${rootDir}/components/Widget.xml`, dest: s`${stagingDir}/components/Widget.xml` },
+                        { src: s`${rootDir}/components/Widget.brs`, dest: s`${stagingDir}/components/Widget.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/components/Widget.xml`);
+                expectPathExists(s`${stagingDir}/components/Widget.brs`);
+            });
+
+            it('copies file to a remapped dest path', async () => {
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/renamed/entry.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/renamed/entry.brs`);
+                expectPathNotExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('copies files from outside rootDir', async () => {
+                const externalDir = s`${tempDir}/externalLib`;
+                writeFiles(externalDir, ['source/thirdParty.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${externalDir}/source/thirdParty.brs`, dest: s`${stagingDir}/source/thirdParty.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/source/thirdParty.brs`);
+            });
+
+            it('does not crash when two files map to the same dest', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, 'original');
+                fsExtra.outputFileSync(`${rootDir}/source/override.brs`, 'override');
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/entry.brs` },
+                        { src: s`${rootDir}/source/override.brs`, dest: s`${stagingDir}/source/entry.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/entry.brs`);
+                expect(fsExtra.readFileSync(s`${stagingDir}/source/entry.brs`, 'utf8')).to.be.oneOf(['original', 'override']);
+            });
+
+            it('clears stagingDir before copying', async () => {
+                // pre-populate stagingDir with a stale file
+                writeFiles(stagingDir, ['stale/old.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` }
+                    ]
+                } as any);
+
+                expectPathNotExists(s`${stagingDir}/stale/old.brs`);
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
         });
     });
 
