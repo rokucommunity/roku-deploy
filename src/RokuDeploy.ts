@@ -218,7 +218,7 @@ export class RokuDeploy {
      * Simulate pressing the home button on the remote for this roku.
      * This makes the roku return to the home screen
      */
-    private async sendKeyEvent(options: Partial<SendKeyEventOptions>) {
+    private async sendKeyEvent(options: SendKeyEventOptions) {
         logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         let filledOptions = this.getOptions(options);
@@ -1274,23 +1274,19 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
     key: RokuKey | string;
 }
 
-export interface KeyUpOptions extends Partial<SendKeyEventOptions> {
-    action?: 'keyup';
+export interface KeyUpOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface KeyDownOptions extends Partial<SendKeyEventOptions> {
-    action?: 'keydown';
+export interface KeyDownOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface KeyPressOptions extends Partial<SendKeyEventOptions> {
-    action?: 'keypress';
+export interface KeyPressOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface SendTextOptions extends Partial<SendKeyEventOptions> {
-    action?: 'keypress';
+export interface SendTextOptions extends BaseEcpOptions {
     text: string;
 }
 
