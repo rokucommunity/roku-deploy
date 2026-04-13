@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.3] - unreleased
+### Changed (Breaking)
+ - Renamed `RekeyDeviceOptions.rekeySignedPackage` → `pkg` to match CLI `--pkg` option
+ - Renamed `ZipOptions.stagingDir` → `dir` to match CLI `--dir` option
+ - Renamed `remotePort` → `ecpPort` throughout all options interfaces and `getOptions()` defaults
+ - CLI `sideload` command: replaced `--noclose` flag with `--close` boolean (use `--no-close` to skip closing the channel)
+### Added
+ - `sideload()` now accepts `zip` (explicit zip path) and `rootDir` (auto-zip a directory) options directly
+ - `sideload()` now automatically calls `closeChannel()` before sideloading (controlled by new `close` option, defaults to `true`)
+ - CLI `sideload --no-close` flag to skip closing the channel before sideloading
+
+
+
 ## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
 ### Added
  - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))

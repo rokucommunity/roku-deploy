@@ -10,7 +10,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
-import { logger } from '@rokucommunity/logger';
+import { logger, type LogLevel } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
@@ -62,18 +62,24 @@ export class RokuDeploy {
      * @param options
      */
     public async zip(options: ZipOptions) {
-        logger.info('Beginning to zip staging folder');
+        logger.info('Beginning to zip folder');
         options = this.getOptions(options) as any;
+
+        if (options.dir) {
+            options.dir = path.resolve((options as any).cwd, options.dir);
+        } else {
+            options.dir = (options as any).stagingDir;
+        }
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
-        //ensure the manifest file exists in the staging folder
-        if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
-            throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
+        //ensure the manifest file exists in the folder to be zipped
+        if (!await util.fileExistsCaseInsensitive(`${options.dir}/manifest`)) {
+            throw new Error(`Cannot zip package: missing manifest file in "${options.dir}"`);
         }
 
-        //create a zip of the staging folder
-        await this.makeZip(options.stagingDir, zipFilePath);
+        //create a zip of the folder
+        await this.makeZip(options.dir, zipFilePath);
         logger.info('Zip created at:', zipFilePath);
     }
 
@@ -197,6 +203,7 @@ export class RokuDeploy {
     }
 
     public async sendText(options: SendTextOptions) {
+        this.checkRequiredOptions(options, ['host', 'text']);
         const chars = options.text.split('');
         for (const char of chars) {
             await this.sendKeyEvent({
@@ -217,7 +224,7 @@ export class RokuDeploy {
         let filledOptions = this.getOptions(options);
         // press the home button to return to the main screen
         return this.doPostRequest({
-            url: `http://${filledOptions.host}:${filledOptions.remotePort}/${filledOptions.action}/${filledOptions.key}`,
+            url: `http://${filledOptions.host}:${filledOptions.ecpPort}/${filledOptions.action}/${filledOptions.key}`,
             timeout: filledOptions.timeout
         }, false);
     }
@@ -232,13 +239,42 @@ export class RokuDeploy {
     }
 
     /**
-     * Publish a pre-existing packaged zip file to a remote Roku.
+     * Sideload a zip to a remote Roku. Either `zip` (path to a pre-built zip) or `rootDir` (directory
+     * to zip on-the-fly) must be provided. If neither are provided, we default to the current directory.
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
-        logger.info('Beggining to sideload package');
+        logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
+
+        // Resolve zip/rootDir before getOptions so outDir/outFile are set correctly
+        if (options.zip) {
+            options.zip = path.resolve(options.cwd ?? process.cwd(), options.zip);
+            options.outDir = path.dirname(options.zip);
+            options.outFile = path.basename(options.zip);
+            options.retainDeploymentArchive ??= true;
+        } else if (options.rootDir) {
+            options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
+            // Generated zips are temporary, so default to deleting them after sideload
+            options.retainDeploymentArchive ??= false;
+            if (options.outZip) {
+                options.outDir = path.dirname(options.outZip);
+                options.outFile = path.basename(options.outZip);
+            }
+        }
+
         options = this.getOptions(options) as any;
+
+        // Close the channel before sideloading unless explicitly disabled
+        if (options.close !== false) {
+            await this.closeChannel(options as CloseChannelOptions);
+        }
+
+        // If rootDir was provided (and no zip), zip it first then sideload
+        if (!options.zip && options.rootDir) {
+            await this.zip({ dir: options.rootDir, outDir: options.outDir, outFile: options.outFile, cwd: options.cwd });
+        }
+
         //make sure the outDir exists
         await fsExtra.ensureDir(options.outDir);
 
@@ -295,7 +331,6 @@ export class RokuDeploy {
             let response: HttpResponse;
             try {
                 try {
-                    console.log('calling once');
                     response = await this.doPostRequest(requestOptions);
                 } catch (replaceError: any) {
                     //fail if this is a compile error
@@ -411,16 +446,16 @@ export class RokuDeploy {
     }
 
     /**
-     * resign Roku Device with supplied pkg and
+     * resign Roku Device with a supplied signed pkg and
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
-        this.checkRequiredOptions(options, ['host', 'password', 'rekeySignedPackage', 'signingPassword']);
+        this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
         options = this.getOptions(options) as any;
 
-        let rekeySignedPackagePath = options.rekeySignedPackage;
-        if (!path.isAbsolute(options.rekeySignedPackage)) {
-            rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
+        let pkgPath = options.pkg;
+        if (!path.isAbsolute(options.pkg)) {
+            pkgPath = path.join(options.rootDir, options.pkg);
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
@@ -430,7 +465,7 @@ export class RokuDeploy {
 
         let results: HttpResponse;
         try {
-            requestOptions.formData.archive = fsExtra.createReadStream(rekeySignedPackagePath);
+            requestOptions.formData.archive = fsExtra.createReadStream(pkgPath);
             results = await this.doPostRequest(requestOptions);
         } finally {
             //ensure the stream is closed
@@ -458,7 +493,7 @@ export class RokuDeploy {
     }
 
     /**
-     * Sign a pre-existing package using Roku and return path to retrieve it
+     * Sign a pre-existing package using Roku and return path to it locally
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
@@ -823,7 +858,12 @@ export class RokuDeploy {
         const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            saveFilePath = util.standardizePath(path.join(options.screenshotDir, options.screenshotFile + imageExt));
+            const userExt = ['.jpg', '.png'].includes(path.extname(options.screenshotFile).toLowerCase()) ? path.extname(options.screenshotFile) : undefined;
+            if (userExt && userExt.toLowerCase() !== imageExt.toLowerCase()) {
+                console.warn(`Warning: Provided screenshot file extension "${userExt}" does not match the device's format "${imageExt}". The file was saved with "${userExt}".`);
+            }
+            const screenshotFile = userExt ? options.screenshotFile : options.screenshotFile + imageExt;
+            saveFilePath = util.standardizePath(path.join(options.screenshotDir, screenshotFile));
             await this.downloadFile(
                 this.generateBaseRequestOptions(imageUrlOnDevice, options),
                 saveFilePath
@@ -883,7 +923,7 @@ export class RokuDeploy {
             failOnCompileError: true,
             deleteDevChannel: true,
             packagePort: 80,
-            remotePort: 8060,
+            ecpPort: 8060,
             timeout: 150000,
             rootDir: './',
             files: [...DefaultFiles],
@@ -933,7 +973,9 @@ export class RokuDeploy {
         if (!zipFileName.toLowerCase().endsWith('.zip') && !zipFileName.toLowerCase().endsWith('.squashfs')) {
             zipFileName += '.zip';
         }
-        let outZipFilePath = path.resolve(options.cwd, options.outDir, zipFileName);
+        let outZipFilePath = util.standardizePath(
+            path.resolve(options.cwd, options.outDir, zipFileName)
+        );
         logger.debug('Output zip file path:', outZipFilePath);
         return outZipFilePath;
     }
@@ -948,10 +990,12 @@ export class RokuDeploy {
         let pkgFileName = options.outFile;
         if (pkgFileName.toLowerCase().endsWith('.zip')) {
             pkgFileName = pkgFileName.replace('.zip', '.pkg');
-        } else {
+        } else if (!pkgFileName.toLowerCase().endsWith('.pkg')) {
             pkgFileName += '.pkg';
         }
-        let outFolderPath = path.resolve(options.outDir);
+        let outFolderPath = util.standardizePath(
+            path.resolve(options.outDir)
+        );
 
         let outPkgFilePath = path.join(outFolderPath, pkgFileName);
         logger.debug('Output pkg file path:', outPkgFilePath);
@@ -976,7 +1020,7 @@ export class RokuDeploy {
             //try using the host as-is (it'll probably fail...)
         }
 
-        const url = `http://${options.host}:${options.remotePort}/query/device-info`;
+        const url = `http://${options.host}:${options.ecpPort}/query/device-info`;
 
         let response;
         try {
@@ -1019,7 +1063,7 @@ export class RokuDeploy {
      * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
      * the device accepts remote control commands via the ECP API.
      *
-     * @param options - Configuration options including host, remotePort, timeout, etc.
+     * @param options - Configuration options including host, ecpPort, timeout, etc.
      * @returns The ECP setting mode:
      *   - 'enabled': fully enabled and accepting commands
      *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
@@ -1029,7 +1073,7 @@ export class RokuDeploy {
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         try {
             const deviceInfo = await this.getDeviceInfo(options);
-            return deviceInfo.ecpSettingMode;
+            return deviceInfo['ecp-setting-mode'];
         } catch (e) {
             if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
                 return 'disabled';
@@ -1195,18 +1239,7 @@ export interface HttpResponse {
     body: any;
 }
 
-export interface CaptureScreenshotOptions {
-    /**
-     * The IP address or hostname of the target Roku device.
-     * @example '192.168.1.21'
-     */
-    host: string;
-
-    /**
-     * The password for logging in to the developer portal on the target Roku device
-     */
-    password: string;
-
+export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
      * A full path to the folder where the screenshots should be saved.
      * Will use the OS temp directory by default
@@ -1225,19 +1258,7 @@ export interface CaptureScreenshotOptions {
     cwd?: string;
 }
 
-export interface GetDeviceInfoOptions {
-    /**
-     * The hostname or IP address to use for the device-info URL
-     */
-    host: string;
-    /**
-     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
-     */
-    remotePort?: number;
-    /**
-     * The number of milliseconds at which point this request should timeout and return a rejected promise
-     */
-    timeout?: number;
+export interface GetDeviceInfoOptions extends BaseEcpOptions {
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
      * @default false
@@ -1247,41 +1268,29 @@ export interface GetDeviceInfoOptions {
 
 export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
 
-export interface SendKeyEventOptions {
+export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
-    host: string;
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RokuKey | string;
-    remotePort?: number;
-    timeout?: number;
 }
 
-export interface KeyUpOptions extends SendKeyEventOptions {
-    action?: 'keyup';
+export interface KeyUpOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface KeyDownOptions extends SendKeyEventOptions {
-    action?: 'keydown';
+export interface KeyDownOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface KeyPressOptions extends SendKeyEventOptions {
-    action?: 'keypress';
+export interface KeyPressOptions extends BaseEcpOptions {
     key: RokuKey;
 }
 
-export interface SendTextOptions extends SendKeyEventOptions {
-    action?: 'keypress';
+export interface SendTextOptions extends BaseEcpOptions {
     text: string;
 }
 
-export interface CloseChannelOptions {
-    host: string;
-    remotePort?: number;
-    timeout?: number;
-
-}
+export type CloseChannelOptions = BaseEcpOptions;
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
@@ -1290,22 +1299,34 @@ export interface StageOptions {
 }
 
 export interface ZipOptions {
-    stagingDir?: string;
+    dir?: string;
     outDir?: string;
     outFile?: string;
     cwd?: string;
 }
 
-export interface SideloadOptions {
+export interface SideloadOptions extends BaseRequestOptions, BaseEcpOptions {
     appType?: 'channel' | 'dcl';
-    host: string;
-    password: string;
+    /**
+     * The path to an existing zip file to sideload. Takes precedence over `rootDir`.
+     */
+    zip?: string;
+    /**
+     * The root folder to zip and then sideload. Used when `zip` is not provided.
+     */
+    rootDir?: string;
+    /**
+     * Close the channel before sideloading. Defaults to true.
+     * Set to false to skip closing the channel.
+     */
+    close?: boolean;
     remoteDebug?: boolean;
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
     retainDeploymentArchive?: boolean;
     outDir?: string;
     outFile?: string;
+    outZip?: string;
     deleteDevChannel?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
@@ -1318,35 +1339,36 @@ export interface PackageUploadOverridesOptions {
 
 export interface BaseRequestOptions {
     host: string;
-    packagePort?: number;
-    timeout?: number;
     username?: string;
     password: string;
+    packagePort?: number;
+    timeout?: number;
+    logLevel?: LogLevel;
 }
 
-export interface ConvertToSquashfsOptions {
+export interface BaseEcpOptions {
     host: string;
-    password: string;
+    ecpPort?: number;
+    timeout?: number;
 }
 
-export interface RekeyDeviceOptions {
-    host: string;
-    password: string;
-    rekeySignedPackage: string;
+export type ConvertToSquashfsOptions = BaseRequestOptions;
+
+export interface RekeyDeviceOptions extends BaseRequestOptions {
+    pkg: string;
     signingPassword: string;
     rootDir?: string;
     devId: string;
     cwd?: string;
 }
 
-export interface CreateSignedPackageOptions {
-    host: string;
-    password: string;
+export interface CreateSignedPackageOptions extends BaseRequestOptions {
     signingPassword: string;
     appTitle?: string;
     appVersion?: string;
     manifestPath?: string;
     outDir?: string;
+    outFile?: string;
     /**
      * If specified, signing will fail if the device's devId is different than this value
      */
@@ -1354,10 +1376,7 @@ export interface CreateSignedPackageOptions {
     cwd?: string;
 }
 
-export interface DeleteDevChannelOptions {
-    host: string;
-    password: string;
-}
+export type DeleteDevChannelOptions = BaseRequestOptions;
 
 export interface GetOutputZipFilePathOptions {
     outFile?: string;
@@ -1365,9 +1384,7 @@ export interface GetOutputZipFilePathOptions {
     cwd?: string;
 }
 
-export interface DeployOptions {
-    host: string;
-    password: string;
+export interface DeployOptions extends BaseRequestOptions {
     files?: FileEntry[];
     rootDir?: string;
     stagingDir?: string;
@@ -1383,17 +1400,7 @@ export interface GetOutputPkgFilePathOptions {
     cwd?: string;
 }
 
-export interface GetDevIdOptions {
-    host: string;
-    /**
-     * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
-     */
-    remotePort?: number;
-    /**
-     * The number of milliseconds at which point this request should timeout and return a rejected promise
-     */
-    timeout?: number;
-}
+export type GetDevIdOptions = BaseEcpOptions;
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 export const rokuDeploy = new RokuDeploy();

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as yargs from 'yargs';
-import * as path from 'path';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
 import { SideloadCommand } from './commands/SideloadCommand';
@@ -19,21 +18,23 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 
 void yargs
 
-    .command('sideload', 'Sideload a pre-existing packaged zip file to a remote Roku', (builder) => {
+    .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
-            .option('outZip', { type: 'string', description: 'The output path to the zip file.', demandOption: false })
+            .option('outZip', { type: 'string', description: 'The output path to the zip file that is created when sideloading rootDir.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
             .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
-            .option('noclose', { type: 'boolean', description: 'Should the command not close the channel before sideloading', demandOption: false })
+            .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
             .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('retainDeploymentArchive', { type: 'boolean', description: 'Should the generated zip be retained after sideloading', demandOption: false })
+            .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new SideloadCommand().run(args);
@@ -51,14 +52,6 @@ void yargs
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        if (args.out) {
-            if (!args.out.endsWith('.pkg')) {
-                throw new Error('Out must end with a .pkg');
-            }
-            args.out = path.resolve(args.cwd, args.out);
-            args.outDir = path.dirname(args.out);
-            args.outFile = path.basename(args.out);
-        }
         return new CreateSignedPackageCommand().run(args);
     })
 
@@ -69,9 +62,6 @@ void yargs
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
         return new KeyPressCommand().run(args);
     })
 
@@ -82,9 +72,6 @@ void yargs
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
         return new KeyUpCommand().run(args);
     })
 
@@ -95,9 +82,6 @@ void yargs
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
         return new KeyDownCommand().run(args);
     })
 
@@ -108,9 +92,6 @@ void yargs
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
     }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
         return new SendTextCommand().run(args);
     })
 
@@ -119,9 +100,6 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false });
     }, (args: any) => {
-        if (args.ecpPort) {
-            args.remotePort = args.ecpPort;
-        }
         return new RemoteControlCommand().run(args);
     })
 
@@ -152,7 +130,6 @@ void yargs
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        args.rekeySignedPackage = path.resolve(args.cwd, args.pkg);
         return new RekeyDeviceCommand().run(args);
     })
 
@@ -171,11 +148,6 @@ void yargs
             .option('out', { type: 'string', description: 'The location where the screenshot will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.jpg' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        if (args.out) {
-            args.out = path.resolve(args.cwd, args.out);
-            args.screenshotDir = path.dirname(args.out);
-            args.screenshotFile = path.basename(args.out);
-        }
         return new CaptureScreenshotCommand().run(args);
     })
 
@@ -199,14 +171,6 @@ void yargs
             .option('out', { type: 'string', description: 'the path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
-        if (args.out) {
-            args.out = path.resolve(args.cwd, args.out);
-            args.outDir = path.dirname(args.out);
-            args.outFile = path.basename(args.out);
-        }
-        if (args.dir) {
-            args.stagingDir = path.resolve(args.cwd, args.dir);
-        }
         return new ZipCommand().run(args);
     })
 
