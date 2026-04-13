@@ -898,9 +898,8 @@ describe('RokuDeploy', () => {
             }).and.to.not.haveOwnProperty('remotedebug');
         });
 
-        it('does not delete a pre-built zip by default', async () => {
+        it('does not delete the generated archive by default', async () => {
             const zipPath = `${outDir}/${options.outFile}`;
-
             mockDoPostRequest();
 
             //the file should exist
@@ -935,7 +934,7 @@ describe('RokuDeploy', () => {
         });
 
         it('deletes the archive when configured', async () => {
-            let zipPath = `${outDir}/${options.outFile}`;
+            const zipPath = `${outDir}/${options.outFile}`;
             mockDoPostRequest();
 
             //the file should exist
@@ -951,7 +950,6 @@ describe('RokuDeploy', () => {
             });
             //the file should not exist
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
-            //the out folder should also be deleted since it's empty
         });
 
         it('failure to close read stream does not crash', async () => {
