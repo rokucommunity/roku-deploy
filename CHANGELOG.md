@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.16.5](https://github.com/rokucommunity/roku-deploy/compare/3.16.4...v3.16.5) - 2026-04-13
-### Changed
- - Bump lodash from 4.17.23 to 4.18.1 ([#247](https://github.com/rokucommunity/roku-deploy/pull/247))
 ### Fixed
  - Resolve files array staging option ([#249](https://github.com/rokucommunity/roku-deploy/pull/249))
 
