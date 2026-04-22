@@ -32,9 +32,6 @@ export class RokuDeploy {
     //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
-    //property seam so tests can stub it
-    private fetch = globalThis.fetch.bind(globalThis);
-
     public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
 
     /**
@@ -1239,7 +1236,7 @@ export class RokuDeploy {
 
         let response: Response;
         try {
-            response = await fetchWithDigest(this.fetch, url, {
+            response = await fetchWithDigest(url, {
                 method: 'HEAD',
                 username: username,
                 password: options.password,

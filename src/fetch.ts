@@ -1,7 +1,5 @@
 import * as crypto from 'crypto';
 
-export type FetchFn = typeof globalThis.fetch;
-
 /**
  * Issue an HTTP request with digest authentication.
  * Performs the two-step challenge/response dance: the first request
@@ -10,7 +8,6 @@ export type FetchFn = typeof globalThis.fetch;
  * the raw `Response` and inspect status/headers only.
  */
 export async function fetchWithDigest(
-    fetch: FetchFn,
     url: string,
     init: RequestInit & { method: string; username: string; password: string; timeout: number }
 ): Promise<Response> {
@@ -18,7 +15,7 @@ export async function fetchWithDigest(
     const method = fetchInit.method.toUpperCase();
 
     // Step 1 — issue the request unauthenticated to collect the challenge.
-    const step1 = await fetchWithTimeout(fetch, url, fetchInit, timeout);
+    const step1 = await fetchWithTimeout(url, fetchInit, timeout);
     if (step1.status !== 401) {
         return step1;
     }
@@ -37,16 +34,16 @@ export async function fetchWithDigest(
         uri: uri,
         challenge: challenge
     });
-    return fetchWithTimeout(fetch, url, {
+    return fetchWithTimeout(url, {
         ...fetchInit,
         headers: { ...fetchInit.headers, Authorization: authorization }
     }, timeout);
 }
 
-function fetchWithTimeout(fetch: FetchFn, url: string, init: RequestInit, timeout: number): Promise<Response> {
+function fetchWithTimeout(url: string, init: RequestInit, timeout: number): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    return fetch(url, { ...init, signal: controller.signal })
+    return globalThis.fetch(url, { ...init, signal: controller.signal })
         .finally(() => clearTimeout(timer));
 }
 

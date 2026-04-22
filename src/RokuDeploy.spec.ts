@@ -4690,7 +4690,7 @@ describe('RokuDeploy', () => {
         }
 
         it('returns ok when the device accepts the credentials', async () => {
-            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+            const fetchStub = sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
@@ -4701,15 +4701,15 @@ describe('RokuDeploy', () => {
             expect(result.reason).to.be.a('string').and.not.empty;
             expect(fetchStub.callCount).to.equal(2);
             // Second call carries the computed Authorization header
-            const secondCallInit = fetchStub.secondCall.args[1];
-            expect(secondCallInit.headers.Authorization).to.match(/^Digest /);
-            expect(secondCallInit.headers.Authorization).to.include('realm="rokudev"');
-            expect(secondCallInit.headers.Authorization).to.include('nonce="abc123"');
-            expect(secondCallInit.headers.Authorization).to.include('uri="/plugin_install"');
+            const secondCallHeaders = (fetchStub.secondCall.args[1] as any).headers;
+            expect(secondCallHeaders.Authorization).to.match(/^Digest /);
+            expect(secondCallHeaders.Authorization).to.include('realm="rokudev"');
+            expect(secondCallHeaders.Authorization).to.include('nonce="abc123"');
+            expect(secondCallHeaders.Authorization).to.include('uri="/plugin_install"');
         });
 
         it('returns bad-password when the authenticated retry is rejected', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch')
+            sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
 
@@ -4721,7 +4721,7 @@ describe('RokuDeploy', () => {
         });
 
         it('returns unreachable when the first request throws', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch').rejects(new Error('ECONNREFUSED'));
+            sinon.stub(globalThis, 'fetch').rejects(new Error('ECONNREFUSED'));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
@@ -4731,7 +4731,7 @@ describe('RokuDeploy', () => {
         });
 
         it('returns unreachable on an unexpected status (e.g. 500)', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch').resolves(fakeResponse(500));
+            sinon.stub(globalThis, 'fetch').resolves(fakeResponse(500));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
@@ -4741,7 +4741,7 @@ describe('RokuDeploy', () => {
         });
 
         it('returns unreachable when a 401 has no WWW-Authenticate header', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch').resolves(fakeResponse(401));
+            sinon.stub(globalThis, 'fetch').resolves(fakeResponse(401));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
@@ -4751,19 +4751,19 @@ describe('RokuDeploy', () => {
         });
 
         it('uses default port 80, username rokudev, and plugin_install path', async () => {
-            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+            const fetchStub = sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({ host: 'device.local', password: 'aaaa' });
 
             expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:80/plugin_install');
-            const authHeader = (fetchStub.secondCall.args[1]).headers.Authorization as string;
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
             expect(authHeader).to.include('username="rokudev"');
         });
 
         it('honors custom username and packagePort', async () => {
-            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+            const fetchStub = sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
@@ -4775,12 +4775,12 @@ describe('RokuDeploy', () => {
             });
 
             expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:8888/plugin_install');
-            const authHeader = (fetchStub.secondCall.args[1]).headers.Authorization as string;
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
             expect(authHeader).to.include('username="somebody"');
         });
 
         it('aborts the request when the timeout elapses', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch').callsFake((_url, init?: any) => {
+            sinon.stub(globalThis, 'fetch').callsFake((_url, init?: any) => {
                 return new Promise((resolve, reject) => {
                     init?.signal?.addEventListener('abort', () => {
                         const err: any = new Error('aborted');
@@ -4801,7 +4801,7 @@ describe('RokuDeploy', () => {
         });
 
         it('stringifies non-Error fetch rejections', async () => {
-            sinon.stub(rokuDeploy as any, 'fetch').callsFake(() => Promise.reject('boom'));
+            sinon.stub(globalThis, 'fetch').callsFake(() => Promise.reject('boom'));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
