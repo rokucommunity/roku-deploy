@@ -4689,16 +4689,14 @@ describe('RokuDeploy', () => {
             };
         }
 
-        it('returns ok when the device accepts the credentials', async () => {
+        it('returns true when the device accepts the credentials', async () => {
             const fetchStub = sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
-            expect(result.ok).to.be.true;
-            expect(result.state).to.equal('ok');
-            expect(result.reason).to.be.a('string').and.not.empty;
+            expect(result).to.be.true;
             expect(fetchStub.callCount).to.equal(2);
             // Second call carries the computed Authorization header
             const secondCallHeaders = (fetchStub.secondCall.args[1] as any).headers;
@@ -4708,46 +4706,48 @@ describe('RokuDeploy', () => {
             expect(secondCallHeaders.Authorization).to.include('uri="/plugin_install"');
         });
 
-        it('returns bad-password when the authenticated retry is rejected', async () => {
+        it('returns false when the authenticated retry is rejected', async () => {
             sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'wrong' });
 
-            expect(result.ok).to.be.false;
-            expect(result.state).to.equal('bad-password');
-            expect(result.reason).to.be.a('string').and.not.empty;
+            expect(result).to.be.false;
         });
 
-        it('returns unreachable when the first request throws', async () => {
+        it('throws DeviceUnreachableError when the first request throws', async () => {
             sinon.stub(globalThis, 'fetch').rejects(new Error('ECONNREFUSED'));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
-
-            expect(result.ok).to.be.false;
-            expect(result.state).to.equal('unreachable');
-            expect(result.reason).to.include('ECONNREFUSED');
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('ECONNREFUSED');
         });
 
-        it('returns unreachable on an unexpected status (e.g. 500)', async () => {
+        it('throws InvalidDeviceResponseCodeError on an unexpected status (e.g. 500)', async () => {
             sinon.stub(globalThis, 'fetch').resolves(fakeResponse(500));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
-
-            expect(result.ok).to.be.false;
-            expect(result.state).to.equal('unreachable');
-            expect(result.reason).to.include('500');
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.InvalidDeviceResponseCodeError);
+            expect((thrown as Error).message).to.include('500');
         });
 
-        it('returns unreachable when a 401 has no WWW-Authenticate header', async () => {
+        it('returns false when a 401 has no WWW-Authenticate header', async () => {
             sinon.stub(globalThis, 'fetch').resolves(fakeResponse(401));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
-            expect(result.ok).to.be.false;
-            // No challenge => we bail out of the digest flow and never see a 200, so the caller gets unreachable-via-unexpected-status
-            expect(['bad-password', 'unreachable']).to.include(result.state);
+            expect(result).to.be.false;
         });
 
         it('uses default port 80, username rokudev, and plugin_install path', async () => {
@@ -4762,7 +4762,7 @@ describe('RokuDeploy', () => {
             expect(authHeader).to.include('username="rokudev"');
         });
 
-        it('honors custom username and packagePort', async () => {
+        it('honors custom username and port', async () => {
             const fetchStub = sinon.stub(globalThis, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
@@ -4790,23 +4790,30 @@ describe('RokuDeploy', () => {
                 });
             });
 
-            const result = await rokuDeploy.validateDeveloperPassword({
-                host: '1.2.3.4',
-                password: 'aaaa',
-                timeout: 20
-            });
-
-            expect(result.ok).to.be.false;
-            expect(result.state).to.equal('unreachable');
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({
+                    host: '1.2.3.4',
+                    password: 'aaaa',
+                    timeout: 20
+                });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
         });
 
         it('stringifies non-Error fetch rejections', async () => {
             sinon.stub(globalThis, 'fetch').callsFake(() => Promise.reject('boom'));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
-
-            expect(result.state).to.equal('unreachable');
-            expect(result.reason).to.include('boom');
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('boom');
         });
     });
 

@@ -90,32 +90,30 @@ describe('device', function device() {
     });
 
     describe('validateDeveloperPassword', () => {
-        it('returns ok when the password is correct', async () => {
+        it('returns true when the password is correct', async () => {
             const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
                 host: options.host,
                 password: options.password
             });
-            assert.strictEqual(result.state, 'ok');
-            assert.strictEqual(result.ok, true);
+            assert.strictEqual(result, true);
         });
 
-        it('returns bad-password when the password is wrong', async () => {
+        it('returns false when the password is wrong', async () => {
             const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
                 host: options.host,
                 password: 'NOT_THE_PASSWORD'
             });
-            assert.strictEqual(result.state, 'bad-password');
-            assert.strictEqual(result.ok, false);
+            assert.strictEqual(result, false);
         });
 
-        it('returns unreachable for an offline host', async () => {
-            const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
-                host: '192.168.254.254',
-                password: 'aaaa',
-                timeout: 2000
+        it('throws DeviceUnreachableError for an offline host', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.rokuDeploy.validateDeveloperPassword({
+                    host: '192.168.254.254',
+                    password: 'aaaa',
+                    timeout: 2000
+                });
             });
-            assert.strictEqual(result.state, 'unreachable');
-            assert.strictEqual(result.ok, false);
         });
     });
 });

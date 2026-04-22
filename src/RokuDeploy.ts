@@ -1221,14 +1221,10 @@ export class RokuDeploy {
 
     /**
      * Check whether the given developer password is accepted by a Roku device.
-     *
-     * Performs a `HEAD /plugin_install` against the device's developer web
-     * server using digest auth. The body is intentionally ignored — only the
-     * response status matters. The two-step digest dance is performed
-     * manually (rather than relying on `postman-request`'s built-in auth)
-     * because Roku's socket handling is picky about keep-alive reuse.
+     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
+     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
      */
-    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<ValidateDeveloperPasswordResult> {
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
         const timeout = options.timeout ?? 3000;
@@ -1244,24 +1240,16 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            return {
-                ok: false,
-                state: 'unreachable',
-                reason: `Device at ${options.host} could not be contacted: ${message}`
-            };
+            throw new errors.DeviceUnreachableError(`Device at ${options.host} could not be contacted: ${message}`, err);
         }
 
         if (response.status === 200) {
-            return { ok: true, state: 'ok', reason: 'Password accepted' };
+            return true;
         }
         if (response.status === 401) {
-            return { ok: false, state: 'bad-password', reason: 'Device rejected the credentials' };
+            return false;
         }
-        return {
-            ok: false,
-            state: 'unreachable',
-            reason: `Unexpected status ${response.status} from device`
-        };
+        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response);
     }
 
     /**
@@ -1599,20 +1587,6 @@ export interface ValidateDeveloperPasswordOptions {
     port?: number;
     /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
     timeout?: number;
-}
-
-export interface ValidateDeveloperPasswordResult {
-    /** `true` when the device accepted the credentials */
-    ok: boolean;
-    /** Human-readable explanation — always populated, safe to show in a UI */
-    reason: string;
-    /**
-     * Machine-readable outcome for programmatic branching:
-     * - `'ok'` — credentials accepted
-     * - `'bad-password'` — device reachable, credentials rejected
-     * - `'unreachable'` — device could not be contacted (transient — do not treat as wrong password)
-     */
-    state: 'ok' | 'bad-password' | 'unreachable';
 }
 
 export interface GetDeviceInfoOptions {
