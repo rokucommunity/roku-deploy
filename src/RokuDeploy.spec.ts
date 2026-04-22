@@ -10,6 +10,7 @@ import * as child_process from 'child_process';
 import * as glob from 'glob';
 import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { RokuDeploy } from './RokuDeploy';
+import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -4670,6 +4671,201 @@ describe('RokuDeploy', () => {
             assert.throws(f);
         }
     }
+
+    describe('validateDeveloperPassword', () => {
+        const CHALLENGE_HEADER = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
+
+        // Minimal Response-like stub — validateDeveloperPassword only reads status + headers.get
+        function fakeResponse(status: number, headers: Record<string, string> = {}): any {
+            const lower: Record<string, string> = {};
+            for (const [k, v] of Object.entries(headers)) {
+                lower[k.toLowerCase()] = v;
+            }
+            return {
+                status: status,
+                headers: {
+                    get: (name: string) => lower[name.toLowerCase()] ?? null
+                }
+            };
+        }
+
+        it('returns ok when the device accepts the credentials', async () => {
+            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result.ok).to.be.true;
+            expect(result.state).to.equal('ok');
+            expect(result.reason).to.be.a('string').and.not.empty;
+            expect(fetchStub.callCount).to.equal(2);
+            // Second call carries the computed Authorization header
+            const secondCallInit = fetchStub.secondCall.args[1];
+            expect(secondCallInit.headers.Authorization).to.match(/^Digest /);
+            expect(secondCallInit.headers.Authorization).to.include('realm="rokudev"');
+            expect(secondCallInit.headers.Authorization).to.include('nonce="abc123"');
+            expect(secondCallInit.headers.Authorization).to.include('uri="/plugin_install"');
+        });
+
+        it('returns bad-password when the authenticated retry is rejected', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'wrong' });
+
+            expect(result.ok).to.be.false;
+            expect(result.state).to.equal('bad-password');
+            expect(result.reason).to.be.a('string').and.not.empty;
+        });
+
+        it('returns unreachable when the first request throws', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch').rejects(new Error('ECONNREFUSED'));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result.ok).to.be.false;
+            expect(result.state).to.equal('unreachable');
+            expect(result.reason).to.include('ECONNREFUSED');
+        });
+
+        it('returns unreachable on an unexpected status (e.g. 500)', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch').resolves(fakeResponse(500));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result.ok).to.be.false;
+            expect(result.state).to.equal('unreachable');
+            expect(result.reason).to.include('500');
+        });
+
+        it('returns unreachable when a 401 has no WWW-Authenticate header', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch').resolves(fakeResponse(401));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result.ok).to.be.false;
+            // No challenge => we bail out of the digest flow and never see a 200, so the caller gets unreachable-via-unexpected-status
+            expect(['bad-password', 'unreachable']).to.include(result.state);
+        });
+
+        it('uses default port 80, username rokudev, and plugin_install path', async () => {
+            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({ host: 'device.local', password: 'aaaa' });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:80/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1]).headers.Authorization as string;
+            expect(authHeader).to.include('username="rokudev"');
+        });
+
+        it('honors custom username and packagePort', async () => {
+            const fetchStub = sinon.stub(rokuDeploy as any, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({
+                host: 'device.local',
+                password: 'aaaa',
+                username: 'somebody',
+                port: 8888
+            });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:8888/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1]).headers.Authorization as string;
+            expect(authHeader).to.include('username="somebody"');
+        });
+
+        it('aborts the request when the timeout elapses', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch').callsFake((_url, init?: any) => {
+                return new Promise((resolve, reject) => {
+                    init?.signal?.addEventListener('abort', () => {
+                        const err: any = new Error('aborted');
+                        err.name = 'AbortError';
+                        reject(err);
+                    });
+                });
+            });
+
+            const result = await rokuDeploy.validateDeveloperPassword({
+                host: '1.2.3.4',
+                password: 'aaaa',
+                timeout: 20
+            });
+
+            expect(result.ok).to.be.false;
+            expect(result.state).to.equal('unreachable');
+        });
+
+        it('stringifies non-Error fetch rejections', async () => {
+            sinon.stub(rokuDeploy as any, 'fetch').callsFake(() => Promise.reject('boom'));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result.state).to.equal('unreachable');
+            expect(result.reason).to.include('boom');
+        });
+    });
+
+    describe('parseDigestChallenge', () => {
+        it('parses quoted values', () => {
+            const parsed = parseDigestChallenge('Digest realm="rokudev", nonce="abc123", qop="auth"');
+            expect(parsed).to.deep.equal({ realm: 'rokudev', nonce: 'abc123', qop: 'auth' });
+        });
+
+        it('parses bare (unquoted) values', () => {
+            const parsed = parseDigestChallenge('Digest realm="rokudev", algorithm=MD5, stale=false');
+            expect(parsed.algorithm).to.equal('MD5');
+            expect(parsed.stale).to.equal('false');
+        });
+    });
+
+    describe('buildDigestAuthorization', () => {
+        const baseParams = {
+            username: 'rokudev',
+            password: 'aaaa',
+            method: 'HEAD',
+            uri: '/plugin_install'
+        };
+
+        it('uses MD5-SESS HA1 when algorithm=MD5-SESS', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc', qop: 'auth', algorithm: 'MD5-SESS' }
+            });
+            expect(header).to.include('algorithm=MD5-SESS');
+        });
+
+        it('omits qop/nc/cnonce when the challenge has no qop', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc' }
+            });
+            expect(header).to.not.include('qop=');
+            expect(header).to.not.include('nc=');
+            expect(header).to.not.include('cnonce=');
+        });
+
+        it('includes opaque when present in the challenge', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc', qop: 'auth', opaque: 'xyz' }
+            });
+            expect(header).to.include('opaque="xyz"');
+        });
+
+        it('defaults missing realm and nonce to empty strings', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { qop: 'auth' }
+            });
+            expect(header).to.include('realm=""');
+            expect(header).to.include('nonce=""');
+        });
+    });
 });
 
 function getFakeResponseBody(messages: string): string {

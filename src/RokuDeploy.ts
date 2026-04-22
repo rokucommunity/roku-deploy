@@ -19,6 +19,7 @@ import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
+import { fetchWithDigest } from './fetch';
 
 export class RokuDeploy {
 
@@ -27,9 +28,12 @@ export class RokuDeploy {
     }
 
     private logger: Logger;
-    //store the import on the class to make testing easier
 
+    //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
+
+    //property seam so tests can stub it
+    private fetch = globalThis.fetch.bind(globalThis);
 
     public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
 
@@ -1219,6 +1223,51 @@ export class RokuDeploy {
     }
 
     /**
+     * Check whether the given developer password is accepted by a Roku device.
+     *
+     * Performs a `HEAD /plugin_install` against the device's developer web
+     * server using digest auth. The body is intentionally ignored — only the
+     * response status matters. The two-step digest dance is performed
+     * manually (rather than relying on `postman-request`'s built-in auth)
+     * because Roku's socket handling is picky about keep-alive reuse.
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<ValidateDeveloperPasswordResult> {
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+        const url = `http://${options.host}:${port}/plugin_install`;
+
+        let response: Response;
+        try {
+            response = await fetchWithDigest(this.fetch, url, {
+                method: 'HEAD',
+                username: username,
+                password: options.password,
+                timeout: timeout
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            return {
+                ok: false,
+                state: 'unreachable',
+                reason: `Device at ${options.host} could not be contacted: ${message}`
+            };
+        }
+
+        if (response.status === 200) {
+            return { ok: true, state: 'ok', reason: 'Password accepted' };
+        }
+        if (response.status === 401) {
+            return { ok: false, state: 'bad-password', reason: 'Device rejected the credentials' };
+        }
+        return {
+            ok: false,
+            state: 'unreachable',
+            reason: `Unexpected status ${response.status} from device`
+        };
+    }
+
+    /**
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
@@ -1540,6 +1589,33 @@ export interface TakeScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     outFile?: string;
+}
+
+export interface ValidateDeveloperPasswordOptions {
+    /** The hostname or IP of the Roku device */
+    host: string;
+    /** The developer password to check */
+    password: string;
+    /** Defaults to `'rokudev'` */
+    username?: string;
+    /** Defaults to `80` (the developer web-server port) */
+    port?: number;
+    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    timeout?: number;
+}
+
+export interface ValidateDeveloperPasswordResult {
+    /** `true` when the device accepted the credentials */
+    ok: boolean;
+    /** Human-readable explanation — always populated, safe to show in a UI */
+    reason: string;
+    /**
+     * Machine-readable outcome for programmatic branching:
+     * - `'ok'` — credentials accepted
+     * - `'bad-password'` — device reachable, credentials rejected
+     * - `'unreachable'` — device could not be contacted (transient — do not treat as wrong password)
+     */
+    state: 'ok' | 'bad-password' | 'unreachable';
 }
 
 export interface GetDeviceInfoOptions {

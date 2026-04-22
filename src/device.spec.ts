@@ -14,7 +14,7 @@ describe('device', function device() {
         process.chdir(rootDir);
         options = rokuDeploy.getOptions({
             outDir: outDir,
-            host: '192.168.1.32',
+            host: '192.168.1.93',
             retainDeploymentArchive: true,
             password: 'aaaa',
             devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
@@ -74,7 +74,7 @@ describe('device', function device() {
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
                 rokuDeploy.deploy(options),
-                'Unauthorized. Please verify username and password for target Roku.'
+                `Unauthorized. Please verify credentials for host '${options.host}'`
             );
         });
     });
@@ -86,6 +86,36 @@ describe('device', function device() {
             expectPathExists(
                 await rokuDeploy.deployAndSignPackage(options)
             );
+        });
+    });
+
+    describe('validateDeveloperPassword', () => {
+        it('returns ok when the password is correct', async () => {
+            const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
+                host: options.host,
+                password: options.password
+            });
+            assert.strictEqual(result.state, 'ok');
+            assert.strictEqual(result.ok, true);
+        });
+
+        it('returns bad-password when the password is wrong', async () => {
+            const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
+                host: options.host,
+                password: 'NOT_THE_PASSWORD'
+            });
+            assert.strictEqual(result.state, 'bad-password');
+            assert.strictEqual(result.ok, false);
+        });
+
+        it('returns unreachable for an offline host', async () => {
+            const result = await rokuDeploy.rokuDeploy.validateDeveloperPassword({
+                host: '192.168.254.254',
+                password: 'aaaa',
+                timeout: 2000
+            });
+            assert.strictEqual(result.state, 'unreachable');
+            assert.strictEqual(result.ok, false);
         });
     });
 });
