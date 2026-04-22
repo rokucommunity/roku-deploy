@@ -20,6 +20,7 @@ import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
+import type * as undici from 'undici';
 
 export class RokuDeploy {
 
@@ -1230,7 +1231,7 @@ export class RokuDeploy {
         const timeout = options.timeout ?? 3000;
         const url = `http://${options.host}:${port}/plugin_install`;
 
-        let response: Response;
+        let response: undici.Response;
         try {
             response = await fetchWithDigest(url, {
                 method: 'HEAD',
@@ -1240,7 +1241,7 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new errors.DeviceUnreachableError(`Device at ${options.host} could not be contacted: ${message}`, err);
+            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
         }
 
         if (response.status === 200) {

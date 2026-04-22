@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as undici from 'undici';
 
 /**
  * Issue an HTTP request with digest authentication.
@@ -9,8 +10,8 @@ import * as crypto from 'crypto';
  */
 export async function fetchWithDigest(
     url: string,
-    init: RequestInit & { method: string; username: string; password: string; timeout: number }
-): Promise<Response> {
+    init: undici.RequestInit & { method: string; username: string; password: string; timeout: number }
+): Promise<undici.Response> {
     const { username, password, timeout, ...fetchInit } = init;
     const method = fetchInit.method.toUpperCase();
 
@@ -40,10 +41,10 @@ export async function fetchWithDigest(
     }, timeout);
 }
 
-function fetchWithTimeout(url: string, init: RequestInit, timeout: number): Promise<Response> {
+function fetchWithTimeout(url: string, init: undici.RequestInit, timeout: number): Promise<undici.Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    return globalThis.fetch(url, { ...init, signal: controller.signal })
+    return undici.fetch(url, { ...init, signal: controller.signal })
         .finally(() => clearTimeout(timer));
 }
 
