@@ -19,6 +19,8 @@ import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
+import { fetchWithDigest } from './fetch';
+import type * as undici from 'undici';
 
 export class RokuDeploy {
 
@@ -27,8 +29,8 @@ export class RokuDeploy {
     }
 
     private logger: Logger;
-    //store the import on the class to make testing easier
 
+    //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
     public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
@@ -1219,6 +1221,39 @@ export class RokuDeploy {
     }
 
     /**
+     * Check whether the given developer password is accepted by a Roku device.
+     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
+     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+        const url = `http://${options.host}:${port}/plugin_install`;
+
+        let response: undici.Response;
+        try {
+            response = await fetchWithDigest(url, {
+                method: 'HEAD',
+                username: username,
+                password: options.password,
+                timeout: timeout
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+        }
+
+        if (response.status === 200) {
+            return true;
+        }
+        if (response.status === 401) {
+            return false;
+        }
+        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response);
+    }
+
+    /**
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
@@ -1540,6 +1575,19 @@ export interface TakeScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     outFile?: string;
+}
+
+export interface ValidateDeveloperPasswordOptions {
+    /** The hostname or IP of the Roku device */
+    host: string;
+    /** The developer password to check */
+    password: string;
+    /** Defaults to `'rokudev'` */
+    username?: string;
+    /** Defaults to `80` (the developer web-server port) */
+    port?: number;
+    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    timeout?: number;
 }
 
 export interface GetDeviceInfoOptions {

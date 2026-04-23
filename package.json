@@ -34,6 +34,7 @@
         "postman-request": "^2.88.1-postman.40",
         "semver": "^7.7.3",
         "temp-dir": "^2.0.0",
+        "undici": "^5.29.0",
         "xml2js": "^0.5.0"
     },
     "devDependencies": {
@@ -43,7 +44,7 @@
         "@types/lodash": "^4.14.200",
         "@types/micromatch": "^4.0.2",
         "@types/mocha": "^9.0.0",
-        "@types/node": "^16.11.3",
+        "@types/node": "^18.19.0",
         "@types/q": "^1.5.8",
         "@types/semver": "^7.7.1",
         "@types/sinon": "^10.0.4",
