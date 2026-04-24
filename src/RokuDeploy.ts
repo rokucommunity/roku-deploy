@@ -20,7 +20,6 @@ import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
-import type * as undici from 'undici';
 
 export class RokuDeploy {
 
@@ -1231,7 +1230,7 @@ export class RokuDeploy {
         const timeout = options.timeout ?? 3000;
         const url = `http://${options.host}:${port}/plugin_install`;
 
-        let response: undici.Response;
+        let response: Response;
         try {
             response = await fetchWithDigest(url, {
                 method: 'HEAD',

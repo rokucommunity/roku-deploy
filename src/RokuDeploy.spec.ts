@@ -10,8 +10,7 @@ import * as child_process from 'child_process';
 import * as glob from 'glob';
 import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { RokuDeploy } from './RokuDeploy';
-import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
-import * as undici from 'undici';
+import { buildDigestAuthorization, httpClient, parseDigestChallenge } from './fetch';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -4691,7 +4690,7 @@ describe('RokuDeploy', () => {
         }
 
         it('returns true when the device accepts the credentials', async () => {
-            const fetchStub = sinon.stub(undici, 'fetch')
+            const fetchStub = sinon.stub(httpClient, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
@@ -4708,7 +4707,7 @@ describe('RokuDeploy', () => {
         });
 
         it('returns false when the authenticated retry is rejected', async () => {
-            sinon.stub(undici, 'fetch')
+            sinon.stub(httpClient, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
 
@@ -4718,7 +4717,7 @@ describe('RokuDeploy', () => {
         });
 
         it('throws DeviceUnreachableError when the first request throws', async () => {
-            sinon.stub(undici, 'fetch').rejects(new Error('ECONNREFUSED'));
+            sinon.stub(httpClient, 'fetch').rejects(new Error('ECONNREFUSED'));
 
             let thrown: unknown;
             try {
@@ -4731,7 +4730,7 @@ describe('RokuDeploy', () => {
         });
 
         it('throws InvalidDeviceResponseCodeError on an unexpected status (e.g. 500)', async () => {
-            sinon.stub(undici, 'fetch').resolves(fakeResponse(500));
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(500));
 
             let thrown: unknown;
             try {
@@ -4744,7 +4743,7 @@ describe('RokuDeploy', () => {
         });
 
         it('returns false when a 401 has no WWW-Authenticate header', async () => {
-            sinon.stub(undici, 'fetch').resolves(fakeResponse(401));
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(401));
 
             const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
 
@@ -4752,7 +4751,7 @@ describe('RokuDeploy', () => {
         });
 
         it('uses default port 80, username rokudev, and plugin_install path', async () => {
-            const fetchStub = sinon.stub(undici, 'fetch')
+            const fetchStub = sinon.stub(httpClient, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
@@ -4764,7 +4763,7 @@ describe('RokuDeploy', () => {
         });
 
         it('honors custom username and port', async () => {
-            const fetchStub = sinon.stub(undici, 'fetch')
+            const fetchStub = sinon.stub(httpClient, 'fetch')
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
@@ -4781,7 +4780,7 @@ describe('RokuDeploy', () => {
         });
 
         it('aborts the request when the timeout elapses', async () => {
-            sinon.stub(undici, 'fetch').callsFake((_url, init?: any) => {
+            sinon.stub(httpClient, 'fetch').callsFake((_url, init?: any) => {
                 return new Promise((resolve, reject) => {
                     init?.signal?.addEventListener('abort', () => {
                         const err: any = new Error('aborted');
@@ -4805,7 +4804,7 @@ describe('RokuDeploy', () => {
         });
 
         it('stringifies non-Error fetch rejections', async () => {
-            sinon.stub(undici, 'fetch').callsFake(() => Promise.reject('boom'));
+            sinon.stub(httpClient, 'fetch').callsFake(() => Promise.reject('boom'));
 
             let thrown: unknown;
             try {
