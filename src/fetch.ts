@@ -1,5 +1,11 @@
 import * as crypto from 'crypto';
-import * as undici from 'undici';
+
+// Module seam for `fetch` so tests can stub it. On Node 18, `fetch` is a lazy
+// getter on `globalThis` (not an own property), so `sinon.stub(globalThis, 'fetch')`
+// fails there — routing calls through this object gives a regular, stubbable export.
+export const httpClient = {
+    fetch: globalThis.fetch.bind(globalThis)
+};
 
 /**
  * Issue an HTTP request with digest authentication.
@@ -10,8 +16,8 @@ import * as undici from 'undici';
  */
 export async function fetchWithDigest(
     url: string,
-    init: undici.RequestInit & { method: string; username: string; password: string; timeout: number }
-): Promise<undici.Response> {
+    init: RequestInit & { method: string; username: string; password: string; timeout: number }
+): Promise<Response> {
     const { username, password, timeout, ...fetchInit } = init;
     const method = fetchInit.method.toUpperCase();
 
@@ -41,10 +47,10 @@ export async function fetchWithDigest(
     }, timeout);
 }
 
-function fetchWithTimeout(url: string, init: undici.RequestInit, timeout: number): Promise<undici.Response> {
+function fetchWithTimeout(url: string, init: RequestInit, timeout: number): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    return undici.fetch(url, { ...init, signal: controller.signal })
+    return httpClient.fetch(url, { ...init, signal: controller.signal })
         .finally(() => clearTimeout(timer));
 }
 
