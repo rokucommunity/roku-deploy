@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 const sinon = createSandbox();
