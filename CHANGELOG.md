@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.0](https://github.com/rokucommunity/roku-deploy/compare/3.16.5...v3.17.0) - 2026-04-27
+### Added
+ - `RokuDeploy.validateDeveloperPassword` function (requires node 18+) ([#252](https://github.com/rokucommunity/roku-deploy/pull/252))
+### Fixed
+ - `DeviceInfoRaw` `serial-number` (`serialNumber`) property name ([#251](https://github.com/rokucommunity/roku-deploy/pull/251))
+
+
+
 ## [3.16.5](https://github.com/rokucommunity/roku-deploy/compare/3.16.4...v3.16.5) - 2026-04-13
 ### Fixed
  - Resolve files array staging option ([#249](https://github.com/rokucommunity/roku-deploy/pull/249))
