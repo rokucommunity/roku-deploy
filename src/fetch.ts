@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 // getter on `globalThis` (not an own property), so `sinon.stub(globalThis, 'fetch')`
 // fails there — routing calls through this object gives a regular, stubbable export.
 export const httpClient = {
-    fetch: globalThis.fetch.bind(globalThis)
+    fetch: globalThis.fetch?.bind(globalThis)
 };
 
 /**
