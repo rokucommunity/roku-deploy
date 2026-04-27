@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.17.0](https://github.com/rokucommunity/roku-deploy/compare/3.16.5...v3.17.0) - 2026-04-27
-### Changed
- - feat: add RokuDeploy.validateDeveloperPassword ([#252](https://github.com/rokucommunity/roku-deploy/pull/252))
+### Added
+ - `RokuDeploy.validateDeveloperPassword` function (requires node 18+) ([#252](https://github.com/rokucommunity/roku-deploy/pull/252))
 ### Fixed
- - fix: correct DeviceInfoRaw serial-number property name ([#251](https://github.com/rokucommunity/roku-deploy/pull/251))
+ - `DeviceInfoRaw` `serial-number` (`serialNumber`) property name ([#251](https://github.com/rokucommunity/roku-deploy/pull/251))
 
 
 
