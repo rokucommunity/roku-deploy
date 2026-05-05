@@ -38,7 +38,6 @@ export interface RokuDeployOptions {
             'source/**\/*.*',
             'components/**\/*.*',
             'images/**\/*.*',
-            'fonts/**\/*.*',
             'locale/**\/*.*',
             'manifest'
         ],
