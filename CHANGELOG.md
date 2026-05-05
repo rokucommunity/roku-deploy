@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.17.2](https://github.com/rokucommunity/roku-deploy/compare/3.17.1...v3.17.2) - 2026-05-05
-### Changed
- - Expanded the default files array to include the locale folder ([#237](https://github.com/rokucommunity/roku-deploy/pull/237))
+### Fixed
+ - default files array missing the locale folder ([#237](https://github.com/rokucommunity/roku-deploy/pull/237))
 
 
 
