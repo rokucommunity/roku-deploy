@@ -1,6 +1,6 @@
 {
     "name": "roku-deploy",
-    "version": "3.17.1",
+    "version": "3.17.2",
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {

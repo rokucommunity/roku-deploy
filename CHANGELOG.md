@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.2](https://github.com/rokucommunity/roku-deploy/compare/3.17.1...v3.17.2) - 2026-05-05
+### Fixed
+ - default files array missing the locale folder ([#237](https://github.com/rokucommunity/roku-deploy/pull/237))
+
+
+
 ## [3.17.1](https://github.com/rokucommunity/roku-deploy/compare/3.17.0...v3.17.1) - 2026-04-27
 ### Fixed
  - Fix crash when loading roku-deploy on node < 18 ([#256](https://github.com/rokucommunity/roku-deploy/pull/256))
