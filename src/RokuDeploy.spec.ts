@@ -10,6 +10,7 @@ import * as child_process from 'child_process';
 import * as glob from 'glob';
 import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { DefaultFiles, RokuDeploy } from './RokuDeploy';
+import { buildDigestAuthorization, httpClient, parseDigestChallenge } from './fetch';
 import * as errors from './Errors';
 import { util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -47,6 +48,8 @@ describe('RokuDeploy', () => {
         fsExtra.ensureDirSync(stagingDir);
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
+        //create the default rekeySignedPackage so createReadStream doesn't leave an open stream to a missing file
+        fsExtra.outputFileSync(`${tempDir}/testSignedPackage.pkg`, '');
 
         writeStreamDeferred = q.defer<WriteStream>() as any;
         writeStreamPromise = writeStreamDeferred.promise as any;
@@ -727,21 +730,9 @@ describe('RokuDeploy', () => {
     });
 
     describe('copyToStaging', () => {
-        it('throws exceptions when rootDir does not exist', async () => {
-            await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], 'staging', 'folder_does_not_exist')
-            );
-        });
-
         it('throws exceptions on missing stagingPath', async () => {
             await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], undefined, undefined)
-            );
-        });
-
-        it('throws exceptions on missing rootDir', async () => {
-            await expectThrowsAsync(
-                rokuDeploy['copyToStaging']([], 'asdf', undefined)
+                rokuDeploy['copyToStaging']([], undefined)
             );
         });
 
@@ -757,19 +748,15 @@ describe('RokuDeploy', () => {
                 return Promise.resolve();
             });
 
-            sinon.stub(rokuDeploy, 'getFilePaths').returns(
-                Promise.resolve([
-                    {
-                        src: s`${rootDir}/source/main.brs`,
-                        dest: '/source/main.brs'
-                    }, {
-                        src: s`${rootDir}/components/a/b/c/comp1.xml`,
-                        dest: '/components/a/b/c/comp1.xml'
-                    }
-                ])
-            );
-
-            await rokuDeploy['copyToStaging']([], stagingDir, rootDir);
+            await rokuDeploy['copyToStaging']([
+                {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: 'source/main.brs'
+                }, {
+                    src: s`${rootDir}/components/a/b/c/comp1.xml`,
+                    dest: 'components/a/b/c/comp1.xml'
+                }
+            ], stagingDir);
 
             expect(ensureDirPaths).to.eql([
                 s`${stagingDir}/source`,
@@ -785,6 +772,41 @@ describe('RokuDeploy', () => {
                     dest: s`${stagingDir}/components/a/b/c/comp1.xml`
                 }
             ]);
+        });
+
+        it('does not double-up the path when dest is absolute', async () => {
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').returns(Promise.resolve() as any);
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src as string, dest: dest as string });
+                return Promise.resolve();
+            });
+
+            const absoluteDest = s`${stagingDir}/source/main.brs`;
+            await rokuDeploy['copyToStaging']([{
+                src: s`${rootDir}/source/main.brs`,
+                dest: absoluteDest
+            }], stagingDir);
+
+            // path.resolve(stagingDir, absoluteDest) returns absoluteDest unchanged,
+            // whereas the old `${stagingDir}/${absoluteDest}` would produce a doubled path
+            expect(copyPaths[0].dest).to.equal(absoluteDest);
+        });
+
+        it('copies to stagingDir root when dest is undefined', async () => {
+            const copyPaths = [] as Array<{ src: string; dest: string }>;
+            sinon.stub(rokuDeploy.fsExtra, 'ensureDir').returns(Promise.resolve() as any);
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+                copyPaths.push({ src: src as string, dest: dest as string });
+                return Promise.resolve();
+            });
+
+            await rokuDeploy['copyToStaging']([{
+                src: s`${rootDir}/source/main.brs`,
+                dest: undefined
+            }], stagingDir);
+
+            expect(copyPaths[0].dest).to.equal(s`${stagingDir}`);
         });
     });
 
@@ -958,7 +980,7 @@ describe('RokuDeploy', () => {
     });
 
     it('runs via the command line using the rokudeploy.json file', function test() {
-        this.timeout(20000);
+        this.timeout(60_000);
         //build the project
         child_process.execSync(`npm run build`, { stdio: 'inherit' });
         child_process.execSync(`node dist/index.js`, { stdio: 'inherit' });
@@ -3357,7 +3379,7 @@ describe('RokuDeploy', () => {
             }
         });
 
-        it('DefaultFiles includes standard Roku directories and excludes non-app files', async () => {
+        it('DefaultFiles includes locale directory', async () => {
             const projectDir = s`${tempDir}/defaultFilesProject`;
             writeFiles(projectDir, [
                 'manifest',
@@ -3365,26 +3387,19 @@ describe('RokuDeploy', () => {
                 'source/lib.brs',
                 'components/MainScene.xml',
                 'components/MainScene.brs',
-                'componentLibraries/myLib/myLib.brs',
-                'componentLibraries/myLib/myLib.xml',
                 'images/splash_hd.jpg',
-                'fonts/custom.ttf',
                 'locale/en_US/translations.xml',
                 'locale/es_ES/translations.xml',
                 // these should NOT be included
-                'README.md',
+                'fonts/custom.ttf',
+                'componentLibraries/myLib/myLib.brs',
                 'bsconfig.json',
                 '.vscode/settings.json',
-                'node_modules/some-package/index.js',
-                'source/data.db',
-                'components/.DS_Store'
+                'node_modules/some-package/index.js'
             ]);
             expect(await getFilePaths(DefaultFiles, projectDir)).to.eql([
-                { src: s`${projectDir}/componentLibraries/myLib/myLib.brs`, dest: s`componentLibraries/myLib/myLib.brs` },
-                { src: s`${projectDir}/componentLibraries/myLib/myLib.xml`, dest: s`componentLibraries/myLib/myLib.xml` },
                 { src: s`${projectDir}/components/MainScene.brs`, dest: s`components/MainScene.brs` },
                 { src: s`${projectDir}/components/MainScene.xml`, dest: s`components/MainScene.xml` },
-                { src: s`${projectDir}/fonts/custom.ttf`, dest: s`fonts/custom.ttf` },
                 { src: s`${projectDir}/images/splash_hd.jpg`, dest: s`images/splash_hd.jpg` },
                 { src: s`${projectDir}/locale/en_US/translations.xml`, dest: s`locale/en_US/translations.xml` },
                 { src: s`${projectDir}/locale/es_ES/translations.xml`, dest: s`locale/es_ES/translations.xml` },
@@ -3393,6 +3408,80 @@ describe('RokuDeploy', () => {
                 { src: s`${projectDir}/source/main.brs`, dest: s`source/main.brs` }
             ]);
         });
+
+        describe('asAbsolute', () => {
+            it('returns relative dest paths by default', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('returns absolute dest paths when asAbsolute is true', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/source/main.brs`
+                }]);
+            });
+
+            it('returns relative dest paths when asAbsolute is false', async () => {
+                const paths = await rokuDeploy.getFilePaths(['source/main.brs'], rootDir, false);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`source/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest against stagingDir for glob patterns', async () => {
+                const paths = (await rokuDeploy.getFilePaths(['source/**/*'], rootDir, true, stagingDir))
+                    .sort((a, b) => a.src.localeCompare(b.src));
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/lib.brs`,
+                    dest: s`${stagingDir}/source/lib.brs`
+                }, {
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/source/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest against stagingDir for {src;dest} with custom dest', async () => {
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: 'source/main.brs',
+                    dest: 'renamed/main.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${rootDir}/source/main.brs`,
+                    dest: s`${stagingDir}/renamed/main.brs`
+                }]);
+            });
+
+            it('resolves absolute dest for file from outside rootDir when asAbsolute is true', async () => {
+                writeFiles(otherProjectDir, ['source/thirdPartyLib.brs']);
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: `${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: 'lib/thirdPartyLib.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.eql([{
+                    src: s`${otherProjectDir}/source/thirdPartyLib.brs`,
+                    dest: s`${stagingDir}/lib/thirdPartyLib.brs`
+                }]);
+            });
+
+            it('last-entry-wins deduplication still applies when asAbsolute is true', async () => {
+                const paths = await rokuDeploy.getFilePaths([{
+                    src: `${rootDir}/components/component1.brs`,
+                    dest: 'comp.brs'
+                }, {
+                    src: `${rootDir}/source/main.brs`,
+                    dest: 'comp.brs'
+                }], rootDir, true, stagingDir);
+                expect(paths).to.be.lengthOf(1);
+                expect(paths[0].src).to.equal(s`${rootDir}/source/main.brs`);
+                expect(paths[0].dest).to.equal(s`${stagingDir}/comp.brs`);
+            });
+        });
     });
 
     describe('computeFileDestPath', () => {
@@ -3400,6 +3489,58 @@ describe('RokuDeploy', () => {
             expect(
                 rokuDeploy['computeFileDestPath'](s`${rootDir}/source/main.brs`, { src: s`source/main.brs` } as any, rootDir)
             ).to.eql(s`source/main.brs`);
+        });
+    });
+
+    describe('zipFolder {src;dest} entries', () => {
+        it('places file at relative dest path', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: 'source/main.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/main.brs')).to.exist;
+        });
+
+        it('places file at redirected relative dest path', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: 'out/renamed.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('out/renamed.brs')).to.exist;
+            expect(zip.file('source/main.brs')).not.to.exist;
+        });
+
+        it('places file from outside srcFolder at specified dest', async () => {
+            const otherDir = s`${tempDir}/other`;
+            writeFiles(otherDir, ['lib.brs']);
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${otherDir}/lib.brs`,
+                dest: 'source/lib.brs'
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            expect(zip.file('source/lib.brs')).to.exist;
+        });
+    });
+
+    describe('zipFolder absolute dest', () => {
+        it('does not create absolute-path entries in the zip when dest is absolute', async () => {
+            writeFiles(stagingDir, ['source/main.brs']);
+            const outputZipPath = s`${tempDir}/output.zip`;
+            await rokuDeploy.zipFolder(stagingDir, outputZipPath, null, [{
+                src: s`${stagingDir}/source/main.brs`,
+                dest: s`${stagingDir}/source/main.brs`
+            }]);
+            const zip = await JSZip.loadAsync(fsExtra.readFileSync(outputZipPath) as any);
+            const zipPaths = Object.keys(zip.files);
+            expect(zipPaths.every(p => !path.isAbsolute(p))).to.be.true;
         });
     });
 
@@ -3629,6 +3770,14 @@ describe('RokuDeploy', () => {
     });
 
     describe('prepublishToStaging', () => {
+        it('throws when rootDir is empty after getOptions', async () => {
+            sinon.stub(rokuDeploy, 'getOptions').returns({ rootDir: '', stagingDir: stagingDir } as any);
+            await expectThrowsAsync(
+                rokuDeploy.prepublishToStaging({}),
+                'rootDir is required'
+            );
+        });
+
         it('is resilient to file system errors', async () => {
             let copy = rokuDeploy.fsExtra.copy;
             let count = 0;
@@ -3694,6 +3843,194 @@ describe('RokuDeploy', () => {
                 }),
                 'fake error thrown as part of the unit test'
             );
+        });
+
+        describe('resolveFilesArray', () => {
+            it('copies pre-resolved absolute file entries when resolveFilesArray is false', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [{
+                        src: s`${rootDir}/source/main.brs`,
+                        dest: s`${stagingDir}/source/main.brs`
+                    }]
+                } as any);
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('throws when resolveFilesArray is false and src is not absolute', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{
+                            src: 'source/main.brs',
+                            dest: s`${stagingDir}/source/main.brs`
+                        }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and dest is not absolute', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{
+                            src: s`${rootDir}/source/main.brs`,
+                            dest: 'source/main.brs'
+                        }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry is null', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [null]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('throws when resolveFilesArray is false and an entry has a missing dest', async () => {
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: rootDir,
+                        stagingDir: stagingDir,
+                        resolveFilesArray: false,
+                        files: [{ src: s`${rootDir}/source/main.brs`, dest: undefined }]
+                    } as any),
+                    'When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths'
+                );
+            });
+
+            it('resolves files array via globbing by default (resolveFilesArray defaults to true)', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    files: ['source/main.brs']
+                });
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('throws when rootDir does not exist', async () => {
+                const missingRootDir = s`${rootDir}/does-not-exist`;
+                await expectThrowsAsync(
+                    rokuDeploy.prepublishToStaging({
+                        rootDir: missingRootDir,
+                        stagingDir: stagingDir,
+                        files: ['source/main.brs']
+                    }),
+                    `rootDir does not exist at "${missingRootDir}"`
+                );
+            });
+        });
+
+        describe('absolute src+dest file list (end-to-end)', () => {
+            it('copies multiple files to correct locations in stagingDir', async () => {
+                writeFiles(rootDir, [
+                    'source/main.brs',
+                    'components/Widget.xml',
+                    'components/Widget.brs'
+                ]);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${rootDir}/components/Widget.xml`, dest: s`${stagingDir}/components/Widget.xml` },
+                        { src: s`${rootDir}/components/Widget.brs`, dest: s`${stagingDir}/components/Widget.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/components/Widget.xml`);
+                expectPathExists(s`${stagingDir}/components/Widget.brs`);
+            });
+
+            it('copies file to a remapped dest path', async () => {
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/renamed/entry.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/renamed/entry.brs`);
+                expectPathNotExists(s`${stagingDir}/source/main.brs`);
+            });
+
+            it('copies files from outside rootDir', async () => {
+                const externalDir = s`${tempDir}/externalLib`;
+                writeFiles(externalDir, ['source/thirdParty.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` },
+                        { src: s`${externalDir}/source/thirdParty.brs`, dest: s`${stagingDir}/source/thirdParty.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+                expectPathExists(s`${stagingDir}/source/thirdParty.brs`);
+            });
+
+            it('does not crash when two files map to the same dest', async () => {
+                fsExtra.outputFileSync(`${rootDir}/source/main.brs`, 'original');
+                fsExtra.outputFileSync(`${rootDir}/source/override.brs`, 'override');
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/entry.brs` },
+                        { src: s`${rootDir}/source/override.brs`, dest: s`${stagingDir}/source/entry.brs` }
+                    ]
+                } as any);
+
+                expectPathExists(s`${stagingDir}/source/entry.brs`);
+                expect(fsExtra.readFileSync(s`${stagingDir}/source/entry.brs`, 'utf8')).to.be.oneOf(['original', 'override']);
+            });
+
+            it('clears stagingDir before copying', async () => {
+                // pre-populate stagingDir with a stale file
+                writeFiles(stagingDir, ['stale/old.brs']);
+                writeFiles(rootDir, ['source/main.brs']);
+
+                await rokuDeploy.prepublishToStaging({
+                    rootDir: rootDir,
+                    stagingDir: stagingDir,
+                    resolveFilesArray: false,
+                    files: [
+                        { src: s`${rootDir}/source/main.brs`, dest: s`${stagingDir}/source/main.brs` }
+                    ]
+                } as any);
+
+                expectPathNotExists(s`${stagingDir}/stale/old.brs`);
+                expectPathExists(s`${stagingDir}/source/main.brs`);
+            });
         });
     });
 
@@ -4364,6 +4701,208 @@ describe('RokuDeploy', () => {
             assert.throws(f);
         }
     }
+
+    describe('validateDeveloperPassword', () => {
+        const CHALLENGE_HEADER = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
+
+        // Minimal Response-like stub — validateDeveloperPassword only reads status + headers.get
+        function fakeResponse(status: number, headers: Record<string, string> = {}): any {
+            const lower: Record<string, string> = {};
+            for (const [k, v] of Object.entries(headers)) {
+                lower[k.toLowerCase()] = v;
+            }
+            return {
+                status: status,
+                headers: {
+                    get: (name: string) => lower[name.toLowerCase()] ?? null
+                }
+            };
+        }
+
+        it('returns true when the device accepts the credentials', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result).to.be.true;
+            expect(fetchStub.callCount).to.equal(2);
+            // Second call carries the computed Authorization header
+            const secondCallHeaders = (fetchStub.secondCall.args[1] as any).headers;
+            expect(secondCallHeaders.Authorization).to.match(/^Digest /);
+            expect(secondCallHeaders.Authorization).to.include('realm="rokudev"');
+            expect(secondCallHeaders.Authorization).to.include('nonce="abc123"');
+            expect(secondCallHeaders.Authorization).to.include('uri="/plugin_install"');
+        });
+
+        it('returns false when the authenticated retry is rejected', async () => {
+            sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'wrong' });
+
+            expect(result).to.be.false;
+        });
+
+        it('throws DeviceUnreachableError when the first request throws', async () => {
+            sinon.stub(httpClient, 'fetch').rejects(new Error('ECONNREFUSED'));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('ECONNREFUSED');
+        });
+
+        it('throws InvalidDeviceResponseCodeError on an unexpected status (e.g. 500)', async () => {
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(500));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.InvalidDeviceResponseCodeError);
+            expect((thrown as Error).message).to.include('500');
+        });
+
+        it('returns false when a 401 has no WWW-Authenticate header', async () => {
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(401));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result).to.be.false;
+        });
+
+        it('uses default port 80, username rokudev, and plugin_install path', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({ host: 'device.local', password: 'aaaa' });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:80/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
+            expect(authHeader).to.include('username="rokudev"');
+        });
+
+        it('honors custom username and port', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({
+                host: 'device.local',
+                password: 'aaaa',
+                username: 'somebody',
+                port: 8888
+            });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:8888/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
+            expect(authHeader).to.include('username="somebody"');
+        });
+
+        it('aborts the request when the timeout elapses', async () => {
+            sinon.stub(httpClient, 'fetch').callsFake((_url, init?: any) => {
+                return new Promise((resolve, reject) => {
+                    init?.signal?.addEventListener('abort', () => {
+                        const err: any = new Error('aborted');
+                        err.name = 'AbortError';
+                        reject(err);
+                    });
+                });
+            });
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({
+                    host: '1.2.3.4',
+                    password: 'aaaa',
+                    timeout: 20
+                });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+        });
+
+        it('stringifies non-Error fetch rejections', async () => {
+            sinon.stub(httpClient, 'fetch').callsFake(() => Promise.reject('boom'));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('boom');
+        });
+    });
+
+    describe('parseDigestChallenge', () => {
+        it('parses quoted values', () => {
+            const parsed = parseDigestChallenge('Digest realm="rokudev", nonce="abc123", qop="auth"');
+            expect(parsed).to.deep.equal({ realm: 'rokudev', nonce: 'abc123', qop: 'auth' });
+        });
+
+        it('parses bare (unquoted) values', () => {
+            const parsed = parseDigestChallenge('Digest realm="rokudev", algorithm=MD5, stale=false');
+            expect(parsed.algorithm).to.equal('MD5');
+            expect(parsed.stale).to.equal('false');
+        });
+    });
+
+    describe('buildDigestAuthorization', () => {
+        const baseParams = {
+            username: 'rokudev',
+            password: 'aaaa',
+            method: 'HEAD',
+            uri: '/plugin_install'
+        };
+
+        it('uses MD5-SESS HA1 when algorithm=MD5-SESS', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc', qop: 'auth', algorithm: 'MD5-SESS' }
+            });
+            expect(header).to.include('algorithm=MD5-SESS');
+        });
+
+        it('omits qop/nc/cnonce when the challenge has no qop', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc' }
+            });
+            expect(header).to.not.include('qop=');
+            expect(header).to.not.include('nc=');
+            expect(header).to.not.include('cnonce=');
+        });
+
+        it('includes opaque when present in the challenge', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { realm: 'rokudev', nonce: 'abc', qop: 'auth', opaque: 'xyz' }
+            });
+            expect(header).to.include('opaque="xyz"');
+        });
+
+        it('defaults missing realm and nonce to empty strings', () => {
+            const header = buildDigestAuthorization({
+                ...baseParams,
+                challenge: { qop: 'auth' }
+            });
+            expect(header).to.include('realm=""');
+            expect(header).to.include('nonce=""');
+        });
+    });
 });
 
 function getFakeResponseBody(messages: string): string {

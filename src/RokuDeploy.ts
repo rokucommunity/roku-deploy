@@ -19,6 +19,7 @@ import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
+import { fetchWithDigest } from './fetch';
 
 export class RokuDeploy {
 
@@ -27,8 +28,8 @@ export class RokuDeploy {
     }
 
     private logger: Logger;
-    //store the import on the class to make testing easier
 
+    //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
     public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
@@ -37,16 +38,51 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    public async prepublishToStaging(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async prepublishToStaging(options: RokuDeployOptions & { resolveFilesArray?: boolean }) {
+        options = this.getOptions(options) as any;
+        options.resolveFilesArray ??= true;
+
+        if (!options.rootDir) {
+            throw new Error('rootDir is required');
+        }
+        if (!await this.fsExtra.pathExists(options.rootDir)) {
+            throw new Error(`rootDir does not exist at "${options.rootDir}"`);
+        }
 
         //clean the staging directory
-        await this.fsExtra.remove(options.stagingDir);
+        await this.fsExtra.emptyDir(options.stagingDir);
 
-        //make sure the staging folder exists
-        await this.fsExtra.ensureDir(options.stagingDir);
-        await this.copyToStaging(options.files, options.stagingDir, options.rootDir);
+        let fileObjects: StandardizedFileEntry[];
+        //if we are supposed to resolve the files array, do it
+        if (options.resolveFilesArray) {
+            fileObjects = await this.getFilePaths(options.files, options.rootDir);
+
+            //do not resolve the files array. (user likely build the list themselves earlier and wants to skip re-globbing the whole list)
+        } else {
+            this.ensureFilesArrayIsResolved(options.files);
+            fileObjects = options.files as StandardizedFileEntry[];
+        }
+
+        await this.copyToStaging(fileObjects, options.stagingDir);
         return options.stagingDir;
+    }
+
+    /**
+     * Ensures that all entries in the files array are in the form of {src:string, dest:string}.
+     *
+     * Assumes all src and dest entries are absolute paths, but may add additional checks or relax this in the future.
+     *
+     * Will throw an exception on the first occurance that was not in the correct format
+     * @param files
+     */
+    private ensureFilesArrayIsResolved(files: FileEntry[]) {
+        //ensure the is no glob magic in any of the patterns
+        for (let fileEntry of files as StandardizedFileEntry[]) {
+            if (!fileEntry || typeof fileEntry.src !== 'string' || !path.isAbsolute(fileEntry.src) || typeof fileEntry.dest !== 'string' || !path.isAbsolute(fileEntry.dest)) {
+                throw new Error('When resolveFilesArray is false, all src and dest entries in the files array must be absolute paths');
+            }
+        }
+        return true;
     }
 
     /**
@@ -175,12 +211,20 @@ export class RokuDeploy {
     * Get all file paths for the specified options
     * @param files
     * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
+    * @param asAbsolute - if true, all returned file paths will be absolute. If false, all returned dest paths will be relative (default: false)
+    * @param stagingDir - the absolute path to the staging dir, used for computing absolute dest paths if `asAbsolute` is true
     */
-    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
+    public async getFilePaths(files: FileEntry[], rootDir: string, asAbsolute = false, stagingDir?: string): Promise<StandardizedFileEntry[]> {
+        const options = this.getOptions({
+            rootDir: rootDir,
+            stagingDir: stagingDir
+        });
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
-            rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
+            rootDir = options.rootDir;
         }
+        stagingDir = options.stagingDir;
+
         const entries = this.normalizeFilesArray(files);
         const srcPathsByIndex = await util.globAllByIndex(
             entries.map(x => {
@@ -202,11 +246,14 @@ export class RokuDeploy {
                 for (let srcPath of srcPaths) {
                     srcPath = util.standardizePath(srcPath);
 
-                    const dest = this.computeFileDestPath(srcPath, entry, rootDir);
+                    let dest = this.computeFileDestPath(srcPath, entry, rootDir);
+
                     //the last file with this `dest` will win, so just replace any existing entry with this one.
                     result.set(dest, {
                         src: srcPath,
-                        dest: dest
+                        dest: asAbsolute
+                            ? util.standardizePath(path.resolve(stagingDir, dest))
+                            : dest
                     });
                 }
             }
@@ -343,21 +390,16 @@ export class RokuDeploy {
      * @param fileGlobs
      * @param stagingPath
      */
-    private async copyToStaging(files: FileEntry[], stagingPath: string, rootDir: string) {
-        if (!stagingPath) {
+    private async copyToStaging(files: StandardizedFileEntry[], stagingDir: string) {
+        if (!stagingDir) {
             throw new Error('stagingPath is required');
         }
-        if (!rootDir) {
-            throw new Error('rootDir is required');
-        }
-        if (!await this.fsExtra.pathExists(rootDir)) {
-            throw new Error(`rootDir does not exist at "${rootDir}"`);
-        }
 
-        let fileObjects = await this.getFilePaths(files, rootDir);
         //copy all of the files
-        await Promise.all(fileObjects.map(async (fileObject) => {
-            let destFilePath = util.standardizePath(`${stagingPath}/${fileObject.dest}`);
+        await Promise.all(files.map(async (fileObject) => {
+            let destFilePath = util.standardizePath(
+                path.resolve(stagingDir, fileObject.dest ?? '')
+            );
 
             //make sure the containing folder exists
             await this.fsExtra.ensureDir(path.dirname(destFilePath));
@@ -1178,6 +1220,39 @@ export class RokuDeploy {
     }
 
     /**
+     * Check whether the given developer password is accepted by a Roku device.
+     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
+     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+        const url = `http://${options.host}:${port}/plugin_install`;
+
+        let response: Response;
+        try {
+            response = await fetchWithDigest(url, {
+                method: 'HEAD',
+                username: username,
+                password: options.password,
+                timeout: timeout
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+        }
+
+        if (response.status === 200) {
+            return true;
+        }
+        if (response.status === 401) {
+            return false;
+        }
+        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response);
+    }
+
+    /**
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
@@ -1354,7 +1429,7 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data as any, {
+                zip.file(path.relative(srcFolder, path.resolve(srcFolder, file.dest)).replace(/[\\/]/g, '/'), data as any, {
                     compression: compression
                 });
             });
@@ -1466,14 +1541,10 @@ enum RokuMessageType {
 
 export const DefaultFiles = [
     'source/**/*.*',
-    'componentLibraries/**/*.*',
     'components/**/*.*',
     'images/**/*.*',
     'locale/**/*',
-    'fonts/**/*',
-    'manifest',
-    '!node_modules',
-    '!**/*.{md,DS_Store,db}'
+    'manifest'
 ];
 
 export interface HttpResponse {
@@ -1504,6 +1575,19 @@ export interface TakeScreenshotOptions {
      * The default format looks something like this: screenshot-YYYY-MM-DD-HH.mm.ss.SSS.<jpg|png>
      */
     outFile?: string;
+}
+
+export interface ValidateDeveloperPasswordOptions {
+    /** The hostname or IP of the Roku device */
+    host: string;
+    /** The developer password to check */
+    password: string;
+    /** Defaults to `'rokudev'` */
+    username?: string;
+    /** Defaults to `80` (the developer web-server port) */
+    port?: number;
+    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    timeout?: number;
 }
 
 export interface GetDeviceInfoOptions {

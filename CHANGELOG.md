@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.1](https://github.com/rokucommunity/roku-deploy/compare/3.17.0...v3.17.1) - 2026-04-27
+### Fixed
+ - Fix crash when loading roku-deploy on node < 18 ([#256](https://github.com/rokucommunity/roku-deploy/pull/256))
+
+
+
+## [3.17.0](https://github.com/rokucommunity/roku-deploy/compare/3.16.5...v3.17.0) - 2026-04-27
+### Added
+ - `RokuDeploy.validateDeveloperPassword` function (requires node 18+) ([#252](https://github.com/rokucommunity/roku-deploy/pull/252))
+### Fixed
+ - `DeviceInfoRaw` `serial-number` (`serialNumber`) property name ([#251](https://github.com/rokucommunity/roku-deploy/pull/251))
+
+
+
+## [3.16.5](https://github.com/rokucommunity/roku-deploy/compare/3.16.4...v3.16.5) - 2026-04-13
+### Fixed
+ - Resolve files array staging option ([#249](https://github.com/rokucommunity/roku-deploy/pull/249))
+
+
+
+## [3.16.4](https://github.com/rokucommunity/roku-deploy/compare/3.16.3...v3.16.4) - 2026-04-07
+### Fixed
+ - Fix `zipFolder` bug that wasn't properly handling absolute `stagingDir` path ([#245](https://github.com/rokucommunity/roku-deploy/pull/245))
+
+
+
+## [3.16.3](https://github.com/rokucommunity/roku-deploy/compare/3.16.2...v3.16.3) - 2026-03-24
+### Changed
+ - chore: Bump flatted from 3.2.2 to 3.4.2 ([#236](https://github.com/rokucommunity/roku-deploy/pull/236))
+
+
+
 ## [3.16.2](https://github.com/rokucommunity/roku-deploy/compare/3.16.1...v3.16.2) - 2026-03-09
 ### Changed
  - Bump minimatch from 3.1.2 to 3.1.5 ([#234](https://github.com/rokucommunity/roku-deploy/pull/234))

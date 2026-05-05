@@ -179,7 +179,7 @@ export class Util {
      */
     private filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
         //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
-        let negatedPatternAbsolute = '!' + path.posix.join(cwd, pattern.replace(/^!/, ''));
+        let negatedPatternAbsolute = '!' + path.resolve(cwd, pattern.replace(/^!/, '')).replace(/\\/g, '/');
         let filter = micromatch.matcher(negatedPatternAbsolute);
         for (let i = 0; i <= stopIndex; i++) {
             if (filesByIndex[i]) {

@@ -43,6 +43,13 @@ export class UnknownDeviceResponseError extends Error {
     }
 }
 
+export class DeviceUnreachableError extends Error {
+    constructor(message: string, public results?: any) {
+        super(message);
+        Object.setPrototypeOf(this, DeviceUnreachableError.prototype);
+    }
+}
+
 export class CompileError extends Error {
     constructor(message: string, public results: any, public rokuMessages: RokuMessages) {
         super(message);
