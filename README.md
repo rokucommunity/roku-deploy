@@ -76,6 +76,7 @@ rokuDeploy.prepublishToStaging({
         "source/**/*",
         "components/**/*",
         "images/**/*",
+        "locale/**/*",
         "manifest"
     ],
     //...other options if necessary
@@ -178,6 +179,7 @@ For most standard projects, the default files array should work just fine:
         "source/**/*",
         "components/**/*",
         "images/**/*",
+        "locale/**/*",
         "manifest"
     ]
 }
@@ -321,6 +323,7 @@ Here are the available options. The defaults are shown to the right of the optio
         "source/**/*.*",
         "components/**/*.*",
         "images/**/*.*",
+        "locale/**/*",
         "manifest"
     ]
     ```
