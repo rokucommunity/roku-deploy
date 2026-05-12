@@ -100,6 +100,12 @@ export interface RokuDeployOptions {
     remoteDebugConnectEarly?: boolean;
 
     /**
+     * When publishing a sideloaded channel, set this to `false` to prevent the Roku device from auto-launching the channel after install.
+     * When omitted (the default), the device's normal auto-launch behavior is used.
+     */
+    autoLaunch?: boolean;
+
+    /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.

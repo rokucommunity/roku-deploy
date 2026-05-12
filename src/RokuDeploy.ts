@@ -493,6 +493,12 @@ export class RokuDeploy {
                 requestOptions.formData.remotedebug_connect_early = '1';
             }
 
+            //disable auto-launching the channel after install if explicitly opted out
+            if (options.autoLaunch === false) {
+                // eslint-disable-next-line camelcase
+                requestOptions.formData.dev_autolaunch = '0';
+            }
+
             //apply any supplied formData overrides
             for (const key in options.packageUploadOverrides?.formData ?? {}) {
                 const value = options.packageUploadOverrides.formData[key];

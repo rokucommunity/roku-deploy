@@ -1354,6 +1354,27 @@ describe('RokuDeploy', () => {
             });
         });
 
+        it('sets dev_autolaunch to 0 when autoLaunch is false', async () => {
+            options.autoLaunch = false;
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.publish(options);
+            expect(result.message).to.equal('Successful deploy');
+            expect(stub.getCall(0).args[0].formData.dev_autolaunch).to.eql('0');
+        });
+
+        it('omits dev_autolaunch when autoLaunch is not false', async () => {
+            const stub = mockDoPostRequest();
+
+            delete options.autoLaunch;
+            await rokuDeploy.publish(options);
+            expect(stub.getCall(0).args[0].formData).to.not.haveOwnProperty('dev_autolaunch');
+
+            options.autoLaunch = true;
+            await rokuDeploy.publish(options);
+            expect(stub.getCall(1).args[0].formData).to.not.haveOwnProperty('dev_autolaunch');
+        });
+
         it('does not set appType if not explicitly defined', async () => {
             delete options.appType;
             const stub = mockDoPostRequest();
