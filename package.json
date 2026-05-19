@@ -4,21 +4,21 @@
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
-        "build": "rimraf dist && tsc",
+        "build": "npm run clean && tsc",
+        "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
         "preversion": "npm run build && npm run lint && npm run test",
         "prepublishOnly": "npm run build",
-        "watch": "rimraf dist && tsc --watch",
+        "watch": "npm run clean && tsc --watch",
         "lint": "eslint \"./src/**/*.ts\"",
         "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:device": "nyc mocha src/device.spec.ts",
         "test:all": "nyc mocha \"src/**/*.spec.ts\"",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
-        "publish-coverage": "nyc report --reporter=text-lcov | coveralls",
         "package": "npm run build && npm pack"
     },
     "dependencies": {
-        "@types/request": "^2.47.0",
+        "@types/request": "^2.48.13",
         "chalk": "^2.4.2",
         "dateformat": "^3.0.3",
         "dayjs": "^1.11.0",
@@ -31,7 +31,7 @@
         "micromatch": "^4.0.4",
         "moment": "^2.29.1",
         "parse-ms": "^2.1.0",
-        "postman-request": "^2.88.1-postman.40",
+        "postman-request": "^2.88.1-postman.48",
         "semver": "^7.7.3",
         "temp-dir": "^2.0.0",
         "xml2js": "^0.5.0"
@@ -42,7 +42,7 @@
         "@types/is-glob": "^4.0.2",
         "@types/lodash": "^4.14.200",
         "@types/micromatch": "^4.0.2",
-        "@types/mocha": "^9.0.0",
+        "@types/mocha": "^10.0.0",
         "@types/node": "^18.19.0",
         "@types/q": "^1.5.8",
         "@types/semver": "^7.7.1",
@@ -51,17 +51,18 @@
         "@typescript-eslint/eslint-plugin": "5.1.0",
         "@typescript-eslint/parser": "5.1.0",
         "chai": "^4.3.4",
-        "coveralls-next": "^4.2.0",
         "eslint": "8.0.1",
-        "mocha": "^9.1.3",
+        "mocha": "^10.8.2",
         "nyc": "^15.1.0",
         "q": "^1.5.1",
-        "rimraf": "^6.0.1",
         "sinon": "^11.1.2",
         "source-map-support": "^0.5.13",
         "ts-node": "^10.3.1",
         "typescript": "^4.4.4",
         "undent": "^1.0.0"
+    },
+    "overrides": {
+        "serialize-javascript": "^7.0.5"
     },
     "mocha": {
         "require": [

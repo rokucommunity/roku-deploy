@@ -27,4 +27,3 @@ jobs:
       - run: npm run build
       - run: npm run lint
       - run: npm run test
-      - run: npm run publish-coverage
