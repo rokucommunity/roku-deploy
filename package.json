@@ -10,6 +10,7 @@
         "prepublishOnly": "npm run build",
         "watch": "npm run clean && tsc --watch",
         "lint": "eslint \"./src/**/*.ts\"",
+        "audit": "npm audit",
         "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:device": "nyc mocha src/device.spec.ts",
