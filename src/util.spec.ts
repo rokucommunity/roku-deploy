@@ -1,4 +1,4 @@
-import { util, standardizePath as s } from './util';
+import { defer, util, standardizePath as s } from './util';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import { tempDir } from './testUtils.spec';
@@ -306,6 +306,76 @@ describe('util', () => {
             expect(
                 await util.dnsLookup('some-host', true)
             ).to.eql('some-host');
+        });
+    });
+
+    describe('defer', () => {
+        it('resolves the promise', async () => {
+            const deferred = defer<number>();
+            deferred.resolve(42);
+            expect(await deferred.promise).to.equal(42);
+            expect(deferred.isResolved).to.be.true;
+            expect(deferred.isCompleted).to.be.true;
+        });
+
+        it('rejects the promise', async () => {
+            const deferred = defer<void>();
+            deferred.reject(new Error('boom'));
+            let caught: Error;
+            try {
+                await deferred.promise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('boom');
+            expect(deferred.isRejected).to.be.true;
+            expect(deferred.isCompleted).to.be.true;
+        });
+
+        it('tryResolve is a no-op once completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryResolve(1);
+            deferred.tryResolve(2);
+            expect(await deferred.promise).to.equal(1);
+        });
+
+        it('tryReject is a no-op once completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryResolve(1);
+            deferred.tryReject(new Error('should not surface'));
+            expect(await deferred.promise).to.equal(1);
+        });
+
+        it('tryReject rejects when not yet completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryReject(new Error('boom'));
+            let caught: Error;
+            try {
+                await deferred.promise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('boom');
+        });
+
+        it('throws when reject is called twice', () => {
+            const deferred = defer<number>();
+            deferred.reject(new Error('first'));
+            //swallow the unhandled rejection
+            deferred.promise.catch(() => { });
+            expect(() => deferred.reject(new Error('second'))).to.throw(/already rejected/);
+        });
+
+        it('throws when resolve is called twice', () => {
+            const deferred = defer<number>();
+            deferred.resolve(1);
+            expect(() => deferred.resolve(2)).to.throw(/already resolved/);
+        });
+
+        it('throws when reject is called after resolve', () => {
+            const deferred = defer<number>();
+            deferred.resolve(1);
+            expect(() => deferred.reject(new Error('x'))).to.throw(/already resolved/);
         });
     });
 

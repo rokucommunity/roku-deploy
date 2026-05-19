@@ -106,6 +106,12 @@ describe('Logger', () => {
     });
 
     describe('time', () => {
+        beforeEach(() => {
+            sinon.stub(console, 'log');
+            sinon.stub(console, 'info');
+            sinon.stub(console, 'trace');
+        });
+
         it('calls action even if logLevel is wrong', () => {
             logger.logLevel = LogLevel.error;
             const spy = sinon.spy();

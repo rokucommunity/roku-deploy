@@ -3,7 +3,6 @@ import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, PathLike } from 'fs-extra';
 import * as fs from 'fs';
-import * as q from 'q';
 import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
@@ -12,7 +11,8 @@ import type { BeforeZipCallbackInfo } from './RokuDeploy';
 import { DefaultFiles, RokuDeploy } from './RokuDeploy';
 import { buildDigestAuthorization, httpClient, parseDigestChallenge } from './fetch';
 import * as errors from './Errors';
-import { util, standardizePath as s } from './util';
+import type { Deferred } from './util';
+import { defer, util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
@@ -27,7 +27,7 @@ describe('RokuDeploy', () => {
     let options: RokuDeployOptions;
 
     let writeStreamPromise: Promise<WriteStream>;
-    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: undefined | true };
+    let writeStreamDeferred: Deferred<WriteStream>;
     let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
@@ -51,21 +51,20 @@ describe('RokuDeploy', () => {
         //create the default rekeySignedPackage so createReadStream doesn't leave an open stream to a missing file
         fsExtra.outputFileSync(`${tempDir}/testSignedPackage.pkg`, '');
 
-        writeStreamDeferred = q.defer<WriteStream>() as any;
-        writeStreamPromise = writeStreamDeferred.promise as any;
+        writeStreamDeferred = defer<WriteStream>();
+        writeStreamPromise = writeStreamDeferred.promise;
 
         //fake out the write stream function
         createWriteStreamStub = sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').callsFake((filePath: PathLike) => {
             const writeStream = fs.createWriteStream(filePath);
-            writeStreamDeferred.resolve(writeStream);
-            writeStreamDeferred.isComplete = true;
+            writeStreamDeferred.tryResolve(writeStream);
             return writeStream;
         });
     });
 
     afterEach(() => {
         try {
-            if (createWriteStreamStub.called && !writeStreamDeferred.isComplete) {
+            if (createWriteStreamStub.called && !writeStreamDeferred.isCompleted) {
                 writeStreamDeferred.reject('Deferred was never resolved...so rejecting in the afterEach');
             }
 
@@ -4276,11 +4275,34 @@ describe('RokuDeploy', () => {
     });
 
     describe('getToFile', () => {
+        it('rejects when the write stream emits an error', async () => {
+            //intercept the http request so it never tries to network
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: () => req,
+                    pipe: () => req
+                };
+                return req;
+            });
+
+            const finalPromise = rokuDeploy['getToFile']({}, s`${tempDir}/out/something.txt`);
+            const writeStream = await writeStreamPromise;
+            writeStream.emit('error', new Error('write stream blew up'));
+
+            let caught: Error | undefined;
+            try {
+                await finalPromise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('write stream blew up');
+        });
+
         it('waits for the write stream to finish writing before resolving', async () => {
             let getToFileIsResolved = false;
 
-            let requestCalled = q.defer();
-            let onResponse = q.defer<(res) => any>();
+            let requestCalled = defer<void>();
+            let onResponse = defer<(res) => any>();
 
             //intercept the http request
             sinon.stub(request, 'get').callsFake(() => {

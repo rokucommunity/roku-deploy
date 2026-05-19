@@ -232,6 +232,68 @@ export class Util {
 
 export let util = new Util();
 
+export function defer<T>() {
+    let _resolve: (value?: PromiseLike<T> | T) => void;
+    let _reject: (reason?: any) => void;
+    let promise = new Promise<T>((resolveValue, rejectValue) => {
+        _resolve = resolveValue;
+        _reject = rejectValue;
+    });
+    return {
+        promise: promise,
+        tryResolve: function tryResolve(value?: PromiseLike<T> | T) {
+            if (!this.isCompleted) {
+                this.resolve(value);
+            }
+        },
+        resolve: function resolve(value?: PromiseLike<T> | T) {
+            if (!this.isResolved) {
+                this.isResolved = true;
+                _resolve(value);
+                _resolve = undefined;
+            } else {
+                throw new Error(
+                    `Attempted to resolve a promise that was already resolved.` +
+                    `New value: ${JSON.stringify(value)}`
+                );
+            }
+        },
+        tryReject: function tryReject(reason?: any) {
+            if (!this.isCompleted) {
+                this.reject(reason);
+            }
+        },
+        reject: function reject(reason?: any) {
+            if (!this.isCompleted) {
+                this.isRejected = true;
+                _reject(reason);
+                _reject = undefined;
+            } else {
+                throw new Error(
+                    `Attempted to reject a promise that was already ${this.isResolved ? 'resolved' : 'rejected'}.` +
+                    `New error message: ${String(reason)}`
+                );
+            }
+        },
+        isResolved: false,
+        isRejected: false,
+        get isCompleted() {
+            return this.isResolved || this.isRejected;
+        }
+    };
+}
+
+export interface Deferred<T> {
+    promise: Promise<T>;
+    tryResolve: (value?: T | PromiseLike<T>) => void;
+    resolve: (value?: T | PromiseLike<T>) => void;
+    tryReject: (reason?: any) => void;
+    reject: (reason?: any) => void;
+    isResolved: boolean;
+    isRejected: boolean;
+    readonly isCompleted: boolean;
+}
+
 
 /**
  * A tagged template literal function for standardizing the path.
