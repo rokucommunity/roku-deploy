@@ -4275,6 +4275,29 @@ describe('RokuDeploy', () => {
     });
 
     describe('getToFile', () => {
+        it('rejects when the write stream emits an error', async () => {
+            //intercept the http request so it never tries to network
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: () => req,
+                    pipe: () => req
+                };
+                return req;
+            });
+
+            const finalPromise = rokuDeploy['getToFile']({}, s`${tempDir}/out/something.txt`);
+            const writeStream = await writeStreamPromise;
+            writeStream.emit('error', new Error('write stream blew up'));
+
+            let caught: Error | undefined;
+            try {
+                await finalPromise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('write stream blew up');
+        });
+
         it('waits for the write stream to finish writing before resolving', async () => {
             let getToFileIsResolved = false;
 

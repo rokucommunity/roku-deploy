@@ -253,7 +253,7 @@ export function defer<T>() {
                 _resolve = undefined;
             } else {
                 throw new Error(
-                    `Attempted to resolve a promise that was already ${this.isResolved ? 'resolved' : 'rejected'}.` +
+                    `Attempted to resolve a promise that was already resolved.` +
                     `New value: ${JSON.stringify(value)}`
                 );
             }
