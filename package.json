@@ -98,7 +98,8 @@
         ],
         "reporter": [
             "text-summary",
-            "html"
+            "html",
+            "lcovonly"
         ],
         "sourceMap": true,
         "instrument": true,
