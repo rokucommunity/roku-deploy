@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.4](https://github.com/rokucommunity/roku-deploy/compare/3.17.3...v3.17.4) - 2026-05-19
+### Changed
+ - npm audit fixes ([#263](https://github.com/rokucommunity/roku-deploy/pull/263))
+
+
+
 ## [3.17.3](https://github.com/rokucommunity/roku-deploy/compare/3.17.2...v3.17.3) - 2026-05-12
 ### Added
  - Add `autoLaunch` option to control wether the app auto starts when sideloading ([#261](https://github.com/rokucommunity/roku-deploy/pull/261))
