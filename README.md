@@ -412,5 +412,9 @@ User-Agent: roku-deploy/unknown
 ## Troubleshooting
  - if you see a `ESOCKETTIMEDOUT` error during deployment, this can be caused by an antivirus blocking network traffic, so consider adding a special exclusion for your Roku device.
 
+## Accepted security advisories
+
+Dependencies flagged by `npm audit` that we have reviewed and chosen not to upgrade are tracked in [audit-ci.jsonc](https://github.com/RokuCommunity/roku-deploy/blob/master/audit-ci.jsonc). Each entry includes the advisory ID, the date it was added, and the reason it does not apply to this project.
+
 ## Changelog
 Click [here](CHANGELOG.md) to view the changelog
