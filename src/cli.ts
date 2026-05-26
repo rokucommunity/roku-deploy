@@ -146,6 +146,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('out', { type: 'string', description: 'The location where the screenshot will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.jpg' })
+            .option('autoExtension', { type: 'boolean', description: 'Automatically handle file extension based on device response. When false (default), filename is used exactly as provided.', demandOption: false, default: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new CaptureScreenshotCommand().run(args);

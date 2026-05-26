@@ -3059,7 +3059,7 @@ describe('RokuDeploy', () => {
             expect(fsExtra.existsSync(result));
         });
 
-        it('take a screenshot from the device and saves to temp but with the supplied file name', async () => {
+        it('take a screenshot from the device and saves to temp but with the supplied file name (no extension added by default)', async () => {
             let body = getFakeResponseBody(`
                 Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
 
@@ -3077,7 +3077,81 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
+            // With autoExtension: false (default), user-provided filename is used exactly
             let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile' });
+            expect(result).not.to.be.undefined;
+            expect(path.basename(result)).to.equal('myFile');
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('autoExtension: true appends device extension when user filename has no extension', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile', autoExtension: true });
+            expect(result).not.to.be.undefined;
+            expect(path.basename(result)).to.equal('myFile.jpg');
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('autoExtension: true swaps extension when user extension does not match device', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            // User provides .png but device returns .jpg - should swap to .jpg
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.png', autoExtension: true });
+            expect(result).not.to.be.undefined;
+            expect(path.basename(result)).to.equal('myFile.jpg');
+            expect(fsExtra.existsSync(result));
+        });
+
+        it('autoExtension: true keeps extension when user extension matches device', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.jpg', autoExtension: true });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));

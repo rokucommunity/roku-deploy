@@ -841,6 +841,10 @@ export class RokuDeploy {
      */
     public async captureScreenshot(options: CaptureScreenshotOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
+
+        // Track if user provided a filename before we apply defaults
+        const userProvidedFilename = options.screenshotFile !== undefined;
+
         options = this.getOptions(options);
         options.screenshotFile ??= `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
         let saveFilePath: string;
@@ -855,14 +859,34 @@ export class RokuDeploy {
         });
 
         // Pull the image url out of the response body
-        const [_, imageUrlOnDevice, imageExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
+        const [_, imageUrlOnDevice, deviceExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
 
         if (imageUrlOnDevice) {
-            const userExt = ['.jpg', '.png'].includes(path.extname(options.screenshotFile).toLowerCase()) ? path.extname(options.screenshotFile) : undefined;
-            if (userExt && userExt.toLowerCase() !== imageExt.toLowerCase()) {
-                console.warn(`Warning: Provided screenshot file extension "${userExt}" does not match the device's format "${imageExt}". The file was saved with "${userExt}".`);
+            let screenshotFile: string;
+            const userExt = path.extname(options.screenshotFile).toLowerCase();
+            const deviceExtLower = deviceExt.toLowerCase();
+
+            if (options.autoExtension) {
+                // Smart extension handling when autoExtension is enabled
+                if (userExt === deviceExtLower) {
+                    // User extension matches device extension - use as-is
+                    screenshotFile = options.screenshotFile;
+                } else if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
+                    // User provided an image extension that doesn't match - swap it
+                    const baseName = options.screenshotFile.slice(0, -userExt.length);
+                    screenshotFile = baseName + deviceExt;
+                } else {
+                    // No recognized image extension - append device extension
+                    screenshotFile = options.screenshotFile + deviceExt;
+                }
+            } else if (!userProvidedFilename) {
+                // No user-provided filename and autoExtension is false - append extension to generated default
+                screenshotFile = options.screenshotFile + deviceExt;
+            } else {
+                // User provided a filename and autoExtension is false - use exactly as provided
+                screenshotFile = options.screenshotFile;
             }
-            const screenshotFile = userExt ? options.screenshotFile : options.screenshotFile + imageExt;
+
             saveFilePath = util.standardizePath(path.join(options.screenshotDir, screenshotFile));
             await this.downloadFile(
                 this.generateBaseRequestOptions(imageUrlOnDevice, options),
@@ -1256,6 +1280,16 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
      * The current working directory to use for relative paths
      */
     cwd?: string;
+
+    /**
+     * When false (default), the filename is used exactly as provided by the user.
+     * When true, the extension is automatically handled:
+     *   - If the user's filename ends with the device's extension, use it as-is
+     *   - If the user's filename ends with .png or .jpg but doesn't match the device's format, swap the extension
+     *   - Otherwise, append the device's extension to the filename
+     * @default false
+     */
+    autoExtension?: boolean;
 }
 
 export interface GetDeviceInfoOptions extends BaseEcpOptions {

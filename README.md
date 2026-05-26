@@ -161,8 +161,11 @@ npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 
 ### Device management
 ```shell
-# Take a screenshot
+# Take a screenshot (filename used exactly as provided)
 npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot.jpg'
+
+# Take a screenshot with auto extension handling (appends/swaps extension based on device response)
+npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot' --autoExtension
 
 # Rekey a device with a signed package
 npx roku-deploy rekey --host 'ip.of.roku' --password 'password' --pkg './path/to/signed.pkg' --signingPassword 'signing password'
@@ -294,12 +297,22 @@ rokuDeploy.sendText({
 
 ### Take a screenshot
 ```typescript
+// Filename is used exactly as provided (default behavior)
 rokuDeploy.captureScreenshot({
     host: 'ip-of-roku',
     password: 'password',
     screenshotDir: './screenshots/',
     screenshotFile: 'screenshot.jpg'
     //...other options if necessary
+})
+
+// With autoExtension: true, the extension is automatically handled based on device response
+rokuDeploy.captureScreenshot({
+    host: 'ip-of-roku',
+    password: 'password',
+    screenshotDir: './screenshots/',
+    screenshotFile: 'screenshot',  // Extension will be appended based on device
+    autoExtension: true
 })
 ```
 
@@ -576,6 +589,9 @@ Here are the available options for customizing to your developer-specific workfl
 
 - **screenshotDir?:** string = `"./tmp/roku-deploy/screenshots/"`
     The directory where screenshots should be saved. Will use the OS temp directory by default.
+
+- **autoExtension?:** boolean = `false`
+    When false (default), the screenshot filename is used exactly as provided. When true, the file extension is automatically handled based on the device response: matching extensions are kept, mismatched image extensions (.jpg/.png) are swapped, and missing extensions are appended.
 
 - **timeout?:** number = `150000`
     The number of milliseconds at which point this request should timeout and return a rejected promise.
