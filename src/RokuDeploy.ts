@@ -411,7 +411,7 @@ export class RokuDeploy {
      * Converts the currently sideloaded dev app to squashfs for faster loading packages
      * @param options
      */
-    public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+    public async squash(options: SquashOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
         options = this.getOptions(options) as any;
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options as any, {
@@ -449,7 +449,7 @@ export class RokuDeploy {
      * resign Roku Device with a supplied signed pkg and
      * @param options
      */
-    public async rekeyDevice(options: RekeyDeviceOptions) {
+    public async rekey(options: RekeyOptions) {
         this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
         options = this.getOptions(options) as any;
 
@@ -496,7 +496,7 @@ export class RokuDeploy {
      * Sign a pre-existing package using Roku and return path to it locally
      * @param options
      */
-    public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+    public async package(options: PackageOptions): Promise<string> {
         logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         options = this.getOptions(options) as any;
@@ -839,7 +839,7 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async captureScreenshot(options: CaptureScreenshotOptions) {
+    public async screenshot(options: ScreenshotOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Track if user provided a filename before we apply defaults
@@ -1263,7 +1263,7 @@ export interface HttpResponse {
     body: any;
 }
 
-export interface CaptureScreenshotOptions extends BaseRequestOptions {
+export interface ScreenshotOptions extends BaseRequestOptions {
     /**
      * A full path to the folder where the screenshots should be saved.
      * Will use the OS temp directory by default
@@ -1386,9 +1386,9 @@ export interface BaseEcpOptions {
     timeout?: number;
 }
 
-export type ConvertToSquashfsOptions = BaseRequestOptions;
+export type SquashOptions = BaseRequestOptions;
 
-export interface RekeyDeviceOptions extends BaseRequestOptions {
+export interface RekeyOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
     rootDir?: string;
@@ -1396,7 +1396,7 @@ export interface RekeyDeviceOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
-export interface CreateSignedPackageOptions extends BaseRequestOptions {
+export interface PackageOptions extends BaseRequestOptions {
     signingPassword: string;
     appTitle?: string;
     appVersion?: string;

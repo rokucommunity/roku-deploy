@@ -16,7 +16,7 @@ import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
 import { RokuDeploy } from './RokuDeploy';
-import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
+import type { ScreenshotOptions, SquashOptions, PackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r as typeof requestType;
 
 const sinon = createSandbox();
@@ -1680,10 +1680,10 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('convertToSquashfs', () => {
+    describe('squash', () => {
         it('should not return an error if successful', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
-            await rokuDeploy.convertToSquashfs({
+            await rokuDeploy.squash({
                 host: options.host,
                 password: 'password'
             });
@@ -1692,7 +1692,7 @@ describe('RokuDeploy', () => {
         it('should return ConvertError if converting failed', async () => {
             mockDoPostRequest();
             try {
-                await rokuDeploy.convertToSquashfs({
+                await rokuDeploy.squash({
                     host: options.host,
                     password: 'password'
                 });
@@ -1710,7 +1710,7 @@ describe('RokuDeploy', () => {
             });
             doPostStub.onSecondCall().returns({ body: '..."fileType":"squashfs"...' });
             try {
-                await rokuDeploy.convertToSquashfs({
+                await rokuDeploy.squash({
                     ...options,
                     host: options.host,
                     password: 'password'
@@ -1726,7 +1726,7 @@ describe('RokuDeploy', () => {
                 throw new ErrorWithCode('Something else');
             });
             try {
-                await rokuDeploy.convertToSquashfs({
+                await rokuDeploy.squash({
                     ...options,
                     host: options.host,
                     password: 'password'
@@ -1746,7 +1746,7 @@ describe('RokuDeploy', () => {
             });
             doPostStub.onSecondCall().returns({ body: '..."fileType":"zip"...' });
             try {
-                await rokuDeploy.convertToSquashfs({
+                await rokuDeploy.squash({
                     ...options,
                     host: options.host,
                     password: 'password'
@@ -1767,7 +1767,7 @@ describe('RokuDeploy', () => {
                 throw new Error('Never seen');
             });
             try {
-                await rokuDeploy.convertToSquashfs({
+                await rokuDeploy.squash({
                     ...options,
                     host: options.host,
                     password: 'password'
@@ -1789,7 +1789,7 @@ describe('RokuDeploy', () => {
         }
     }
 
-    describe('rekeyDevice', () => {
+    describe('rekey', () => {
         beforeEach(() => {
             const body = `<device-info>
                 <keyed-developer-id>${options.devId}</keyed-developer-id>
@@ -1803,7 +1803,7 @@ describe('RokuDeploy', () => {
             sinon.stub(fsExtra, 'createReadStream').throws(expectedError);
             let actualError: Error;
             try {
-                await rokuDeploy.rekeyDevice({
+                await rokuDeploy.rekey({
                     host: '1.2.3.4',
                     password: 'password',
                     pkg: options.pkg,
@@ -1824,7 +1824,7 @@ describe('RokuDeploy', () => {
 
             try {
                 fsExtra.writeFileSync(s`notReal.pkg`, '');
-                await rokuDeploy.rekeyDevice({
+                await rokuDeploy.rekey({
                     host: '1.2.3.4',
                     password: 'password',
                     pkg: s`notReal.pkg`,
@@ -1841,7 +1841,7 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            await rokuDeploy.rekeyDevice({
+            await rokuDeploy.rekey({
                 host: '1.2.3.4',
                 password: 'password',
                 pkg: s`${tempDir}/testSignedPackage.pkg`,
@@ -1855,7 +1855,7 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            await rokuDeploy.rekeyDevice({
+            await rokuDeploy.rekey({
                 host: '1.2.3.4',
                 password: 'password',
                 pkg: options.pkg,
@@ -1869,7 +1869,7 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
-            await rokuDeploy.rekeyDevice({
+            await rokuDeploy.rekey({
                 host: '1.2.3.4',
                 password: 'password',
                 pkg: options.pkg,
@@ -1881,7 +1881,7 @@ describe('RokuDeploy', () => {
         it('should throw error if response is not parsable', async () => {
             try {
                 mockDoPostRequest();
-                await rokuDeploy.rekeyDevice({
+                await rokuDeploy.rekey({
                     host: '1.2.3.4',
                     password: 'password',
                     pkg: options.pkg,
@@ -1901,7 +1901,7 @@ describe('RokuDeploy', () => {
                     <font color="red">Invalid public key.</font>
                 </div>`;
                 mockDoPostRequest(body);
-                await rokuDeploy.rekeyDevice({
+                await rokuDeploy.rekey({
                     host: '1.2.3.4',
                     password: 'password',
                     pkg: options.pkg,
@@ -1921,7 +1921,7 @@ describe('RokuDeploy', () => {
                     <font color="red">Success.</font>
                 </div>`;
                 mockDoPostRequest(body);
-                await rokuDeploy.rekeyDevice({
+                await rokuDeploy.rekey({
                     host: '1.2.3.4',
                     password: 'password',
                     pkg: options.pkg,
@@ -1936,7 +1936,7 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('createSignedPackage', () => {
+    describe('package', () => {
         let onHandler: any;
         beforeEach(() => {
             fsExtra.outputFileSync(`${tempDir}/manifest`, `
@@ -1975,7 +1975,7 @@ describe('RokuDeploy', () => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
-                await rokuDeploy.createSignedPackage({
+                await rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -1991,7 +1991,7 @@ describe('RokuDeploy', () => {
         it('should return our error if it received invalid data', async () => {
             try {
                 mockDoPostRequest(null);
-                await rokuDeploy.createSignedPackage({
+                await rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2012,7 +2012,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
 
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2030,7 +2030,7 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve('pkgs//P6953175d5df120c0069c53de12515b9a.pkg'));
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let pkgPath = await rokuDeploy.package({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
@@ -2046,7 +2046,7 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let pkgPath = await rokuDeploy.package({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
@@ -2065,7 +2065,7 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let pkgPath = await rokuDeploy.package({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
@@ -2079,7 +2079,7 @@ describe('RokuDeploy', () => {
         it('should return our fallback error if neither error or package link was detected', async () => {
             mockDoPostRequest();
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2096,7 +2096,7 @@ describe('RokuDeploy', () => {
                 </device-info>
                 `);
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2109,7 +2109,7 @@ describe('RokuDeploy', () => {
 
         it('should return error if neither manifestPath nor appTitle and appVersion are provided', async () => {
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2122,7 +2122,7 @@ describe('RokuDeploy', () => {
         it('should return error if major or minor version is missing from manifest', async () => {
             fsExtra.outputFileSync(`${tempDir}/manifest`, `title=AwesomeApp`);
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2136,7 +2136,7 @@ describe('RokuDeploy', () => {
         it('should return error if value for appTitle is missing from manifest', async () => {
             fsExtra.outputFileSync(`${tempDir}/manifest`, `major_version=1\nminor_version=0`);
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2169,7 +2169,7 @@ describe('RokuDeploy', () => {
 
             let error: Error;
             try {
-                await rokuDeploy.createSignedPackage({
+                await rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'password',
                     signingPassword: options.signingPassword,
@@ -2194,7 +2194,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
 
             await expectThrowsAsync(
-                rokuDeploy.createSignedPackage({
+                rokuDeploy.package({
                     host: '1.2.3.4',
                     password: 'aaaa',
                     signingPassword: options.signingPassword,
@@ -2837,7 +2837,7 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('captureScreenshot', () => {
+    describe('screenshot', () => {
         let onHandler: any;
         let screenshotAddress: any;
 
@@ -2880,19 +2880,19 @@ describe('RokuDeploy', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.screenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.screenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.screenshot({ host: options.host, password: 'password' }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -2913,7 +2913,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.screenshot({ host: options.host, password: 'password' }));
         });
 
         it('handles the device returning a png', async () => {
@@ -2934,7 +2934,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.png');
             expect(fsExtra.existsSync(result));
@@ -2958,7 +2958,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(path.extname(result)).to.equal('.jpg');
             expect(fsExtra.existsSync(result));
@@ -2982,7 +2982,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: `${tempDir}/myScreenShots` });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotDir: `${tempDir}/myScreenShots` });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(result));
@@ -3006,7 +3006,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.png')));
@@ -3030,7 +3030,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my.jpg' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotDir: tempDir, screenshotFile: 'my.jpg' });
             expect(result).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result));
             expect(fsExtra.existsSync(path.join(tempDir, 'my.jpg.png')));
@@ -3054,7 +3054,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(fsExtra.existsSync(result));
         });
@@ -3078,7 +3078,7 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             // With autoExtension: false (default), user-provided filename is used exactly
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile' });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotFile: 'myFile' });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile');
             expect(fsExtra.existsSync(result));
@@ -3102,7 +3102,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile', autoExtension: true });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotFile: 'myFile', autoExtension: true });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
@@ -3127,7 +3127,7 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             // User provides .png but device returns .jpg - should swap to .jpg
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.png', autoExtension: true });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.png', autoExtension: true });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
@@ -3151,7 +3151,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.jpg', autoExtension: true });
+            let result = await rokuDeploy.screenshot({ host: options.host, password: 'password', screenshotFile: 'myFile.jpg', autoExtension: true });
             expect(result).not.to.be.undefined;
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
@@ -4096,25 +4096,25 @@ describe('RokuDeploy', () => {
             await testRequiredOptions('sideload', requiredOptions, 'password');
         });
 
-        it('throws error when convertToSquashfs is missing required options', async () => {
-            const requiredOptions: Partial<ConvertToSquashfsOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('convertToSquashfs', requiredOptions, 'host');
-            await testRequiredOptions('convertToSquashfs', requiredOptions, 'password');
+        it('throws error when squash is missing required options', async () => {
+            const requiredOptions: Partial<SquashOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('squash', requiredOptions, 'host');
+            await testRequiredOptions('squash', requiredOptions, 'password');
         });
 
-        it('throws error when rekeyDevice is missing required options', async () => {
-            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', pkg: 'abcd', signingPassword: 'abcd' };
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'pkg');
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'signingPassword');
+        it('throws error when rekey is missing required options', async () => {
+            const requiredOptions: Partial<RekeyOptions> = { host: '1.2.3.4', password: 'abcd', pkg: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('rekey', requiredOptions, 'host');
+            await testRequiredOptions('rekey', requiredOptions, 'password');
+            await testRequiredOptions('rekey', requiredOptions, 'pkg');
+            await testRequiredOptions('rekey', requiredOptions, 'signingPassword');
         });
 
-        it('throws error when createSignedPackage is missing required options', async () => {
-            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd' };
-            await testRequiredOptions('createSignedPackage', requiredOptions, 'host');
-            await testRequiredOptions('createSignedPackage', requiredOptions, 'password');
-            await testRequiredOptions('createSignedPackage', requiredOptions, 'signingPassword');
+        it('throws error when package is missing required options', async () => {
+            const requiredOptions: Partial<PackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('package', requiredOptions, 'host');
+            await testRequiredOptions('package', requiredOptions, 'password');
+            await testRequiredOptions('package', requiredOptions, 'signingPassword');
         });
 
         it('throws error when deleteDevChannel is missing required options', async () => {
@@ -4123,10 +4123,10 @@ describe('RokuDeploy', () => {
             await testRequiredOptions('deleteDevChannel', requiredOptions, 'password');
         });
 
-        it('throws error when captureScreenshot is missing required options', async () => {
-            const requiredOptions: Partial<CaptureScreenshotOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('captureScreenshot', requiredOptions, 'host');
-            await testRequiredOptions('captureScreenshot', requiredOptions, 'password');
+        it('throws error when screenshot is missing required options', async () => {
+            const requiredOptions: Partial<ScreenshotOptions> = { host: '1.2.3.4', password: 'abcd' };
+            await testRequiredOptions('screenshot', requiredOptions, 'host');
+            await testRequiredOptions('screenshot', requiredOptions, 'password');
         });
 
         it('throws error when getDeviceInfo is missing required options', async () => {

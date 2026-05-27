@@ -12,11 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Renamed `ZipOptions.stagingDir` → `dir` to match CLI `--dir` option
  - Renamed `remotePort` → `ecpPort` throughout all options interfaces and `getOptions()` defaults
  - CLI `sideload` command: replaced `--noclose` flag with `--close` boolean (use `--no-close` to skip closing the channel)
+ - Renamed methods to match CLI command names:
+   - `createSignedPackage()` → `package()`
+   - `convertToSquashfs()` → `squash()`
+   - `rekeyDevice()` → `rekey()`
+   - `captureScreenshot()` → `screenshot()`
+ - Renamed options interfaces to match method names:
+   - `CreateSignedPackageOptions` → `PackageOptions`
+   - `ConvertToSquashfsOptions` → `SquashOptions`
+   - `RekeyDeviceOptions` → `RekeyOptions`
+   - `CaptureScreenshotOptions` → `ScreenshotOptions`
 ### Added
  - `sideload()` now accepts `zip` (explicit zip path) and `rootDir` (auto-zip a directory) options directly
  - `sideload()` now automatically calls `closeChannel()` before sideloading (controlled by new `close` option, defaults to `true`)
  - CLI `sideload --no-close` flag to skip closing the channel before sideloading
- - `captureScreenshot()` now has `autoExtension` option (default: `false`). When false, filename is used exactly as provided. When true, extension is automatically handled based on device response (matching extensions kept, mismatched swapped, missing appended)
+ - `screenshot()` now has `autoExtension` option (default: `false`). When false, filename is used exactly as provided. When true, extension is automatically handled based on device response (matching extensions kept, mismatched swapped, missing appended)
  - CLI `screenshot --autoExtension` flag for automatic extension handling
 
 

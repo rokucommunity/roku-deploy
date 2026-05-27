@@ -84,9 +84,11 @@ Another set of changes are the names and features available in the Node API. Som
 - `zipPackage()` -> `zip()`
 - `pressHomeButton()` -> `closeChannel()`
 - `publish()` -> `sideload()`
-- `signExistingPackage()` -> `createSignedPackage()`
+- `signExistingPackage()` -> `package()`
 - `deleteInstalledChannel()` -> `deleteDevChannel()`
-- `takeScreenshot()` -> `captureScreenshot()`
+- `takeScreenshot()` -> `screenshot()`
+- `convertToSquashfs()` -> `squash()`
+- `rekeyDevice()` -> `rekey()`
 
 Some functions were added to help with certain developer usecases. These mostly allow for any remote-to-Roku interaction:
 - `keyPress()`
@@ -269,7 +271,7 @@ rokuDeploy.sideload({
 
 ### Convert to SquashFS
 ```typescript
-rokuDeploy.convertToSquashfs({
+rokuDeploy.squash({
     host: '1.2.3.4',
     password: 'password'
     //...other options if necessary
@@ -278,7 +280,7 @@ rokuDeploy.convertToSquashfs({
 
 ### Create a signed package
 ```typescript
-rokuDeploy.createSignedPackage({
+rokuDeploy.package({
     host: '1.2.3.4',
     password: 'password',
     signingPassword: 'signing password'
@@ -298,7 +300,7 @@ rokuDeploy.sendText({
 ### Take a screenshot
 ```typescript
 // Filename is used exactly as provided (default behavior)
-rokuDeploy.captureScreenshot({
+rokuDeploy.screenshot({
     host: 'ip-of-roku',
     password: 'password',
     screenshotDir: './screenshots/',
@@ -307,7 +309,7 @@ rokuDeploy.captureScreenshot({
 })
 
 // With autoExtension: true, the extension is automatically handled based on device response
-rokuDeploy.captureScreenshot({
+rokuDeploy.screenshot({
     host: 'ip-of-roku',
     password: 'password',
     screenshotDir: './screenshots/',
@@ -318,7 +320,7 @@ rokuDeploy.captureScreenshot({
 
 ### Rekey a device
 ```typescript
-rokuDeploy.rekeyDevice({
+rokuDeploy.rekey({
     host: 'ip-of-roku',
     password: 'password',
     pkg: './path/to/signed.pkg'
@@ -336,11 +338,11 @@ Can't find what you need? We offer a variety of functions available in the [Roku
 - `keyDown()`
 - `sendText()`
 - `closeChannel()`
-- `rekeyDevice()`
-- `createSignedPackage()`
+- `rekey()`
+- `package()`
 - `deleteDevChannel()`
-- `captureScreenshot()`
-- `convertToSquashfs()`
+- `screenshot()`
+- `squash()`
 - `getDeviceInfo()`
 - `getDevId()`
 - `getOptions()`
