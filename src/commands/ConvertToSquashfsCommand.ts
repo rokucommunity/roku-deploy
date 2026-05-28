@@ -6,6 +6,6 @@ export class ConvertToSquashfsCommand {
             ...util.getOptionsFromJson(args),
             ...args
         };
-        await rokuDeploy.squash(options);
+        await rokuDeploy.convertToSquashfs(options);
     }
 }

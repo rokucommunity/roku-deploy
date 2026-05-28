@@ -54,7 +54,7 @@ describe('cli', () => {
     });
 
     it('Converts to squashfs', async () => {
-        const stub = sinon.stub(rokuDeploy, 'squash').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'convertToSquashfs').callsFake(async () => {
             return Promise.resolve();
         });
 
@@ -73,7 +73,7 @@ describe('cli', () => {
     });
 
     it('Rekeys a device', async () => {
-        const stub = sinon.stub(rokuDeploy, 'rekey').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'rekeyDevice').callsFake(async () => {
             return Promise.resolve();
         });
 
@@ -101,7 +101,7 @@ describe('cli', () => {
     });
 
     it('Signs an existing package', async () => {
-        const stub = sinon.stub(rokuDeploy, 'package').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve('');
         });
 
@@ -144,7 +144,7 @@ describe('cli', () => {
     });
 
     it('Takes a screenshot', async () => {
-        const stub = sinon.stub(rokuDeploy, 'screenshot').callsFake(async () => {
+        const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
             return Promise.resolve('');
         });
 

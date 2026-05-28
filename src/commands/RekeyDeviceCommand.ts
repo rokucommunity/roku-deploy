@@ -14,6 +14,6 @@ export class RekeyDeviceCommand {
                 path.resolve(args.cwd, args.pkg)
             );
         }
-        await rokuDeploy.rekey(options);
+        await rokuDeploy.rekeyDevice(options);
     }
 }

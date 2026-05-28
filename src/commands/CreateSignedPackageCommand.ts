@@ -17,6 +17,6 @@ export class CreateSignedPackageCommand {
             options.outDir = path.dirname(args.out);
             options.outFile = path.basename(args.out);
         }
-        await rokuDeploy.package(options);
+        await rokuDeploy.createSignedPackage(options);
     }
 }

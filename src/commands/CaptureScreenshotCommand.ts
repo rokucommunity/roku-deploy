@@ -14,6 +14,6 @@ export class CaptureScreenshotCommand {
             options.screenshotDir = path.dirname(args.out);
             options.screenshotFile = path.basename(args.out);
         }
-        await rokuDeploy.screenshot(options);
+        await rokuDeploy.captureScreenshot(options);
     }
 }
