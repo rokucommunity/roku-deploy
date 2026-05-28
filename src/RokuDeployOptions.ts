@@ -13,12 +13,6 @@ export interface RokuDeployOptions {
     outDir?: string;
 
     /**
-     * The base filename the zip/pkg file should be given (excluding the extension)
-     * @default 'roku-deploy'
-     */
-    outFile?: string;
-
-    /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */

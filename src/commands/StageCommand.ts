@@ -1,5 +1,4 @@
 import { rokuDeploy, util } from '../index';
-import * as path from 'path';
 
 export class StageCommand {
     async run(args) {
@@ -9,9 +8,6 @@ export class StageCommand {
             ...util.getOptionsFromJson(args),
             ...args
         };
-        if (args.out) {
-            options.stagingDir = path.resolve(args.cwd, args.out);
-        }
         await rokuDeploy.stage(options);
     }
 }
