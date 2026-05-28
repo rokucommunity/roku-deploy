@@ -247,20 +247,18 @@ export class RokuDeploy {
         logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
 
+        // Track whether we're using a user-provided zip or generating one from rootDir
+        let deleteZipAfterSideload = false;
+
         // Resolve zip/rootDir before getOptions so outDir/outFile are set correctly
         if (options.zip) {
             options.zip = path.resolve(options.cwd ?? process.cwd(), options.zip);
             options.outDir = path.dirname(options.zip);
             options.outFile = path.basename(options.zip);
-            options.retainDeploymentArchive ??= true;
         } else if (options.rootDir) {
             options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
-            // Generated zips are temporary, so default to deleting them after sideload
-            options.retainDeploymentArchive ??= false;
-            if (options.outZip) {
-                options.outDir = path.dirname(options.outZip);
-                options.outFile = path.basename(options.outZip);
-            }
+            // Generated zips are temporary, so delete them after sideload
+            deleteZipAfterSideload = true;
         }
 
         options = this.getOptions(options) as any;
@@ -373,8 +371,8 @@ export class RokuDeploy {
             logger.info('Successful sideload');
             return { message: 'Successful sideload', results: response };
         } finally {
-            //delete the zip file only if configured to do so
-            if (options.retainDeploymentArchive === false) {
+            //delete the zip file if we generated it from rootDir
+            if (deleteZipAfterSideload) {
                 await fsExtra.remove(zipFilePath);
             }
             //try to close the read stream to prevent files becoming locked
@@ -943,7 +941,6 @@ export class RokuDeploy {
             cwd: process.cwd(),
             outDir: './out',
             outFile: 'roku-deploy',
-            retainDeploymentArchive: true,
             failOnCompileError: true,
             deleteDevChannel: true,
             packagePort: 80,
@@ -1357,10 +1354,8 @@ export interface SideloadOptions extends BaseRequestOptions, BaseEcpOptions {
     remoteDebug?: boolean;
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
-    retainDeploymentArchive?: boolean;
     outDir?: string;
     outFile?: string;
-    outZip?: string;
     deleteDevChannel?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;

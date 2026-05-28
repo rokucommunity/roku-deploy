@@ -44,12 +44,6 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
 
     /**
-     * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
-     * @default true
-     */
-    retainDeploymentArchive?: boolean;
-
-    /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
      */
     stagingDir?: string;

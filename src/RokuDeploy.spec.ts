@@ -933,25 +933,6 @@ describe('RokuDeploy', () => {
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
         });
 
-        it('deletes the archive when configured', async () => {
-            const zipPath = `${outDir}/${options.outFile}`;
-            mockDoPostRequest();
-
-            //the file should exist
-            expect(fsExtra.pathExistsSync(zipPath)).to.be.true;
-            await rokuDeploy.sideload({
-                host: '1.2.3.4',
-                password: 'password',
-                outDir: outDir,
-                retainDeploymentArchive: false,
-                outFile: options.outFile,
-                rootDir: rootDir,
-                close: false
-            });
-            //the file should not exist
-            expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
-        });
-
         it('failure to close read stream does not crash', async () => {
             const orig = fsExtra.createReadStream;
             //wrap the stream.close call so we can throw
@@ -975,14 +956,12 @@ describe('RokuDeploy', () => {
                 host: '1.2.3.4',
                 password: 'password',
                 outDir: outDir,
-                retainDeploymentArchive: false,
                 outFile: options.outFile,
                 rootDir: rootDir,
                 close: false
             });
-            //the file should not exist
+            //the file should not exist (rootDir generates a temp zip that gets deleted)
             expect(fsExtra.pathExistsSync(zipPath)).to.be.false;
-            //the out folder should also be deleted since it's empty
         });
 
         it('fails when the zip file is missing', async () => {
