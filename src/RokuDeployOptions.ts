@@ -7,12 +7,6 @@ export interface RokuDeployOptions {
     cwd?: string;
 
     /**
-     * A full path to the folder where the zip/pkg package should be placed
-     * @default './out'
-     */
-    outDir?: string;
-
-    /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */

@@ -42,7 +42,7 @@ export class RokuDeploy {
             throw new Error(`rootDir does not exist at "${opts.rootDir}"`);
         }
 
-        let fileObjects = await this.getFilePaths(opts.files, opts.rootDir);
+        let fileObjects = await this.getFilePaths({ files: opts.files, rootDir: opts.rootDir });
         //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
@@ -80,7 +80,7 @@ export class RokuDeploy {
         // Resolve output zip path - use 'out' if provided, otherwise default
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : opts.zipPath;
+            : opts.out;
 
         // Ensure .zip extension
         if (!out.toLowerCase().endsWith('.zip')) {
@@ -104,7 +104,7 @@ export class RokuDeploy {
      * @param files a files array used to filter the files from `srcFolder`
      */
     private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
-        const filePaths = await this.getFilePaths(files, srcFolder);
+        const filePaths = await this.getFilePaths({ files: files, rootDir: srcFolder });
 
         const zip = new JSZip();
         // Allows us to wait until all are done before we build the zip
@@ -125,7 +125,7 @@ export class RokuDeploy {
         }
         await Promise.all(promises);
 
-        //ensure the outDir exists
+        //ensure the output directory exists
         await fsExtra.ensureDir(
             path.dirname(zipFilePath)
         );
@@ -136,10 +136,11 @@ export class RokuDeploy {
 
     /**
     * Get all file paths for the specified options
-    * @param files
-    * @param rootFolderPath - the absolute path to the root dir where relative files entries are relative to
     */
-    public async getFilePaths(files: FileEntry[], rootDir: string): Promise<StandardizedFileEntry[]> {
+    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
+        let rootDir = options.rootDir;
+        const files = options.files;
+
         //if the rootDir isn't absolute, convert it to absolute using the standard options flow
         if (path.isAbsolute(rootDir) === false) {
             rootDir = this.getOptions({ rootDir: rootDir }).rootDir;
@@ -261,37 +262,28 @@ export class RokuDeploy {
         logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
 
-        // Track whether we're using a user-provided zip or generating one from rootDir
-        let deleteZipAfterSideload = false;
-
-        // Resolve zip/rootDir before getOptions so outDir/outFile are set correctly
-        if (options.zip) {
-            options.zip = path.resolve(options.cwd ?? process.cwd(), options.zip);
-            options.outDir = path.dirname(options.zip);
-            options.outFile = path.basename(options.zip);
-        } else if (options.rootDir) {
-            options.rootDir = path.resolve(options.cwd ?? process.cwd(), options.rootDir);
-            // Generated zips are temporary, so delete them after sideload
-            deleteZipAfterSideload = true;
-        }
-
+        const cwd = options.cwd ?? process.cwd();
         const opts = this.getOptions(options) as any;
+        let zipFilePath: string;
+        let deleteZipAfterSideload = false;
 
         // Close the channel before sideloading unless explicitly disabled
         if (options.close !== false) {
             await this.closeChannel(opts as CloseChannelOptions);
         }
 
-        // If rootDir was provided (and no zip), zip it first then sideload
-        if (!options.zip && opts.rootDir) {
-            const zipFilePath = this.getOutputZipFilePath(opts);
-            await this.zip({ dir: opts.rootDir, out: zipFilePath, cwd: opts.cwd });
+        // Determine the zip file path based on whether zip or dir was provided
+        if ('zip' in options && options.zip) {
+            zipFilePath = path.resolve(cwd, options.zip);
+        } else if ('dir' in options && options.dir) {
+            // Generate zip from directory to a temp location
+            zipFilePath = opts.out;
+            await fsExtra.ensureDir(path.dirname(zipFilePath));
+            await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
+            deleteZipAfterSideload = true;
+        } else {
+            throw new Error('Either zip or dir must be provided');
         }
-
-        //make sure the outDir exists
-        await fsExtra.ensureDir(opts.outDir);
-
-        let zipFilePath = this.getOutputZipFilePath(opts);
 
         if (opts.deleteDevChannel) {
             try {
@@ -464,11 +456,11 @@ export class RokuDeploy {
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
         this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
-        options = this.getOptions(options) as any;
+        const cwd = options.cwd ?? process.cwd();
 
         let pkgPath = options.pkg;
         if (!path.isAbsolute(options.pkg)) {
-            pkgPath = path.join(options.rootDir, options.pkg);
+            pkgPath = path.resolve(cwd, options.pkg);
         }
         let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options as any, {
             mysubmit: 'Rekey',
@@ -515,10 +507,10 @@ export class RokuDeploy {
         const opts = this.getOptions(options) as any;
         const cwd = options.cwd ?? process.cwd();
 
-        // Resolve output pkg path - use 'out' if provided, otherwise default
+        // Resolve output pkg path - use 'out' if provided, otherwise derive from default zip path
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : opts.packagePath;
+            : opts.out.replace(/\.zip$/i, '.pkg');
 
         // Ensure .pkg extension
         if (out.toLowerCase().endsWith('.zip')) {
@@ -964,7 +956,6 @@ export class RokuDeploy {
         // Fill in default options for any missing values
         options = {
             cwd: process.cwd(),
-            outDir: './out',
             failOnCompileError: true,
             deleteDevChannel: true,
             packagePort: 80,
@@ -982,28 +973,29 @@ export class RokuDeploy {
 
         //fully resolve the folder paths
         options.rootDir = path.resolve(options.cwd, options.rootDir);
-        options.outDir = path.resolve(options.cwd, options.outDir);
         options.screenshotDir = path.resolve(options.cwd, options.screenshotDir);
 
-        //stagingDir
+        // Resolve the output zip path
+        const opts = options as any;
+        if (!opts.out) {
+            opts.out = './out/roku-deploy.zip';
+        }
+        opts.out = path.resolve(options.cwd, opts.out);
+        // Ensure .zip extension
+        if (!opts.out.toLowerCase().endsWith('.zip')) {
+            opts.out += '.zip';
+        }
+
+        // Compute stagingDir from out path if not provided
+        const outDir = path.dirname(opts.out);
         if (options.stagingDir) {
             options.stagingDir = path.resolve(options.cwd, options.stagingDir);
         } else {
             options.stagingDir = path.resolve(
                 options.cwd,
-                util.standardizePath(`${options.outDir}/.roku-deploy-staging`)
+                util.standardizePath(`${outDir}/.roku-deploy-staging`)
             );
         }
-
-        // Computed method-specific output paths
-        // Support backward compat if outFile is provided
-        const outFile = (options as any).outFile ?? 'roku-deploy';
-        let zipFileName = outFile;
-        if (!zipFileName.toLowerCase().endsWith('.zip')) {
-            zipFileName += '.zip';
-        }
-        (options as any).zipPath = path.resolve(options.outDir, zipFileName);
-        (options as any).packagePath = path.resolve(options.outDir, outFile.replace(/\.zip$/i, '') + '.pkg');
 
         logger.info('Retrieved options:', options);
         return options;
@@ -1015,16 +1007,6 @@ export class RokuDeploy {
                 throw new Error('Missing required option: ' + opt);
             }
         }
-    }
-
-    /**
-     * Centralizes getting output zip file path based on passed in options
-     * @param options
-     */
-    private getOutputZipFilePath(options?: GetOutputZipFilePathOptions) {
-        const opts = this.getOptions(options) as any;
-        logger.debug('Output zip file path:', opts.zipPath);
-        return opts.zipPath;
     }
 
     /**
@@ -1165,11 +1147,11 @@ export class RokuDeploy {
         return manifestData;
     }
 
-    public async rebootDevice(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async rebootDevice(options: BaseRequestOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
-        const deviceInfo = await this.getDeviceInfo(options as any);
+        const deviceInfo = await this.getDeviceInfo(options);
         const softwareVersion = deviceInfo['software-version'];
 
         // Check if device version is at least 15.0.4
@@ -1178,7 +1160,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', options as any),
+            ...this.generateBaseRequestOptions('plugin_swup', options),
             formData: {
                 mysubmit: 'Reboot',
                 archive: ''
@@ -1186,11 +1168,11 @@ export class RokuDeploy {
         });
     }
 
-    public async checkForUpdate(options: RokuDeployOptions) {
-        options = this.getOptions(options);
+    public async checkForUpdate(options: BaseRequestOptions) {
+        this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
-        const deviceInfo = await this.getDeviceInfo(options as any);
+        const deviceInfo = await this.getDeviceInfo(options);
         const softwareVersion = deviceInfo['software-version'];
 
         // Check if device version is at least 15.0.4
@@ -1199,7 +1181,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', options as any),
+            ...this.generateBaseRequestOptions('plugin_swup', options),
             formData: {
                 mysubmit: 'CheckUpdate',
                 archive: ''
@@ -1320,6 +1302,12 @@ export interface SendTextOptions extends BaseEcpOptions {
 }
 
 export type CloseChannelOptions = BaseEcpOptions;
+
+export interface GetFilePathsOptions {
+    files: FileEntry[];
+    rootDir: string;
+}
+
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
@@ -1342,30 +1330,21 @@ export interface ZipOptions {
     cwd?: string;
 }
 
-export interface SideloadOptions extends BaseRequestOptions, BaseEcpOptions {
+type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     appType?: 'channel' | 'dcl';
-    /**
-     * The path to an existing zip file to sideload. Takes precedence over `rootDir`.
-     */
-    zip?: string;
-    /**
-     * The root folder to zip and then sideload. Used when `zip` is not provided.
-     */
-    rootDir?: string;
-    /**
-     * Close the channel before sideloading. Defaults to true.
-     * Set to false to skip closing the channel.
-     */
     close?: boolean;
     remoteDebug?: boolean;
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
-    outDir?: string;
-    outFile?: string;
     deleteDevChannel?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
-}
+};
+
+export type SideloadOptions = BaseSideloadOptions & (
+    | { zip: string; dir?: never }
+    | { dir: string; zip?: never }
+);
 
 export interface PackageUploadOverridesOptions {
     route?: string;
@@ -1392,7 +1371,6 @@ export type ConvertToSquashfsOptions = BaseRequestOptions;
 export interface RekeyDeviceOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
-    rootDir?: string;
     devId: string;
     cwd?: string;
 }
@@ -1416,8 +1394,7 @@ export interface CreateSignedPackageOptions extends BaseRequestOptions {
 export type DeleteDevChannelOptions = BaseRequestOptions;
 
 export interface GetOutputZipFilePathOptions {
-    outFile?: string;
-    outDir?: string;
+    out?: string;
     cwd?: string;
 }
 
@@ -1426,8 +1403,7 @@ export interface DeployOptions extends BaseRequestOptions {
     rootDir?: string;
     stagingDir?: string;
     deleteDevChannel?: boolean;
-    outFile?: string;
-    outDir?: string;
+    out?: string;
     cwd?: string;
 }
 
