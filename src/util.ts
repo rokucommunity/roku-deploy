@@ -8,6 +8,7 @@ import * as micromatch from 'micromatch';
 import fastGlob = require('fast-glob');
 
 export class Util {
+    //Map<filesystem root path, is case-sensitive>
     private isFileSystemCaseSensitiveCache = new Map<string, boolean>();
 
     /**
@@ -185,7 +186,8 @@ export class Util {
             return cachedValue;
         }
 
-        const testFileBase = `roku_deploy_case_check_${crypto.randomBytes(8).toString('hex')}.txt`;
+        const probeFileRandomBytes = 8;
+        const testFileBase = `roku_deploy_case_check_${crypto.randomBytes(probeFileRandomBytes).toString('hex')}.txt`;
         const upperCasePath = path.resolve(cwd, testFileBase.toUpperCase());
         const lowerCasePath = path.resolve(cwd, testFileBase.toLowerCase());
         try {

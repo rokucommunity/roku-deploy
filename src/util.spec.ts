@@ -191,6 +191,7 @@ describe('util', () => {
             const value2 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder2'));
             expect(outputFileSpy.callCount).to.equal(1);
             expect(value2).to.equal(value1);
+            outputFileSpy.restore();
             util['isFileSystemCaseSensitiveCache'].clear();
             for (const [key, value] of previousCache) {
                 util['isFileSystemCaseSensitiveCache'].set(key, value);
