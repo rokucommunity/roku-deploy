@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.5](https://github.com/rokucommunity/roku-deploy/compare/3.17.4...v3.17.5) - 2026-05-30
+### Added
+ - Add `security-audit-required` gate job to security audit workflow ([#269](https://github.com/rokucommunity/roku-deploy/pull/269))
+### Changed
+ - Preserve `!` glob-negation prefix in standardizePath ([#277](https://github.com/rokucommunity/roku-deploy/pull/277))
+ - Update minimum audit threshold ([#273](https://github.com/rokucommunity/roku-deploy/pull/273))
+ - Accept GHSA-w5hq-g745-h8pq (uuid <11.1.1) advisory ([#272](https://github.com/rokucommunity/roku-deploy/pull/272))
+ - Use explicit label on Security Audit badge ([#266](https://github.com/rokucommunity/roku-deploy/pull/266))
+ - Security Audit workflow ([#265](https://github.com/rokucommunity/roku-deploy/pull/265))
+
+
+
 ## [3.17.4](https://github.com/rokucommunity/roku-deploy/compare/3.17.3...v3.17.4) - 2026-05-19
 ### Changed
  - Security enhancements ([#263](https://github.com/rokucommunity/roku-deploy/pull/263))
