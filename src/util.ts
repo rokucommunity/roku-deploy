@@ -46,16 +46,9 @@ export class Util {
         if (!thePath) {
             return thePath;
         }
-        // Preserve a leading `!` glob-negation prefix across normalization. `path.normalize`
-        // doesn't know about glob semantics and would otherwise treat `!..` as a regular
-        // path segment, consuming both the `!` and one `..` during parent-dir resolution
-        // (e.g. `!../../X` -> `X` instead of `!../../X`).
-        const isNegated = thePath.startsWith('!');
-        const stripped = isNegated ? thePath.slice(1) : thePath;
-        const normalized = path.normalize(
-            stripped.replace(/[\/\\]+/g, path.sep)
+        return path.normalize(
+            thePath.replace(/[\/\\]+/g, path.sep)
         );
-        return isNegated ? '!' + normalized : normalized;
     }
 
     /**

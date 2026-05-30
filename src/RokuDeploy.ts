@@ -94,6 +94,18 @@ export class RokuDeploy {
     public normalizeFilesArray(files: FileEntry[]) {
         const result: Array<string | StandardizedFileEntry> = [];
 
+        // `src` values are glob patterns, so a leading `!` is a negation prefix
+        // that must survive normalization. `path.normalize` treats `!..` as a
+        // regular path segment, and a subsequent `..` then resolves through it,
+        // dropping both the `!` and one `..` (e.g. `!../../X` -> `X`). Strip the
+        // `!` before standardizing and reattach it after.
+        const standardizeSrcPattern = (pattern: string) => {
+            const isNegated = pattern.startsWith('!');
+            const stripped = isNegated ? pattern.slice(1) : pattern;
+            const normalized = util.standardizePath(stripped);
+            return isNegated ? '!' + normalized : normalized;
+        };
+
         for (let i = 0; i < files.length; i++) {
             let entry = files[i];
             //skip falsey and blank entries
@@ -114,7 +126,7 @@ export class RokuDeploy {
                 //objects with src: string
                 if (typeof entry.src === 'string') {
                     result.push({
-                        src: util.standardizePath(entry.src),
+                        src: standardizeSrcPattern(entry.src),
                         dest: util.standardizePath(entry.dest)
                     });
 
@@ -123,7 +135,7 @@ export class RokuDeploy {
                     //create a distinct entry for each item in the src array
                     for (let srcEntry of entry.src) {
                         result.push({
-                            src: util.standardizePath(srcEntry),
+                            src: standardizeSrcPattern(srcEntry),
                             dest: util.standardizePath(entry.dest)
                         });
                     }
