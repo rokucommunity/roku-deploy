@@ -167,6 +167,22 @@ describe('util', () => {
             ]);
         });
 
+        it('matches absolute glob paths case-insensitively on windows', async function() {
+            if (process.platform !== 'win32') {
+                this.skip();
+            }
+            writeFiles([
+                'components/ROKUtils/rokutils.brs'
+            ]);
+            await doTest([
+                util.standardizePath(path.resolve(tempDir, 'components/ROKUtils/R*.brs'))
+            ], [
+                [
+                    'components/ROKUtils/rokutils.brs'
+                ]
+            ]);
+        });
+
         it('returns the same file path in multiple matches', async () => {
             writeFiles([
                 'manifest',

@@ -152,7 +152,8 @@ export class Util {
                     cwd: cwd,
                     absolute: true,
                     followSymbolicLinks: true,
-                    onlyFiles: true
+                    onlyFiles: true,
+                    caseSensitiveMatch: process.platform !== 'win32'
                 });
             }
         });
