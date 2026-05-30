@@ -37,6 +37,27 @@ describe('util', () => {
         });
     });
 
+    describe('standardizePath', () => {
+        it('returns falsy values unchanged', () => {
+            expect(util.standardizePath('')).to.eql('');
+            expect(util.standardizePath(undefined)).to.be.undefined;
+            expect(util.standardizePath(<any>null)).to.be.null;
+        });
+
+        it('normalizes parent-dir segments in plain paths', () => {
+            expect(util.standardizePath('a/../b')).to.eql(s`b`);
+            expect(util.standardizePath('../../a/b')).to.eql(s`../../a/b`);
+        });
+
+        it('preserves leading `!` glob-negation prefix when path has parent-dir segments', () => {
+            //2+ parent-dir levels expose the regression — `path.normalize` would otherwise
+            //treat `!..` as a literal segment and let a subsequent `..` consume it.
+            expect(util.standardizePath('!../../themes/X')).to.eql(`!${s`../../themes/X`}`);
+            expect(util.standardizePath('!../external/skip/X')).to.eql(`!${s`../external/skip/X`}`);
+            expect(util.standardizePath('!source/X')).to.eql(`!${s`source/X`}`);
+        });
+    });
+
     describe('isChildOfPath', () => {
         it('works for child path', () => {
             let parentPath = `${process.cwd()}\\testProject`;
