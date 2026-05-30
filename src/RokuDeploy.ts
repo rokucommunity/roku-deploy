@@ -102,7 +102,7 @@ export class RokuDeploy {
 
                 //string entries
             } else if (typeof entry === 'string') {
-                result.push(entry);
+                result.push(this.standardizeSrcPattern(entry));
 
                 //objects with src: (string | string[])
             } else if ('src' in entry) {
@@ -114,7 +114,7 @@ export class RokuDeploy {
                 //objects with src: string
                 if (typeof entry.src === 'string') {
                     result.push({
-                        src: util.standardizePath(entry.src),
+                        src: this.standardizeSrcPattern(entry.src),
                         dest: util.standardizePath(entry.dest)
                     });
 
@@ -123,7 +123,7 @@ export class RokuDeploy {
                     //create a distinct entry for each item in the src array
                     for (let srcEntry of entry.src) {
                         result.push({
-                            src: util.standardizePath(srcEntry),
+                            src: this.standardizeSrcPattern(srcEntry),
                             dest: util.standardizePath(entry.dest)
                         });
                     }
@@ -136,6 +136,21 @@ export class RokuDeploy {
         }
 
         return result;
+    }
+
+    /**
+     * Standardize a glob `src` pattern from the `files` array. Mirrors
+     * `util.standardizePath` (slash + parent-dir normalization) but preserves a
+     * leading `!` glob-negation prefix that `path.normalize` would otherwise
+     * consume — it treats `!..` as a regular path segment, and a subsequent
+     * `..` then resolves through it, dropping both the `!` and one `..`
+     * (e.g. `!../../X` -> `X`).
+     */
+    private standardizeSrcPattern(pattern: string) {
+        const isNegated = pattern.startsWith('!');
+        const stripped = isNegated ? pattern.slice(1) : pattern;
+        const normalized = util.standardizePath(stripped);
+        return isNegated ? '!' + normalized : normalized;
     }
 
     /**

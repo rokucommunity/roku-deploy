@@ -2213,7 +2213,7 @@ describe('RokuDeploy', () => {
                 'source/main.brs'
             ])).to.eql([
                 'manifest',
-                'source/main.brs'
+                s`source/main.brs`
             ]);
         });
 
@@ -2262,6 +2262,24 @@ describe('RokuDeploy', () => {
             }, {
                 src: s`source/main.brs`,
                 dest: undefined
+            }]);
+        });
+
+        it('preserves negation prefix and parent-dir segments in {src:string[]} entries', () => {
+            expect(rokuDeploy['normalizeFilesArray']([
+                {
+                    src: [
+                        '../../external/**/*',
+                        '!../../external/skip/**/*.brs'
+                    ],
+                    dest: '/'
+                }
+            ])).to.eql([{
+                src: s`../../external/**/*`,
+                dest: s`/`
+            }, {
+                src: `!${s`../../external/skip/**/*.brs`}`,
+                dest: s`/`
             }]);
         });
 
