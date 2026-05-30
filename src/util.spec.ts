@@ -184,12 +184,14 @@ describe('util', () => {
         });
 
         it('caches file system case sensitivity by root path', async () => {
+            const previousCache = new Map(util['isFileSystemCaseSensitiveCache']);
             util['isFileSystemCaseSensitiveCache'].clear();
             const outputFileSpy = sinon.spy(fsExtra, 'outputFile');
             const value1 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder1'));
             const value2 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder2'));
             expect(outputFileSpy.callCount).to.equal(1);
             expect(value2).to.equal(value1);
+            util['isFileSystemCaseSensitiveCache'] = previousCache;
         });
 
         it('returns the same file path in multiple matches', async () => {

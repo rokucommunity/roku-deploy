@@ -194,6 +194,8 @@ export class Util {
             this.isFileSystemCaseSensitiveCache.set(root, isCaseSensitive);
             return isCaseSensitive;
         } catch {
+            //if we cannot probe the filesystem (permissions/read-only/etc), default to case-sensitive matching
+            //to avoid unintentionally broadening glob matches.
             this.isFileSystemCaseSensitiveCache.set(root, true);
             return true;
         } finally {
