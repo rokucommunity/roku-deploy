@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.5](https://github.com/rokucommunity/roku-deploy/compare/3.17.4...v3.17.5) - 2026-05-30
+### Fixed
+ - Preserve `!` glob-negation prefix when using normalizeFilesArray ([#277](https://github.com/rokucommunity/roku-deploy/pull/277))
+
+
+
 ## [3.17.4](https://github.com/rokucommunity/roku-deploy/compare/3.17.3...v3.17.4) - 2026-05-19
 ### Changed
  - Security enhancements ([#263](https://github.com/rokucommunity/roku-deploy/pull/263))
