@@ -191,7 +191,10 @@ describe('util', () => {
             const value2 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder2'));
             expect(outputFileSpy.callCount).to.equal(1);
             expect(value2).to.equal(value1);
-            util['isFileSystemCaseSensitiveCache'] = previousCache;
+            util['isFileSystemCaseSensitiveCache'].clear();
+            for (const [key, value] of previousCache) {
+                util['isFileSystemCaseSensitiveCache'].set(key, value);
+            }
         });
 
         it('returns the same file path in multiple matches', async () => {

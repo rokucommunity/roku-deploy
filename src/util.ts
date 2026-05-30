@@ -2,6 +2,7 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dns from 'dns';
+import * as crypto from 'crypto';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
@@ -184,7 +185,7 @@ export class Util {
             return cachedValue;
         }
 
-        const testFileBase = `roku_deploy_case_check_${Math.random().toString(16).slice(2)}.txt`;
+        const testFileBase = `roku_deploy_case_check_${crypto.randomBytes(8).toString('hex')}.txt`;
         const upperCasePath = path.resolve(cwd, testFileBase.toUpperCase());
         const lowerCasePath = path.resolve(cwd, testFileBase.toLowerCase());
         try {
