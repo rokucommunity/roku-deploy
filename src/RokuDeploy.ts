@@ -114,7 +114,7 @@ export class RokuDeploy {
 
                 //string entries
             } else if (typeof entry === 'string') {
-                result.push(entry);
+                result.push(standardizeSrcPattern(entry));
 
                 //objects with src: (string | string[])
             } else if ('src' in entry) {

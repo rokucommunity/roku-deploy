@@ -2213,7 +2213,7 @@ describe('RokuDeploy', () => {
                 'source/main.brs'
             ])).to.eql([
                 'manifest',
-                'source/main.brs'
+                s`source/main.brs`
             ]);
         });
 
