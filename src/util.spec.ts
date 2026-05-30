@@ -167,7 +167,7 @@ describe('util', () => {
             ]);
         });
 
-        it('matches absolute glob paths case-insensitively on case-insensitive file systems', async function() {
+        it('matches absolute glob paths case-insensitively on case-insensitive file systems', async function matchesAbsoluteGlobPathsCaseInsensitively() {
             if (await util['getIsFileSystemCaseSensitive'](tempDir)) {
                 this.skip();
             }
