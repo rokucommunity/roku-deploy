@@ -184,13 +184,13 @@ export class Util {
             return cachedValue;
         }
 
-        const testFileName = `.ROKU_DEPLOY_CASE_CHECK_${Math.random().toString(16).slice(2)}.txt`;
-        const upperCasePath = path.resolve(cwd, testFileName.toUpperCase());
-        const lowerCasePath = path.resolve(cwd, testFileName.toLowerCase());
+        const testFileBase = `roku_deploy_case_check_${Math.random().toString(16).slice(2)}.txt`;
+        const upperCasePath = path.resolve(cwd, testFileBase.toUpperCase());
+        const lowerCasePath = path.resolve(cwd, testFileBase.toLowerCase());
         try {
             await fsExtra.ensureDir(cwd);
             await fsExtra.outputFile(upperCasePath, 'case-check');
-            const isCaseSensitive = await fsExtra.pathExists(lowerCasePath) === false;
+            const isCaseSensitive = !(await fsExtra.pathExists(lowerCasePath));
             this.isFileSystemCaseSensitiveCache.set(root, isCaseSensitive);
             return isCaseSensitive;
         } catch {
