@@ -7,6 +7,8 @@ import * as micromatch from 'micromatch';
 import fastGlob = require('fast-glob');
 
 export class Util {
+    private isFileSystemCaseSensitiveCache = new Map<string, boolean>();
+
     /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath
@@ -138,6 +140,7 @@ export class Util {
     public async globAllByIndex(patterns: string[], cwd: string) {
         //force all path separators to unix style
         cwd = cwd.replace(/\\/g, '/');
+        const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
             //force all windows-style slashes to unix style
@@ -153,7 +156,7 @@ export class Util {
                     absolute: true,
                     followSymbolicLinks: true,
                     onlyFiles: true,
-                    caseSensitiveMatch: process.platform !== 'win32'
+                    caseSensitiveMatch: isFileSystemCaseSensitive
                 });
             }
         });
@@ -171,6 +174,31 @@ export class Util {
             }
         }
         return matchesByIndex;
+    }
+
+    private async getIsFileSystemCaseSensitive(cwd: string) {
+        cwd = this.standardizePath(cwd);
+        const root = this.standardizePath(path.parse(cwd).root);
+        const cachedValue = this.isFileSystemCaseSensitiveCache.get(root);
+        if (cachedValue !== undefined) {
+            return cachedValue;
+        }
+
+        const testFileName = `.ROKU_DEPLOY_CASE_CHECK_${Math.random().toString(16).slice(2)}.txt`;
+        const upperCasePath = path.resolve(cwd, testFileName.toUpperCase());
+        const lowerCasePath = path.resolve(cwd, testFileName.toLowerCase());
+        try {
+            await fsExtra.ensureDir(cwd);
+            await fsExtra.outputFile(upperCasePath, 'case-check');
+            const isCaseSensitive = await fsExtra.pathExists(lowerCasePath) === false;
+            this.isFileSystemCaseSensitiveCache.set(root, isCaseSensitive);
+            return isCaseSensitive;
+        } catch {
+            this.isFileSystemCaseSensitiveCache.set(root, true);
+            return true;
+        } finally {
+            await fsExtra.remove(upperCasePath);
+        }
     }
 
     /**

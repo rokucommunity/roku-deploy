@@ -167,8 +167,8 @@ describe('util', () => {
             ]);
         });
 
-        it('matches absolute glob paths case-insensitively on windows', async function() {
-            if (process.platform !== 'win32') {
+        it('matches absolute glob paths case-insensitively on case-insensitive file systems', async function() {
+            if (await util['getIsFileSystemCaseSensitive'](tempDir)) {
                 this.skip();
             }
             writeFiles([
@@ -181,6 +181,14 @@ describe('util', () => {
                     'components/ROKUtils/rokutils.brs'
                 ]
             ]);
+        });
+
+        it('caches file system case sensitivity by root path', async () => {
+            util['isFileSystemCaseSensitiveCache'].clear();
+            const outputFileSpy = sinon.spy(fsExtra, 'outputFile');
+            await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder1'));
+            await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder2'));
+            expect(outputFileSpy.callCount).to.equal(1);
         });
 
         it('returns the same file path in multiple matches', async () => {
