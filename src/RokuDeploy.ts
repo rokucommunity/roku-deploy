@@ -1146,7 +1146,7 @@ export class RokuDeploy {
         return manifestData;
     }
 
-    public async rebootDevice(options: BaseRequestOptions) {
+    public async rebootDevice(options: RebootDeviceOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
@@ -1167,7 +1167,7 @@ export class RokuDeploy {
         });
     }
 
-    public async checkForUpdate(options: BaseRequestOptions) {
+    public async checkForUpdate(options: CheckForUpdateOptions) {
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
@@ -1391,6 +1391,10 @@ export interface CreateSignedPackageOptions extends BaseRequestOptions {
 }
 
 export type DeleteDevChannelOptions = BaseRequestOptions;
+
+export type RebootDeviceOptions = BaseRequestOptions;
+
+export type CheckForUpdateOptions = BaseRequestOptions;
 
 export interface GetOutputZipFilePathOptions {
     out?: string;
