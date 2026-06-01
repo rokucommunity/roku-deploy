@@ -198,6 +198,18 @@ describe('util', () => {
             }
         });
 
+        it('defaults to case-sensitive when the filesystem probe fails', async () => {
+            const previousCache = new Map(util['isFileSystemCaseSensitiveCache']);
+            util['isFileSystemCaseSensitiveCache'].clear();
+            sinon.stub(fsExtra, 'outputFile').rejects(new Error('read-only filesystem'));
+            const value = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder1'));
+            expect(value).to.equal(true);
+            util['isFileSystemCaseSensitiveCache'].clear();
+            for (const [key] of previousCache) {
+                util['isFileSystemCaseSensitiveCache'].set(key, value);
+            }
+        });
+
         it('returns the same file path in multiple matches', async () => {
             writeFiles([
                 'manifest',
