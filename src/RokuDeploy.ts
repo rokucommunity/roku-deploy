@@ -3,7 +3,7 @@ import * as fsExtra from 'fs-extra';
 import type { WriteStream, ReadStream } from 'fs-extra';
 import * as r from 'postman-request';
 import type * as requestType from 'request';
-const request = r as typeof requestType;
+const request = r;
 import * as JSZip from 'jszip';
 import * as errors from './Errors';
 import * as xml2js from 'xml2js';

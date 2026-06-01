@@ -17,7 +17,7 @@ import * as r from 'postman-request';
 import type * as requestType from 'request';
 import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
-const request = r as typeof requestType;
+const request = r;
 
 const sinon = createSandbox();
 
@@ -1528,8 +1528,9 @@ describe('RokuDeploy', () => {
         it('triggers zip when dir is provided', async () => {
             mockDoPostRequest();
             // Stub zip to create the file at the path sideload expects
-            const zipStub = sinon.stub(rokuDeploy, 'zip').callsFake(async (zipOptions) => {
+            const zipStub = sinon.stub(rokuDeploy, 'zip').callsFake((zipOptions) => {
                 fsExtra.outputFileSync(zipOptions.out, 'dummy');
+                return Promise.resolve();
             });
             sinon.stub(rokuDeploy, 'closeChannel').resolves();
 
@@ -3916,13 +3917,13 @@ describe('RokuDeploy', () => {
             });
 
             it('if no config file is available it should use the default values', () => {
-                expect((rokuDeploy.getOptions() as any).out).to.contain('roku-deploy.zip');
+                expect(rokuDeploy.getOptions().out).to.contain('roku-deploy.zip');
             });
 
             it('if runtime options are provided, they should override any default options', () => {
-                expect((rokuDeploy.getOptions({
+                expect(rokuDeploy.getOptions({
                     out: `${outDir}/roku-deploy.zip`
-                } as any) as any).out).to.equal(s`${outDir}/roku-deploy.zip`);
+                }).out).to.equal(s`${outDir}/roku-deploy.zip`);
             });
         });
 
