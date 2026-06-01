@@ -2,11 +2,15 @@ import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dns from 'dns';
+import * as crypto from 'crypto';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
 
 export class Util {
+    //Map<filesystem root path, is case-sensitive>
+    private isFileSystemCaseSensitiveCache = new Map<string, boolean>();
+
     /**
      * Determine if `childPath` is contained within the `parentPath`
      * @param parentPath
@@ -138,6 +142,7 @@ export class Util {
     public async globAllByIndex(patterns: string[], cwd: string) {
         //force all path separators to unix style
         cwd = cwd.replace(/\\/g, '/');
+        const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
             //force all windows-style slashes to unix style
@@ -152,7 +157,8 @@ export class Util {
                     cwd: cwd,
                     absolute: true,
                     followSymbolicLinks: true,
-                    onlyFiles: true
+                    onlyFiles: true,
+                    caseSensitiveMatch: isFileSystemCaseSensitive
                 });
             }
         });
@@ -170,6 +176,34 @@ export class Util {
             }
         }
         return matchesByIndex;
+    }
+
+    private async getIsFileSystemCaseSensitive(cwd: string) {
+        cwd = this.standardizePath(cwd);
+        const root = this.standardizePath(path.parse(cwd).root);
+        const cachedValue = this.isFileSystemCaseSensitiveCache.get(root);
+        if (cachedValue !== undefined) {
+            return cachedValue;
+        }
+
+        const probeFileRandomBytes = 8;
+        const testFileBase = `roku_deploy_case_check_${crypto.randomBytes(probeFileRandomBytes).toString('hex')}.txt`;
+        const upperCasePath = path.resolve(cwd, testFileBase.toUpperCase());
+        const lowerCasePath = path.resolve(cwd, testFileBase.toLowerCase());
+        try {
+            await fsExtra.ensureDir(cwd);
+            await fsExtra.outputFile(upperCasePath, 'case-check');
+            const isCaseSensitive = !(await fsExtra.pathExists(lowerCasePath));
+            this.isFileSystemCaseSensitiveCache.set(root, isCaseSensitive);
+            return isCaseSensitive;
+        } catch {
+            //if we cannot probe the filesystem (permissions/read-only/etc), default to case-sensitive matching
+            //to avoid unintentionally broadening glob matches.
+            this.isFileSystemCaseSensitiveCache.set(root, true);
+            return true;
+        } finally {
+            await fsExtra.remove(upperCasePath);
+        }
     }
 
     /**
