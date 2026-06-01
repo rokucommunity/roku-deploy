@@ -278,7 +278,6 @@ export class RokuDeploy {
         } else if ('dir' in options && options.dir) {
             // Generate zip from directory to a temp location
             zipFilePath = opts.out;
-            await fsExtra.ensureDir(path.dirname(zipFilePath));
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
         } else {
@@ -456,7 +455,7 @@ export class RokuDeploy {
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
         this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
-        const cwd = options.cwd ?? process.cwd();
+        const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
         let pkgPath = options.pkg;
         if (!path.isAbsolute(options.pkg)) {
