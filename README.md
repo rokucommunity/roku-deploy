@@ -221,7 +221,7 @@ Use this logic if you'd like to create a zip from your application folder.
 rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
     dir: 'path/to/files/to/zip',
-    outFile: 'filename-of-your-app.zip'
+    outFile: 'filename-of-your-app.zip',
     //...other options if necessary
 }).then(function(){
     //the zip has been created
@@ -234,7 +234,7 @@ rokuDeploy.zip({
 ### Pressing the Home key
 ```typescript
 rokuDeploy.keyPress({
-    key: 'Home'
+    key: 'Home',
     //...other options if necessary
 })
 ```
@@ -246,7 +246,7 @@ Sideload a zip file, a directory, or a pre-built zip at the default `outDir`/`ou
 rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
-    zip: './path/to/your/app.zip'
+    zip: './path/to/your/app.zip',
     //...other options if necessary
 }).then(function(){
     //the app has been sideloaded
@@ -259,7 +259,7 @@ rokuDeploy.sideload({
 rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
-    rootDir: './path/to/your/project'
+    dir: './path/to/your/project',
     //...other options if necessary
 }).then(function(){
     //the app has been sideloaded
@@ -273,7 +273,7 @@ rokuDeploy.sideload({
 ```typescript
 rokuDeploy.squash({
     host: '1.2.3.4',
-    password: 'password'
+    password: 'password',
     //...other options if necessary
 })
 ```
@@ -283,7 +283,7 @@ rokuDeploy.squash({
 rokuDeploy.package({
     host: '1.2.3.4',
     password: 'password',
-    signingPassword: 'signing password'
+    signingPassword: 'signing password',
     //...other options if necessary
 })
 ```
@@ -292,7 +292,7 @@ rokuDeploy.package({
 ```typescript
 rokuDeploy.sendText({
     text: 'Hello World',
-    host: 'ip-of-roku'
+    host: 'ip-of-roku',
     //...other options if necessary
 })
 ```
@@ -304,7 +304,7 @@ rokuDeploy.screenshot({
     host: 'ip-of-roku',
     password: 'password',
     screenshotDir: './screenshots/',
-    screenshotFile: 'screenshot.jpg'
+    screenshotFile: 'screenshot.jpg',
     //...other options if necessary
 })
 
