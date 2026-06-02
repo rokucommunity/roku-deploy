@@ -1096,6 +1096,34 @@ export class RokuDeploy {
         return manifestData;
     }
 
+    /**
+     * Convert a ManifestData object back into a manifest file string.
+     * If keyIndexes and lineCount are present, preserves original line ordering.
+     */
+    public stringifyManifest(manifestData: ManifestData): string {
+        let output: string[] = [];
+
+        if (manifestData.keyIndexes && manifestData.lineCount) {
+            output.fill('', 0, manifestData.lineCount);
+
+            let key: string;
+            for (key in manifestData) {
+                if (key === 'lineCount' || key === 'keyIndexes') {
+                    continue;
+                }
+
+                let index = manifestData.keyIndexes[key];
+                output[index] = `${key}=${manifestData[key]}`;
+            }
+        } else {
+            output = Object.keys(manifestData).map((key) => {
+                return `${key}=${manifestData[key]}`;
+            });
+        }
+
+        return output.join('\n');
+    }
+
     public async rebootDevice(options: RokuDeployOptions) {
         options = this.getOptions(options);
 

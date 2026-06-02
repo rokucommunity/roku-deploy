@@ -3735,6 +3735,39 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('stringifyManifest', () => {
+        it('converts manifest data to string', () => {
+            const result = rokuDeploy.stringifyManifest({
+                title: 'MyApp',
+                major_version: '1',
+                minor_version: '0'
+            });
+            expect(result).to.include('title=MyApp');
+            expect(result).to.include('major_version=1');
+            expect(result).to.include('minor_version=0');
+        });
+
+        it('preserves line order when keyIndexes and lineCount are present', () => {
+            const result = rokuDeploy.stringifyManifest({
+                title: 'MyApp',
+                major_version: '1',
+                keyIndexes: { title: 0, major_version: 2 },
+                lineCount: 3
+            });
+            const lines = result.split('\n');
+            expect(lines[0]).to.equal('title=MyApp');
+            expect(lines[1]).to.equal('');
+            expect(lines[2]).to.equal('major_version=1');
+        });
+
+        it('round-trips with parseManifestFromString', () => {
+            const original = 'title=TestApp\nmajor_version=2\nminor_version=5';
+            const parsed = rokuDeploy['parseManifestFromString'](original);
+            const stringified = rokuDeploy.stringifyManifest(parsed);
+            expect(stringified).to.equal(original);
+        });
+    });
+
     describe('checkRequest', () => {
         it('throws FailedDeviceResponseError when necessary', () => {
             sinon.stub(rokuDeploy as any, 'getRokuMessagesFromResponseBody').returns({
