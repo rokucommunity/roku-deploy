@@ -6,61 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-## [3.17.4](https://github.com/rokucommunity/roku-deploy/compare/3.17.3...v3.17.4) - 2026-05-19
-### Changed
- - Security enhancements ([#263](https://github.com/rokucommunity/roku-deploy/pull/263))
-
-
-
-## [3.17.3](https://github.com/rokucommunity/roku-deploy/compare/3.17.2...v3.17.3) - 2026-05-12
+## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
 ### Added
- - Add `autoLaunch` option to control wether the app auto starts when sideloading ([#261](https://github.com/rokucommunity/roku-deploy/pull/261))
+ - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
 
 
 
-## [3.17.2](https://github.com/rokucommunity/roku-deploy/compare/3.17.1...v3.17.2) - 2026-05-05
-### Fixed
- - default files array missing the locale folder ([#237](https://github.com/rokucommunity/roku-deploy/pull/237))
+## [4.0.0-alpha.1](https://github.com/rokucommunity/roku-deploy/compare/v4.0.0-alpha.0...v4.0.0-alpha.1) - 2024-05-17
+### Changed
+ - Enhanced logging levels ([#168](https://github.com/rokucommunity/roku-deploy/pull/168))
+ - Update files array ([#164](https://github.com/rokucommunity/roku-deploy/pull/164))
+ - Change documentation ([#162](https://github.com/rokucommunity/roku-deploy/pull/162))
 
 
 
-## [3.17.1](https://github.com/rokucommunity/roku-deploy/compare/3.17.0...v3.17.1) - 2026-04-27
-### Fixed
- - Fix crash when loading roku-deploy on node < 18 ([#256](https://github.com/rokucommunity/roku-deploy/pull/256))
-
-
-
-## [3.17.0](https://github.com/rokucommunity/roku-deploy/compare/3.16.5...v3.17.0) - 2026-04-27
+## [4.0.0-alpha.0](https://github.com/rokucommunity/roku-deploy/compare/v3.11.1...v4.0.0-alpha.0) - 2024-04-16
 ### Added
- - `RokuDeploy.validateDeveloperPassword` function (requires node 18+) ([#252](https://github.com/rokucommunity/roku-deploy/pull/252))
-### Fixed
- - `DeviceInfoRaw` `serial-number` (`serialNumber`) property name ([#251](https://github.com/rokucommunity/roku-deploy/pull/251))
-
-
-
-## [3.16.5](https://github.com/rokucommunity/roku-deploy/compare/3.16.4...v3.16.5) - 2026-04-13
-### Fixed
- - Resolve files array staging option ([#249](https://github.com/rokucommunity/roku-deploy/pull/249))
-
-
-
-## [3.16.4](https://github.com/rokucommunity/roku-deploy/compare/3.16.3...v3.16.4) - 2026-04-07
-### Fixed
- - Fix `zipFolder` bug that wasn't properly handling absolute `stagingDir` path ([#245](https://github.com/rokucommunity/roku-deploy/pull/245))
-
-
-
-## [3.16.3](https://github.com/rokucommunity/roku-deploy/compare/3.16.2...v3.16.3) - 2026-03-24
+ - individual interfaces for every rokuDeploy function ([#126](https://github.com/rokucommunity/roku-deploy/pull/126))
+ - cli commands ([#139](https://github.com/rokucommunity/roku-deploy/pull/139))
+ - cli commands and rename roku-deploy functions, reorganize functions ([#142](https://github.com/rokucommunity/roku-deploy/pull/142))
+ - cwd option ([#158](https://github.com/rokucommunity/roku-deploy/pull/158))
 ### Changed
- - chore: Bump flatted from 3.2.2 to 3.4.2 ([#236](https://github.com/rokucommunity/roku-deploy/pull/236))
-
-
-
-## [3.16.2](https://github.com/rokucommunity/roku-deploy/compare/3.16.1...v3.16.2) - 2026-03-09
-### Changed
- - Bump minimatch from 3.1.2 to 3.1.5 ([#234](https://github.com/rokucommunity/roku-deploy/pull/234))
- - Bump ajv from 6.12.6 to 6.14.0 ([#232](https://github.com/rokucommunity/roku-deploy/pull/232))
- - Bump lodash from 4.17.21 to 4.17.23 ([#227](https://github.com/rokucommunity/roku-deploy/pull/227))
+ - don't normalize file patterns ([#131](https://github.com/rokucommunity/roku-deploy/pull/131))
+ - Throw exceptions on missing options ([#156](https://github.com/rokucommunity/roku-deploy/pull/156))
+ - upgrade typescript & other packages ([#157](https://github.com/rokucommunity/roku-deploy/pull/157))
+### Fixed
+ - bug with `{src;dest}` object handling ([#135](https://github.com/rokucommunity/roku-deploy/pull/135))
+### Removed
+ - removed deprecated `retainStagingFolder` property ([#130](https://github.com/rokucommunity/roku-deploy/pull/130))
+ - eliminate top index functions ([#144](https://github.com/rokucommunity/roku-deploy/pull/144))
 
 
 
@@ -590,7 +564,3 @@ chore: Update package.json repository to support provenance (#218)
 ## [1.0.0](https://github.com/RokuCommunity/roku-deploy/compare/v0.2.1...v1.0.0) - 2018-12-18
 ### Added
  - support for negated globs
-
-
-
-
