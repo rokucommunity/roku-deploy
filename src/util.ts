@@ -270,6 +270,21 @@ export class Util {
      * This makes it easier to reason about later on in the process.
      * @param files
      */
+    /**
+     * Standardize a glob `src` pattern from the `files` array.
+     * Normalizes forward slashes to the OS path separator while preserving:
+     * - Leading `!` glob-negation prefix
+     * - Glob escape sequences (like `\\[` to match literal brackets)
+     */
+    public standardizeSrcPattern(pattern: string) {
+        const isNegated = pattern.startsWith('!');
+        const stripped = isNegated ? pattern.slice(1) : pattern;
+        // Only normalize forward slashes to OS separator, don't use path.normalize
+        // which would break glob escape sequences like \\[
+        const normalized = stripped.replace(/\//g, path.sep);
+        return isNegated ? '!' + normalized : normalized;
+    }
+
     public normalizeFilesArray(files: FileEntry[]) {
         const result: Array<StandardizedFileEntry | string> = [];
 
@@ -281,7 +296,7 @@ export class Util {
 
                 //string entries
             } else if (typeof entry === 'string') {
-                result.push(entry);
+                result.push(this.standardizeSrcPattern(entry));
 
                 //objects with src: (string | string[])
             } else if ('src' in entry) {
@@ -293,7 +308,7 @@ export class Util {
                 //objects with src: string
                 if (typeof entry.src === 'string') {
                     result.push({
-                        src: entry.src,
+                        src: this.standardizeSrcPattern(entry.src),
                         dest: util.standardizePath(entry.dest)
                     });
 
@@ -302,7 +317,7 @@ export class Util {
                     //create a distinct entry for each item in the src array
                     for (let srcEntry of entry.src) {
                         result.push({
-                            src: srcEntry,
+                            src: this.standardizeSrcPattern(srcEntry),
                             dest: util.standardizePath(entry.dest)
                         });
                     }

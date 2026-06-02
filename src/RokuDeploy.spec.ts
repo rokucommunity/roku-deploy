@@ -2611,6 +2611,24 @@ describe('RokuDeploy', () => {
             }]);
         });
 
+        it('preserves negation prefix and parent-dir segments in {src:string[]} entries', () => {
+            expect(util['normalizeFilesArray']([
+                {
+                    src: [
+                        '../../external/**/*',
+                        '!../../external/skip/**/*.brs'
+                    ],
+                    dest: '/'
+                }
+            ])).to.eql([{
+                src: sp`../../external/**/*`,
+                dest: s`/`
+            }, {
+                src: `!${sp`../../external/skip/**/*.brs`}`,
+                dest: s`/`
+            }]);
+        });
+
         it('throws when encountering invalid entries', () => {
             expect(() => util['normalizeFilesArray'](<any>[true])).to.throw();
             expect(() => util['normalizeFilesArray'](<any>[/asdf/])).to.throw();
