@@ -14,7 +14,6 @@ import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import * as r from 'postman-request';
-import type * as requestType from 'request';
 import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
 const request = r;
@@ -3917,13 +3916,13 @@ describe('RokuDeploy', () => {
             });
 
             it('if no config file is available it should use the default values', () => {
-                expect(rokuDeploy.getOptions().out).to.contain('roku-deploy.zip');
+                expect((rokuDeploy.getOptions() as any).out).to.contain('roku-deploy.zip');
             });
 
             it('if runtime options are provided, they should override any default options', () => {
-                expect(rokuDeploy.getOptions({
+                expect((rokuDeploy.getOptions({
                     out: `${outDir}/roku-deploy.zip`
-                }).out).to.equal(s`${outDir}/roku-deploy.zip`);
+                }) as any).out).to.equal(s`${outDir}/roku-deploy.zip`);
             });
         });
 
