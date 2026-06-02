@@ -16,6 +16,7 @@ import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
+import { fetchWithDigest } from './fetch';
 
 export class RokuDeploy {
     /**
@@ -279,6 +280,12 @@ export class RokuDeploy {
             if (options.remoteDebugConnectEarly) {
                 // eslint-disable-next-line camelcase
                 requestOptions.formData.remotedebug_connect_early = '1';
+            }
+
+            //disable auto-launching the channel after install if explicitly opted out
+            if (options.autoLaunch === false) {
+                // eslint-disable-next-line camelcase
+                requestOptions.formData.dev_autolaunch = '0';
             }
 
             //apply any supplied formData overrides
@@ -959,6 +966,41 @@ export class RokuDeploy {
     }
 
     /**
+     * Validate a developer password for a Roku device
+     * @param options - Options including host and password to validate
+     * @returns Promise resolving to true if password is valid, false if invalid
+     * @throws DeviceUnreachableError if the device cannot be reached
+     * @throws InvalidDeviceResponseCodeError for unexpected response codes
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+        const url = `http://${options.host}:${port}/plugin_install`;
+
+        let response: Response;
+        try {
+            response = await fetchWithDigest(url, {
+                method: 'HEAD',
+                username: username,
+                password: options.password,
+                timeout: timeout
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+        }
+
+        if (response.status === 200) {
+            return true;
+        }
+        if (response.status === 401) {
+            return false;
+        }
+        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
+    }
+
+    /**
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
@@ -1337,6 +1379,11 @@ export interface SideloadOptions {
     deleteDevChannel?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
+    /**
+     * If false, prevents the channel from auto-launching after sideload.
+     * Default is true (channel auto-launches).
+     */
+    autoLaunch?: boolean;
 }
 
 export interface PackageUploadOverridesOptions {
@@ -1420,6 +1467,19 @@ export interface GetDevIdOptions {
     /**
      * The number of milliseconds at which point this request should timeout and return a rejected promise
      */
+    timeout?: number;
+}
+
+export interface ValidateDeveloperPasswordOptions {
+    /** The hostname or IP of the Roku device */
+    host: string;
+    /** The developer password to check */
+    password: string;
+    /** Defaults to `'rokudev'` */
+    username?: string;
+    /** Defaults to `80` (the developer web-server port) */
+    port?: number;
+    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
     timeout?: number;
 }
 
