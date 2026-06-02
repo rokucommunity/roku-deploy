@@ -3916,13 +3916,15 @@ describe('RokuDeploy', () => {
             });
 
             it('if no config file is available it should use the default values', () => {
-                expect((rokuDeploy.getOptions() as any).out).to.contain('roku-deploy.zip');
+                options = rokuDeploy.getOptions();
+                expect((options as any).out).to.contain('roku-deploy.zip');
             });
 
             it('if runtime options are provided, they should override any default options', () => {
-                expect((rokuDeploy.getOptions({
+                options = rokuDeploy.getOptions({
                     out: `${outDir}/roku-deploy.zip`
-                }) as any).out).to.equal(s`${outDir}/roku-deploy.zip`);
+                });
+                expect((options as any).out).to.equal(s`${outDir}/roku-deploy.zip`);
             });
         });
 
