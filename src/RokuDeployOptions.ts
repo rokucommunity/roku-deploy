@@ -149,12 +149,6 @@ export interface RokuDeployOptions {
     deleteDevChannel?: boolean;
 
     /**
-     * If true, the `build_version` field in the manifest will be updated with a timestamp before zipping the package.
-     * The format is `YYMMDDHHmm` (e.g., `2506031425` for June 3, 2025 at 2:25 PM).
-     */
-    incrementBuildNumber?: boolean;
-
-    /**
      * Overrides for values used during the zip upload process. You probably don't need to change these...
      */
     packageUploadOverrides?: {

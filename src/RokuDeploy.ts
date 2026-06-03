@@ -68,19 +68,9 @@ export class RokuDeploy {
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
-        const manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
-
         //ensure the manifest file exists in the staging folder
-        if (!await util.fileExistsCaseInsensitive(manifestPath)) {
+        if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
             throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
-        }
-
-        //update the build_version in the manifest if requested
-        if (options.incrementBuildNumber) {
-            const parsedManifest = await this.parseManifest(manifestPath);
-            const timestamp = dayjs().format('YYMMDDHHmm');
-            parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
-            await fsExtra.outputFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
         //create a zip of the staging folder
@@ -1148,34 +1138,6 @@ export class RokuDeploy {
         return manifestData;
     }
 
-    /**
-     * Convert a ManifestData object back into a manifest file string.
-     * If keyIndexes and lineCount are present, preserves original line ordering.
-     */
-    private stringifyManifest(manifestData: ManifestData): string {
-        let output: string[] = [];
-
-        if (manifestData.keyIndexes && manifestData.lineCount) {
-            output.fill('', 0, manifestData.lineCount);
-
-            let key: string;
-            for (key in manifestData) {
-                if (key === 'lineCount' || key === 'keyIndexes') {
-                    continue;
-                }
-
-                let index = manifestData.keyIndexes[key];
-                output[index] = `${key}=${manifestData[key]}`;
-            }
-        } else {
-            output = Object.keys(manifestData).map((key) => {
-                return `${key}=${manifestData[key]}`;
-            });
-        }
-
-        return output.join('\n');
-    }
-
     public async rebootDevice(options: RokuDeployOptions) {
         options = this.getOptions(options);
 
@@ -1374,7 +1336,6 @@ export interface ZipOptions {
     outDir?: string;
     outFile?: string;
     cwd?: string;
-    incrementBuildNumber?: boolean;
 }
 
 export interface SideloadOptions {

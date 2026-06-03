@@ -764,19 +764,6 @@ describe('RokuDeploy', () => {
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
         });
 
-        it('updates build_version in manifest when incrementBuildNumber is true', async () => {
-            fsExtra.outputFileSync(s`${stagingDir}/manifest`, 'title=Test\nmajor_version=1\nminor_version=0\nbuild_version=0');
-            await rokuDeploy.zip({
-                stagingDir: stagingDir,
-                outDir: outDir,
-                incrementBuildNumber: true
-            });
-            const manifest = fsExtra.readFileSync(s`${stagingDir}/manifest`, 'utf-8');
-            //the build_version should be a 10-digit timestamp in YYMMDDHHmm format
-            expect(manifest).to.match(/build_version=\d{10}/);
-            expect(manifest).not.to.include('build_version=0');
-        });
-
     });
 
     it('runs via the command line using the rokudeploy.json file', function test() {
@@ -3744,39 +3731,6 @@ describe('RokuDeploy', () => {
             expect(parsedManifest.ui_resolutions).to.equal('hd');
             expect(parsedManifest.bs_const).to.equal('IS_DEV_BUILD=false');
             expect(parsedManifest.splash_color).to.equal('#000000');
-        });
-    });
-
-    describe('stringifyManifest', () => {
-        it('converts manifest data to string', () => {
-            const result = rokuDeploy['stringifyManifest']({
-                title: 'MyApp',
-                major_version: '1',
-                minor_version: '0'
-            });
-            expect(result).to.include('title=MyApp');
-            expect(result).to.include('major_version=1');
-            expect(result).to.include('minor_version=0');
-        });
-
-        it('preserves line order when keyIndexes and lineCount are present', () => {
-            const result = rokuDeploy['stringifyManifest']({
-                title: 'MyApp',
-                major_version: '1',
-                keyIndexes: { title: 0, major_version: 2 },
-                lineCount: 3
-            });
-            const lines = result.split('\n');
-            expect(lines[0]).to.equal('title=MyApp');
-            expect(lines[1]).to.equal('');
-            expect(lines[2]).to.equal('major_version=1');
-        });
-
-        it('round-trips with parseManifestFromString', () => {
-            const original = 'title=TestApp\nmajor_version=2\nminor_version=5';
-            const parsed = rokuDeploy['parseManifestFromString'](original);
-            const stringified = rokuDeploy['stringifyManifest'](parsed);
-            expect(stringified).to.equal(original);
         });
     });
 
