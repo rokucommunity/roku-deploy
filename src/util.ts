@@ -149,9 +149,10 @@ export class Util {
         const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
-            //force windows-style path separators to unix style, but preserve glob escape sequences
-            //escape sequences are backslashes followed by glob special chars: [ ] * ? ! @
-            pattern = pattern.replace(/\\(?![[\]*?!@])/g, '/');
+            //force windows-style path separators to unix style, but preserve literal-bracket
+            //glob escapes (`\[` and `\]`). A backslash before `*`/`?`/`!`/`@` is a Windows path
+            //separator here, not a glob escape, so it must still be converted.
+            pattern = pattern.replace(/\\(?![[\]])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
@@ -274,17 +275,26 @@ export class Util {
      * @param files
      */
     /**
-     * Standardize a glob `src` pattern from the `files` array.
-     * Normalizes forward slashes to the OS path separator while preserving:
-     * - Leading `!` glob-negation prefix
-     * - Glob escape sequences (like `\\[` to match literal brackets)
+     * Standardize a glob `src` pattern from the `files` array. Glob patterns must use
+     * forward slashes (fast-glob/micromatch treat backslashes as escapes, not path
+     * separators), so we normalize to posix slashes rather than the OS separator.
+     * Preserves:
+     * - the leading `!` glob-negation prefix that `path.normalize` would otherwise consume
+     * - literal-bracket glob escapes (`\[`, `\]`), which `path.normalize` would otherwise
+     *   collapse into path separators
      */
     public standardizeSrcPattern(pattern: string) {
         const isNegated = pattern.startsWith('!');
         const stripped = isNegated ? pattern.slice(1) : pattern;
-        // Only normalize forward slashes to OS separator, don't use path.normalize
-        // which would break glob escape sequences like \\[
-        const normalized = stripped.replace(/\//g, path.sep);
+        //shield `\[` and `\]` escapes from path.normalize, then restore them afterward
+        const openEscape = '\0OPEN_BRACKET\0';
+        const closeEscape = '\0CLOSE_BRACKET\0';
+        const shielded = stripped
+            .replace(/\\\[/g, openEscape)
+            .replace(/\\\]/g, closeEscape);
+        const normalized = this.standardizePathPosix(shielded)
+            .replace(new RegExp(openEscape, 'g'), '\\[')
+            .replace(new RegExp(closeEscape, 'g'), '\\]');
         return isNegated ? '!' + normalized : normalized;
     }
 
