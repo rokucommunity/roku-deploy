@@ -16,9 +16,7 @@ import { defer, util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
-import * as r from 'postman-request';
-import type * as requestType from 'request';
-const request = r as typeof requestType;
+import { request } from './request';
 
 const sinon = createSandbox();
 
