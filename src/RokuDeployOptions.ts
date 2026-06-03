@@ -26,6 +26,7 @@ export interface RokuDeployOptions {
             'source/**\/*.*',
             'components/**\/*.*',
             'images/**\/*.*',
+            'locale/**\/*.*',
             'manifest'
         ],
      */
@@ -60,6 +61,12 @@ export interface RokuDeployOptions {
      * will be trying to attach to the debug protocol control port to consume those compile errors. This must be used in conjuction with the `remoteDebug` option
      */
     remoteDebugConnectEarly?: boolean;
+
+    /**
+     * When publishing a sideloaded channel, set this to `false` to prevent the Roku device from auto-launching the channel after install.
+     * When omitted (the default), the device's normal auto-launch behavior is used.
+     */
+    autoLaunch?: boolean;
 
     /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.

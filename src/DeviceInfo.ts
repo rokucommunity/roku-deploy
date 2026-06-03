@@ -78,7 +78,7 @@ export interface DeviceInfo {
 
 export interface DeviceInfoRaw {
     'udn'?: string;
-    'serialNumber'?: string;
+    'serial-number'?: string;
     'deviceId'?: string;
     'advertising-id'?: string;
     'vendor-name'?: string;
