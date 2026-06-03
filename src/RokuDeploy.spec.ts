@@ -3,13 +3,13 @@ import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, PathLike } from 'fs-extra';
 import * as fs from 'fs';
-import * as q from 'q';
 import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
 import * as errors from './Errors';
-import { util, standardizePath as s, standardizePathPosix as sp } from './util';
+import type { Deferred } from './util';
+import { defer, util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
@@ -26,7 +26,7 @@ describe('RokuDeploy', () => {
     let options: RokuDeployOptions;
 
     let writeStreamPromise: Promise<WriteStream>;
-    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: true | undefined };
+    let writeStreamDeferred: Deferred<WriteStream>;
     let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
@@ -49,21 +49,20 @@ describe('RokuDeploy', () => {
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
 
-        writeStreamDeferred = q.defer<WriteStream>() as any;
-        writeStreamPromise = writeStreamDeferred.promise as any;
+        writeStreamDeferred = defer<WriteStream>();
+        writeStreamPromise = writeStreamDeferred.promise;
 
         //fake out the write stream function
         createWriteStreamStub = sinon.stub(fsExtra, 'createWriteStream').callsFake((filePath: PathLike) => {
             const writeStream = fs.createWriteStream(filePath);
             writeStreamDeferred.resolve(writeStream);
-            writeStreamDeferred.isComplete = true;
             return writeStream;
         });
     });
 
     afterEach(() => {
         try {
-            if (createWriteStreamStub.called && !writeStreamDeferred.isComplete) {
+            if (createWriteStreamStub.called && !writeStreamDeferred.isCompleted) {
                 writeStreamDeferred.reject('Deferred was never resolved...so rejecting in the afterEach');
             }
 
@@ -763,6 +762,19 @@ describe('RokuDeploy', () => {
             }
             expect(err).to.exist;
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
+        });
+
+        it('updates build_version in manifest when incrementBuildNumber is true', async () => {
+            fsExtra.outputFileSync(s`${stagingDir}/manifest`, 'title=Test\nmajor_version=1\nminor_version=0\nbuild_version=0');
+            await rokuDeploy.zip({
+                stagingDir: stagingDir,
+                outDir: outDir,
+                incrementBuildNumber: true
+            });
+            const manifest = fsExtra.readFileSync(s`${stagingDir}/manifest`, 'utf-8');
+            //the build_version should be a 10-digit timestamp in YYMMDDHHmm format
+            expect(manifest).to.match(/build_version=\d{10}/);
+            expect(manifest).not.to.include('build_version=0');
         });
 
     });
@@ -3737,7 +3749,7 @@ describe('RokuDeploy', () => {
 
     describe('stringifyManifest', () => {
         it('converts manifest data to string', () => {
-            const result = rokuDeploy.stringifyManifest({
+            const result = rokuDeploy['stringifyManifest']({
                 title: 'MyApp',
                 major_version: '1',
                 minor_version: '0'
@@ -3748,7 +3760,7 @@ describe('RokuDeploy', () => {
         });
 
         it('preserves line order when keyIndexes and lineCount are present', () => {
-            const result = rokuDeploy.stringifyManifest({
+            const result = rokuDeploy['stringifyManifest']({
                 title: 'MyApp',
                 major_version: '1',
                 keyIndexes: { title: 0, major_version: 2 },
@@ -3763,7 +3775,7 @@ describe('RokuDeploy', () => {
         it('round-trips with parseManifestFromString', () => {
             const original = 'title=TestApp\nmajor_version=2\nminor_version=5';
             const parsed = rokuDeploy['parseManifestFromString'](original);
-            const stringified = rokuDeploy.stringifyManifest(parsed);
+            const stringified = rokuDeploy['stringifyManifest'](parsed);
             expect(stringified).to.equal(original);
         });
     });
@@ -3972,8 +3984,8 @@ describe('RokuDeploy', () => {
         it('waits for the write stream to finish writing before resolving', async () => {
             let downloadFileIsResolved = false;
 
-            let requestCalled = q.defer();
-            let onResponse = q.defer<(res) => any>();
+            let requestCalled = defer();
+            let onResponse = defer<(res) => any>();
 
             //intercept the http request
             sinon.stub(request, 'get').callsFake(() => {

@@ -68,9 +68,19 @@ export class RokuDeploy {
 
         let zipFilePath = this.getOutputZipFilePath(options as any);
 
+        const manifestPath = util.standardizePath(`${options.stagingDir}/manifest`);
+
         //ensure the manifest file exists in the staging folder
-        if (!await util.fileExistsCaseInsensitive(`${options.stagingDir}/manifest`)) {
+        if (!await util.fileExistsCaseInsensitive(manifestPath)) {
             throw new Error(`Cannot zip package: missing manifest file in "${options.stagingDir}"`);
+        }
+
+        //update the build_version in the manifest if requested
+        if (options.incrementBuildNumber) {
+            const parsedManifest = await this.parseManifest(manifestPath);
+            const timestamp = dayjs().format('YYMMDDHHmm');
+            parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
+            await fsExtra.outputFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
 
         //create a zip of the staging folder
@@ -1142,7 +1152,7 @@ export class RokuDeploy {
      * Convert a ManifestData object back into a manifest file string.
      * If keyIndexes and lineCount are present, preserves original line ordering.
      */
-    public stringifyManifest(manifestData: ManifestData): string {
+    private stringifyManifest(manifestData: ManifestData): string {
         let output: string[] = [];
 
         if (manifestData.keyIndexes && manifestData.lineCount) {
@@ -1364,6 +1374,7 @@ export interface ZipOptions {
     outDir?: string;
     outFile?: string;
     cwd?: string;
+    incrementBuildNumber?: boolean;
 }
 
 export interface SideloadOptions {
