@@ -20,11 +20,14 @@ function execSync(command: string) {
     process.stdout.write(output);
     return output;
 }
-describe('cli', () => {
-    before(function build() {
-        this.timeout(20000);
+describe('cli', function cliSuite() {
+    //all cli tests spawn `node dist/cli.js` via execSync, which can exceed the default 2s timeout
+    this.timeout(60_000);
+
+    before(() => {
         execSync('npm run build');
     });
+
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         //most tests depend on a manifest file existing, so write an empty one
@@ -116,7 +119,7 @@ describe('cli', () => {
 
     it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
         const command = new SideloadCommand();
-        
+
         try {
             await command.run({
                 host: '1.2.3.4',
