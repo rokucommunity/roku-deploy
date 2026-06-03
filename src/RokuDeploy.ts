@@ -1,8 +1,7 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as r from 'postman-request';
+import { request } from './request';
 import type * as requestType from 'request';
-const request = r as typeof requestType;
 import * as JSZip from 'jszip';
 import * as dateformat from 'dateformat';
 import * as errors from './Errors';
