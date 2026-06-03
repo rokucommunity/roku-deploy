@@ -766,7 +766,7 @@ describe('RokuDeploy', () => {
 
     });
 
-    it('runs via the command line using the rokudeploy.json file', function test() {
+    it('runs via the command line using the rokudeploy.json file', () => {
         //build the project
         child_process.execSync(`npm run build`, { stdio: 'inherit' });
         child_process.execSync(`node dist/index.js`, { stdio: 'inherit' });
