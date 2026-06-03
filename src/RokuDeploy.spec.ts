@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, PathLike } from 'fs-extra';
 import * as fs from 'fs';
-import * as q from 'q';
+import { defer, type Deferred } from './util';
 import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
@@ -25,7 +25,7 @@ describe('RokuDeploy', () => {
     let options: RokuDeployOptions;
 
     let writeStreamPromise: Promise<WriteStream>;
-    let writeStreamDeferred: q.Deferred<WriteStream> & { isComplete: true | undefined };
+    let writeStreamDeferred: Deferred<WriteStream> & { isComplete: true | undefined };
     let createWriteStreamStub: sinon.SinonStub;
 
     beforeEach(() => {
@@ -47,7 +47,7 @@ describe('RokuDeploy', () => {
         //most tests depend on a manifest file existing, so write an empty one
         fsExtra.outputFileSync(`${rootDir}/manifest`, '');
 
-        writeStreamDeferred = q.defer<WriteStream>() as any;
+        writeStreamDeferred = defer<WriteStream>() as any;
         writeStreamPromise = writeStreamDeferred.promise as any;
 
         //fake out the write stream function
@@ -4038,8 +4038,8 @@ describe('RokuDeploy', () => {
         it('waits for the write stream to finish writing before resolving', async () => {
             let downloadFileIsResolved = false;
 
-            let requestCalled = q.defer();
-            let onResponse = q.defer<(res) => any>();
+            let requestCalled = defer();
+            let onResponse = defer<(res) => any>();
 
             //intercept the http request
             sinon.stub(request, 'get').callsFake(() => {
