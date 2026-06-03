@@ -149,6 +149,9 @@ export class Util {
         const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
+            //force windows-style path separators to unix style, but preserve glob escape sequences
+            //escape sequences are backslashes followed by glob special chars: [ ] * ? ! @
+            pattern = pattern.replace(/\\(?![[\]*?!@])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
