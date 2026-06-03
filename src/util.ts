@@ -149,9 +149,12 @@ export class Util {
         const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
-            //force windows-style path separators to unix style, but preserve literal-bracket
-            //glob escapes (`\[` and `\]`). A backslash before `*`/`?`/`!`/`@` is a Windows path
-            //separator here, not a glob escape, so it must still be converted.
+            //Canonicalize separators so callers can use either style: convert every backslash
+            //to a forward slash EXCEPT `\[` and `\]`. This is the one rule that disambiguates
+            //the overloaded Windows backslash without guessing: literal-bracket escapes are the
+            //only glob escape with no backslash-free alternative (use `[*]`/`[?]` for a literal
+            //`*`/`?`), and `path.*` joins never emit `\[`/`\]` on their own. So a surviving
+            //backslash can only be an intentional bracket escape; everything else was a separator.
             pattern = pattern.replace(/\\(?![[\]])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
@@ -275,13 +278,15 @@ export class Util {
      * @param files
      */
     /**
-     * Standardize a glob `src` pattern from the `files` array. Glob patterns must use
-     * forward slashes (fast-glob/micromatch treat backslashes as escapes, not path
-     * separators), so we normalize to posix slashes rather than the OS separator.
+     * Standardize a glob `src` pattern from the `files` array. fast-glob/micromatch require
+     * forward slashes as separators (a backslash is an escape char to them), so we normalize
+     * to posix slashes rather than the OS separator. Callers may pass either separator style
+     * (e.g. the backslashes that `path.join` produces on Windows); both canonicalize the same.
      * Preserves:
      * - the leading `!` glob-negation prefix that `path.normalize` would otherwise consume
-     * - literal-bracket glob escapes (`\[`, `\]`), which `path.normalize` would otherwise
-     *   collapse into path separators
+     * - literal-bracket glob escapes (`\[`, `\]`), the one escape with no backslash-free
+     *   alternative, which `path.normalize` would otherwise collapse into path separators.
+     *   (To match a literal `*`/`?` in a filename, use the `[*]`/`[?]` char-class form instead.)
      */
     public standardizeSrcPattern(pattern: string) {
         const isNegated = pattern.startsWith('!');
