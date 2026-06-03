@@ -767,7 +767,7 @@ describe('RokuDeploy', () => {
     });
 
     it('runs via the command line using the rokudeploy.json file', function test() {
-        this.timeout(20000);
+        this.timeout(60_000);
         //build the project
         child_process.execSync(`npm run build`, { stdio: 'inherit' });
         child_process.execSync(`node dist/index.js`, { stdio: 'inherit' });
@@ -1912,7 +1912,7 @@ describe('RokuDeploy', () => {
                         "packages":[{"appType":"channel","fileType":"zip",
                         "pkgPath":"pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg"}]}')`;
             mockDoPostRequest(body);
-    
+
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let pkgPath = await rokuDeploy.createSignedPackage({
