@@ -20,11 +20,14 @@ function execSync(command: string) {
     process.stdout.write(output);
     return output;
 }
-describe('cli', () => {
-    before(function build() {
-        this.timeout(60_000);
+describe('cli', function cliSuite() {
+    //all cli tests spawn `node dist/cli.js` via execSync, which can exceed the default 2s timeout
+    this.timeout(60_000);
+
+    before(() => {
         execSync('npm run build');
     });
+
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         //most tests depend on a manifest file existing, so write an empty one
