@@ -22,7 +22,8 @@ function execSync(command: string) {
 }
 describe('cli', () => {
     before(function build() {
-        this.timeout(20000);
+        //all cli tests spawn `node dist/cli.js` via execSync, which can exceed the default 2s timeout
+        this.timeout(60_000);
         execSync('npm run build');
     });
     beforeEach(() => {
