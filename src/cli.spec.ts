@@ -4,7 +4,6 @@ import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import { rokuDeploy } from './index';
-import { SideloadCommand } from './commands/SideloadCommand';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
@@ -12,6 +11,7 @@ import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
 import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
 import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
 import { GetDevIdCommand } from './commands/GetDevIdCommand';
+import { standardizePath as s } from './util';
 
 const sinon = createSandbox();
 
@@ -20,14 +20,12 @@ function execSync(command: string) {
     process.stdout.write(output);
     return output;
 }
-describe('cli', function cliSuite() {
-    //all cli tests spawn `node dist/cli.js` via execSync, which can exceed the default 2s timeout
-    this.timeout(60_000);
-
-    before(() => {
+describe('cli', () => {
+    before(function build() {
+        //all cli tests spawn `node dist/cli.js` via execSync, which can exceed the default 2s timeout
+        this.timeout(60_000);
         execSync('npm run build');
     });
-
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         //most tests depend on a manifest file existing, so write an empty one
@@ -44,126 +42,16 @@ describe('cli', function cliSuite() {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
         expect(() => {
-            execSync(`node ${cwd}/dist/cli.js stage --stagingDir ${stagingDir} --rootDir ${rootDir}`);
+            execSync(`node ${cwd}/dist/cli.js stage --out ${stagingDir} --rootDir ${rootDir}`);
         }).to.not.throw();
     });
 
     it('Successfully copies rootDir folder to staging folder', () => {
         fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
 
-        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --stagingDir ${stagingDir}`);
+        execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
-    });
-
-    it('SideloadCommand passes proper options when zip is provided', async () => {
-        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
-            return Promise.resolve();
-        });
-        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
-            return Promise.resolve({
-                message: 'Successful sideload',
-                results: {}
-            });
-        });
-
-        const command = new SideloadCommand();
-        await command.run({
-            host: '1.2.3.4',
-            password: '5536',
-            zip: 'test.zip'
-        });
-
-        expect(
-            sideloadStub.getCall(0).args[0]
-        ).to.eql({
-            host: '1.2.3.4',
-            password: '5536',
-            outDir: cwd,
-            outFile: 'test.zip',
-            zip: 'test.zip',
-            retainDeploymentArchive: true
-        });
-    });
-
-    it('SideloadCommand passes proper options when rootDir is provided', async () => {
-        sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
-            return Promise.resolve();
-        });
-        sinon.stub(rokuDeploy, 'zip').callsFake(async () => {
-            return Promise.resolve();
-        });
-        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
-            return Promise.resolve({
-                message: 'Successful sideload',
-                results: {}
-            });
-        });
-
-        const command = new SideloadCommand();
-        await command.run({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir
-        });
-
-        expect(
-            sideloadStub.getCall(0).args[0]
-        ).to.eql({
-            host: '1.2.3.4',
-            password: '5536',
-            rootDir: rootDir,
-            retainDeploymentArchive: false
-        });
-    });
-
-    it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
-        const command = new SideloadCommand();
-
-        try {
-            await command.run({
-                host: '1.2.3.4',
-                password: '5536',
-                noclose: true
-            });
-            expect.fail('Expected an error to be thrown');
-        } catch (error) {
-            expect((error as Error).message).to.equal('Either zip or rootDir must be provided for sideload command');
-        }
-    });
-
-    it('SideloadCommand calls the proper methods when noclose is provided', async () => {
-        const closeChannelStub = sinon.stub(rokuDeploy, 'closeChannel').callsFake(async () => {
-            return Promise.resolve();
-        });
-        const sideloadStub = sinon.stub(rokuDeploy, 'sideload').callsFake(async () => {
-            return Promise.resolve({
-                message: 'Successful sideload',
-                results: {}
-            });
-        });
-
-        const command = new SideloadCommand();
-        await command.run({
-            host: '1.2.3.4',
-            password: '5536',
-            zip: 'test.zip',
-            noclose: true
-        });
-
-        expect(closeChannelStub.callCount).to.equal(0);
-
-        expect(
-            sideloadStub.getCall(0).args[0]
-        ).to.eql({
-            host: '1.2.3.4',
-            password: '5536',
-            noclose: true,
-            outDir: cwd,
-            outFile: 'test.zip',
-            retainDeploymentArchive: true,
-            zip: 'test.zip'
-        });
     });
 
     it('Converts to squashfs', async () => {
@@ -194,7 +82,7 @@ describe('cli', function cliSuite() {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`,
+            pkg: `${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
             rootDir: rootDir,
             devId: 'abcde'
@@ -203,9 +91,10 @@ describe('cli', function cliSuite() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
-            rekeySignedPackage: `${tempDir}/testSignedPackage.pkg`,
+            pkg: s`${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
             rootDir: rootDir,
             devId: 'abcde'
@@ -228,6 +117,7 @@ describe('cli', function cliSuite() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
             signingPassword: undefined,
@@ -268,6 +158,7 @@ describe('cli', function cliSuite() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
@@ -339,7 +230,7 @@ describe('cli', function cliSuite() {
     });
 
     it('Zips a folder', () => {
-        execSync(`node ${cwd}/dist/cli.js zip --stagingDir ${rootDir} --outDir ${outDir}`);
+        execSync(`node ${cwd}/dist/cli.js zip --dir ${rootDir} --out ${outDir}/roku-deploy.zip`);
 
         expectPathExists(`${outDir}/roku-deploy.zip`);
     });

@@ -170,49 +170,6 @@ describe('util', () => {
             ]);
         });
 
-        it('matches absolute glob paths case-insensitively on case-insensitive file systems', async function matchesAbsoluteGlobPathsCaseInsensitively() {
-            if (await util['getIsFileSystemCaseSensitive'](tempDir)) {
-                this.skip();
-            }
-            writeFiles([
-                'components/ROKUtils/rokutils.brs'
-            ]);
-            await doTest([
-                util.standardizePath(path.resolve(tempDir, 'components/ROKUtils/R*.brs'))
-            ], [
-                [
-                    'components/ROKUtils/rokutils.brs'
-                ]
-            ]);
-        });
-
-        it('caches file system case sensitivity by root path', async () => {
-            const previousCache = new Map(util['isFileSystemCaseSensitiveCache']);
-            util['isFileSystemCaseSensitiveCache'].clear();
-            const outputFileSpy = sinon.spy(fsExtra, 'outputFile');
-            const value1 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder1'));
-            const value2 = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder2'));
-            expect(outputFileSpy.callCount).to.equal(1);
-            expect(value2).to.equal(value1);
-            outputFileSpy.restore();
-            util['isFileSystemCaseSensitiveCache'].clear();
-            for (const [key, value] of previousCache) {
-                util['isFileSystemCaseSensitiveCache'].set(key, value);
-            }
-        });
-
-        it('defaults to case-sensitive when the filesystem probe fails', async () => {
-            const previousCache = new Map(util['isFileSystemCaseSensitiveCache']);
-            util['isFileSystemCaseSensitiveCache'].clear();
-            sinon.stub(fsExtra, 'outputFile').rejects(new Error('read-only filesystem'));
-            const value = await util['getIsFileSystemCaseSensitive'](path.resolve(tempDir, 'folder1'));
-            expect(value).to.equal(true);
-            util['isFileSystemCaseSensitiveCache'].clear();
-            for (const [key] of previousCache) {
-                util['isFileSystemCaseSensitiveCache'].set(key, value);
-            }
-        });
-
         it('returns the same file path in multiple matches', async () => {
             writeFiles([
                 'manifest',
@@ -527,7 +484,6 @@ describe('util', () => {
             try {
                 util.getOptionsFromJson();
             } catch (e) {
-                console.log(e);
                 ex = e;
             }
             expect(ex).to.exist;

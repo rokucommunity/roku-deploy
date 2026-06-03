@@ -7,18 +7,6 @@ export interface RokuDeployOptions {
     cwd?: string;
 
     /**
-     * A full path to the folder where the zip/pkg package should be placed
-     * @default './out'
-     */
-    outDir?: string;
-
-    /**
-     * The base filename the zip/pkg file should be given (excluding the extension)
-     * @default 'roku-deploy'
-     */
-    outFile?: string;
-
-    /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
      * @default './'
      */
@@ -43,12 +31,6 @@ export interface RokuDeployOptions {
         ],
      */
     files?: FileEntry[];
-
-    /**
-     * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
-     * @default true
-     */
-    retainDeploymentArchive?: boolean;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
@@ -91,7 +73,7 @@ export interface RokuDeployOptions {
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
      */
-    remotePort?: number;
+    ecpPort?: number;
 
     /**
      * The directory where screenshots should be saved. Will use the OS temp directory by default
@@ -125,7 +107,7 @@ export interface RokuDeployOptions {
     /**
      * Path to a copy of the signed package you want to use for rekeying
      */
-    rekeySignedPackage?: string;
+    pkg?: string;
 
     /**
      * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected

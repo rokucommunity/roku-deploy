@@ -84,9 +84,11 @@ Another set of changes are the names and features available in the Node API. Som
 - `zipPackage()` -> `zip()`
 - `pressHomeButton()` -> `closeChannel()`
 - `publish()` -> `sideload()`
-- `signExistingPackage()` -> `createSignedPackage()`
+- `signExistingPackage()` -> `package()`
 - `deleteInstalledChannel()` -> `deleteDevChannel()`
-- `takeScreenshot()` -> `captureScreenshot()`
+- `takeScreenshot()` -> `screenshot()`
+- `convertToSquashfs()` -> `squash()`
+- `rekeyDevice()` -> `rekey()`
 
 Some functions were added to help with certain developer usecases. These mostly allow for any remote-to-Roku interaction:
 - `keyPress()`
@@ -105,13 +107,16 @@ Lastly, the default files array has changed. node modules and static analysis fi
 ## CLI Usage
 
 ### Sideload a project to your Roku device
-Sideload a .zip package or directory to a roku device:
+Sideload a .zip package or directory to a roku device. By default, the channel is closed before sideloading. Use `--no-close` to skip this.
 ```shell
 # Sideload a zip file
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
 
 # Sideload from a directory (will be zipped first automatically)
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --rootDir './path/to/your/project'
+
+# Sideload without closing the channel first
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip' --no-close
 ```
 
 ### Create a signed package from an existing dev channel
@@ -158,8 +163,11 @@ npx roku-deploy squash --host 'ip.of.roku' --password 'password'
 
 ### Device management
 ```shell
-# Take a screenshot
+# Take a screenshot (filename used exactly as provided)
 npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot.jpg'
+
+# Take a screenshot with auto extension handling (appends/swaps extension based on device response)
+npx roku-deploy screenshot --host 'ip.of.roku' --password 'password' --out './screenshot' --autoExtension
 
 # Rekey a device with a signed package
 npx roku-deploy rekey --host 'ip.of.roku' --password 'password' --pkg './path/to/signed.pkg' --signingPassword 'signing password'
@@ -212,8 +220,8 @@ Use this logic if you'd like to create a zip from your application folder.
 //create a signed package of your project
 rokuDeploy.zip({
     outDir: 'folder/to/put/zip',
-    stagingDir: 'path/to/files/to/zip',
-    outFile: 'filename-of-your-app.zip'
+    dir: 'path/to/files/to/zip',
+    outFile: 'filename-of-your-app.zip',
     //...other options if necessary
 }).then(function(){
     //the zip has been created
@@ -226,20 +234,32 @@ rokuDeploy.zip({
 ### Pressing the Home key
 ```typescript
 rokuDeploy.keyPress({
-    key: 'Home'
+    key: 'Home',
     //...other options if necessary
 })
 ```
 
 ### Sideloading a project
-If you've already created a zip using some other tool, you can use roku-deploy to sideload the zip.
+Sideload a zip file, a directory, or a pre-built zip at the default `outDir`/`outFile` location. The current dev channel is closed before sideloading by default; pass `close: false` to skip.
 ```typescript
-//sideload a package onto a specified Roku
+// Sideload a zip file
 rokuDeploy.sideload({
     host: 'ip-of-roku',
     password: 'password for roku dev admin portal',
-    outDir: 'folder/where/your/zip/resides/',
-    outFile: 'filename-of-your-app.zip'
+    zip: './path/to/your/app.zip',
+    //...other options if necessary
+}).then(function(){
+    //the app has been sideloaded
+}, function(error) {
+    //it failed
+    console.error(error);
+});
+
+// Sideload from a source directory (will be zipped automatically)
+rokuDeploy.sideload({
+    host: 'ip-of-roku',
+    password: 'password for roku dev admin portal',
+    dir: './path/to/your/project',
     //...other options if necessary
 }).then(function(){
     //the app has been sideloaded
@@ -251,20 +271,19 @@ rokuDeploy.sideload({
 
 ### Convert to SquashFS
 ```typescript
-rokuDeploy.convertToSquashfs({
+rokuDeploy.squash({
     host: '1.2.3.4',
-    password: 'password'
+    password: 'password',
     //...other options if necessary
 })
 ```
 
 ### Create a signed package
 ```typescript
-rokuDeploy.createSignedPackage({
+rokuDeploy.package({
     host: '1.2.3.4',
     password: 'password',
     signingPassword: 'signing password',
-    stagingDir: './path/to/staging/directory'
     //...other options if necessary
 })
 ```
@@ -273,28 +292,38 @@ rokuDeploy.createSignedPackage({
 ```typescript
 rokuDeploy.sendText({
     text: 'Hello World',
-    host: 'ip-of-roku'
+    host: 'ip-of-roku',
     //...other options if necessary
 })
 ```
 
 ### Take a screenshot
 ```typescript
-rokuDeploy.captureScreenshot({
+// Filename is used exactly as provided (default behavior)
+rokuDeploy.screenshot({
     host: 'ip-of-roku',
     password: 'password',
     screenshotDir: './screenshots/',
-    screenshotFile: 'screenshot.jpg'
+    screenshotFile: 'screenshot.jpg',
     //...other options if necessary
+})
+
+// With autoExtension: true, the extension is automatically handled based on device response
+rokuDeploy.screenshot({
+    host: 'ip-of-roku',
+    password: 'password',
+    screenshotDir: './screenshots/',
+    screenshotFile: 'screenshot',  // Extension will be appended based on device
+    autoExtension: true
 })
 ```
 
 ### Rekey a device
 ```typescript
-rokuDeploy.rekeyDevice({
+rokuDeploy.rekey({
     host: 'ip-of-roku',
     password: 'password',
-    rekeySignedPackage: './path/to/signed.pkg'
+    pkg: './path/to/signed.pkg'
     //...other options if necessary
 })
 ```
@@ -309,11 +338,11 @@ Can't find what you need? We offer a variety of functions available in the [Roku
 - `keyDown()`
 - `sendText()`
 - `closeChannel()`
-- `rekeyDevice()`
-- `createSignedPackage()`
+- `rekey()`
+- `package()`
 - `deleteDevChannel()`
-- `captureScreenshot()`
-- `convertToSquashfs()`
+- `screenshot()`
+- `squash()`
 - `getDeviceInfo()`
 - `getDevId()`
 - `getOptions()`
@@ -482,7 +511,7 @@ Here are the available options for customizing to your developer-specific workfl
 - **signingPassword:** string (*required for signing*)
     The password used for creating signed packages.
 
-- **rekeySignedPackage:** string (*required for rekeying*)
+- **pkg:** string (*required for rekeying*)
     Path to a copy of the signed package you want to use for rekeying.
 
 - **devId:** string
@@ -568,13 +597,16 @@ Here are the available options for customizing to your developer-specific workfl
     just in case roku adds support for custom usernames in the future.
 
 - **packagePort?:** number = `80`
-    The port used for package-related requests. This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
+    The port used for package-related requests. This is mainly used when your roku is behind a firewall with a port-forward.
 
-- **remotePort?:** number = `8060`
-    The port used for sending remote control commands (like home press or back press). This is mainly used for things like emulators, or when your roku is behind a firewall with a port-forward.
+- **ecpPort?:** number = `8060`
+    The port used for sending ECP/remote control commands (like key presses). This is mainly used when your roku is behind a firewall with a port-forward.
 
 - **screenshotDir?:** string = `"./tmp/roku-deploy/screenshots/"`
     The directory where screenshots should be saved. Will use the OS temp directory by default.
+
+- **autoExtension?:** boolean = `false`
+    When false (default), the screenshot filename is used exactly as provided. When true, the file extension is automatically handled based on the device response: matching extensions are kept, mismatched image extensions (.jpg/.png) are swapped, and missing extensions are appended.
 
 - **timeout?:** number = `150000`
     The number of milliseconds at which point this request should timeout and return a rejected promise.
