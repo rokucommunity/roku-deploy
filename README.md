@@ -510,7 +510,20 @@ Here are the available options for customizing to your developer-specific workfl
         "!**/*.{md,DS_Store,db}"
     ]
     ```
-    An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. Make sure to _exclusively_ use forward slashes ( `/` ) for path separators (even on Windows), as backslashes are reserved for character escaping. You can learn more about this requirement [here](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows).
+    An array of file paths, globs, or `{ src: string; dest: string }` objects that will be copied into the deployment package. You may use either forward slashes ( `/` ) or backslashes ( `\` ) as path separators — roku-deploy normalizes both internally, so patterns built with Node's `path.join` on Windows work as-is. Forward slashes are still recommended for portability.
+
+    Because a backslash is also the glob escape character, prefer the character-class form to match a literal glob metacharacter in a filename: use `[*]` / `[?]` rather than `\*` / `\?`.
+
+    **Folders or files with square brackets in their name** (e.g. `[ios]`, `[v2]`) are a common gotcha: unescaped square brackets are a glob _character class_ (`[abc]` means "one of `a`, `b`, `c`"), so `[v2]/*` will _not_ match a folder literally named `[v2]` — and may match unintended folders named `v` or `2`. Escape the brackets to match them literally:
+    ```jsonc
+    {
+        "files": [
+            //matches the folder literally named "[v2]"
+            "\\[v2\\]/**/*"
+        ]
+    }
+    ```
+    roku-deploy preserves these `\[` / `\]` escapes even on Windows (where the backslash would otherwise look like a path separator). There is no character-class alternative for literal brackets, so the escape is required. See [how fast-glob handles patterns on Windows](https://www.npmjs.com/package/fast-glob?activeTab=readme#how-to-write-patterns-on-windows) for background.
 
     Using the {src;dest} objects will allow you to move files into different destination paths in the
     deployment package. This would be useful for copying environment-specific configs into a common config location
