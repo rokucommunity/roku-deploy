@@ -149,6 +149,13 @@ export class Util {
         const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
+            //Canonicalize separators so callers can use either style: convert every backslash
+            //to a forward slash EXCEPT `\[` and `\]`. This is the one rule that disambiguates
+            //the overloaded Windows backslash without guessing: literal-bracket escapes are the
+            //only glob escape with no backslash-free alternative (use `[*]`/`[?]` for a literal
+            //`*`/`?`), and `path.*` joins never emit `\[`/`\]` on their own. So a surviving
+            //backslash can only be an intentional bracket escape; everything else was a separator.
+            pattern = pattern.replace(/\\(?![[\]])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
                 return pattern;
@@ -270,6 +277,32 @@ export class Util {
      * This makes it easier to reason about later on in the process.
      * @param files
      */
+    /**
+     * Standardize a glob `src` pattern from the `files` array. fast-glob/micromatch require
+     * forward slashes as separators (a backslash is an escape char to them), so we normalize
+     * to posix slashes rather than the OS separator. Callers may pass either separator style
+     * (e.g. the backslashes that `path.join` produces on Windows); both canonicalize the same.
+     * Preserves:
+     * - the leading `!` glob-negation prefix that `path.normalize` would otherwise consume
+     * - literal-bracket glob escapes (`\[`, `\]`), the one escape with no backslash-free
+     *   alternative, which `path.normalize` would otherwise collapse into path separators.
+     *   (To match a literal `*`/`?` in a filename, use the `[*]`/`[?]` char-class form instead.)
+     */
+    public standardizeSrcPattern(pattern: string) {
+        const isNegated = pattern.startsWith('!');
+        const stripped = isNegated ? pattern.slice(1) : pattern;
+        //shield `\[` and `\]` escapes from path.normalize, then restore them afterward
+        const openEscape = '\0OPEN_BRACKET\0';
+        const closeEscape = '\0CLOSE_BRACKET\0';
+        const shielded = stripped
+            .replace(/\\\[/g, openEscape)
+            .replace(/\\\]/g, closeEscape);
+        const normalized = this.standardizePathPosix(shielded)
+            .replace(new RegExp(openEscape, 'g'), '\\[')
+            .replace(new RegExp(closeEscape, 'g'), '\\]');
+        return isNegated ? '!' + normalized : normalized;
+    }
+
     public normalizeFilesArray(files: FileEntry[]) {
         const result: Array<StandardizedFileEntry | string> = [];
 
@@ -281,7 +314,7 @@ export class Util {
 
                 //string entries
             } else if (typeof entry === 'string') {
-                result.push(entry);
+                result.push(this.standardizeSrcPattern(entry));
 
                 //objects with src: (string | string[])
             } else if ('src' in entry) {
@@ -293,7 +326,7 @@ export class Util {
                 //objects with src: string
                 if (typeof entry.src === 'string') {
                     result.push({
-                        src: entry.src,
+                        src: this.standardizeSrcPattern(entry.src),
                         dest: util.standardizePath(entry.dest)
                     });
 
@@ -302,7 +335,7 @@ export class Util {
                     //create a distinct entry for each item in the src array
                     for (let srcEntry of entry.src) {
                         result.push({
-                            src: srcEntry,
+                            src: this.standardizeSrcPattern(srcEntry),
                             dest: util.standardizePath(entry.dest)
                         });
                     }

@@ -10,6 +10,13 @@
                 "active": true,
                 "notes": "`uuid` <11.1.1 (via `postman-request` and dev-only `nyc>istanbul-lib-processinfo`): vulnerable code path is `v3()`/`v5()`/`v6()` when a caller-provided buffer is passed. Both consumers call only `v4()` (no buffer arg), so the vulnerable path is unreachable from this dep graph."
             }
+        },
+        {
+            "GHSA-fjxv-7rqg-78g4": {
+                // Added: 2026-06-03
+                "active": true,
+                "notes": "`form-data` 4.0.0-4.0.3 (via dev-only `coveralls-next`): uses weak random for boundary generation. Only affects dev dependency used for coverage reporting, not production code."
+            }
         }
     ]
 }
