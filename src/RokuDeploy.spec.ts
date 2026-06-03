@@ -16,7 +16,8 @@ import { defer, util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
-import { request } from './request';
+import { request, needleClient } from './request';
+import { PassThrough } from 'stream';
 
 const sinon = createSandbox();
 
@@ -191,6 +192,168 @@ describe('RokuDeploy', () => {
                 return;
             }
             assert.fail('Exception should have been thrown');
+        });
+    });
+
+    describe('error results structure (postman-request compatibility)', () => {
+        //These tests drive RokuDeploy through the REAL needle shim (by stubbing the low-level
+        //`needleClient`), then assert the exact shape of the `results`/`response` object attached to
+        //each thrown error. roku-deploy historically exposed a `request`/`postman-request`-shaped
+        //object here, and consumers read specific paths off it (`results.response.statusCode`,
+        //`results.response.headers.server`, `results.response.request.host`, string `results.body`).
+        //Getting any of these wrong is a BREAKING API change, so they're pinned down explicitly.
+
+        /** Stub needleClient.post to deliver the given needle-style response + body */
+        function stubNeedlePost(response: any, body: any, error: any = null) {
+            return sinon.stub(needleClient, 'post').callsFake(((url: string, data: any, opts: any, callback: any) => {
+                process.nextTick(callback, error, response, body);
+                return {} as any;
+            }) as any);
+        }
+
+        /** Stub needleClient.get (callback form) to deliver the given needle-style response + body */
+        function stubNeedleGet(response: any, body: any, error: any = null) {
+            return sinon.stub(needleClient, 'get').callsFake(((url: string, opts: any, callback: any) => {
+                if (callback) {
+                    process.nextTick(callback, error, response, body);
+                }
+                return new PassThrough() as any;
+            }) as any);
+        }
+
+        describe('UnauthorizedDeviceResponseError (401)', () => {
+            it('attaches results with response.statusCode, request.host, and a string body', async () => {
+                stubNeedlePost({ statusCode: 401, headers: {} }, Buffer.alloc(0));
+                let caught: any;
+                try {
+                    await rokuDeploy.deleteInstalledChannel({ host: '1.2.3.4', password: 'aaaa' } as any);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.UnauthorizedDeviceResponseError);
+                //message embeds the host pulled off results.response.request.host
+                expect(caught.message).to.equal(`Unauthorized. Please verify credentials for host '1.2.3.4'`);
+                //the postman-style results object
+                expect(caught.results).to.be.an('object');
+                expect(caught.results.response.statusCode).to.equal(401);
+                expect(caught.results.response.request.host).to.equal('1.2.3.4');
+                expect(caught.results.response.headers).to.be.an('object');
+                expect(caught.results.body).to.be.a('string');
+            });
+        });
+
+        describe('InvalidDeviceResponseCodeError (non-200)', () => {
+            it('attaches results with the offending statusCode and message', async () => {
+                stubNeedlePost({ statusCode: 500, headers: {} }, 'oops');
+                let caught: any;
+                try {
+                    await rokuDeploy.deleteInstalledChannel({ host: '1.2.3.4', password: 'aaaa' } as any);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
+                expect(caught.message).to.equal('Invalid response code: 500');
+                expect(caught.results.response.statusCode).to.equal(500);
+                expect(caught.results.body).to.equal('oops');
+            });
+        });
+
+        describe('UnparsableDeviceResponseError', () => {
+            it('is thrown (with results) when the response object is missing', async () => {
+                //needle delivers no response object and no body
+                stubNeedlePost(undefined, undefined);
+                let caught: any;
+                try {
+                    await rokuDeploy.deleteInstalledChannel({ host: '1.2.3.4', password: 'aaaa' } as any);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.UnparsableDeviceResponseError);
+            });
+        });
+
+        describe('FailedDeviceResponseError (roku message in body)', () => {
+            it('attaches the parsed rokuMessages object (errors/infos/successes)', async () => {
+                const body = getFakeResponseBody(`
+                    Shell.create('Roku.Message').trigger('Set message type', 'error').trigger('Set message content', 'Failure: Form Error: "archive" Field Not Found').trigger('Render', node);
+                `);
+                stubNeedlePost({ statusCode: 200, headers: {} }, body);
+                let caught: any;
+                try {
+                    await rokuDeploy.deleteInstalledChannel({ host: '1.2.3.4', password: 'aaaa' } as any);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.FailedDeviceResponseError);
+                expect(caught.message).to.equal('Failure: Form Error: "archive" Field Not Found');
+                //for this error, `results` is the rokuMessages object, not the http results
+                expect(caught.results).to.eql({
+                    errors: ['Failure: Form Error: "archive" Field Not Found'],
+                    infos: [],
+                    successes: []
+                });
+            });
+        });
+
+        describe('getDeviceInfo -> EcpNetworkAccessModeDisabledError', () => {
+            it('detects a Roku server header on the error results', async () => {
+                //device-info is a GET; a Roku server header on a failing response means ECP is disabled
+                stubNeedleGet({ statusCode: 403, headers: { server: 'Roku/12.0' } }, 'forbidden');
+                let caught: any;
+                try {
+                    await rokuDeploy.getDeviceInfo({ host: '1.2.3.4' });
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.EcpNetworkAccessModeDisabledError);
+            });
+
+            it('does NOT treat a non-Roku server header as ECP-disabled', async () => {
+                stubNeedleGet({ statusCode: 500, headers: { server: 'Apache' } }, 'err');
+                let caught: any;
+                try {
+                    await rokuDeploy.getDeviceInfo({ host: '1.2.3.4' });
+                } catch (e) {
+                    caught = e;
+                }
+                //the original (InvalidDeviceResponseCodeError from checkRequest) bubbles up, with results intact
+                expect(caught).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
+                expect(caught.results.response.headers.server).to.equal('Apache');
+            });
+        });
+
+        describe('publish error mapping', () => {
+            beforeEach(() => {
+                options.host = '1.2.3.4';
+                options.failOnCompileError = true;
+                options.retainDeploymentArchive = true;
+                //make a dummy zip so publish gets past the file-exists check
+                fsExtra.outputFileSync(rokuDeploy.getOutputZipFilePath(options), 'fake-zip-content');
+            });
+
+            it('maps a 577 response to UpdateCheckRequiredError', async () => {
+                stubNeedlePost({ statusCode: 577, headers: {} }, '');
+                let caught: any;
+                try {
+                    await rokuDeploy.publish(options);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.UpdateCheckRequiredError);
+            });
+
+            it('maps an ECONNRESET to ConnectionResetError', async () => {
+                const resetError: any = new Error('socket hang up');
+                resetError.code = 'ECONNRESET';
+                stubNeedlePost(undefined, undefined, resetError);
+                let caught: any;
+                try {
+                    await rokuDeploy.publish(options);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught).to.be.instanceof(errors.ConnectionResetError);
+            });
         });
     });
 
