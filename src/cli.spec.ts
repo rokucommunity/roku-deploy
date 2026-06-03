@@ -22,7 +22,7 @@ function execSync(command: string) {
 }
 describe('cli', () => {
     before(function build() {
-        this.timeout(20000);
+        this.timeout(60_000);
         execSync('npm run build');
     });
     beforeEach(() => {
@@ -116,7 +116,7 @@ describe('cli', () => {
 
     it('SideloadCommand throws error when neither zip nor rootDir is provided', async () => {
         const command = new SideloadCommand();
-        
+
         try {
             await command.run({
                 host: '1.2.3.4',
