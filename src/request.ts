@@ -46,8 +46,9 @@ export interface RequestResponse {
         href: string;
     };
     /**
-     * The raw needle response (an `http.IncomingMessage`), in case anything
-     * needs to reach through to the underlying object.
+     * The response body, as a string. `request`/`postman-request` attached the body to
+     * `response.body` in addition to returning it as the callback's 3rd argument, so we mirror that
+     * for callers that read `error.results.response.body`.
      */
     body: string;
 }
@@ -180,7 +181,7 @@ function coerceBody(body: any): string {
  * Reshape needle's response object into the `request`-compatible response that
  * roku-deploy expects to receive (and to find attached to thrown errors).
  */
-function buildResponse(needleResponse: any, url: string): RequestResponse {
+function buildResponse(needleResponse: any, url: string, body: string): RequestResponse {
     //`request`/`postman-request` could hand back a callback with no response object; roku-deploy's
     //`checkRequest` explicitly guards on `!results.response`. Preserve that by passing through a missing
     //response rather than throwing while trying to reshape it.
@@ -200,7 +201,9 @@ function buildResponse(needleResponse: any, url: string): RequestResponse {
             host: host,
             href: url
         },
-        body: undefined
+        //`request`/`postman-request` attached the (string) body to `response.body` as well as
+        //returning it as the 3rd callback arg. Mirror that so `error.results.response.body` matches.
+        body: body
     };
 }
 
@@ -215,7 +218,8 @@ export const request = {
             if (error) {
                 return callback(error, undefined, undefined);
             }
-            return callback(null, buildResponse(response, url), coerceBody(body));
+            const coerced = coerceBody(body);
+            return callback(null, buildResponse(response, url, coerced), coerced);
         });
     },
 
@@ -232,7 +236,8 @@ export const request = {
                 if (error) {
                     return callback(error, undefined, undefined);
                 }
-                return callback(null, buildResponse(response, url), coerceBody(body));
+                const coerced = coerceBody(body);
+                return callback(null, buildResponse(response, url, coerced), coerced);
             });
         }
         //streaming form (no callback) - used by getToFile to pipe the response to disk.

@@ -240,6 +240,32 @@ describe('RokuDeploy', () => {
                 expect(caught.results.response.headers).to.be.an('object');
                 expect(caught.results.body).to.be.a('string');
             });
+
+            it('attaches the EXACT full results structure (verified against postman-request 3.17.6)', async () => {
+                //The parity harness confirmed this is the complete `results` object the old
+                //postman-request build produced for a 401. Deep-equal the whole thing so any future
+                //drift in the shim's reshape is caught.
+                const headers = { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' };
+                stubNeedlePost({ statusCode: 401, headers: headers }, Buffer.alloc(0));
+                let caught: any;
+                try {
+                    await rokuDeploy.deleteInstalledChannel({ host: '1.2.3.4', password: 'aaaa' } as any);
+                } catch (e) {
+                    caught = e;
+                }
+                expect(caught.results).to.eql({
+                    response: {
+                        statusCode: 401,
+                        headers: { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' },
+                        request: {
+                            host: '1.2.3.4',
+                            href: 'http://1.2.3.4:80/plugin_install'
+                        },
+                        body: ''
+                    },
+                    body: ''
+                });
+            });
         });
 
         describe('InvalidDeviceResponseCodeError (non-200)', () => {
