@@ -4373,14 +4373,14 @@ describe('RokuDeploy', () => {
         describe('stage', () => {
             it('uses default rootDir of ./', async () => {
                 // stage uses rootDir ?? './' which resolves to cwd
-                const cwd = process.cwd();
-                writeFiles(cwd, ['manifest']);
+                const currentDir = process.cwd();
+                writeFiles(currentDir, ['manifest']);
                 try {
                     const result = await rokuDeploy.stage({ out: stagingDir });
                     // If it doesn't throw, it found the manifest in cwd (default rootDir)
                     expect(result).to.equal(stagingDir);
                 } finally {
-                    await fsExtra.remove(`${cwd}/manifest`);
+                    await fsExtra.remove(`${currentDir}/manifest`);
                 }
             });
 
