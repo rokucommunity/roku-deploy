@@ -199,6 +199,37 @@ describe('request (needle shim)', () => {
     });
 
     describe('response reshape (postman-request compatibility)', () => {
+        it('produces the EXACT full response structure (verified against postman-request 3.17.6)', async () => {
+            //This is the complete shape that the parity harness confirmed the old postman-request build
+            //emitted for a 401 on `plugin_install`. The whole object is part of roku-deploy's public
+            //contract (it's attached to thrown errors), so we deep-equal the entire thing.
+            const headers = { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' };
+            stubPost(null, { statusCode: 401, headers: headers }, Buffer.alloc(0));
+            const { response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Delete', archive: '' }
+            });
+            expect(response).to.eql({
+                statusCode: 401,
+                headers: { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' },
+                request: {
+                    host: '1.2.3.4',
+                    href: 'http://1.2.3.4:80/plugin_install'
+                },
+                //postman-request attached the (string) body to response.body too; the shim must match
+                body: ''
+            });
+        });
+
+        it('attaches the string body to response.body (postman-request parity)', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, Buffer.from('<device-info/>'));
+            const { response, body } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
+            //the body is on BOTH the callback arg and response.body, and they're the same string
+            expect(response.body).to.equal('<device-info/>');
+            expect(response.body).to.equal(body);
+        });
+
         it('exposes statusCode, headers, request.host and request.href', async () => {
             stubPost(null, { statusCode: 401, headers: { server: 'Roku' } }, '');
             const { response } = await callPost({ url: 'http://1.2.3.4:80/plugin_install', formData: { a: 'b' } });
