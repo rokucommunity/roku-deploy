@@ -31,15 +31,15 @@ describe('RokuDeploy', () => {
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
 
-        options = rokuDeploy.getOptions({
+        options = {
             rootDir: rootDir,
+            stagingDir: stagingDir,
             devId: 'abcde',
             out: `${outDir}/roku-deploy.zip`,
             signingPassword: '12345',
             host: 'localhost',
             pkg: `${tempDir}/testSignedPackage.pkg`
-        });
-        options.rootDir = rootDir;
+        } as any;
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
         fsExtra.ensureDirSync(outDir);
@@ -2375,7 +2375,6 @@ describe('RokuDeploy', () => {
                     ]
                 };
 
-                let stagingDirValue = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
                 expect(await rokuDeploy.getFilePaths({ files: ['renamed_test.md'], rootDir: opts.rootDir })).to.eql([{
                     src: s`${opts.rootDir}/renamed_test.md`,
@@ -2390,7 +2389,7 @@ describe('RokuDeploy', () => {
                         'renamed_test.md'
                     ]
                 });
-                let stagedFilePath = s`${stagingDirValue}/renamed_test.md`;
+                let stagedFilePath = s`${stagingDir}/renamed_test.md`;
                 expectPathExists(stagedFilePath);
                 let fileContents = await fsExtra.readFile(stagedFilePath);
                 expect(fileContents.toString()).to.equal('hello symlink');
@@ -2419,7 +2418,6 @@ describe('RokuDeploy', () => {
                     ]
                 };
 
-                let stagingPath = rokuDeploy.getOptions(opts).stagingDir;
                 //getFilePaths detects the file
                 expect(
                     (await rokuDeploy.getFilePaths({ files: opts.files, rootDir: opts.rootDir })).sort((a, b) => a.src.localeCompare(b.src))
@@ -2441,7 +2439,7 @@ describe('RokuDeploy', () => {
                     ],
                     rootDir: s`${tempDir}/mainProject`
                 });
-                expect(fsExtra.pathExistsSync(`${stagingPath}/source/lib/promise/promise.brs`));
+                expect(fsExtra.pathExistsSync(`${stagingDir}/source/lib/promise/promise.brs`));
             });
         });
         it('is resilient to file system errors', async () => {
@@ -3156,7 +3154,7 @@ describe('RokuDeploy', () => {
         //create baseline project structure
         beforeEach(() => {
             rokuDeploy = new RokuDeploy();
-            options = rokuDeploy.getOptions({});
+            options = { rootDir: rootDir } as RokuDeployOptions;
             fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
             writeFiles(rootDir, [
                 `manifest`,
@@ -3594,16 +3592,6 @@ describe('RokuDeploy', () => {
             });
         });
 
-        it('converts relative rootDir path to absolute', async () => {
-            let stub = sinon.stub(rokuDeploy, 'getOptions').callThrough();
-            await getFilePaths([
-                'source/main.brs'
-            ], './rootDir');
-            expect(stub.callCount).to.be.greaterThan(0);
-            expect(stub.getCall(0).args[0].rootDir).to.eql('./rootDir');
-            expect(stub.getCall(0).returnValue.rootDir).to.eql(s`${cwd}/rootDir`);
-        });
-
         it('works when using a different current working directory than rootDir', async () => {
             writeFiles(rootDir, [
                 'manifest',
@@ -3850,125 +3838,6 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('getOptions', () => {
-        it('calling with no parameters works', () => {
-            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
-                return false;
-            });
-            options = rokuDeploy.getOptions(undefined);
-            expect(options.stagingDir).to.exist;
-        });
-
-        it('calling with empty param object', () => {
-            sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
-                return false;
-            });
-            options = rokuDeploy.getOptions({});
-            expect(options.stagingDir).to.exist;
-        });
-
-        it('works when passing in stagingDir', () => {
-            options = rokuDeploy.getOptions({
-                stagingDir: './staging-dir'
-            });
-            expect(options.stagingDir.endsWith('staging-dir')).to.be.true;
-        });
-
-        it('does not error when no parameter provided', () => {
-            expect(rokuDeploy.getOptions(undefined)).to.exist;
-        });
-
-        describe('deleteDevChannel', () => {
-            it('defaults to true', () => {
-                expect(rokuDeploy.getOptions({}).deleteDevChannel).to.equal(true);
-            });
-
-            it('can be overridden', () => {
-                expect(rokuDeploy.getOptions({ deleteDevChannel: false }).deleteDevChannel).to.equal(false);
-            });
-        });
-
-        describe('packagePort', () => {
-
-            it('defaults to 80', () => {
-                expect(rokuDeploy.getOptions({}).packagePort).to.equal(80);
-            });
-
-            it('can be overridden', () => {
-                expect(rokuDeploy.getOptions({ packagePort: 95 }).packagePort).to.equal(95);
-            });
-
-        });
-
-        describe('ecpPort', () => {
-            it('defaults to 8060', () => {
-                expect(rokuDeploy.getOptions({}).ecpPort).to.equal(8060);
-            });
-
-            it('can be overridden', () => {
-                expect(rokuDeploy.getOptions({ ecpPort: 1234 }).ecpPort).to.equal(1234);
-            });
-        });
-
-        describe('default options', () => {
-            beforeEach(() => {
-                process.chdir(rootDir);
-            });
-
-            it('if no config file is available it should use the default values', () => {
-                options = rokuDeploy.getOptions();
-                expect((options as any).out).to.contain('roku-deploy.zip');
-            });
-
-            it('if runtime options are provided, they should override any default options', () => {
-                options = rokuDeploy.getOptions({
-                    out: `${outDir}/roku-deploy.zip`
-                });
-                expect((options as any).out).to.equal(s`${outDir}/roku-deploy.zip`);
-            });
-        });
-
-        describe('cwd', () => {
-            it('Only has cwd supplied', () => {
-                options = rokuDeploy.getOptions({
-                    cwd: rootDir
-                });
-
-                expect(options.rootDir).to.equal(s`${rootDir}`);
-                expect((options as any).out).to.equal(s`${rootDir}/out/roku-deploy.zip`);
-                expect(options.screenshotDir.endsWith(s`/roku-deploy/screenshots`)).to.be.true;
-            });
-
-            it('has no cwd supplied', () => {
-                options = rokuDeploy.getOptions({});
-
-                expect(options.rootDir).to.equal(s`${__dirname}/..`);
-                expect((options as any).out).to.equal(s`${__dirname}/../out/roku-deploy.zip`);
-                expect(options.screenshotDir.endsWith(s`/roku-deploy/screenshots`)).to.be.true;
-            });
-
-            it('has no cwd supplied but screenshotDir is supplied', () => {
-                options = rokuDeploy.getOptions({
-                    screenshotDir: './screenshotDir'
-                });
-
-                expect(options.rootDir).to.equal(s`${__dirname}/..`);
-                expect((options as any).out).to.equal(s`${__dirname}/../out/roku-deploy.zip`);
-                expect(options.screenshotDir).to.equal(s`${__dirname}/../screenshotDir`);
-            });
-
-            it('screenshotDir is built relative to cwd', () => {
-                options = rokuDeploy.getOptions({
-                    cwd: tempDir,
-                    screenshotDir: './screenshotDir'
-                });
-
-                expect(options.screenshotDir).to.equal(s`${tempDir}/screenshotDir`);
-            });
-        });
-
-    });
-
     describe('checkRequiredOptions', () => {
         async function testRequiredOptions(action: string, requiredOptions: Partial<RokuDeployOptions>, testedOption: string) {
             const newOptions = { ...requiredOptions };
@@ -4205,7 +4074,7 @@ describe('RokuDeploy', () => {
         it('sends the dcl_enabled qs flag', async () => {
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([]);
         });
@@ -4218,7 +4087,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
                 dcl_enabled: '1'
@@ -4230,7 +4099,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([{
                 appType: 'channel',
@@ -4248,7 +4117,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
             expect(result).to.eql([]);
         });
 
@@ -4256,7 +4125,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('123');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
             expect(result).to.eql([]);
         });
     });
@@ -4266,7 +4135,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             sinon.stub(rokuDeploy as any, 'generateBaseRequestOptions').returns({} as any);
-            await rokuDeploy.deleteComponentLibrary({} as any);
+            await rokuDeploy.deleteComponentLibrary({ host: 'localhost', password: 'test', fileName: 'test.zip' } as any);
 
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
         });
@@ -4279,7 +4148,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoPostRequest();
 
-            await rokuDeploy.deleteComponentLibrary({} as any);
+            await rokuDeploy.deleteComponentLibrary({ host: 'localhost', password: 'test', fileName: 'test.zip' } as any);
 
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
