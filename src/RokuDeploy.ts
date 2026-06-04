@@ -17,6 +17,22 @@ import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
 
+/**
+ * Default values for common options
+ */
+export const defaults = {
+    timeout: 150000,
+    packagePort: 80,
+    ecpPort: 8060,
+    username: 'rokudev',
+    deleteDevChannel: true,
+    failOnCompileError: true,
+    rootDir: './',
+    outDir: './out',
+    outFile: 'roku-deploy.zip',
+    screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/')
+};
+
 export class RokuDeploy {
     /**
      * Copies all of the referenced files to the staging folder
@@ -27,13 +43,13 @@ export class RokuDeploy {
         const cwd = options.cwd ?? process.cwd();
 
         // Set defaults and resolve paths
-        const rootDir = path.resolve(cwd, options.rootDir ?? './');
+        const rootDir = path.resolve(cwd, options.rootDir ?? defaults.rootDir);
         const files = options.files ?? [...DefaultFiles];
 
         // Resolve output directory - use 'out' if provided, otherwise default to staging dir
         const out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, './out/.roku-deploy-staging');
+            : path.resolve(cwd, defaults.outDir, '.roku-deploy-staging');
 
         //clean the staging directory
         await fsExtra.remove(out);
@@ -83,7 +99,7 @@ export class RokuDeploy {
         // Resolve output zip path - use 'out' if provided, otherwise default
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, './out/roku-deploy.zip');
+            : path.resolve(cwd, defaults.outDir, defaults.outFile);
 
         // Ensure .zip extension
         if (!out.toLowerCase().endsWith('.zip')) {
@@ -183,9 +199,9 @@ export class RokuDeploy {
 
     private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
         // Set defaults for request options
-        const packagePort = options.packagePort ?? 80;
-        const timeout = options.timeout ?? 150000;
-        const username = options.username ?? 'rokudev';
+        const packagePort = options.packagePort ?? defaults.packagePort;
+        const timeout = options.timeout ?? defaults.timeout;
+        const username = options.username ?? defaults.username;
 
         let url = `http://${options.host}:${packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -244,8 +260,8 @@ export class RokuDeploy {
         logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         // Set defaults
-        const ecpPort = options.ecpPort ?? 8060;
-        const timeout = options.timeout ?? 150000;
+        const ecpPort = options.ecpPort ?? defaults.ecpPort;
+        const timeout = options.timeout ?? defaults.timeout;
         // press the home button to return to the main screen
         return this.doPostRequest({
             url: `http://${options.host}:${ecpPort}/${options.action}/${options.key}`,
@@ -273,8 +289,8 @@ export class RokuDeploy {
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
-        const deleteDevChannel = options.deleteDevChannel ?? true;
-        const failOnCompileError = options.failOnCompileError ?? true;
+        const deleteDevChannel = options.deleteDevChannel ?? defaults.deleteDevChannel;
+        const failOnCompileError = options.failOnCompileError ?? defaults.failOnCompileError;
 
         let zipFilePath: string;
         let deleteZipAfterSideload = false;
@@ -289,7 +305,7 @@ export class RokuDeploy {
             zipFilePath = path.resolve(cwd, options.zip);
         } else if ('dir' in options && options.dir) {
             // Generate zip from directory to a temp location
-            zipFilePath = path.resolve(cwd, './out/roku-deploy.zip');
+            zipFilePath = path.resolve(cwd, defaults.outDir, defaults.outFile);
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
         } else {
@@ -519,7 +535,7 @@ export class RokuDeploy {
         // Resolve output pkg path - use 'out' if provided, otherwise derive from default
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, './out/roku-deploy.pkg');
+            : path.resolve(cwd, defaults.outDir, 'roku-deploy.pkg');
 
         // Ensure .pkg extension
         if (out.toLowerCase().endsWith('.zip')) {
@@ -869,7 +885,7 @@ export class RokuDeploy {
         const cwd = options.cwd ?? process.cwd();
         const screenshotDir = options.screenshotDir
             ? path.resolve(cwd, options.screenshotDir)
-            : path.join(tempDir, '/roku-deploy/screenshots/');
+            : defaults.screenshotDir;
 
         // Track if user provided output path
         const userProvidedOut = options.out !== undefined;
@@ -977,8 +993,8 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['host']);
 
         // Set defaults
-        const ecpPort = options.ecpPort ?? 8060;
-        const timeout = options.timeout ?? 150000;
+        const ecpPort = options.ecpPort ?? defaults.ecpPort;
+        const timeout = options.timeout ?? defaults.timeout;
 
         //if the host is a DNS name, look up the IP address
         let host = options.host;
