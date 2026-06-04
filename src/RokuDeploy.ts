@@ -17,18 +17,18 @@ import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
 
-/**
- * Default values for common options used across multiple functions
- */
-const defaults = {
-    timeout: 150000,
-    packagePort: 80,
-    ecpPort: 8060,
-    outDir: './out',
-    outFile: 'roku-deploy.zip'
-};
-
 export class RokuDeploy {
+    /**
+     * Default values for common options used across multiple functions
+     */
+    private static readonly defaults = {
+        timeout: 150000,
+        packagePort: 80,
+        ecpPort: 8060,
+        outDir: './out',
+        outFile: 'roku-deploy.zip'
+    };
+
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
@@ -44,7 +44,7 @@ export class RokuDeploy {
         // Resolve output directory - use 'out' if provided, otherwise default to staging dir
         const out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, defaults.outDir, '.roku-deploy-staging');
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
 
         //clean the staging directory
         await fsExtra.remove(out);
@@ -94,7 +94,7 @@ export class RokuDeploy {
         // Resolve output zip path - use 'out' if provided, otherwise default
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, defaults.outDir, defaults.outFile);
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
 
         // Ensure .zip extension
         if (!out.toLowerCase().endsWith('.zip')) {
@@ -194,8 +194,8 @@ export class RokuDeploy {
 
     private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
         // Set defaults for request options
-        const packagePort = options.packagePort ?? defaults.packagePort;
-        const timeout = options.timeout ?? defaults.timeout;
+        const packagePort = options.packagePort ?? RokuDeploy.defaults.packagePort;
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
         const username = options.username ?? 'rokudev';
 
         let url = `http://${options.host}:${packagePort}/${requestPath}`;
@@ -255,8 +255,8 @@ export class RokuDeploy {
         logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         // Set defaults
-        const ecpPort = options.ecpPort ?? defaults.ecpPort;
-        const timeout = options.timeout ?? defaults.timeout;
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
         // press the home button to return to the main screen
         return this.doPostRequest({
             url: `http://${options.host}:${ecpPort}/${options.action}/${options.key}`,
@@ -300,7 +300,7 @@ export class RokuDeploy {
             zipFilePath = path.resolve(cwd, options.zip);
         } else if ('dir' in options && options.dir) {
             // Generate zip from directory to a temp location
-            zipFilePath = path.resolve(cwd, defaults.outDir, defaults.outFile);
+            zipFilePath = path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
         } else {
@@ -530,7 +530,7 @@ export class RokuDeploy {
         // Resolve output pkg path - use 'out' if provided, otherwise derive from default
         let out = options.out
             ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, defaults.outDir, 'roku-deploy.pkg');
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, 'roku-deploy.pkg');
 
         // Ensure .pkg extension
         if (out.toLowerCase().endsWith('.zip')) {
@@ -988,8 +988,8 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['host']);
 
         // Set defaults
-        const ecpPort = options.ecpPort ?? defaults.ecpPort;
-        const timeout = options.timeout ?? defaults.timeout;
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
 
         //if the host is a DNS name, look up the IP address
         let host = options.host;

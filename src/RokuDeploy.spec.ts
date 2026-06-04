@@ -4293,6 +4293,139 @@ describe('RokuDeploy', () => {
         });
     }
 
+    describe('defaults', () => {
+        describe('generateBaseRequestOptions', () => {
+            it('uses default timeout', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
+            });
+
+            it('uses default packagePort', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                expect(result.url).to.equal(`http://localhost:${RokuDeploy['defaults'].packagePort}/test`);
+            });
+
+            it('uses default username of rokudev', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                expect(result.auth.user).to.equal('rokudev');
+            });
+
+            it('allows overriding timeout', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', timeout: 5000 });
+                expect(result.timeout).to.equal(5000);
+            });
+
+            it('allows overriding packagePort', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', packagePort: 8080 });
+                expect(result.url).to.equal('http://localhost:8080/test');
+            });
+
+            it('allows overriding username', () => {
+                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', username: 'admin' });
+                expect(result.auth.user).to.equal('admin');
+            });
+        });
+
+        describe('sendKeyEvent', () => {
+            it('uses default ecpPort', async () => {
+                const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
+                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                expect(stub.getCall(0).args[0].url).to.include(`:${RokuDeploy['defaults'].ecpPort}/`);
+            });
+
+            it('uses default timeout', async () => {
+                const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
+                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
+            });
+
+            it('allows overriding ecpPort', async () => {
+                const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
+                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress', ecpPort: 9000 });
+                expect(stub.getCall(0).args[0].url).to.include(':9000/');
+            });
+        });
+
+        describe('getDeviceInfo', () => {
+            it('uses default ecpPort', async () => {
+                const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
+                sinon.stub(util, 'dnsLookup').resolves('localhost');
+                try {
+                    await rokuDeploy.getDeviceInfo({ host: 'localhost' });
+                } catch (e) {
+                    // ignore parse errors
+                }
+                expect(stub.getCall(0).args[0].url).to.include(`:${RokuDeploy['defaults'].ecpPort}/`);
+            });
+
+            it('uses default timeout', async () => {
+                const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
+                sinon.stub(util, 'dnsLookup').resolves('localhost');
+                try {
+                    await rokuDeploy.getDeviceInfo({ host: 'localhost' });
+                } catch (e) {
+                    // ignore parse errors
+                }
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
+            });
+        });
+
+        describe('stage', () => {
+            it('uses default rootDir of ./', async () => {
+                // stage uses rootDir ?? './' which resolves to cwd
+                const cwd = process.cwd();
+                writeFiles(cwd, ['manifest']);
+                try {
+                    const result = await rokuDeploy.stage({ out: stagingDir });
+                    // If it doesn't throw, it found the manifest in cwd (default rootDir)
+                    expect(result).to.equal(stagingDir);
+                } finally {
+                    await fsExtra.remove(`${cwd}/manifest`);
+                }
+            });
+
+            it('uses default outDir for staging', async () => {
+                writeFiles(rootDir, ['manifest']);
+                const result = await rokuDeploy.stage({ rootDir: rootDir });
+                expect(result).to.equal(s`${process.cwd()}/${RokuDeploy['defaults'].outDir}/.roku-deploy-staging`);
+            });
+        });
+
+        describe('zip', () => {
+            it('uses default outDir and outFile for zip path', async () => {
+                writeFiles(stagingDir, ['manifest']);
+                const zipSpy = sinon.spy(rokuDeploy as any, 'makeZip');
+                await rokuDeploy.zip({ dir: stagingDir });
+                const outPath = zipSpy.getCall(0).args[1];
+                expect(outPath).to.equal(s`${process.cwd()}/${RokuDeploy['defaults'].outDir}/${RokuDeploy['defaults'].outFile}`);
+            });
+        });
+
+        describe('sideload', () => {
+            it('uses default deleteDevChannel of true', async () => {
+                const deleteStub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves();
+                sinon.stub(rokuDeploy, 'closeChannel').resolves();
+                sinon.stub(fsExtra, 'pathExists').resolves(true);
+                sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
+                mockDoPostRequest('success');
+
+                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip' });
+                expect(deleteStub.called).to.be.true;
+            });
+
+            it('allows disabling deleteDevChannel', async () => {
+                const deleteStub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves();
+                sinon.stub(rokuDeploy, 'closeChannel').resolves();
+                sinon.stub(fsExtra, 'pathExists').resolves(true);
+                sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
+                mockDoPostRequest('success');
+
+                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', deleteDevChannel: false });
+                expect(deleteStub.called).to.be.false;
+            });
+        });
+    });
+
     async function assertThrowsAsync(fn) {
         let f = () => { };
         try {
