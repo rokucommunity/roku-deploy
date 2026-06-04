@@ -84,6 +84,18 @@ describe('request (needle shim)', () => {
             expect(postArgs.options.password).to.equal('aaaa');
         });
 
+        it('accepts auth specified as username/password (request alias)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({
+                url: 'http://1.2.3.4:80/x',
+                auth: { username: 'rokudev', password: 'aaaa' },
+                formData: { a: 'b' }
+            });
+            expect(postArgs.options.auth).to.equal('digest');
+            expect(postArgs.options.username).to.equal('rokudev');
+            expect(postArgs.options.password).to.equal('aaaa');
+        });
+
         it('bakes the qs object into the url', async () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             await callGet({ url: 'http://1.2.3.4:80/plugin_install', qs: { dcl_enabled: '1', foo: 'bar' } });
@@ -94,6 +106,18 @@ describe('request (needle shim)', () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             await callGet({ url: 'http://1.2.3.4:80/x?already=1', qs: { more: '2' } });
             expect(getArgs.url).to.equal('http://1.2.3.4:80/x?already=1&more=2');
+        });
+
+        it('skips null/undefined qs values', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
+            await callGet({ url: 'http://1.2.3.4:80/x', qs: { keep: '1', drop: null, gone: undefined } });
+            expect(getArgs.url).to.equal('http://1.2.3.4:80/x?keep=1');
+        });
+
+        it('leaves the url untouched when every qs value is null/undefined', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
+            await callGet({ url: 'http://1.2.3.4:80/x', qs: { drop: null, gone: undefined } });
+            expect(getArgs.url).to.equal('http://1.2.3.4:80/x');
         });
     });
 
@@ -159,6 +183,19 @@ describe('request (needle shim)', () => {
             const { body } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
             expect(body).to.equal('<xml/>');
         });
+
+        it('coerces a null/undefined body to an empty string', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, null);
+            const { body } = await callGet({ url: 'http://1.2.3.4:8060/x' });
+            expect(body).to.equal('');
+        });
+
+        it('stringifies a non-string, non-buffer body (defensive fallback)', async () => {
+            //parse_response:false should keep bodies as Buffers, but guard against a parsed value anyway
+            stubGet(null, { statusCode: 200, headers: {} }, 1234 as any);
+            const { body } = await callGet({ url: 'http://1.2.3.4:8060/x' });
+            expect(body).to.equal('1234');
+        });
     });
 
     describe('response reshape (postman-request compatibility)', () => {
@@ -191,6 +228,13 @@ describe('request (needle shim)', () => {
             const { error, response } = await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' } });
             expect(error).to.be.null;
             expect(response).to.be.undefined;
+        });
+
+        it('leaves request.host undefined when the url cannot be parsed', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
+            const { response } = await callGet({ url: 'not-a-valid-url' });
+            expect(response.request.host).to.be.undefined;
+            expect(response.request.href).to.equal('not-a-valid-url');
         });
     });
 
@@ -260,6 +304,20 @@ describe('request (needle shim)', () => {
             fakeStream.emit('response', { statusCode: 401 });
 
             expect(seen).to.eql([401]);
+        });
+
+        it('forwards a response event that has no response object (digest auth)', () => {
+            const fakeStream = new PassThrough();
+            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            const stream: any = request.get({ url: 'http://1.2.3.4:80/x', auth: { user: 'u', pass: 'p' } } as any);
+
+            let fired = false;
+            stream.on('response', () => {
+                fired = true;
+            });
+            //an undefined resp must not be mistaken for the 401 challenge to swallow
+            fakeStream.emit('response', undefined);
+            expect(fired).to.be.true;
         });
     });
 });
