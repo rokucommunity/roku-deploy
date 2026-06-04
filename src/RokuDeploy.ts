@@ -18,19 +18,14 @@ import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
 
 /**
- * Default values for common options
+ * Default values for common options used across multiple functions
  */
-export const defaults = {
+const defaults = {
     timeout: 150000,
     packagePort: 80,
     ecpPort: 8060,
-    username: 'rokudev',
-    deleteDevChannel: true,
-    failOnCompileError: true,
-    rootDir: './',
     outDir: './out',
-    outFile: 'roku-deploy.zip',
-    screenshotDir: path.join(tempDir, '/roku-deploy/screenshots/')
+    outFile: 'roku-deploy.zip'
 };
 
 export class RokuDeploy {
@@ -43,7 +38,7 @@ export class RokuDeploy {
         const cwd = options.cwd ?? process.cwd();
 
         // Set defaults and resolve paths
-        const rootDir = path.resolve(cwd, options.rootDir ?? defaults.rootDir);
+        const rootDir = path.resolve(cwd, options.rootDir ?? './');
         const files = options.files ?? [...DefaultFiles];
 
         // Resolve output directory - use 'out' if provided, otherwise default to staging dir
@@ -201,7 +196,7 @@ export class RokuDeploy {
         // Set defaults for request options
         const packagePort = options.packagePort ?? defaults.packagePort;
         const timeout = options.timeout ?? defaults.timeout;
-        const username = options.username ?? defaults.username;
+        const username = options.username ?? 'rokudev';
 
         let url = `http://${options.host}:${packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -289,8 +284,8 @@ export class RokuDeploy {
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
-        const deleteDevChannel = options.deleteDevChannel ?? defaults.deleteDevChannel;
-        const failOnCompileError = options.failOnCompileError ?? defaults.failOnCompileError;
+        const deleteDevChannel = options.deleteDevChannel ?? true;
+        const failOnCompileError = options.failOnCompileError ?? true;
 
         let zipFilePath: string;
         let deleteZipAfterSideload = false;
@@ -885,7 +880,7 @@ export class RokuDeploy {
         const cwd = options.cwd ?? process.cwd();
         const screenshotDir = options.screenshotDir
             ? path.resolve(cwd, options.screenshotDir)
-            : defaults.screenshotDir;
+            : path.join(tempDir, '/roku-deploy/screenshots/');
 
         // Track if user provided output path
         const userProvidedOut = options.out !== undefined;
