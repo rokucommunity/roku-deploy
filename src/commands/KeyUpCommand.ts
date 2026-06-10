@@ -1,9 +1,9 @@
-import { rokuDeploy, util } from '../index';
+import { rokuDeploy, RokuDeploy } from '../index';
 
 export class KeyUpCommand {
     async run(args) {
         let options = {
-            ...util.getOptionsFromJson(args),
+            ...RokuDeploy.loadOptionsFromJson(args),
             ...args
         };
         await rokuDeploy.keyUp(options);
