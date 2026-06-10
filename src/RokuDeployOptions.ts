@@ -1,6 +1,10 @@
-import type { LogLevel } from '@rokucommunity/logger';
+import type { LogLevel, Logger } from '@rokucommunity/logger';
 
 export interface RokuDeployOptions {
+    /**
+     * A custom logger instance. If not provided, the global logger will be used.
+     */
+    logger?: Logger;
     /**
      * The working directory where the command should be executed
      */

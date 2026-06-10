@@ -4294,6 +4294,41 @@ describe('RokuDeploy', () => {
     }
 
     describe('defaults', () => {
+        describe('constructor defaults', () => {
+            it('merges constructor defaults with method options', async () => {
+                const rd = new RokuDeploy({ host: 'constructor-host', password: 'constructor-password' });
+                const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
+                expect(stub.getCall(0).args[0].url).to.include('constructor-host');
+            });
+
+            it('method options override constructor defaults', async () => {
+                const rd = new RokuDeploy({ host: 'constructor-host', password: 'constructor-password' });
+                const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                await rd['sendKeyEvent']({ host: 'method-host', key: 'home', action: 'keypress' });
+                expect(stub.getCall(0).args[0].url).to.include('method-host');
+            });
+
+            it('uses custom logger when provided in constructor', () => {
+                const customLogger = {
+                    logLevel: 'off' as any,
+                    log: sinon.stub(),
+                    info: sinon.stub(),
+                    warn: sinon.stub(),
+                    debug: sinon.stub(),
+                    error: sinon.stub(),
+                    trace: sinon.stub()
+                };
+                const rd = new RokuDeploy({ logger: customLogger as any });
+                expect(rd['_logger']).to.equal(customLogger);
+            });
+
+            it('sets logLevel on logger when provided in constructor', () => {
+                const rd = new RokuDeploy({ logLevel: 'debug' as any });
+                expect(rd['_logger'].logLevel).to.equal('debug');
+            });
+        });
+
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', () => {
                 const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
