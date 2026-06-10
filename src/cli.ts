@@ -164,10 +164,11 @@ void yargs
         return new GetDevIdCommand().run(args);
     })
 
-    .command('zip', 'Given a path to a folder, zip up that folder and all of its contents', (builder) => {
+    .command('zip', 'Zip a folder into a package', (builder) => {
         return builder
-            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
-            .option('out', { type: 'string', description: 'the path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
+            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: true })
+            .option('files', { type: 'array', description: 'Optional file patterns to filter which files are included (defaults to all files)', demandOption: false })
+            .option('out', { type: 'string', description: 'The path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new ZipCommand().run(args);

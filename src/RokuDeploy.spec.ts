@@ -727,6 +727,60 @@ describe('RokuDeploy', () => {
             expect(err.message.startsWith('Cannot zip'), `Unexpected error message: "${err.message}"`).to.be.true;
         });
 
+        it('should zip only files matching the files array filter', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+            fsExtra.outputFileSync(s`${rootDir}/source/main.brs`, 'sub main()\nend sub');
+            fsExtra.outputFileSync(s`${rootDir}/components/comp.xml`, '<component />');
+            fsExtra.outputFileSync(s`${rootDir}/extra/stuff.txt`, 'should not be included');
+
+            await rokuDeploy.zip({
+                dir: rootDir,
+                files: ['manifest', 'source/**/*'],
+                out: `${outDir}/roku-deploy.zip`
+            });
+
+            const zip = new JSZip();
+            const zipContents = await zip.loadAsync(fsExtra.readFileSync(`${outDir}/roku-deploy.zip`));
+            expect(zipContents.files['manifest']).to.exist;
+            expect(zipContents.files['source/main.brs']).to.exist;
+            expect(zipContents.files['components/comp.xml']).to.not.exist;
+            expect(zipContents.files['extra/stuff.txt']).to.not.exist;
+        });
+
+        it('should throw error when files filter excludes manifest', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+            fsExtra.outputFileSync(s`${rootDir}/source/main.brs`, 'sub main()\nend sub');
+
+            let err: Error | undefined;
+            try {
+                await rokuDeploy.zip({
+                    dir: rootDir,
+                    files: ['source/**/*'],
+                    out: `${outDir}/roku-deploy.zip`
+                });
+            } catch (e) {
+                err = e as Error;
+            }
+            expect(err?.message).to.include('missing manifest');
+        });
+
+        it('should zip all files when files array is not provided', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+            fsExtra.outputFileSync(s`${rootDir}/source/main.brs`, 'sub main()\nend sub');
+            fsExtra.outputFileSync(s`${rootDir}/components/comp.xml`, '<component />');
+
+            await rokuDeploy.zip({
+                dir: rootDir,
+                out: `${outDir}/roku-deploy.zip`
+            });
+
+            const zip = new JSZip();
+            const zipContents = await zip.loadAsync(fsExtra.readFileSync(`${outDir}/roku-deploy.zip`));
+            expect(zipContents.files['manifest']).to.exist;
+            expect(zipContents.files['source/main.brs']).to.exist;
+            expect(zipContents.files['components/comp.xml']).to.exist;
+        });
+
     });
 
     it('runs via the command line using the rokudeploy.json file', function test() {
