@@ -9,7 +9,7 @@ import * as errors from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { util } from './util';
-import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
 import { logger } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
@@ -32,12 +32,16 @@ export class RokuDeploy {
     /**
      * Instance-level default options that are merged into every method call
      */
-    private readonly options: RokuDeployOptions;
+    private readonly options: RokuDeployConstructorOptions;
 
     /**
-     * Custom logger instance, if provided
+     * The logger instance for this RokuDeploy instance. Can be used to set log level:
+     * @example
+     * ```typescript
+     * rokuDeploy.logger.logLevel = 'debug';
+     * ```
      */
-    private readonly _logger: typeof logger;
+    public readonly logger: typeof logger;
 
     /**
      * Create a new RokuDeploy instance with optional default options.
@@ -50,27 +54,11 @@ export class RokuDeploy {
      * await rd.sideload({ rootDir: './dist' }); // host and password come from defaults
      * ```
      */
-    constructor(options?: RokuDeployOptions) {
+    constructor(options?: RokuDeployConstructorOptions) {
         this.options = options ?? {};
 
         // Use custom logger if provided, otherwise use global logger
-        if (this.options.logger) {
-            this._logger = this.options.logger;
-        } else {
-            this._logger = logger;
-        }
-
-        // Set log level if provided
-        if (this.options.logLevel) {
-            this._logger.logLevel = this.options.logLevel;
-        }
-    }
-
-    /**
-     * Get the logger instance for this RokuDeploy instance
-     */
-    private get log() {
-        return this._logger;
+        this.logger = this.options.logger ?? logger;
     }
 
     /**
@@ -79,7 +67,7 @@ export class RokuDeploy {
      */
     public async stage(options: StageOptions) {
         options = { ...this.options, ...options };
-        this.log.info('Beginning to copy files to staging folder');
+        this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
 
         // Set defaults and resolve paths
@@ -118,7 +106,7 @@ export class RokuDeploy {
                 });
             }, 10);
         }));
-        this.log.info('Relevant files copied to:', out);
+        this.logger.info('Relevant files copied to:', out);
         return out;
     }
 
@@ -128,7 +116,7 @@ export class RokuDeploy {
      */
     public async zip(options: ZipOptions) {
         options = { ...this.options, ...options };
-        this.log.info('Beginning to zip folder');
+        this.logger.info('Beginning to zip folder');
         const cwd = options.cwd ?? process.cwd();
 
         // Resolve source directory - dir is required
@@ -154,7 +142,7 @@ export class RokuDeploy {
 
         //create a zip of the folder
         await this.makeZip(dir, out);
-        this.log.info('Zip created at:', out);
+        this.logger.info('Zip created at:', out);
     }
 
     /**
@@ -240,18 +228,20 @@ export class RokuDeploy {
     }
 
     private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
+        // Merge constructor options with call options
+        const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
-        const packagePort = options.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-        const username = options.username ?? 'rokudev';
+        const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
+        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const username = mergedOptions.username ?? 'rokudev';
 
-        let url = `http://${options.host}:${packagePort}/${requestPath}`;
+        let url = `http://${mergedOptions.host}:${packagePort}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
             timeout: timeout,
             auth: {
                 user: username,
-                pass: options.password,
+                pass: mergedOptions.password,
                 sendImmediately: false
             },
             formData: formData,
@@ -304,7 +294,7 @@ export class RokuDeploy {
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
         options = { ...this.options, ...options } as SendKeyEventOptions;
-        this.log.info('Sending key event:', options.key);
+        this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         // Set defaults
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
@@ -333,7 +323,7 @@ export class RokuDeploy {
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
         options = { ...this.options, ...options } as SideloadOptions;
-        this.log.info('Beginning to sideload package');
+        this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
 
         const cwd = options.cwd ?? process.cwd();
@@ -451,7 +441,7 @@ export class RokuDeploy {
             if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
-            this.log.info('Successful sideload');
+            this.logger.info('Successful sideload');
             return { message: 'Successful sideload', results: response };
         } finally {
             //delete the zip file if we generated it from rootDir
@@ -462,7 +452,7 @@ export class RokuDeploy {
             try {
                 readStream?.close();
             } catch (e) {
-                this.log.warn('Error closing read stream', e);
+                this.logger.warn('Error closing read stream', e);
             }
         }
     }
@@ -514,7 +504,7 @@ export class RokuDeploy {
                         return results;
                     }
                 } catch (e) {
-                    this.log.warn('Error converting to squashfs:', error);
+                    this.logger.warn('Error converting to squashfs:', error);
                     throw error;
                 }
             } else {
@@ -580,7 +570,7 @@ export class RokuDeploy {
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
         options = { ...this.options, ...options } as CreateSignedPackageOptions;
-        this.log.info('Creating signed package');
+        this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         const cwd = options.cwd ?? process.cwd();
 
@@ -650,7 +640,7 @@ export class RokuDeploy {
             const url = pkgSearchMatches[1];
             let requestOptions2 = this.generateBaseRequestOptions(url, options);
             await this.downloadFile(requestOptions2, out);
-            this.log.info('Signed package created at:', out);
+            this.logger.info('Signed package created at:', out);
             return out;
         }
 
@@ -697,7 +687,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
-        this.log.info('handling POST request to', params.url);
+        this.logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -720,7 +710,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: requestType.OptionsWithUrl) {
-        this.log.info('handling GET request to', params.url);
+        this.logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -872,7 +862,7 @@ export class RokuDeploy {
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
-        this.log.info('Deleting dev channel...');
+        this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['host', 'password']);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -1093,10 +1083,10 @@ export class RokuDeploy {
                 }
                 deviceInfo = result;
             }
-            this.log.debug('Device info:', deviceInfo);
+            this.logger.debug('Device info:', deviceInfo);
             return deviceInfo;
         } catch (e) {
-            this.log.warn('Error getting device info:', e);
+            this.logger.warn('Error getting device info:', e);
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
@@ -1154,7 +1144,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as GetDevIdOptions;
         this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
-        this.log.debug('Found dev id:', deviceInfo['keyed-developer-id']);
+        this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
         return deviceInfo['keyed-developer-id'];
     }
 
