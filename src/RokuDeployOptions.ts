@@ -1,4 +1,4 @@
-import type { LogLevel, Logger } from '@rokucommunity/logger';
+import type { Logger } from '@rokucommunity/logger';
 
 /**
  * Options that can be passed to the RokuDeploy constructor to set defaults
@@ -160,12 +160,6 @@ export interface RokuDeployOptions {
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;
-
-    /**
-     * The log level.
-     * @default LogLevel.log
-     */
-    logLevel?: LogLevel;
 
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one
