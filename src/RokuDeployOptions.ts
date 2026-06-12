@@ -1,6 +1,48 @@
-import type { LogLevel } from '@rokucommunity/logger';
+import type { Logger } from '@rokucommunity/logger';
+
+/**
+ * Options that can be passed to the RokuDeploy constructor to set defaults
+ * that will be merged into every method call.
+ */
+export interface RokuDeployConstructorOptions {
+    /**
+     * A custom logger instance. If not provided, the global logger will be used.
+     */
+    logger?: Logger;
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host?: string;
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password?: string;
+    /**
+     * The username for the roku box. This will always be 'rokudev', but allows to be overridden
+     * just in case roku adds support for custom usernames in the future
+     * @default 'rokudev'
+     */
+    username?: string;
+    /**
+     * The port that should be used when installing the package. Defaults to 80.
+     */
+    packagePort?: number;
+    /**
+     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
+     */
+    ecpPort?: number;
+    /**
+     * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
+     */
+    timeout?: number;
+}
 
 export interface RokuDeployOptions {
+    /**
+     * A custom logger instance. If not provided, the global logger will be used.
+     */
+    logger?: Logger;
     /**
      * The working directory where the command should be executed
      */
@@ -118,12 +160,6 @@ export interface RokuDeployOptions {
      * If true, the publish will fail on compile error
      */
     failOnCompileError?: boolean;
-
-    /**
-     * The log level.
-     * @default LogLevel.log
-     */
-    logLevel?: LogLevel;
 
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one

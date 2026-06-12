@@ -4348,6 +4348,131 @@ describe('RokuDeploy', () => {
     }
 
     describe('defaults', () => {
+        describe('constructor defaults', () => {
+            describe('host option', () => {
+                it('fails when not provided in constructor or call', async () => {
+                    const rd = new RokuDeploy();
+                    await expectThrowsAsync(async () => {
+                        await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
+                    }, 'Missing required option: host');
+                });
+
+                it('uses constructor value when not provided in call', async () => {
+                    const rd = new RokuDeploy({ host: 'constructor-host' });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
+                    expect(stub.getCall(0).args[0].url).to.include('constructor-host');
+                });
+
+                it('uses call value when not provided in constructor', async () => {
+                    const rd = new RokuDeploy();
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ host: 'call-host', key: 'home', action: 'keypress' });
+                    expect(stub.getCall(0).args[0].url).to.include('call-host');
+                });
+
+                it('call value overrides constructor value', async () => {
+                    const rd = new RokuDeploy({ host: 'constructor-host' });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ host: 'call-host', key: 'home', action: 'keypress' });
+                    expect(stub.getCall(0).args[0].url).to.include('call-host');
+                });
+            });
+
+            describe('password option', () => {
+                it('fails when not provided in constructor or call', async () => {
+                    const rd = new RokuDeploy();
+                    await expectThrowsAsync(async () => {
+                        await rd.deleteDevChannel({ host: 'localhost' } as any);
+                    }, 'Missing required option: password');
+                });
+
+                it('uses constructor value when not provided in call', async () => {
+                    const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
+                    await rd.deleteDevChannel();
+                    expect(stub.getCall(0).args[0].auth.pass).to.equal('constructor-pass');
+                });
+
+                it('call value overrides constructor value', async () => {
+                    const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
+                    await rd.deleteDevChannel({ password: 'call-pass' } as any);
+                    expect(stub.getCall(0).args[0].auth.pass).to.equal('call-pass');
+                });
+            });
+
+            describe('ecpPort option', () => {
+                it('uses static default when not provided anywhere', async () => {
+                    const rd = new RokuDeploy();
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                    expect(stub.getCall(0).args[0].url).to.include(':8060/');
+                });
+
+                it('uses constructor value when not provided in call', async () => {
+                    const rd = new RokuDeploy({ ecpPort: 9000 });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                    expect(stub.getCall(0).args[0].url).to.include(':9000/');
+                });
+
+                it('call value overrides constructor value', async () => {
+                    const rd = new RokuDeploy({ ecpPort: 9000 });
+                    const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
+                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress', ecpPort: 9999 });
+                    expect(stub.getCall(0).args[0].url).to.include(':9999/');
+                });
+            });
+
+            describe('packagePort option', () => {
+                it('uses static default when not provided anywhere', () => {
+                    const rd = new RokuDeploy();
+                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                    expect(result.url).to.include(':80/');
+                });
+
+                it('uses constructor value when not provided in call', () => {
+                    const rd = new RokuDeploy({ packagePort: 8080 });
+                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                    expect(result.url).to.include(':8080/');
+                });
+
+                it('call value overrides constructor value', () => {
+                    const rd = new RokuDeploy({ packagePort: 8080 });
+                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', packagePort: 9090 });
+                    expect(result.url).to.include(':9090/');
+                });
+            });
+
+            describe('logger option', () => {
+                it('uses global logger when not provided in constructor', () => {
+                    const rd = new RokuDeploy();
+                    expect(rd.logger).to.exist;
+                });
+
+                it('uses custom logger when provided in constructor', () => {
+                    const customLogger = {
+                        logLevel: 'off' as any,
+                        log: sinon.stub(),
+                        info: sinon.stub(),
+                        warn: sinon.stub(),
+                        debug: sinon.stub(),
+                        error: sinon.stub(),
+                        trace: sinon.stub()
+                    };
+                    const rd = new RokuDeploy({ logger: customLogger as any });
+                    expect(rd.logger).to.equal(customLogger);
+                });
+
+                it('allows setting logLevel on logger after construction', () => {
+                    const rd = new RokuDeploy();
+                    rd.logger.logLevel = 'debug';
+                    expect(rd.logger.logLevel).to.equal('debug');
+                });
+            });
+        });
+
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', () => {
                 const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
