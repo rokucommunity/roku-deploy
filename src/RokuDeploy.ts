@@ -116,13 +116,14 @@ export class RokuDeploy {
      */
     public async zip(options: ZipOptions) {
         options = { ...this.options, ...options };
-        this.logger.info('Beginning to zip folder');
+        this.logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
 
-        // Resolve source directory - dir is required
+        // dir is required
         if (!options.dir) {
-            throw new Error('dir is required for zip');
+            throw new Error('"dir" is required for zip');
         }
+
         const dir = path.resolve(cwd, options.dir);
 
         // Resolve output zip path - use 'out' if provided, otherwise default
@@ -135,14 +136,20 @@ export class RokuDeploy {
             out += '.zip';
         }
 
-        //ensure the manifest file exists in the folder to be zipped
-        if (!await util.fileExistsCaseInsensitive(`${dir}/manifest`)) {
+        // Get files to include - use provided files array or default to everything
+        const files = options.files ?? ['**/*'];
+
+        // Check that manifest will be included
+        const filePaths = await this.getFilePaths({ files: files, rootDir: dir });
+        const hasManifest = filePaths.some(f => f.dest.toLowerCase() === 'manifest');
+        if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
         }
-
+      
         //create a zip of the folder
-        await this.makeZip(dir, out);
+        await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
+
     }
 
     /**
@@ -1355,9 +1362,14 @@ export interface StageOptions {
 
 export interface ZipOptions {
     /**
-     * The directory to be zipped
+     * The directory containing the files to be zipped
      */
-    dir?: string;
+    dir: string;
+    /**
+     * An optional array of file patterns to include in the zip.
+     * If not provided, defaults to all files (`**\/*`).
+     */
+    files?: FileEntry[];
     /**
      * The output zip file path (e.g., './out/roku-deploy.zip')
      */
