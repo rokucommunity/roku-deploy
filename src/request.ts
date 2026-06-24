@@ -1,7 +1,33 @@
 /* eslint-disable camelcase */
 import * as needle from 'needle';
+import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
 import type * as requestType from 'request';
+
+/**
+ * Title-case an HTTP header name the way `request`/`postman-request` preserved it on the outgoing
+ * request (`Content-Type`, `User-Agent`, `WWW-Authenticate`, ...). needle lowercases outgoing header
+ * names, so we re-case them to maximize parity with what consumers saw on `response.request.headers`.
+ */
+function titleCaseHeaderName(name: string): string {
+    return name.split('-').map(part => {
+        if (/^(?:WWW|TE|DNT|ETag)$/i.test(part)) {
+            return part.toUpperCase();
+        }
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    }).join('-');
+}
+
+function titleCaseHeaders(headers: Record<string, any> | undefined): Record<string, any> | undefined {
+    if (!headers || typeof headers !== 'object') {
+        return headers;
+    }
+    const out: Record<string, any> = {};
+    for (const key of Object.keys(headers)) {
+        out[titleCaseHeaderName(key)] = headers[key];
+    }
+    return out;
+}
 
 /**
  * Module seam for needle so tests can stub the underlying HTTP calls and assert
@@ -28,22 +54,28 @@ export const needleClient = {
  */
 
 /**
- * The `response` object roku-deploy expects. `request` returned an
- * `http.IncomingMessage` augmented with a `.request` property exposing the
- * outgoing request details. needle exposes the outgoing request as `.req`
- * instead and does not attach a `.request` object, so we synthesize the few
- * fields that roku-deploy actually reads (currently just `request.host`).
+ * The `response` object roku-deploy (and its consumers) see. Both `postman-request` and `needle`
+ * hand back a Node `http.IncomingMessage`, so the real object carries far more than the few fields
+ * roku-deploy reads — `statusCode`, `headers`, `statusMessage`, `rawHeaders`, `httpVersion*`,
+ * `socket`, `req`, `complete`, etc. We keep all of that (it's needle's actual IncomingMessage) and
+ * layer on the `request`-compat extras postman added. The interface therefore declares the fields we
+ * guarantee, and allows the rest of the IncomingMessage surface via the index signature.
  */
 export interface RequestResponse {
     statusCode: number;
     headers: Record<string, any>;
     /**
-     * Mirrors `request`'s `response.request` object. roku-deploy reads
-     * `response.request.host` when constructing the "Unauthorized" error message.
+     * Mirrors `request`'s `response.request` object. roku-deploy reads `response.request.host` when
+     * constructing the "Unauthorized" error message; other consumers may read `href`/`uri`/`method`.
      */
     request: {
         host: string;
         href: string;
+        uri?: Record<string, any>;
+        method?: string;
+        headers?: Record<string, any>;
+        /** Plus the other consumable `request` fields we reproduce (path, port, protocol, ...). */
+        [key: string]: any;
     };
     /**
      * The response body, as a string. `request`/`postman-request` attached the body to
@@ -51,6 +83,8 @@ export interface RequestResponse {
      * for callers that read `error.results.response.body`.
      */
     body: string;
+    /** Plus the rest of the underlying http.IncomingMessage surface (statusMessage, rawHeaders, ...). */
+    [key: string]: any;
 }
 
 export type RequestCallback = (error: Error | null, response: RequestResponse | undefined, body: string | undefined) => void;
@@ -178,33 +212,83 @@ function coerceBody(body: any): string {
 }
 
 /**
- * Reshape needle's response object into the `request`-compatible response that
- * roku-deploy expects to receive (and to find attached to thrown errors).
+ * Reshape needle's response into the `request`-compatible response roku-deploy expects (and attaches
+ * to thrown errors).
+ *
+ * Maximum-parity strategy: needle's callback `resp` is the *same* underlying Node
+ * `http.IncomingMessage` that `postman-request` exposed (needle just augments it with `.body`/`.raw`/
+ * `.bytes`). So rather than fabricate a minimal plain object — which would drop everything underneath
+ * (`statusCode`/`statusMessage`/`rawHeaders`/`httpVersion*`/`socket`/`req`/`complete`/... that a
+ * consumer might reach into) — we KEEP needle's IncomingMessage and only layer on the two things
+ * `request`/`postman-request` added on top of it:
+ *   1. a `.request` object exposing the outgoing-request fields consumers read (`host`, `href`, ...),
+ *   2. a string `.body` (postman put the decoded string here; needle leaves a Buffer under
+ *      `parse_response:false`).
+ * This way the vast majority of the old response's reachable surface is reproduced for free.
  */
 function buildResponse(needleResponse: any, url: string, body: string): RequestResponse {
     //`request`/`postman-request` could hand back a callback with no response object; roku-deploy's
     //`checkRequest` explicitly guards on `!results.response`. Preserve that by passing through a missing
-    //response rather than throwing while trying to reshape it.
+    //response rather than throwing while trying to augment it.
     if (!needleResponse) {
         return undefined;
     }
-    let host: string;
+
+    //Parse with the legacy `url.parse()` to match postman-request's `response.request.uri` exactly: it
+    //was a Node `Url` object (host WITH port, plus auth/hash/query/search/slashes/protocol/port). The
+    //WHATWG `URL` would strip the default `:80` and omit these fields, so we deliberately use the legacy
+    //parser here for byte-parity with what consumers read off `response.request.uri.*`.
+    let uri: Record<string, any>;
     try {
-        host = new URL(url).host;
+        const u = urlModule.parse(url);
+        uri = {
+            protocol: u.protocol,
+            slashes: u.slashes,
+            auth: u.auth,
+            host: u.host,
+            port: u.port,
+            hostname: u.hostname,
+            hash: u.hash,
+            search: u.search,
+            query: u.query,
+            pathname: u.pathname,
+            path: u.path,
+            href: u.href
+        };
     } catch {
-        host = undefined;
+        uri = { href: url, host: undefined, hostname: undefined, port: null, protocol: null, path: url, pathname: url, search: null, query: null, hash: null, auth: null, slashes: null };
     }
-    return {
-        statusCode: needleResponse.statusCode,
-        headers: needleResponse.headers,
-        request: {
-            host: host,
-            href: url
-        },
-        //`request`/`postman-request` attached the (string) body to `response.body` as well as
-        //returning it as the 3rd callback arg. Mirror that so `error.results.response.body` matches.
-        body: body
-    };
+
+    //needle's resp IS the http.IncomingMessage. Augment it in place to mirror postman-request's shape.
+    const response = needleResponse;
+
+    //`request`/`postman-request` attached the (string) body to `response.body`. needle leaves a Buffer
+    //here under parse_response:false, so overwrite with the decoded string to match.
+    response.body = body;
+
+    //`request`/`postman-request` exposed its outgoing `Request` object at `response.request`. Its
+    //library-internal guts (`_auth`, `_form`, `_qs`, `httpModule`, `pool`, ...) can't exist without the
+    //`request` package, but we reproduce every CONSUMABLE field a caller could portably read. Don't
+    //clobber it if needle/Node ever populates one.
+    if (!response.request) {
+        const outgoingHeaders = titleCaseHeaders(response.req?.getHeaders?.());
+        response.request = {
+            uri: uri,
+            method: response.req?.method ?? undefined,
+            headers: outgoingHeaders,
+            host: uri.hostname,
+            href: uri.href,
+            path: uri.path,
+            port: uri.port ?? undefined,
+            originalHost: uri.hostname,
+            originalHostHeaderName: 'Host',
+            protocol: uri.protocol,
+            readable: true,
+            writable: true
+        };
+    }
+
+    return response as RequestResponse;
 }
 
 export const request = {

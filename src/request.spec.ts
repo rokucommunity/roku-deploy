@@ -199,10 +199,12 @@ describe('request (needle shim)', () => {
     });
 
     describe('response reshape (postman-request compatibility)', () => {
-        it('produces the EXACT full response structure (verified against postman-request 3.17.6)', async () => {
-            //This is the complete shape that the parity harness confirmed the old postman-request build
-            //emitted for a 401 on `plugin_install`. The whole object is part of roku-deploy's public
-            //contract (it's attached to thrown errors), so we deep-equal the entire thing.
+        it('guarantees the request-compat fields on the response (verified against postman-request 3.17.6)', async () => {
+            //For maximum parity the shim returns needle's underlying http.IncomingMessage (so consumers
+            //keep access to statusCode/statusMessage/rawHeaders/httpVersion/req/socket/... just like with
+            //postman-request) and layers on the `request`-compat extras postman added. We therefore
+            //assert the GUARANTEED fields are present/correct rather than deep-equaling the whole object
+            //(it legitimately carries the full IncomingMessage surface, which we intentionally preserve).
             const headers = { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' };
             stubPost(null, { statusCode: 401, headers: headers }, Buffer.alloc(0));
             const { response } = await callPost({
@@ -210,15 +212,18 @@ describe('request (needle shim)', () => {
                 auth: { user: 'rokudev', pass: 'aaaa' },
                 formData: { mysubmit: 'Delete', archive: '' }
             });
-            expect(response).to.eql({
-                statusCode: 401,
-                headers: { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' },
-                request: {
-                    host: '1.2.3.4',
-                    href: 'http://1.2.3.4:80/plugin_install'
-                },
-                //postman-request attached the (string) body to response.body too; the shim must match
-                body: ''
+            expect(response.statusCode).to.equal(401);
+            expect(response.headers).to.eql({ 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' });
+            //postman-request attached the (string) body to response.body too; the shim must match
+            expect(response.body).to.equal('');
+            //the request-compat object postman exposed at response.request
+            expect(response.request.host).to.equal('1.2.3.4');
+            expect(response.request.href).to.equal('http://1.2.3.4:80/plugin_install');
+            expect(response.request.uri).to.include({
+                host: '1.2.3.4',
+                hostname: '1.2.3.4',
+                href: 'http://1.2.3.4:80/plugin_install',
+                pathname: '/plugin_install'
             });
         });
 
@@ -238,6 +243,40 @@ describe('request (needle shim)', () => {
             //request.host strips the default :80 (matches request's behavior / URL semantics)
             expect(response.request.host).to.equal('1.2.3.4');
             expect(response.request.href).to.equal('http://1.2.3.4:80/plugin_install');
+        });
+
+        it('populates request.method and request.headers from the underlying req when present', async () => {
+            //needle's resp IS an http.IncomingMessage with a `.req` (ClientRequest). Simulate that so the
+            //shim can surface the outgoing method/headers the way postman-request did.
+            const fakeResp: any = {
+                statusCode: 200,
+                headers: {},
+                req: {
+                    method: 'POST',
+                    getHeaders: () => ({ 'user-agent': 'roku-deploy/test' })
+                }
+            };
+            stubGet(null, fakeResp, 'ok');
+            const { response } = await callGet({ url: 'http://1.2.3.4:80/plugin_install' });
+            expect(response.request.method).to.equal('POST');
+            expect(response.request.headers).to.eql({ 'user-agent': 'roku-deploy/test' });
+        });
+
+        it('does not clobber a pre-existing response.request', async () => {
+            //if the underlying response already carries a `request` object, leave it untouched
+            const preExisting = { host: 'pre.existing', href: 'http://pre.existing/x', custom: 'kept' };
+            const fakeResp: any = { statusCode: 200, headers: {}, request: preExisting };
+            stubGet(null, fakeResp, 'ok');
+            const { response } = await callGet({ url: 'http://1.2.3.4:80/plugin_install' });
+            expect(response.request).to.equal(preExisting);
+            expect(response.request.custom).to.equal('kept');
+        });
+
+        it('leaves request.uri.hostname undefined when the url cannot be parsed', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
+            const { response } = await callGet({ url: 'not-a-valid-url' });
+            expect(response.request.host).to.be.undefined;
+            expect(response.request.uri.hostname).to.be.undefined;
         });
 
         it('keeps a non-default port in request.host', async () => {
