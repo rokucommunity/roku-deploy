@@ -220,8 +220,10 @@ describe('request (needle shim)', () => {
             expect(response.request.host).to.equal('1.2.3.4');
             expect(response.request.href).to.equal('http://1.2.3.4:80/plugin_install');
             expect(response.request.uri).to.include({
-                host: '1.2.3.4',
+                host: '1.2.3.4:80',
                 hostname: '1.2.3.4',
+                port: '80',
+                protocol: 'http:',
                 href: 'http://1.2.3.4:80/plugin_install',
                 pathname: '/plugin_install'
             });
@@ -259,7 +261,8 @@ describe('request (needle shim)', () => {
             stubGet(null, fakeResp, 'ok');
             const { response } = await callGet({ url: 'http://1.2.3.4:80/plugin_install' });
             expect(response.request.method).to.equal('POST');
-            expect(response.request.headers).to.eql({ 'user-agent': 'roku-deploy/test' });
+            //needle lowercases outgoing header names; the shim re-cases them to match postman-request
+            expect(response.request.headers).to.eql({ 'User-Agent': 'roku-deploy/test' });
         });
 
         it('does not clobber a pre-existing response.request', async () => {
@@ -272,17 +275,21 @@ describe('request (needle shim)', () => {
             expect(response.request.custom).to.equal('kept');
         });
 
-        it('leaves request.uri.hostname undefined when the url cannot be parsed', async () => {
+        it('leaves request.uri.hostname null when the url cannot be parsed (url.parse parity)', async () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             const { response } = await callGet({ url: 'not-a-valid-url' });
-            expect(response.request.host).to.be.undefined;
-            expect(response.request.uri.hostname).to.be.undefined;
+            //url.parse() of a bare token yields null host/hostname (this is what postman-request produced too)
+            expect(response.request.host).to.be.null;
+            expect(response.request.uri.hostname).to.be.null;
         });
 
-        it('keeps a non-default port in request.host', async () => {
+        it('exposes the port via request.uri (host=hostname, uri.host=host:port) — postman-request parity', async () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             const { response } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
-            expect(response.request.host).to.equal('1.2.3.4:8060');
+            //postman-request set response.request.host to the hostname only; the port lived on uri.host
+            expect(response.request.host).to.equal('1.2.3.4');
+            expect(response.request.uri.host).to.equal('1.2.3.4:8060');
+            expect(response.request.uri.port).to.equal('8060');
         });
 
         it('passes the raw headers object through (so callers can read e.g. headers.server)', async () => {
@@ -300,10 +307,10 @@ describe('request (needle shim)', () => {
             expect(response).to.be.undefined;
         });
 
-        it('leaves request.host undefined when the url cannot be parsed', async () => {
+        it('still exposes the raw url as request.href when the url cannot be parsed', async () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             const { response } = await callGet({ url: 'not-a-valid-url' });
-            expect(response.request.host).to.be.undefined;
+            expect(response.request.host).to.be.null;
             expect(response.request.href).to.equal('not-a-valid-url');
         });
     });

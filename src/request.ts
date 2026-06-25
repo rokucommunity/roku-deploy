@@ -10,12 +10,10 @@ import type * as requestType from 'request';
  * names, so we re-case them to maximize parity with what consumers saw on `response.request.headers`.
  */
 function titleCaseHeaderName(name: string): string {
-    return name.split('-').map(part => {
-        if (/^(?:WWW|TE|DNT|ETag)$/i.test(part)) {
-            return part.toUpperCase();
-        }
-        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-    }).join('-');
+    //title-case each hyphen-delimited segment (Content-Type, User-Agent, Authorization, ...). This
+    //covers the outgoing request headers roku-deploy sends; we don't special-case acronym headers
+    //(WWW-Authenticate etc.) because those are response headers, not outgoing-request headers.
+    return name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('-');
 }
 
 function titleCaseHeaders(headers: Record<string, any> | undefined): Record<string, any> | undefined {
@@ -238,26 +236,23 @@ function buildResponse(needleResponse: any, url: string, body: string): RequestR
     //was a Node `Url` object (host WITH port, plus auth/hash/query/search/slashes/protocol/port). The
     //WHATWG `URL` would strip the default `:80` and omit these fields, so we deliberately use the legacy
     //parser here for byte-parity with what consumers read off `response.request.uri.*`.
-    let uri: Record<string, any>;
-    try {
-        const u = urlModule.parse(url);
-        uri = {
-            protocol: u.protocol,
-            slashes: u.slashes,
-            auth: u.auth,
-            host: u.host,
-            port: u.port,
-            hostname: u.hostname,
-            hash: u.hash,
-            search: u.search,
-            query: u.query,
-            pathname: u.pathname,
-            path: u.path,
-            href: u.href
-        };
-    } catch {
-        uri = { href: url, host: undefined, hostname: undefined, port: null, protocol: null, path: url, pathname: url, search: null, query: null, hash: null, auth: null, slashes: null };
-    }
+    //`url.parse()` is total for string input (it never throws — a bare token like 'not-a-valid-url'
+    //yields null host/hostname and the token as path/pathname), so no try/catch is needed.
+    const u = urlModule.parse(url);
+    const uri: Record<string, any> = {
+        protocol: u.protocol,
+        slashes: u.slashes,
+        auth: u.auth,
+        host: u.host,
+        port: u.port,
+        hostname: u.hostname,
+        hash: u.hash,
+        search: u.search,
+        query: u.query,
+        pathname: u.pathname,
+        path: u.path,
+        href: u.href
+    };
 
     //needle's resp IS the http.IncomingMessage. Augment it in place to mirror postman-request's shape.
     const response = needleResponse;
