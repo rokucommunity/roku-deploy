@@ -51,21 +51,18 @@ export function formatLogTimestamp(date = new Date()): string {
 }
 
 /**
- * Break a millisecond duration into time components.
- * Reproduces the `parse-ms` package.
+ * Break a non-negative millisecond duration into time components.
+ * Reproduces the subset of the `parse-ms` package that `Stopwatch` consumes
+ * (durations from `performance.now()` are always non-negative).
  */
 export function parseMilliseconds(milliseconds: number) {
-    if (typeof milliseconds !== 'number') {
-        throw new TypeError('Expected a number');
-    }
-    const roundTowardsZero = milliseconds > 0 ? Math.floor : Math.ceil;
     return {
-        days: roundTowardsZero(milliseconds / 86400000),
-        hours: roundTowardsZero(milliseconds / 3600000) % 24,
-        minutes: roundTowardsZero(milliseconds / 60000) % 60,
-        seconds: roundTowardsZero(milliseconds / 1000) % 60,
-        milliseconds: roundTowardsZero(milliseconds) % 1000,
-        microseconds: roundTowardsZero(milliseconds * 1000) % 1000,
-        nanoseconds: roundTowardsZero(milliseconds * 1e6) % 1000
+        days: Math.floor(milliseconds / 86400000),
+        hours: Math.floor(milliseconds / 3600000) % 24,
+        minutes: Math.floor(milliseconds / 60000) % 60,
+        seconds: Math.floor(milliseconds / 1000) % 60,
+        milliseconds: Math.floor(milliseconds) % 1000,
+        microseconds: Math.floor(milliseconds * 1000) % 1000,
+        nanoseconds: Math.floor(milliseconds * 1e6) % 1000
     };
 }
