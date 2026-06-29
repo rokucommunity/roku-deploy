@@ -1,6 +1,6 @@
 import chalk from 'chalk';
-import * as moment from 'moment';
 import { Stopwatch } from './Stopwatch';
+import { formatLogTimestamp } from './dateUtils';
 
 export class Logger {
     /**
@@ -27,7 +27,7 @@ export class Logger {
     private _logLevel = LogLevel.log;
 
     private getTimestamp() {
-        return '[' + chalk.grey(moment().format(`hh:mm:ss:SSSS A`)) + ']';
+        return '[' + chalk.grey(formatLogTimestamp()) + ']';
     }
 
     private writeToLog(method: (...consoleArgs: any[]) => void, ...args: any[]) {

@@ -21,8 +21,6 @@
     "dependencies": {
         "@types/request": "^2.48.13",
         "chalk": "^2.4.2",
-        "dateformat": "^3.0.3",
-        "dayjs": "^1.11.0",
         "fast-glob": "^3.2.12",
         "fs-extra": "^7.0.1",
         "is-glob": "^4.0.3",
@@ -30,8 +28,6 @@
         "jszip": "^3.6.0",
         "lodash": "^4.17.21",
         "micromatch": "^4.0.4",
-        "moment": "^2.29.1",
-        "parse-ms": "^2.1.0",
         "postman-request": "^2.88.1-postman.48",
         "semver": "^7.7.3",
         "temp-dir": "^2.0.0",
