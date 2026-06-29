@@ -26,18 +26,15 @@
         "is-glob": "^4.0.3",
         "jsonc-parser": "^2.3.0",
         "jszip": "^3.6.0",
-        "lodash": "^4.17.21",
         "micromatch": "^4.0.4",
         "postman-request": "^2.88.1-postman.48",
         "semver": "^7.7.3",
-        "temp-dir": "^2.0.0",
         "xml2js": "^0.5.0"
     },
     "devDependencies": {
         "@types/chai": "^4.2.22",
         "@types/fs-extra": "^5.0.1",
         "@types/is-glob": "^4.0.2",
-        "@types/lodash": "^4.14.200",
         "@types/micromatch": "^4.0.2",
         "@types/mocha": "^10.0.0",
         "@types/node": "^18.19.0",
