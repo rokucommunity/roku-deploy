@@ -691,6 +691,47 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('normalizeDeviceInfo', () => {
+        it('camel-cases keys and normalizes values', () => {
+            const result = rokuDeploy.normalizeDeviceInfo({
+                'serial-number': 'abc123',
+                'software-build': '4170',
+                'uptime': '19799',
+                'is-tv': 'false',
+                'supports-ethernet': 'true',
+                'support-url': '3&amp;4'
+            });
+            expect(result).to.eql({
+                serialNumber: 'abc123',
+                softwareBuild: 4170,
+                uptime: 19799,
+                isTv: false,
+                supportsEthernet: true,
+                supportUrl: '3&4'
+            });
+        });
+
+        it('produces the same result as getDeviceInfo with enhance enabled', async () => {
+            const deviceInfoBody = `<device-info>
+                <serial-number>abc123</serial-number>
+                <software-build>4170</software-build>
+                <is-tv>false</is-tv>
+                <developer-enabled>true</developer-enabled>
+                <support-url>3&amp;4</support-url>
+            </device-info>`;
+
+            mockDoGetRequest(deviceInfoBody);
+            const enhanced = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
+            const raw = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060 });
+
+            expect(rokuDeploy.normalizeDeviceInfo(raw)).to.eql(enhanced);
+        });
+
+        it('returns an empty object for an empty input', () => {
+            expect(rokuDeploy.normalizeDeviceInfo({})).to.eql({});
+        });
+    });
+
     describe('normalizeDeviceInfoFieldValue', () => {
         it('converts normal values', () => {
             expect(rokuDeploy.normalizeDeviceInfoFieldValue('true')).to.eql(true);

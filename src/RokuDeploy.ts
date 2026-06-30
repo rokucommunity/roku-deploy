@@ -1311,12 +1311,7 @@ export class RokuDeploy {
             } as Record<string, any>;
 
             if (options.enhance) {
-                const result = {};
-                // sanitize/normalize values to their native formats, and also convert property names to camelCase
-                for (let key in deviceInfo) {
-                    result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
-                }
-                deviceInfo = result;
+                return this.normalizeDeviceInfo(deviceInfo);
             }
             return deviceInfo;
         } catch (e) {
@@ -1346,6 +1341,23 @@ export class RokuDeploy {
             throw new errors.UnknownDeviceResponseError('Could not retrieve device ECP setting');
         }
 
+    }
+
+    /**
+     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
+     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
+     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
+     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
+     * enhance it without making another request to the device.
+     * @param deviceInfo the raw device-info object to enhance
+     */
+    public normalizeDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
+        const result = {} as DeviceInfo;
+        // sanitize/normalize values to their native formats, and also convert property names to camelCase
+        for (let key in deviceInfo) {
+            result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+        }
+        return result;
     }
 
     /**
