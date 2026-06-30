@@ -1,6 +1,7 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as dns from 'dns';
 import * as crypto from 'crypto';
 import * as micromatch from 'micromatch';
@@ -261,6 +262,43 @@ export class Util {
             return String.fromCharCode(num);
         });
     }
+
+    /**
+     * The OS temp directory, with symlinks resolved (e.g. on macOS `/var` -> `/private/var`).
+     * Replaces the `temp-dir` package. Cached on first access.
+     */
+    public get tempDir() {
+        if (this._tempDir === undefined) {
+            this._tempDir = fs.realpathSync(os.tmpdir());
+        }
+        return this._tempDir;
+    }
+
+    private _tempDir: string;
+
+    /**
+     * Convert a string to camelCase (e.g. `device-id` -> `deviceId`, `has-wifi-5g-support` -> `hasWifi5GSupport`).
+     * Replaces `lodash.camelCase`. Reproduces lodash's word-splitting (boundaries at non-alphanumeric
+     * runs, lower->UPPER transitions, acronym->Word transitions, and digit<->letter transitions),
+     * verified against lodash across the full Roku device-info key set.
+     */
+    public camelCase(value: string) {
+        let matches = String(value ?? '').matchAll(Util.wordSplitRegex);
+        let result = '';
+        let index = 0;
+        for (let match of matches) {
+            let word = match[0].toLowerCase();
+            if (index === 0) {
+                result += word;
+            } else {
+                result += word.charAt(0).toUpperCase() + word.slice(1);
+            }
+            index++;
+        }
+        return result;
+    }
+
+    private static wordSplitRegex = /[A-Z\xc0-\xd6\xd8-\xde]?[a-z\xdf-\xf6\xf8-\xff]+(?:['’](?:d|ll|m|re|s|t|ve))?(?=[A-Z\xc0-\xd6\xd8-\xde]|\b|_|\d)|[A-Z\xc0-\xd6\xd8-\xde]+(?:['’](?:D|LL|M|RE|S|T|VE))?(?=[A-Z\xc0-\xd6\xd8-\xde][a-z\xdf-\xf6\xf8-\xff]|\b|_|\d)|[A-Z\xc0-\xd6\xd8-\xde]?[a-z\xdf-\xf6\xf8-\xff]+|[A-Z\xc0-\xd6\xd8-\xde]+|\d+/g;
 
 }
 

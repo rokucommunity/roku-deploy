@@ -13,8 +13,6 @@ import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
-import * as tempDir from 'temp-dir';
-import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
@@ -31,7 +29,7 @@ export class RokuDeploy {
     //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
-    public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
+    public screenshotDir = path.join(util.tempDir, '/roku-deploy/screenshots/');
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -1316,7 +1314,7 @@ export class RokuDeploy {
                 const result = {};
                 // sanitize/normalize values to their native formats, and also convert property names to camelCase
                 for (let key in deviceInfo) {
-                    result[lodash.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+                    result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
                 }
                 deviceInfo = result;
             }
