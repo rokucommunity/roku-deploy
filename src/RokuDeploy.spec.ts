@@ -753,6 +753,19 @@ describe('RokuDeploy', () => {
             expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&4')).to.eql('3&4');
             expect(rokuDeploy.normalizeDeviceInfoFieldValue('3&amp;4')).to.eql('3&4');
         });
+
+        it('returns non-string values unchanged', () => {
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(42)).to.eql(42);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(0)).to.eql(0);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(true)).to.eql(true);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(false)).to.eql(false);
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(null)).to.be.null;
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(undefined)).to.be.undefined;
+            const obj = { name: 'roku' };
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(obj)).to.equal(obj);
+            const arr = [1, 2, 3];
+            expect(rokuDeploy.normalizeDeviceInfoFieldValue(arr)).to.equal(arr);
+        });
     });
 
 
