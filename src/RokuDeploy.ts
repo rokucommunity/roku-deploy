@@ -3,7 +3,6 @@ import * as _fsExtra from 'fs-extra';
 import { request } from './request';
 import type * as requestType from 'request';
 import * as JSZip from 'jszip';
-import * as dateformat from 'dateformat';
 import * as errors from './Errors';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
@@ -13,12 +12,10 @@ import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
-import * as tempDir from 'temp-dir';
-import * as dayjs from 'dayjs';
-import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
+import { formatTimestampForPackage, formatTimestampForScreenshot } from './dateUtils';
 
 export class RokuDeploy {
 
@@ -31,7 +28,7 @@ export class RokuDeploy {
     //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
-    public screenshotDir = path.join(tempDir, '/roku-deploy/screenshots/');
+    public screenshotDir = path.join(util.tempDir, '/roku-deploy/screenshots/');
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -191,7 +188,7 @@ export class RokuDeploy {
         let parsedManifest = await this.parseManifest(manifestPath);
 
         if (options.incrementBuildNumber) {
-            let timestamp = dateformat(new Date(), 'yymmddHHMM');
+            let timestamp = formatTimestampForPackage();
             parsedManifest.build_version = timestamp; //eslint-disable-line camelcase
             await this.fsExtra.outputFile(manifestPath, this.stringifyManifest(parsedManifest));
         }
@@ -1040,7 +1037,7 @@ export class RokuDeploy {
      */
     public async takeScreenshot(options: TakeScreenshotOptions) {
         options.outDir = options.outDir ?? this.screenshotDir;
-        options.outFile = options.outFile ?? `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}`;
+        options.outFile = options.outFile ?? `screenshot-${formatTimestampForScreenshot()}`;
         let saveFilePath: string;
 
         // Ask for the device to make an image
@@ -1316,7 +1313,7 @@ export class RokuDeploy {
                 const result = {};
                 // sanitize/normalize values to their native formats, and also convert property names to camelCase
                 for (let key in deviceInfo) {
-                    result[lodash.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+                    result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
                 }
                 deviceInfo = result;
             }
