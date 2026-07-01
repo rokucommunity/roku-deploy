@@ -16,7 +16,8 @@ import { defer, util, standardizePath as s } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
-import { request, needleClient } from './request';
+import * as needle from 'needle';
+import { request } from './request';
 import { PassThrough } from 'stream';
 
 const sinon = createSandbox();
@@ -197,23 +198,23 @@ describe('RokuDeploy', () => {
 
     describe('error results structure (postman-request compatibility)', () => {
         //These tests drive RokuDeploy through the REAL needle shim (by stubbing the low-level
-        //`needleClient`), then assert the exact shape of the `results`/`response` object attached to
+        //`needle`), then assert the exact shape of the `results`/`response` object attached to
         //each thrown error. roku-deploy historically exposed a `request`/`postman-request`-shaped
         //object here, and consumers read specific paths off it (`results.response.statusCode`,
         //`results.response.headers.server`, `results.response.request.host`, string `results.body`).
         //Getting any of these wrong is a BREAKING API change, so they're pinned down explicitly.
 
-        /** Stub needleClient.post to deliver the given needle-style response + body */
+        /** Stub needle.post to deliver the given needle-style response + body */
         function stubNeedlePost(response: any, body: any, error: any = null) {
-            return sinon.stub(needleClient, 'post').callsFake(((url: string, data: any, opts: any, callback: any) => {
+            return sinon.stub(needle, 'post').callsFake(((url: string, data: any, opts: any, callback: any) => {
                 process.nextTick(callback, error, response, body);
                 return {} as any;
             }) as any);
         }
 
-        /** Stub needleClient.get (callback form) to deliver the given needle-style response + body */
+        /** Stub needle.get (callback form) to deliver the given needle-style response + body */
         function stubNeedleGet(response: any, body: any, error: any = null) {
-            return sinon.stub(needleClient, 'get').callsFake(((url: string, opts: any, callback: any) => {
+            return sinon.stub(needle, 'get').callsFake(((url: string, opts: any, callback: any) => {
                 if (callback) {
                     process.nextTick(callback, error, response, body);
                 }
