@@ -2,11 +2,25 @@ import * as assert from 'assert';
 import * as fsExtra from 'fs-extra';
 import * as net from 'net';
 import * as http from 'http';
+import * as path from 'path';
 import * as semver from 'semver';
+import * as dotenv from 'dotenv';
 import * as rokuDeploy from './index';
 import * as errors from './Errors';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
+
+//load device connection info from a .env file at the repo root (if present), then fall back to any
+//pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
+//real Roku without hardcoding host/password into the repo. See .env.example.
+dotenv.config({
+    path: path.resolve(__dirname, '../.env'),
+    override: true,
+    quiet: true
+});
+
+const HOST = process.env.ROKU_HOST;
+const PASSWORD = process.env.ROKU_PASSWORD;
 
 //socket teardown callbacks, drained in afterEach so the suite doesn't hang open
 const cleanups: Array<() => void> = [];
@@ -20,15 +34,25 @@ const REQUEST_TIMEOUT = 15_000;
 describe('device', function device() {
     let options: rokuDeploy.RokuDeployOptions;
 
+    before(() => {
+        //fail fast with a clear message rather than letting every test time out against an empty host
+        if (!HOST || !PASSWORD) {
+            throw new Error(
+                `Missing Roku device connection info. Set ROKU_HOST and ROKU_PASSWORD in "${path.resolve(__dirname, '../.env')}" ` +
+                `(see .env.example) or as environment variables before running "npm run test:device".`
+            );
+        }
+    });
+
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
         process.chdir(rootDir);
         options = rokuDeploy.getOptions({
             outDir: outDir,
-            host: '192.168.1.31',
+            host: HOST,
             retainDeploymentArchive: true,
-            password: 'aaaa',
+            password: PASSWORD,
             devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
             rekeySignedPackage: `${cwd}/testSignedPackage.pkg`,
             signingPassword: 'drRCEVWP/++K5TYnTtuAfQ=='

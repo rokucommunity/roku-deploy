@@ -13,7 +13,7 @@
         "audit": "npm audit || audit-ci --config ./audit-ci.jsonc",
         "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
         "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
-        "test:device": "nyc mocha src/device.spec.ts",
+        "test:device": "mocha src/device.spec.ts",
         "test:all": "nyc mocha \"src/**/*.spec.ts\"",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
         "package": "npm run build && npm pack"
@@ -47,6 +47,7 @@
         "@typescript-eslint/parser": "5.1.0",
         "audit-ci": "^7.1.0",
         "chai": "^4.3.4",
+        "dotenv": "^17.4.2",
         "eslint": "8.0.1",
         "mocha": "^10.8.2",
         "nyc": "^15.1.0",

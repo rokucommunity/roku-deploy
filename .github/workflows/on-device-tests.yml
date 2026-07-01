@@ -1,0 +1,22 @@
+name: on-device-tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  on-device-tests:
+    runs-on: [self-hosted, roku-latest, enabled]
+    env:
+      #the self-hosted runner points these at its attached Roku device. Configure them as repo/org
+      #secrets (or on the runner itself). Locally, developers use a .env file instead (see .env.example).
+      ROKU_HOST: ${{ secrets.ROKU_HOST }}
+      ROKU_PASSWORD: ${{ secrets.ROKU_PASSWORD }}
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-node@master
+        with:
+          node-version: "18.20.4"
+      - run: npm ci
+      - run: npm run test:device
