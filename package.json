@@ -19,7 +19,6 @@
         "package": "npm run build && npm pack"
     },
     "dependencies": {
-        "@types/request": "^2.48.13",
         "chalk": "^2.4.2",
         "fast-glob": "^3.2.12",
         "fs-extra": "^7.0.1",

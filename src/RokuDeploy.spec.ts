@@ -4627,43 +4627,30 @@ describe('RokuDeploy', () => {
             expect(currentVersion).to.exist.and.to.match(/^\d+\.\d+\.\d+.*/);
         });
 
-        it('works when params is undefined', () => {
-            //undefined
-            expect(
-                rokuDeploy['setUserAgentIfMissing'](undefined)
-            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        it('adds the header container when params has none', () => {
+            const params = {} as any;
+            rokuDeploy['setUserAgentIfMissing'](params);
+            expect(params).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
         });
 
-        it('works when params has no header container', () => {
-            expect(
-                rokuDeploy['setUserAgentIfMissing']({} as any)
-            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
+        it('sets the user agent when params has an empty header container', () => {
+            const params = { headers: {} } as any;
+            rokuDeploy['setUserAgentIfMissing'](params);
+            expect(params).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
         });
 
-        it('works when params has empty header container', () => {
-            expect(
-                rokuDeploy['setUserAgentIfMissing']({} as any)
-            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
-        });
-
-        it('works when params has existing header container with no user agent', () => {
-            expect(
-                rokuDeploy['setUserAgentIfMissing']({ headers: {} } as any)
-            ).to.eql({ headers: { 'User-Agent': `roku-deploy/${currentVersion}` } });
-        });
-
-        it('works when params has existing header container with user agent', () => {
-            expect(
-                rokuDeploy['setUserAgentIfMissing']({ headers: { 'User-Agent': 'some-other-user-agent' } } as any)
-            ).to.eql({ headers: { 'User-Agent': 'some-other-user-agent' } });
+        it('does not overwrite an existing user agent', () => {
+            const params = { headers: { 'User-Agent': 'some-other-user-agent' } } as any;
+            rokuDeploy['setUserAgentIfMissing'](params);
+            expect(params).to.eql({ headers: { 'User-Agent': 'some-other-user-agent' } });
         });
 
         it('works when we fail to load package version', () => {
             sinon.stub(fsExtra, 'readJsonSync').throws(new Error('Unable to read package.json'));
             rokuDeploy['_packageVersion'] = undefined;
-            expect(
-                rokuDeploy['setUserAgentIfMissing']({} as any)
-            ).to.eql({ headers: { 'User-Agent': 'roku-deploy/unknown' } });
+            const params = {} as any;
+            rokuDeploy['setUserAgentIfMissing'](params);
+            expect(params).to.eql({ headers: { 'User-Agent': 'roku-deploy/unknown' } });
         });
     });
 

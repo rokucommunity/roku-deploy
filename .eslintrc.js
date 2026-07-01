@@ -51,6 +51,7 @@ module.exports = {
             'error',
             'always'
         ],
+        '@typescript-eslint/parameter-properties': 'off',
         '@typescript-eslint/prefer-readonly': 'off',
         '@typescript-eslint/prefer-readonly-parameter-types': 'off',
         '@typescript-eslint/promise-function-async': 'off',
@@ -111,6 +112,7 @@ module.exports = {
         'no-constant-condition': 'off',
         'no-console': 'off',
         'no-continue': 'off',
+        'no-duplicate-imports': 'off',
         'no-else-return': 'off',
         'no-empty': 'off',
         'no-implicit-coercion': 'off',

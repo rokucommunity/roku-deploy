@@ -2,7 +2,48 @@
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
-import type * as requestType from 'request';
+
+/**
+ * The subset of the legacy `request`/`postman-request` options object that roku-deploy actually
+ * builds and this shim consumes. We previously typed these as `request.OptionsWithUrl` (from
+ * `@types/request`), but that pulled a dependency purely for a type and forced `as any` reads for the
+ * fields the `@types/request` surface didn't cleanly expose. Declaring exactly what we use lets us drop
+ * `@types/request` entirely and read every field type-safely.
+ */
+export interface RequestOptions {
+
+    /** The full request url (already includes host/port/path). */
+    url: string;
+
+    /** Per-request timeout in ms (connection + first-response-byte). */
+    timeout?: number;
+
+    /** Outgoing request headers. */
+    headers?: Record<string, any>;
+
+    /** Digest-auth credentials. `sendImmediately: false` requests the 401-challenge/response dance. */
+    auth?: {
+        user?: string;
+        username?: string;
+        pass?: string;
+        password?: string;
+        sendImmediately?: boolean;
+    };
+
+    /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
+    formData?: Record<string, any>;
+
+    /** Query-string object appended to the url. */
+    qs?: Record<string, any>;
+
+    /**
+     * Legacy `request` agent options. Only `keepAlive` is consulted: `request` used
+     * `{ keepAlive: false }` so each exchange used a fresh socket that closed when done.
+     */
+    agentOptions?: {
+        keepAlive?: boolean;
+    };
+}
 
 /**
  * Title-case an HTTP header name the way `request`/`postman-request` preserved it on the outgoing
@@ -62,6 +103,7 @@ export const needleClient = {
 export interface RequestResponse {
     statusCode: number;
     headers: Record<string, any>;
+
     /**
      * Mirrors `request`'s `response.request` object. roku-deploy reads `response.request.host` when
      * constructing the "Unauthorized" error message; other consumers may read `href`/`uri`/`method`.
@@ -72,15 +114,18 @@ export interface RequestResponse {
         uri?: Record<string, any>;
         method?: string;
         headers?: Record<string, any>;
+
         /** Plus the other consumable `request` fields we reproduce (path, port, protocol, ...). */
         [key: string]: any;
     };
+
     /**
      * The response body, as a string. `request`/`postman-request` attached the body to
      * `response.body` in addition to returning it as the callback's 3rd argument, so we mirror that
      * for callers that read `error.results.response.body`.
      */
     body: string;
+
     /** Plus the rest of the underlying http.IncomingMessage surface (statusMessage, rawHeaders, ...). */
     [key: string]: any;
 }
@@ -91,21 +136,37 @@ export type RequestCallback = (error: Error | null, response: RequestResponse | 
  * Translate the `request`-style options object that roku-deploy builds into the
  * `(url, data, needleOptions)` triple that needle expects.
  */
-function translateOptions(params: requestType.OptionsWithUrl, method: 'GET' | 'POST') {
+function translateOptions(params: RequestOptions, method: 'GET' | 'POST') {
     const url = buildUrl(params);
 
     const needleOptions: needle.NeedleOptions = {
         //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
         parse_response: false,
-        //request had a single `timeout` that covered the whole exchange; map it to both needle timeouts
+        //`request` had a single `timeout` that governed how long to wait to establish the connection and
+        //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
+        //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
+        //every chunk and, in the digest-auth retry path, a read-timer can be left running after the request
+        //has already completed — it later fires `request.destroy()` and emits a spurious error, and (worse)
+        //keeps the Node event loop alive so a process that only made roku-deploy requests never exits.
         open_timeout: params.timeout,
-        read_timeout: params.timeout,
-        headers: params.headers as Record<string, any>
+        response_timeout: params.timeout,
+        headers: params.headers
     };
+
+    //`request` was configured with `agentOptions: { keepAlive: false }` so each exchange used a fresh
+    //socket that closed when done. needle does NOT honor `agentOptions`, and on modern Node it does not
+    //send `Connection: close` by default, so the socket to the Roku is left open (keep-alive) after the
+    //response. That lingering socket keeps the Node event loop alive, so a process that only made
+    //roku-deploy requests never exits. Translate the old keepAlive:false intent into needle's
+    //`connection: 'close'` so needle sends `Connection: close` and tears the socket down after each
+    //response. Only skip this if the caller explicitly asked to keep the connection alive.
+    if (params.agentOptions?.keepAlive !== true) {
+        needleOptions.connection = 'close';
+    }
 
     //digest auth. `request` was configured with `auth.sendImmediately: false`, which performs the
     //401-challenge/response digest dance. needle does the same when `auth: 'digest'` is set.
-    const auth = params.auth as { user?: string; username?: string; pass?: string; password?: string } | undefined;
+    const auth = params.auth;
     if (auth) {
         needleOptions.username = auth.user ?? auth.username;
         needleOptions.password = auth.pass ?? auth.password;
@@ -114,7 +175,7 @@ function translateOptions(params: requestType.OptionsWithUrl, method: 'GET' | 'P
 
     let data: any = null;
     if (method === 'POST') {
-        const formData = translateFormData((params as any).formData);
+        const formData = translateFormData(params.formData);
         //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
         //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
         //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
@@ -131,9 +192,9 @@ function translateOptions(params: requestType.OptionsWithUrl, method: 'GET' | 'P
  * Append the `qs` query-string object (if any) onto the url. `request` accepted
  * `qs` as a separate option; needle expects it baked into the url.
  */
-function buildUrl(params: requestType.OptionsWithUrl): string {
-    let url = params.url as string;
-    const qs = (params as any).qs as Record<string, any> | undefined;
+function buildUrl(params: RequestOptions): string {
+    let url = params.url;
+    const qs = params.qs;
     if (qs && Object.keys(qs).length > 0) {
         const search = new URLSearchParams();
         for (const key in qs) {
@@ -287,11 +348,12 @@ function buildResponse(needleResponse: any, url: string, body: string): RequestR
 }
 
 export const request = {
+
     /**
      * POST a multipart/form-data request, `request`-style. Invokes `callback`
      * with `(error, response, body)`.
      */
-    post: (params: requestType.OptionsWithUrl, callback: RequestCallback) => {
+    post: (params: RequestOptions, callback: RequestCallback) => {
         const { url, data, needleOptions } = translateOptions(params, 'POST');
         return needleClient.post(url, data, needleOptions, (error, response, body) => {
             if (error) {
@@ -308,7 +370,7 @@ export const request = {
      * stream (which supports `.on('error'|'response', ...)` and `.pipe(...)`)
      * for the file-download path.
      */
-    get: (params: requestType.OptionsWithUrl, callback?: RequestCallback) => {
+    get: (params: RequestOptions, callback?: RequestCallback) => {
         const { url, needleOptions } = translateOptions(params, 'GET');
         if (callback) {
             return needleClient.get(url, needleOptions, (error, response, body) => {

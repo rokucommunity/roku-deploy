@@ -14,6 +14,7 @@ const sinon = createSandbox();
  * of this wrong is a breaking change.
  */
 describe('request (needle shim)', () => {
+
     /** captured args from the stubbed needle call: { url, data, options, callback } */
     let postArgs: { url: string; data: any; options: any; callback: any };
     let getArgs: { url: string; options: any; callback: any };
@@ -58,18 +59,48 @@ describe('request (needle shim)', () => {
     });
 
     describe('option translation', () => {
-        it('sets parse_response=false and maps timeout to both needle timeouts', async () => {
+        it('sets parse_response=false and maps timeout to open_timeout + response_timeout', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/plugin_install', timeout: 12345, formData: { a: 'b' } });
             expect(postArgs.options.parse_response).to.equal(false);
             expect(postArgs.options.open_timeout).to.equal(12345);
-            expect(postArgs.options.read_timeout).to.equal(12345);
+            expect(postArgs.options.response_timeout).to.equal(12345);
+        });
+
+        it('does NOT set read_timeout (its lingering re-armed timer leaks a handle in the digest-auth path)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/plugin_install', timeout: 12345, formData: { a: 'b' } });
+            expect(postArgs.options.read_timeout).to.be.undefined;
         });
 
         it('passes through headers', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/x', headers: { 'User-Agent': 'roku-deploy/test' }, formData: { a: 'b' } });
             expect(postArgs.options.headers).to.eql({ 'User-Agent': 'roku-deploy/test' });
+        });
+
+        it('closes the connection by default (needle keeps sockets alive otherwise, which pins the process)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' } });
+            expect(postArgs.options.connection).to.equal('close');
+        });
+
+        it('closes the connection when agentOptions.keepAlive is false (request parity)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, agentOptions: { keepAlive: false } });
+            expect(postArgs.options.connection).to.equal('close');
+        });
+
+        it('leaves the connection alone when the caller explicitly opts into keepAlive', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, agentOptions: { keepAlive: true } });
+            expect(postArgs.options.connection).to.be.undefined;
+        });
+
+        it('closes the connection by default on GET too', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
+            await callGet({ url: 'http://1.2.3.4:80/x' });
+            expect(getArgs.options.connection).to.equal('close');
         });
 
         it('translates auth into digest username/password', async () => {
