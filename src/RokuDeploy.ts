@@ -1311,7 +1311,7 @@ export class RokuDeploy {
             } as Record<string, any>;
 
             if (options.enhance) {
-                return this.normalizeDeviceInfo(deviceInfo);
+                return this.enhanceDeviceInfo(deviceInfo);
             }
             return deviceInfo;
         } catch (e) {
@@ -1351,7 +1351,7 @@ export class RokuDeploy {
      * enhance it without making another request to the device.
      * @param deviceInfo the raw device-info object to enhance
      */
-    public normalizeDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
+    public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
         const result = {} as DeviceInfo;
         // sanitize/normalize values to their native formats, and also convert property names to camelCase
         for (let key in deviceInfo) {

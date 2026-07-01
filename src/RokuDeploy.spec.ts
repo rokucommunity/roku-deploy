@@ -691,9 +691,9 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('normalizeDeviceInfo', () => {
+    describe('enhanceDeviceInfo', () => {
         it('camel-cases keys and normalizes values', () => {
-            const result = rokuDeploy.normalizeDeviceInfo({
+            const result = rokuDeploy.enhanceDeviceInfo({
                 'serial-number': 'abc123',
                 'software-build': '4170',
                 'uptime': '19799',
@@ -724,11 +724,11 @@ describe('RokuDeploy', () => {
             const enhanced = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060, enhance: true });
             const raw = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', remotePort: 8060 });
 
-            expect(rokuDeploy.normalizeDeviceInfo(raw)).to.eql(enhanced);
+            expect(rokuDeploy.enhanceDeviceInfo(raw)).to.eql(enhanced);
         });
 
         it('returns an empty object for an empty input', () => {
-            expect(rokuDeploy.normalizeDeviceInfo({})).to.eql({});
+            expect(rokuDeploy.enhanceDeviceInfo({})).to.eql({});
         });
     });
 

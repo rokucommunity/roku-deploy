@@ -14,13 +14,13 @@ let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
+let enhanceDeviceInfo = RokuDeploy.prototype.enhanceDeviceInfo.bind(rokuDeploy);
 let getDestPath = RokuDeploy.prototype.getDestPath.bind(rokuDeploy);
 let getDeviceInfo = RokuDeploy.prototype.getDeviceInfo.bind(rokuDeploy);
 let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
 let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDeploy);
-let normalizeDeviceInfo = RokuDeploy.prototype.normalizeDeviceInfo.bind(rokuDeploy);
 let normalizeFilesArray = RokuDeploy.prototype.normalizeFilesArray.bind(rokuDeploy);
 let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let parseManifest = RokuDeploy.prototype.parseManifest.bind(rokuDeploy);
@@ -40,13 +40,13 @@ export {
     deleteInstalledChannel,
     deploy,
     deployAndSignPackage,
+    enhanceDeviceInfo,
     getDestPath,
     getDeviceInfo,
     getFilePaths,
     getOptions,
     getOutputPkgFilePath,
     getOutputZipFilePath,
-    normalizeDeviceInfo,
     normalizeFilesArray,
     normalizeRootDir,
     parseManifest,
