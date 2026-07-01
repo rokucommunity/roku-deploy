@@ -27,16 +27,6 @@ function titleCaseHeaders(headers: Record<string, any> | undefined): Record<stri
 }
 
 /**
- * Module seam for needle so tests can stub the underlying HTTP calls and assert
- * that the shim translates options and reshapes responses correctly. Mirrors the
- * `httpClient` seam in `fetch.ts`.
- */
-export const needleClient = {
-    post: needle.post.bind(needle),
-    get: needle.get.bind(needle)
-};
-
-/**
  * A thin compatibility shim over `needle` that mimics the small slice of the
  * `request`/`postman-request` API that roku-deploy relies on. We migrated off
  * `postman-request` (unmaintained, pulls in a large dependency tree) but a lot
@@ -273,7 +263,7 @@ export const request = {
      */
     post: (params: RequestOptions, callback: RequestCallback) => {
         const { url, data, needleOptions } = translateOptions(params, 'POST');
-        return needleClient.post(url, data, needleOptions, (error, response, body) => {
+        return needle.post(url, data, needleOptions, (error, response, body) => {
             if (error) {
                 return callback(error, undefined, undefined);
             }
@@ -291,7 +281,7 @@ export const request = {
     get: (params: RequestOptions, callback?: RequestCallback) => {
         const { url, needleOptions } = translateOptions(params, 'GET');
         if (callback) {
-            return needleClient.get(url, needleOptions, (error, response, body) => {
+            return needle.get(url, needleOptions, (error, response, body) => {
                 if (error) {
                     return callback(error, undefined, undefined);
                 }
@@ -300,7 +290,7 @@ export const request = {
             });
         }
         //streaming form (no callback) - used by getToFile to pipe the response to disk.
-        const stream = needleClient.get(url, needleOptions);
+        const stream = needle.get(url, needleOptions);
 
         //needle's stream emits its failures on the `'err'` event, but `request` (and roku-deploy's
         //getToFile) listens on `'error'`, so bridge `'err'` -> `'error'` to preserve that behavior.

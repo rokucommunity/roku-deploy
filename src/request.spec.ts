@@ -1,7 +1,8 @@
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import { PassThrough } from 'stream';
-import { request, needleClient } from './request';
+import * as needle from 'needle';
+import { request } from './request';
 
 const sinon = createSandbox();
 
@@ -9,7 +10,7 @@ const sinon = createSandbox();
  * Unit tests for the needle compatibility shim.
  *
  * These pin down the translation between roku-deploy's `request`/`postman-request`-style
- * options/response and needle, by stubbing `needleClient` directly. The error/response SHAPE
+ * options/response and needle, by stubbing `needle` directly. The error/response SHAPE
  * here is part of roku-deploy's public surface (it's attached to thrown errors), so getting any
  * of this wrong is a breaking change.
  */
@@ -19,9 +20,9 @@ describe('request (needle shim)', () => {
     let postArgs: { url: string; data: any; options: any; callback: any };
     let getArgs: { url: string; options: any; callback: any };
 
-    /** Stub needleClient.post and capture/drive the callback */
+    /** Stub needle.post and capture/drive the callback */
     function stubPost(err: any, response: any, body: any) {
-        return sinon.stub(needleClient, 'post').callsFake(((url: string, data: any, options: any, callback: any) => {
+        return sinon.stub(needle, 'post').callsFake(((url: string, data: any, options: any, callback: any) => {
             postArgs = { url: url, data: data, options: options, callback: callback };
             //invoke async like needle does
             process.nextTick(callback, err, response, body);
@@ -29,9 +30,9 @@ describe('request (needle shim)', () => {
         }) as any);
     }
 
-    /** Stub needleClient.get (callback form) and capture/drive the callback */
+    /** Stub needle.get (callback form) and capture/drive the callback */
     function stubGet(err: any, response: any, body: any) {
-        return sinon.stub(needleClient, 'get').callsFake(((url: string, options: any, callback: any) => {
+        return sinon.stub(needle, 'get').callsFake(((url: string, options: any, callback: any) => {
             getArgs = { url: url, options: options, callback: callback };
             if (callback) {
                 process.nextTick(callback, err, response, body);
@@ -369,14 +370,14 @@ describe('request (needle shim)', () => {
     describe('streaming get (getToFile path)', () => {
         it('returns the needle stream when no callback is given', () => {
             const fakeStream = new PassThrough();
-            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            sinon.stub(needle, 'get').returns(fakeStream as any);
             const result = request.get({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { user: 'u', pass: 'p' } } as any);
             expect(result).to.equal(fakeStream);
         });
 
         it(`bridges needle's 'err' event to 'error'`, (done) => {
             const fakeStream = new PassThrough();
-            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            sinon.stub(needle, 'get').returns(fakeStream as any);
             const stream: any = request.get({ url: 'http://1.2.3.4:80/x', auth: { user: 'u', pass: 'p' } } as any);
             const theError = new Error('stream blew up');
             stream.on('error', (e) => {
@@ -388,7 +389,7 @@ describe('request (needle shim)', () => {
 
         it('swallows the intermediate 401 response, then forwards the retried 200 (digest auth)', () => {
             const fakeStream = new PassThrough();
-            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            sinon.stub(needle, 'get').returns(fakeStream as any);
             const stream: any = request.get({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { user: 'u', pass: 'p' } } as any);
 
             const seen: number[] = [];
@@ -404,7 +405,7 @@ describe('request (needle shim)', () => {
 
         it('does NOT swallow a 401 when there is no digest auth (no credentials)', () => {
             const fakeStream = new PassThrough();
-            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            sinon.stub(needle, 'get').returns(fakeStream as any);
             const stream: any = request.get({ url: 'http://1.2.3.4:8060/x' } as any);
 
             const seen: number[] = [];
@@ -416,7 +417,7 @@ describe('request (needle shim)', () => {
 
         it('forwards a response event that has no response object (digest auth)', () => {
             const fakeStream = new PassThrough();
-            sinon.stub(needleClient, 'get').returns(fakeStream as any);
+            sinon.stub(needle, 'get').returns(fakeStream as any);
             const stream: any = request.get({ url: 'http://1.2.3.4:80/x', auth: { user: 'u', pass: 'p' } } as any);
 
             let fired = false;
