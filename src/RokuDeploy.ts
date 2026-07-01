@@ -1353,6 +1353,10 @@ export class RokuDeploy {
      * @param deviceInfo
      */
     public normalizeDeviceInfoFieldValue(value: any) {
+        // non-string values have nothing to normalize; return them unchanged
+        if (typeof value !== 'string') {
+            return value;
+        }
         let num: number;
         // convert 'true' and 'false' string values to boolean
         if (value === 'true') {
