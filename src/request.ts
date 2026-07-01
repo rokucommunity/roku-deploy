@@ -4,48 +4,6 @@ import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
 
 /**
- * The subset of the legacy `request`/`postman-request` options object that roku-deploy actually
- * builds and this shim consumes. We previously typed these as `request.OptionsWithUrl` (from
- * `@types/request`), but that pulled a dependency purely for a type and forced `as any` reads for the
- * fields the `@types/request` surface didn't cleanly expose. Declaring exactly what we use lets us drop
- * `@types/request` entirely and read every field type-safely.
- */
-export interface RequestOptions {
-
-    /** The full request url (already includes host/port/path). */
-    url: string;
-
-    /** Per-request timeout in ms (connection + first-response-byte). */
-    timeout?: number;
-
-    /** Outgoing request headers. */
-    headers?: Record<string, any>;
-
-    /** Digest-auth credentials. `sendImmediately: false` requests the 401-challenge/response dance. */
-    auth?: {
-        user?: string;
-        username?: string;
-        pass?: string;
-        password?: string;
-        sendImmediately?: boolean;
-    };
-
-    /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
-    formData?: Record<string, any>;
-
-    /** Query-string object appended to the url. */
-    qs?: Record<string, any>;
-
-    /**
-     * Legacy `request` agent options. Only `keepAlive` is consulted: `request` used
-     * `{ keepAlive: false }` so each exchange used a fresh socket that closed when done.
-     */
-    agentOptions?: {
-        keepAlive?: boolean;
-    };
-}
-
-/**
  * Title-case an HTTP header name the way `request`/`postman-request` preserved it on the outgoing
  * request (`Content-Type`, `User-Agent`, `WWW-Authenticate`, ...). needle lowercases outgoing header
  * names, so we re-case them to maximize parity with what consumers saw on `response.request.headers`.
@@ -91,46 +49,6 @@ export const needleClient = {
  * roku-deploy uses. `get` additionally supports the callback-less streaming
  * form (`request.get(opts).on(...).pipe(...)`) used when downloading files.
  */
-
-/**
- * The `response` object roku-deploy (and its consumers) see. Both `postman-request` and `needle`
- * hand back a Node `http.IncomingMessage`, so the real object carries far more than the few fields
- * roku-deploy reads — `statusCode`, `headers`, `statusMessage`, `rawHeaders`, `httpVersion*`,
- * `socket`, `req`, `complete`, etc. We keep all of that (it's needle's actual IncomingMessage) and
- * layer on the `request`-compat extras postman added. The interface therefore declares the fields we
- * guarantee, and allows the rest of the IncomingMessage surface via the index signature.
- */
-export interface RequestResponse {
-    statusCode: number;
-    headers: Record<string, any>;
-
-    /**
-     * Mirrors `request`'s `response.request` object. roku-deploy reads `response.request.host` when
-     * constructing the "Unauthorized" error message; other consumers may read `href`/`uri`/`method`.
-     */
-    request: {
-        host: string;
-        href: string;
-        uri?: Record<string, any>;
-        method?: string;
-        headers?: Record<string, any>;
-
-        /** Plus the other consumable `request` fields we reproduce (path, port, protocol, ...). */
-        [key: string]: any;
-    };
-
-    /**
-     * The response body, as a string. `request`/`postman-request` attached the body to
-     * `response.body` in addition to returning it as the callback's 3rd argument, so we mirror that
-     * for callers that read `error.results.response.body`.
-     */
-    body: string;
-
-    /** Plus the rest of the underlying http.IncomingMessage surface (statusMessage, rawHeaders, ...). */
-    [key: string]: any;
-}
-
-export type RequestCallback = (error: Error | null, response: RequestResponse | undefined, body: string | undefined) => void;
 
 /**
  * Translate the `request`-style options object that roku-deploy builds into the
@@ -420,3 +338,85 @@ function interceptIntermediate401(stream: { emit: (event: string, ...args: any[]
         return originalEmit(event, ...args);
     }) as any;
 }
+
+/**
+ * The subset of the legacy `request`/`postman-request` options object that roku-deploy actually
+ * builds and this shim consumes. We previously typed these as `request.OptionsWithUrl` (from
+ * `@types/request`), but that pulled a dependency purely for a type and forced `as any` reads for the
+ * fields the `@types/request` surface didn't cleanly expose. Declaring exactly what we use lets us drop
+ * `@types/request` entirely and read every field type-safely.
+ */
+export interface RequestOptions {
+
+    /** The full request url (already includes host/port/path). */
+    url: string;
+
+    /** Per-request timeout in ms (connection + first-response-byte). */
+    timeout?: number;
+
+    /** Outgoing request headers. */
+    headers?: Record<string, any>;
+
+    /** Digest-auth credentials. `sendImmediately: false` requests the 401-challenge/response dance. */
+    auth?: {
+        user?: string;
+        username?: string;
+        pass?: string;
+        password?: string;
+        sendImmediately?: boolean;
+    };
+
+    /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
+    formData?: Record<string, any>;
+
+    /** Query-string object appended to the url. */
+    qs?: Record<string, any>;
+
+    /**
+     * Legacy `request` agent options. Only `keepAlive` is consulted: `request` used
+     * `{ keepAlive: false }` so each exchange used a fresh socket that closed when done.
+     */
+    agentOptions?: {
+        keepAlive?: boolean;
+    };
+}
+
+/**
+ * The `response` object roku-deploy (and its consumers) see. Both `postman-request` and `needle`
+ * hand back a Node `http.IncomingMessage`, so the real object carries far more than the few fields
+ * roku-deploy reads — `statusCode`, `headers`, `statusMessage`, `rawHeaders`, `httpVersion*`,
+ * `socket`, `req`, `complete`, etc. We keep all of that (it's needle's actual IncomingMessage) and
+ * layer on the `request`-compat extras postman added. The interface therefore declares the fields we
+ * guarantee, and allows the rest of the IncomingMessage surface via the index signature.
+ */
+export interface RequestResponse {
+    statusCode: number;
+    headers: Record<string, any>;
+
+    /**
+     * Mirrors `request`'s `response.request` object. roku-deploy reads `response.request.host` when
+     * constructing the "Unauthorized" error message; other consumers may read `href`/`uri`/`method`.
+     */
+    request: {
+        host: string;
+        href: string;
+        uri?: Record<string, any>;
+        method?: string;
+        headers?: Record<string, any>;
+
+        /** Plus the other consumable `request` fields we reproduce (path, port, protocol, ...). */
+        [key: string]: any;
+    };
+
+    /**
+     * The response body, as a string. `request`/`postman-request` attached the body to
+     * `response.body` in addition to returning it as the callback's 3rd argument, so we mirror that
+     * for callers that read `error.results.response.body`.
+     */
+    body: string;
+
+    /** Plus the rest of the underlying http.IncomingMessage surface (statusMessage, rawHeaders, ...). */
+    [key: string]: any;
+}
+
+export type RequestCallback = (error: Error | null, response: RequestResponse | undefined, body: string | undefined) => void;
