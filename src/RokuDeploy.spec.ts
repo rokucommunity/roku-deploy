@@ -3097,6 +3097,85 @@ describe('RokuDeploy', () => {
             expect(path.basename(result)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result));
         });
+
+        it('returns Buffer when returnBuffer is true', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            const testImageData = Buffer.from('fake-image-data');
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                } else if (event === 'data') {
+                    callback(testImageData);
+                } else if (event === 'end') {
+                    callback();
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', returnBuffer: true });
+            expect(result).to.be.instanceOf(Buffer);
+            expect(result.toString()).to.equal('fake-image-data');
+        });
+
+        it('ignores out option when returnBuffer is true', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            const testImageData = Buffer.from('fake-image-data');
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 200
+                    });
+                } else if (event === 'data') {
+                    callback(testImageData);
+                } else if (event === 'end') {
+                    callback();
+                }
+            };
+
+            mockDoPostRequest(body);
+            // Pass out option, but it should be ignored when returnBuffer is true
+            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/should-not-exist.png`, returnBuffer: true });
+            expect(result).to.be.instanceOf(Buffer);
+            // Verify file was NOT created
+            expect(fsExtra.existsSync(`${tempDir}/should-not-exist.png`)).to.be.false;
+        });
+
+        it('throws error when returnBuffer request fails', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.png?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({
+                        statusCode: 500
+                    });
+                }
+            };
+
+            mockDoPostRequest(body);
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password', returnBuffer: true }));
+        });
     });
 
     describe('makeZip', () => {

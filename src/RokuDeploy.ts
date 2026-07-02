@@ -880,7 +880,9 @@ export class RokuDeploy {
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
-    public async captureScreenshot(options: CaptureScreenshotOptions) {
+    public async captureScreenshot(options: CaptureScreenshotOptions & { returnBuffer: true }): Promise<Buffer>;
+    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<string>;
+    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<string | Buffer> {
         this.checkRequiredOptions(options, ['host', 'password']);
         const cwd = options.cwd ?? process.cwd();
         const screenshotDir = options.screenshotDir
@@ -904,6 +906,13 @@ export class RokuDeploy {
 
         if (!imageUrlOnDevice) {
             throw new Error('No screenshot url returned from device');
+        }
+
+        const requestParams = this.generateBaseRequestOptions(imageUrlOnDevice, options);
+
+        // If returnBuffer is true, return the image as a Buffer
+        if (options.returnBuffer) {
+            return this.downloadToBuffer(requestParams);
         }
 
         // Determine output path
@@ -932,10 +941,7 @@ export class RokuDeploy {
             out = path.resolve(cwd, screenshotDir, defaultFilename);
         }
 
-        await this.downloadFile(
-            this.generateBaseRequestOptions(imageUrlOnDevice, options),
-            out
-        );
+        await this.downloadFile(requestParams, out);
         return out;
     }
 
@@ -971,6 +977,27 @@ export class RokuDeploy {
             try {
                 writeStream.close();
             } catch { }
+        });
+    }
+
+    private downloadToBuffer(requestParams: any): Promise<Buffer> {
+        return new Promise<Buffer>((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            request.get(requestParams)
+                .on('error', (err) => {
+                    reject(err);
+                })
+                .on('response', (response) => {
+                    if (response.statusCode !== 200) {
+                        return reject(new Error('Invalid response code: ' + response.statusCode));
+                    }
+                })
+                .on('data', (chunk: Buffer) => {
+                    chunks.push(chunk);
+                })
+                .on('end', () => {
+                    resolve(Buffer.concat(chunks));
+                });
         });
     }
 
@@ -1250,6 +1277,13 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
      * @default false
      */
     autoExtension?: boolean;
+
+    /**
+     * When true, returns the screenshot as a Buffer instead of writing to disk.
+     * The `out` and `screenshotDir` options are ignored when this is true.
+     * @default false
+     */
+    returnBuffer?: boolean;
 }
 
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
