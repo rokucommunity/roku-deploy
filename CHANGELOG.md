@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.17.7](https://github.com/rokucommunity/roku-deploy/compare/3.17.6...v3.17.7) - 2026-07-06
+### Changed
+ - Extract normalizeDeviceInfo helper from getDeviceInfo ([#300](https://github.com/rokucommunity/roku-deploy/pull/300))
+ - Declare picomatch as a direct dependency ([#299](https://github.com/rokucommunity/roku-deploy/pull/299))
+ - Inline lodash.camelCase and temp-dir into util ([#298](https://github.com/rokucommunity/roku-deploy/pull/298))
+ - Consolidate date libraries into dependency-free helpers ([#297](https://github.com/rokucommunity/roku-deploy/pull/297))
+ - Bump form-data from 2.5.5 to 2.5.6 ([#293](https://github.com/rokucommunity/roku-deploy/pull/293))
+### Fixed
+ - Fix: potential crash in normalizeDeviceInfoFieldValue when supplied non-string values ([#301](https://github.com/rokucommunity/roku-deploy/pull/301))
+
+
+
 ## [3.17.6](https://github.com/rokucommunity/roku-deploy/compare/3.17.5...v3.17.6) - 2026-06-04
 ### Fixed
  - Fix case-insensitive matching for absolute `files.src` glob patterns on case-insensitive file systems ([#279](https://github.com/rokucommunity/roku-deploy/pull/279))
