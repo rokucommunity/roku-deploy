@@ -781,6 +781,29 @@ describe('RokuDeploy', () => {
             expect(zipContents.files['components/comp.xml']).to.exist;
         });
 
+        it('should return the provided out path', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+            const expectedPath = s`${outDir}/my-custom.zip`;
+
+            const result = await rokuDeploy.zip({
+                dir: rootDir,
+                out: expectedPath
+            });
+
+            expect(result).to.equal(expectedPath);
+        });
+
+        it('should return the default path when out is not specified', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+
+            const result = await rokuDeploy.zip({
+                dir: rootDir
+            });
+
+            const expectedPath = path.resolve(process.cwd(), RokuDeploy['defaults'].outDir, RokuDeploy['defaults'].outFile);
+            expect(result).to.equal(expectedPath);
+        });
+
     });
 
     it('runs via the command line using the rokudeploy.json file', function test() {
@@ -1583,7 +1606,7 @@ describe('RokuDeploy', () => {
             // Stub zip to create the file at the path sideload expects
             const zipStub = sinon.stub(rokuDeploy, 'zip').callsFake((zipOptions) => {
                 fsExtra.outputFileSync(zipOptions.out, 'dummy');
-                return Promise.resolve();
+                return Promise.resolve(zipOptions.out);
             });
             sinon.stub(rokuDeploy, 'closeChannel').resolves();
 
