@@ -905,7 +905,7 @@ export class RokuDeploy {
         // Always download to buffer
         const buffer = await this.downloadToBuffer(requestParams);
 
-        const result: CaptureScreenshotResult = { buffer };
+        const result: CaptureScreenshotResult = { buffer: buffer };
 
         // If out is provided, also save to disk
         if (options.out) {
