@@ -30,29 +30,17 @@ export class RokuDeploy {
     };
 
     /**
-     * Instance-level default options that are merged into every method call
+     * Instance-level default options merged into every method call
      */
     private readonly options: RokuDeployConstructorOptions;
 
     /**
-     * The logger instance for this RokuDeploy instance. Can be used to set log level:
-     * @example
-     * ```typescript
-     * rokuDeploy.logger.logLevel = 'debug';
-     * ```
+     * The logger instance for this RokuDeploy instance
      */
     public readonly logger: typeof logger;
 
     /**
-     * Create a new RokuDeploy instance with optional default options.
-     * These defaults will be merged into every method call, so you don't need to
-     * repeat common options like `host` and `password` on every call.
-     *
-     * @example
-     * ```typescript
-     * const rd = new RokuDeploy({ host: '192.168.1.100', password: 'secret' });
-     * await rd.sideload({ rootDir: './dist' }); // host and password come from defaults
-     * ```
+     * Create a new RokuDeploy instance with optional default options
      */
     constructor(options?: RokuDeployConstructorOptions) {
         this.options = options ?? {};
