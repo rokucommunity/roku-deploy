@@ -879,18 +879,10 @@ export class RokuDeploy {
 
     /**
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
+     * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
      */
-    public async captureScreenshot(options: CaptureScreenshotOptions & { returnBuffer: true }): Promise<Buffer>;
-    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<string>;
-    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<string | Buffer> {
+    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         this.checkRequiredOptions(options, ['host', 'password']);
-        const cwd = options.cwd ?? process.cwd();
-        const screenshotDir = options.screenshotDir
-            ? path.resolve(cwd, options.screenshotDir)
-            : path.join(tempDir, '/roku-deploy/screenshots/');
-
-        // Track if user provided output path
-        const userProvidedOut = options.out !== undefined;
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
@@ -910,39 +902,48 @@ export class RokuDeploy {
 
         const requestParams = this.generateBaseRequestOptions(imageUrlOnDevice, options);
 
-        // If returnBuffer is true, return the image as a Buffer
-        if (options.returnBuffer) {
-            return this.downloadToBuffer(requestParams);
-        }
+        // Always download to buffer
+        const buffer = await this.downloadToBuffer(requestParams);
 
-        // Determine output path
-        let out: string;
-        if (userProvidedOut) {
-            out = path.resolve(cwd, options.out);
-            const userExt = path.extname(out).toLowerCase();
-            const deviceExtLower = deviceExt.toLowerCase();
+        const result: CaptureScreenshotResult = { buffer };
 
-            if (options.autoExtension) {
-                // Smart extension handling when autoExtension is enabled
-                if (userExt === deviceExtLower) {
-                    // User extension matches device extension - use as-is
-                } else if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
-                    // User provided an image extension that doesn't match - swap it
-                    out = out.slice(0, -userExt.length) + deviceExt;
-                } else {
-                    // No recognized image extension - append device extension
-                    out += deviceExt;
+        // If out is provided, also save to disk
+        if (options.out) {
+            const cwd = options.cwd ?? process.cwd();
+            const screenshotDir = options.screenshotDir
+                ? path.resolve(cwd, options.screenshotDir)
+                : path.join(tempDir, '/roku-deploy/screenshots/');
+
+            let filePath: string;
+            if (options.out === true) {
+                // Use default directory with generated filename
+                const defaultFilename = `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}${deviceExt}`;
+                filePath = path.resolve(cwd, screenshotDir, defaultFilename);
+            } else {
+                // User provided a path
+                filePath = path.resolve(cwd, options.out);
+                const userExt = path.extname(filePath).toLowerCase();
+                const deviceExtLower = deviceExt.toLowerCase();
+
+                if (options.autoExtension) {
+                    if (userExt === deviceExtLower) {
+                        // User extension matches device extension - use as-is
+                    } else if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
+                        // User provided an image extension that doesn't match - swap it
+                        filePath = filePath.slice(0, -userExt.length) + deviceExt;
+                    } else {
+                        // No recognized image extension - append device extension
+                        filePath += deviceExt;
+                    }
                 }
             }
-            // else: use exactly as provided
-        } else {
-            // No user-provided path - use default directory with generated filename
-            const defaultFilename = `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}${deviceExt}`;
-            out = path.resolve(cwd, screenshotDir, defaultFilename);
+
+            await fsExtra.ensureFile(filePath);
+            await fsExtra.writeFile(filePath, buffer);
+            result.filePath = filePath;
         }
 
-        await this.downloadFile(requestParams, out);
-        return out;
+        return result;
     }
 
     private async downloadFile(requestParams: any, filePath: string) {
@@ -1252,10 +1253,11 @@ export interface HttpResponse {
 
 export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
-     * The output screenshot file path (e.g., './screenshots/capture.jpg')
-     * Will use the OS temp directory with auto-generated filename by default
+     * When provided, saves the screenshot to disk in addition to returning the buffer.
+     * - If `true`, saves to the default location (screenshotDir or OS temp directory)
+     * - If a string path, saves to that location
      */
-    out?: string;
+    out?: string | true;
 
     /**
      * The current working directory to use for relative paths
@@ -1263,7 +1265,7 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
     cwd?: string;
 
     /**
-     * The directory where screenshots should be saved when no `out` path is specified.
+     * The directory where screenshots should be saved when `out` is `true`.
      * Defaults to the OS temp directory.
      */
     screenshotDir?: string;
@@ -1277,13 +1279,17 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
      * @default false
      */
     autoExtension?: boolean;
+}
 
+export interface CaptureScreenshotResult {
     /**
-     * When true, returns the screenshot as a Buffer instead of writing to disk.
-     * The `out` and `screenshotDir` options are ignored when this is true.
-     * @default false
+     * The screenshot image data
      */
-    returnBuffer?: boolean;
+    buffer: Buffer;
+    /**
+     * The file path where the screenshot was saved (only present when `out` option was provided)
+     */
+    filePath?: string;
 }
 
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
