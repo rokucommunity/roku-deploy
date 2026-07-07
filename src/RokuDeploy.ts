@@ -81,7 +81,7 @@ export class RokuDeploy {
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zip(options: ZipOptions) {
+    public async zip(options: ZipOptions): Promise<string> {
         logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
 
@@ -111,9 +111,9 @@ export class RokuDeploy {
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
         }
-
         await this.makeZip(dir, out, files);
         logger.info('Zip created at:', out);
+        return out;
     }
 
     /**
