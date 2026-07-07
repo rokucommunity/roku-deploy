@@ -3,7 +3,7 @@ import { rokuDeploy, RokuDeploy } from '../index';
 export class GetDevIdCommand {
     async run(args) {
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
         const devId = await rokuDeploy.getDevId(options);

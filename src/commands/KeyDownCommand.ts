@@ -3,7 +3,7 @@ import { rokuDeploy, RokuDeploy } from '../index';
 export class KeyDownCommand {
     async run(args) {
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
         await rokuDeploy.keyDown(options);

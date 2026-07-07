@@ -4473,11 +4473,11 @@ describe('RokuDeploy', () => {
             });
         });
 
-        describe('loadOptionsFromJson', () => {
+        describe('loadConfigFile', () => {
             it('should fill in options from rokudeploy.json', () => {
                 fsExtra.outputJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
                 expect(
-                    RokuDeploy.loadOptionsFromJson({ cwd: rootDir })
+                    RokuDeploy.loadConfigFile({ cwd: rootDir })
                 ).to.eql({
                     password: 'password'
                 });
@@ -4487,7 +4487,7 @@ describe('RokuDeploy', () => {
                 try {
                     fsExtra.outputJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
                     expect(
-                        RokuDeploy.loadOptionsFromJson()
+                        RokuDeploy.loadConfigFile()
                     ).to.eql({
                         host: '1.2.3.4'
                     });
@@ -4504,7 +4504,7 @@ describe('RokuDeploy', () => {
                 `);
                 let ex;
                 try {
-                    RokuDeploy.loadOptionsFromJson();
+                    RokuDeploy.loadConfigFile();
                 } catch (e) {
                     ex = e;
                 }
@@ -4522,7 +4522,7 @@ describe('RokuDeploy', () => {
                         "stagingDir": "./staging-dir"
                     }
                 `);
-                let loadedOptions = RokuDeploy.loadOptionsFromJson();
+                let loadedOptions = RokuDeploy.loadConfigFile();
                 expect(loadedOptions.stagingDir.endsWith('staging-dir')).to.be.true;
             });
 
@@ -4535,12 +4535,12 @@ describe('RokuDeploy', () => {
                     }
                     //trailing comment
                 `);
-                let loadedOptions = RokuDeploy.loadOptionsFromJson({ cwd: tempDir });
+                let loadedOptions = RokuDeploy.loadConfigFile({ cwd: tempDir });
                 expect(loadedOptions.rootDir).to.equal('src');
             });
 
             it('returns empty object when config file does not exist', () => {
-                const result = RokuDeploy.loadOptionsFromJson({ cwd: '/nonexistent/path' });
+                const result = RokuDeploy.loadConfigFile({ cwd: '/nonexistent/path' });
                 expect(result).to.eql({});
             });
         });

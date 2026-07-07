@@ -3,7 +3,7 @@ import { rokuDeploy, RokuDeploy, util } from '../index';
 export class GetDeviceInfoCommand {
     async run(args) {
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
         const outputPath = await rokuDeploy.getDeviceInfo(options);

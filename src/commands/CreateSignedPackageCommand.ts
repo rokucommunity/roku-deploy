@@ -5,7 +5,7 @@ export class CreateSignedPackageCommand {
         args.cwd ??= process.cwd();
 
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
         await rokuDeploy.createSignedPackage(options);

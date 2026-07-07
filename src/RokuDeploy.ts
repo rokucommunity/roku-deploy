@@ -34,7 +34,7 @@ export class RokuDeploy {
      * @param options - Optional cwd and configPath settings
      * @returns The parsed options from the config file, or an empty object if not found
      */
-    public static loadOptionsFromJson(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
+    public static loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 

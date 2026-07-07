@@ -5,7 +5,7 @@ export class StageCommand {
         args.cwd ??= process.cwd();
 
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
         await rokuDeploy.stage(options);

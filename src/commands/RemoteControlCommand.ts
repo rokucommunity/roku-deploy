@@ -5,7 +5,7 @@ import { rokuDeploy, RokuDeploy } from '../index';
 export class RemoteControlCommand {
     run(args) {
         let options = {
-            ...RokuDeploy.loadOptionsFromJson(args),
+            ...RokuDeploy.loadConfigFile(args),
             ...args
         };
 
