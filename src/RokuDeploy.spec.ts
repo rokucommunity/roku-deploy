@@ -3206,7 +3206,7 @@ describe('RokuDeploy', () => {
             let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/screenshot.png` });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.buffer.toString()).to.equal('fake-image-data');
-            expect(result.filePath).to.equal(`${tempDir}/screenshot.png`);
+            expect(result.filePath).to.equal(path.join(tempDir, 'screenshot.png'));
             expect(fsExtra.existsSync(result.filePath)).to.be.true;
         });
 
