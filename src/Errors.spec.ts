@@ -26,7 +26,7 @@ import {
     isConnectionResetError,
     isCompileError,
     isUnauthorizedError,
-    extractHttpResponseDetails
+    extractHttpDetails
 } from './Errors';
 import type {
     DeviceErrorDetails,
@@ -49,9 +49,11 @@ describe('Errors', () => {
         it('stores details when provided', () => {
             const details: DeviceErrorDetails = {
                 host: '192.168.1.100',
-                httpResponse: {
-                    statusCode: 500,
-                    body: 'error body'
+                httpDetails: {
+                    response: {
+                        statusCode: 500,
+                        body: 'error body'
+                    }
                 }
             };
             const error = new InvalidDeviceResponseCodeError('test message', details);
@@ -87,8 +89,10 @@ describe('Errors', () => {
             it('serializes the error to JSON', () => {
                 const details: DeviceErrorDetails = {
                     host: '192.168.1.100',
-                    httpResponse: {
-                        statusCode: 500
+                    httpDetails: {
+                        response: {
+                            statusCode: 500
+                        }
                     }
                 };
                 const error = new InvalidDeviceResponseCodeError('test message', details);
@@ -409,45 +413,56 @@ describe('Errors', () => {
         });
     });
 
-    describe('extractHttpResponseDetails', () => {
+    describe('extractHttpDetails', () => {
         it('extracts details from response object', () => {
             const response = {
                 statusCode: 200,
                 headers: { 'content-type': 'text/html' },
                 request: {
                     uri: { href: 'http://192.168.1.100/plugin_install' },
-                    method: 'POST'
+                    method: 'POST',
+                    headers: { 'user-agent': 'test' }
                 }
             };
             const body = '<html>response body</html>';
 
-            const details = extractHttpResponseDetails(response, body);
+            const details = extractHttpDetails(response, body);
 
             expect(details).to.deep.equal({
-                url: 'http://192.168.1.100/plugin_install',
-                method: 'POST',
-                statusCode: 200,
-                headers: { 'content-type': 'text/html' },
-                body: body
+                request: {
+                    url: 'http://192.168.1.100/plugin_install',
+                    method: 'POST',
+                    headers: { 'user-agent': 'test' }
+                },
+                response: {
+                    statusCode: 200,
+                    headers: { 'content-type': 'text/html' },
+                    body: body
+                }
             });
         });
 
         it('returns undefined for undefined response', () => {
-            expect(extractHttpResponseDetails(undefined, 'body')).to.be.undefined;
+            expect(extractHttpDetails(undefined, 'body')).to.be.undefined;
         });
 
         it('handles partial response object', () => {
             const response = {
                 statusCode: 500
             };
-            const details = extractHttpResponseDetails(response, 'error body');
+            const details = extractHttpDetails(response, 'error body');
 
             expect(details).to.deep.equal({
-                url: undefined,
-                method: undefined,
-                statusCode: 500,
-                headers: undefined,
-                body: 'error body'
+                request: {
+                    url: undefined,
+                    method: undefined,
+                    headers: undefined
+                },
+                response: {
+                    statusCode: 500,
+                    headers: undefined,
+                    body: 'error body'
+                }
             });
         });
     });

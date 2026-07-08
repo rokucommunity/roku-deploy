@@ -22,22 +22,39 @@ export enum RokuDeployErrorCode {
 }
 
 /**
+ * Abstracted HTTP request details - NOT tied to request library.
+ * This allows switching from postman-request to native fetch later.
+ */
+export interface HttpRequestDetails {
+    url?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string | Buffer;
+}
+
+/**
  * Abstracted HTTP response details - NOT tied to request library.
  * This allows switching from postman-request to native fetch later.
  */
 export interface HttpResponseDetails {
-    url?: string;
-    method?: string;
-    headers?: Record<string, string>;
     statusCode?: number;
-    body?: string;
+    headers?: Record<string, string>;
+    body?: string | Buffer;
+}
+
+/**
+ * Combined HTTP details containing both request and response information.
+ */
+export interface HttpDetails {
+    request?: HttpRequestDetails;
+    response?: HttpResponseDetails;
 }
 
 /**
  * Details for device communication errors
  */
 export interface DeviceErrorDetails {
-    httpResponse?: HttpResponseDetails;
+    httpDetails?: HttpDetails;
     rokuMessages?: RokuMessages;
     host?: string;
 }
@@ -70,7 +87,7 @@ export type CompileErrorDetails = DeviceErrorDetails;
  * Details for convert errors
  */
 export interface ConvertErrorDetails {
-    httpResponse?: HttpResponseDetails;
+    httpDetails?: HttpDetails;
     rokuMessages?: RokuMessages;
 }
 
@@ -352,26 +369,101 @@ export function isUnauthorizedError(e: unknown): e is UnauthorizedDeviceResponse
     return e instanceof UnauthorizedDeviceResponseError;
 }
 
+/**
+ * Check if an error is an InvalidDeviceResponseCodeError
+ */
+export function isInvalidDeviceResponseCodeError(e: unknown): e is InvalidDeviceResponseCodeError {
+    return e instanceof InvalidDeviceResponseCodeError;
+}
+
+/**
+ * Check if an error is a FailedDeviceResponseError
+ */
+export function isFailedDeviceResponseError(e: unknown): e is FailedDeviceResponseError {
+    return e instanceof FailedDeviceResponseError;
+}
+
+/**
+ * Check if an error is an UnparsableDeviceResponseError
+ */
+export function isUnparsableDeviceResponseError(e: unknown): e is UnparsableDeviceResponseError {
+    return e instanceof UnparsableDeviceResponseError;
+}
+
+/**
+ * Check if an error is an UnknownDeviceResponseError
+ */
+export function isUnknownDeviceResponseError(e: unknown): e is UnknownDeviceResponseError {
+    return e instanceof UnknownDeviceResponseError;
+}
+
+/**
+ * Check if an error is a DeviceUnreachableError
+ */
+export function isDeviceUnreachableError(e: unknown): e is DeviceUnreachableError {
+    return e instanceof DeviceUnreachableError;
+}
+
+/**
+ * Check if an error is an EcpNetworkAccessModeDisabledError
+ */
+export function isEcpNetworkAccessModeDisabledError(e: unknown): e is EcpNetworkAccessModeDisabledError {
+    return e instanceof EcpNetworkAccessModeDisabledError;
+}
+
+/**
+ * Check if an error is a ConvertError
+ */
+export function isConvertError(e: unknown): e is ConvertError {
+    return e instanceof ConvertError;
+}
+
+/**
+ * Check if an error is a MissingRequiredOptionError
+ */
+export function isMissingRequiredOptionError(e: unknown): e is MissingRequiredOptionError {
+    return e instanceof MissingRequiredOptionError;
+}
+
+/**
+ * Check if an error is an InvalidOptionError
+ */
+export function isInvalidOptionError(e: unknown): e is InvalidOptionError {
+    return e instanceof InvalidOptionError;
+}
+
+/**
+ * Check if an error is an UnsupportedFirmwareVersionError
+ */
+export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedFirmwareVersionError {
+    return e instanceof UnsupportedFirmwareVersionError;
+}
+
 // ============================================================================
 // Helper function
 // ============================================================================
 
 /**
- * Extract HttpResponseDetails from a request library response.
+ * Extract HttpDetails from a request library response.
  * This abstracts the response format so we can switch HTTP libraries later.
  */
-export function extractHttpResponseDetails(
-    response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string } } | undefined,
-    body?: string
-): HttpResponseDetails | undefined {
+export function extractHttpDetails(
+    response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string; headers?: Record<string, string> } } | undefined,
+    body?: string | Buffer
+): HttpDetails | undefined {
     if (!response) {
         return undefined;
     }
     return {
-        url: response.request?.uri?.href,
-        method: response.request?.method,
-        statusCode: response.statusCode,
-        headers: response.headers,
-        body: body
+        request: {
+            url: response.request?.uri?.href,
+            method: response.request?.method,
+            headers: response.request?.headers
+        },
+        response: {
+            statusCode: response.statusCode,
+            headers: response.headers,
+            body: body
+        }
     };
 }

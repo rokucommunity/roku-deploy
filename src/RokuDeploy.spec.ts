@@ -538,9 +538,9 @@ describe('RokuDeploy', () => {
         it('handles all error scenarios in catch block', async () => {
             const doGetRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
 
-            // Reject with an error that has details.httpResponse.headers.server = 'Roku'
+            // Reject with an error that has details.httpDetails.response.headers.server = 'Roku'
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: { headers: { server: 'Roku' } }
+                httpDetails: { response: { headers: { server: 'Roku' } } }
             }));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
@@ -549,57 +549,57 @@ describe('RokuDeploy', () => {
                 expect(e).to.be.instanceof(errors.EcpNetworkAccessModeDisabledError);
             }
 
-            // Reject with an error that has details.httpResponse.headers.server = 'Apache'
+            // Reject with an error that has details.httpDetails.response.headers.server = 'Apache'
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: { headers: { server: 'Apache' } }
+                httpDetails: { response: { headers: { server: 'Apache' } } }
             }));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect((e as errors.InvalidDeviceResponseCodeError).details.httpResponse?.headers?.server).to.equal('Apache');
+                expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.equal('Apache');
             }
 
             // Reject with an error that has no server header
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: { headers: {} }
+                httpDetails: { response: { headers: {} } }
             }));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect((e as errors.InvalidDeviceResponseCodeError).details.httpResponse?.headers?.server).to.be.undefined;
+                expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.be.undefined;
             }
 
             // Reject with an error that has server: null
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: { headers: { server: null as any } }
+                httpDetails: { response: { headers: { server: null as any } } }
             }));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect((e as errors.InvalidDeviceResponseCodeError).details.httpResponse?.headers?.server).to.be.null;
+                expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.be.null;
             }
 
             // Reject with an error that has no headers
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: {}
+                httpDetails: { response: {} }
             }));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect((e as errors.InvalidDeviceResponseCodeError).details.httpResponse?.headers).to.be.undefined;
+                expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers).to.be.undefined;
             }
 
-            // Reject with an error that has no httpResponse
+            // Reject with an error that has no httpDetails
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {}));
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
-                expect((e as errors.InvalidDeviceResponseCodeError).details.httpResponse).to.be.undefined;
+                expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails).to.be.undefined;
             }
 
             // Reject with an empty object (not a proper error)
@@ -640,9 +640,9 @@ describe('RokuDeploy', () => {
 
         it(`returns 'disabled' when response header had Roku in it`, async () => {
             const getDeviceInfoStub = sinon.stub(rokuDeploy, 'getDeviceInfo');
-            // Reject with an error that has details.httpResponse.headers.server = 'Roku'
+            // Reject with an error that has details.httpDetails.response.headers.server = 'Roku'
             getDeviceInfoStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
-                httpResponse: { headers: { server: 'Roku' } }
+                httpDetails: { response: { headers: { server: 'Roku' } } }
             }));
             expect(await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' })).to.equal('disabled');
         });
@@ -660,10 +660,10 @@ describe('RokuDeploy', () => {
             }
 
             // Test with various errors that don't have Roku in the server header - should throw UnknownDeviceResponseError
-            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpResponse: { headers: { server: 'Apache' } } }));
-            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpResponse: { headers: {} } }));
-            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpResponse: { headers: { server: null as any } } }));
-            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpResponse: {} }));
+            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpDetails: { response: { headers: { server: 'Apache' } } } }));
+            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpDetails: { response: { headers: {} } } }));
+            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpDetails: { response: { headers: { server: null as any } } } }));
+            await doTest(new errors.InvalidDeviceResponseCodeError('test', { httpDetails: { response: {} } }));
             await doTest(new errors.InvalidDeviceResponseCodeError('test', {}));
             await doTest({});
             await doTest(new Error('Network error'));
@@ -4109,14 +4109,14 @@ describe('RokuDeploy', () => {
     describe('isUpdateRequiredError', () => {
         it('returns true if the status code is 577', () => {
             expect(
-                rokuDeploy['isUpdateRequiredError']({ details: { httpResponse: { statusCode: 577 } } })
+                rokuDeploy['isUpdateRequiredError']({ details: { httpDetails: { response: { statusCode: 577 } } } })
             ).to.be.true;
         });
 
         it('returns true if the body is an update response from device', () => {
             const response = `<html>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"HandheldFriendly\" content=\"True\">\n  <title> Roku Development Kit </title>\n\n  <link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"css/global.css\" />\n</head>\n<body>\n  <div id=\"root\" style=\"background: #fff\">\n\n  </div>\n\n  <script type=\"text/javascript\" src=\"css/global.js\"></script>\n  <script type=\"text/javascript\">\n  \n      // Include core components and resounce bundle (needed)\n      Shell.resource.set(null, {\n          endpoints: {} \n      });\n      Shell.create('Roku.Event.Key');\n      Shell.create('Roku.Events.Resize');\n      Shell.create('Roku.Events.Scroll');  \n      // Create global navigation and render it\n      var nav = Shell.create('Roku.Nav')\n        .trigger('Enable standalone and utility mode - hide user menu, shopping cart, and etc.')\n        .trigger('Use compact footer')\n        .trigger('Hide footer')\n        .trigger('Render', document.getElementById('root'))\n        .trigger('Remove all feature links from header')\n\n      // Retrieve main content body node\n      var node = nav.invoke('Get main body section mounting node');\n      \n      // Create page container and page header\n      var container = Shell.create('Roku.Nav.Page.Standard').trigger('Render', node);\n      node = container.invoke('Get main body node');\n      container.invoke('Get headline node').innerHTML = 'Failed to check for software update';\n\t  // Cannot reach Software Update Server\n      node.innerHTML = '<p>Please make sure that your Roku device is connected to internet and running most recent software.</p> <p> After connecting to internet, go to system settings and check for software update.</p> ';\n\n      var hrDiv = document.createElement('div');\n      hrDiv.innerHTML = '<hr />';\n      node.appendChild(hrDiv);\n\n      var d = document.createElement('div');\n      d.innerHTML = '<br />';\n      node.appendChild(d);\n\n  </script>\n\n\n  <div style=\"display:none\">\n\n  <font color=\"red\">Please make sure that your Roku device is connected to internet, and running most recent software version (d=953108)</font>\n\n  </div>\n\n</body>\n</html>\n`;
             expect(
-                rokuDeploy['isUpdateRequiredError']({ details: { httpResponse: { statusCode: 500, body: response } } })
+                rokuDeploy['isUpdateRequiredError']({ details: { httpDetails: { response: { statusCode: 500, body: response } } } })
             ).to.be.true;
         });
 
@@ -4126,7 +4126,7 @@ describe('RokuDeploy', () => {
             ).to.be.false;
         });
 
-        it('returns false on missing httpResponse', () => {
+        it('returns false on missing httpDetails', () => {
             expect(
                 rokuDeploy['isUpdateRequiredError']({ details: {} })
             ).to.be.false;
@@ -4134,13 +4134,13 @@ describe('RokuDeploy', () => {
 
         it('returns false on missing status code', () => {
             expect(
-                rokuDeploy['isUpdateRequiredError']({ details: { httpResponse: {} } })
+                rokuDeploy['isUpdateRequiredError']({ details: { httpDetails: { response: {} } } })
             ).to.be.false;
         });
 
         it('returns false on non-string missing body', () => {
             expect(
-                rokuDeploy['isUpdateRequiredError']({ details: { httpResponse: { statusCode: 500, body: false } } })
+                rokuDeploy['isUpdateRequiredError']({ details: { httpDetails: { response: { statusCode: 500, body: false } } } })
             ).to.be.false;
         });
     });
