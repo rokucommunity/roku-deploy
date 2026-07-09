@@ -3694,7 +3694,7 @@ describe('RokuDeploy', () => {
             it('uses constructor host when not provided in call', async () => {
                 const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<img src="pkgs/dev.jpg?time=1234">' });
-                sinon.stub(rd as any, 'downloadFile').resolves('screenshot.jpg');
+                sinon.stub(rd as any, 'downloadToBuffer').resolves(Buffer.from('test'));
                 await rd.captureScreenshot({} as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
@@ -3702,7 +3702,7 @@ describe('RokuDeploy', () => {
             it('call host overrides constructor host', async () => {
                 const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<img src="pkgs/dev.jpg?time=1234">' });
-                sinon.stub(rd as any, 'downloadFile').resolves('screenshot.jpg');
+                sinon.stub(rd as any, 'downloadToBuffer').resolves(Buffer.from('test'));
                 await rd.captureScreenshot({ host: 'call-host' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
