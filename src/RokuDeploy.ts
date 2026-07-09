@@ -1,8 +1,7 @@
 import * as path from 'path';
 import * as _fsExtra from 'fs-extra';
-import * as r from 'postman-request';
-import type * as requestType from 'request';
-const request = r as typeof requestType;
+import { request } from './request';
+import type { RequestOptions } from './request';
 import * as JSZip from 'jszip';
 import * as errors from './Errors';
 import * as isGlob from 'is-glob';
@@ -89,7 +88,7 @@ export class RokuDeploy {
      * @param files
      */
     public normalizeFilesArray(files: FileEntry[]) {
-        const result: Array<string | StandardizedFileEntry> = [];
+        const result: Array<StandardizedFileEntry | string> = [];
 
         for (let i = 0; i < files.length; i++) {
             let entry = files[i];
@@ -332,7 +331,7 @@ export class RokuDeploy {
      * @param pattern the glob pattern originally used to find this file
      * @param rootDir absolute normalized path to the rootDir
      */
-    private computeFileDestPath(srcPath: string, entry: string | StandardizedFileEntry, rootDir: string) {
+    private computeFileDestPath(srcPath: string, entry: StandardizedFileEntry | string, rootDir: string) {
         let result: string;
         let globstarIdx: number;
         //files under rootDir with no specified dest
@@ -427,7 +426,7 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): requestType.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: RokuDeployOptions, formData = {} as T): RequestOptions {
         options = this.getOptions(options);
         let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
@@ -747,21 +746,14 @@ export class RokuDeploy {
     }
 
     /**
-     * Set the `User-Agent` header if missing from the request params, ensuring it's included in all requests made by roku-deploy
+     * Set the `User-Agent` header (in place) if missing from the request params, ensuring it's included
+     * in all requests made by roku-deploy. Mutates `params.headers` because callers pass the same object
+     * straight on to `request.post`/`request.get`.
      * @param params
-     * @returns
      */
-    private setUserAgentIfMissing(params: requestType.OptionsWithUrl) {
-        if (!params) {
-            params = {} as requestType.OptionsWithUrl;
-        }
-        if (!params.headers) {
-            params.headers = {};
-        }
-        if (!params.headers['User-Agent']) {
-            params.headers['User-Agent'] = this.getUserAgent();
-        }
-        return params;
+    private setUserAgentIfMissing(params: RequestOptions) {
+        params.headers ??= {};
+        params.headers['User-Agent'] ??= this.getUserAgent();
     }
 
     /**
@@ -785,7 +777,7 @@ export class RokuDeploy {
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
+    private async doPostRequest(params: RequestOptions, verify = true) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -807,7 +799,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: requestType.OptionsWithUrl) {
+    private async doGetRequest(params: RequestOptions) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -1037,8 +1029,8 @@ export class RokuDeploy {
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      */
     public async takeScreenshot(options: TakeScreenshotOptions) {
-        options.outDir = options.outDir ?? this.screenshotDir;
-        options.outFile = options.outFile ?? `screenshot-${formatTimestampForScreenshot()}`;
+        options.outDir ??= this.screenshotDir;
+        options.outFile ??= `screenshot-${formatTimestampForScreenshot()}`;
         let saveFilePath: string;
 
         // Ask for the device to make an image
@@ -1275,8 +1267,8 @@ export class RokuDeploy {
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
      */
-    public async getDeviceInfo(options?: { enhance: true } & GetDeviceInfoOptions): Promise<DeviceInfo>;
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>
+    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = this.getOptions(options) as any;
 
@@ -1525,14 +1517,17 @@ export interface ManifestData {
 }
 
 export interface BeforeZipCallbackInfo {
+
     /**
      * Contains an associative array of the parsed values in the manifest
      */
     manifestData: ManifestData;
+
     /**
      * @deprecated since 3.9.0. use `stagingDir` instead
      */
     stagingFolderPath: string;
+
     /**
      * The directory where the files were staged
      */
@@ -1540,10 +1535,12 @@ export interface BeforeZipCallbackInfo {
 }
 
 export interface StandardizedFileEntry {
+
     /**
      * The full path to the source file
      */
     src: string;
+
     /**
      * The path relative to the root of the pkg to where the file should be placed
      */
@@ -1587,6 +1584,7 @@ export interface HttpResponse {
 }
 
 export interface TakeScreenshotOptions {
+
     /**
      * The IP address or hostname of the target Roku device.
      * @example '192.168.1.21'
@@ -1612,31 +1610,40 @@ export interface TakeScreenshotOptions {
 }
 
 export interface ValidateDeveloperPasswordOptions {
+
     /** The hostname or IP of the Roku device */
     host: string;
+
     /** The developer password to check */
     password: string;
+
     /** Defaults to `'rokudev'` */
     username?: string;
+
     /** Defaults to `80` (the developer web-server port) */
     port?: number;
+
     /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
     timeout?: number;
 }
 
 export interface GetDeviceInfoOptions {
+
     /**
      * The hostname or IP address to use for the device-info URL
      */
     host: string;
+
     /**
      * The port to use to send the device-info request (defaults to the standard 8060 ECP port)
      */
     remotePort?: number;
+
     /**
      * The number of milliseconds at which point this request should timeout and return a rejected promise
      */
     timeout?: number;
+
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
      * @default false
@@ -1644,4 +1651,4 @@ export interface GetDeviceInfoOptions {
     enhance?: boolean;
 }
 
-export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';
+export type EcpNetworkAccessMode = 'disabled' | 'enabled' | 'limited' | 'permissive';
