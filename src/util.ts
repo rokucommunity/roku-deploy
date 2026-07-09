@@ -6,11 +6,10 @@ import * as crypto from 'crypto';
 import * as micromatch from 'micromatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
-import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { FileEntry } from './RokuDeployOptions';
 import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
-import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 
 export class Util {
     //Map<filesystem root path, is case-sensitive>
@@ -505,38 +504,6 @@ export class Util {
         }
 
         return table.join('\n');
-    }
-
-    /**
-     * A function to fill in any missing arguments with JSON values
-     * Only run when CLI commands are used
-     */
-    public getOptionsFromJson(options?: { cwd?: string; configPath?: string }) {
-        let fileOptions: RokuDeployOptions = {};
-        const cwd = options?.cwd ?? process.cwd();
-        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
-
-        if (fsExtra.existsSync(configPath)) {
-            let configFileText = fsExtra.readFileSync(configPath).toString();
-            let parseErrors = [] as ParseError[];
-            fileOptions = parseJsonc(configFileText, parseErrors, {
-                allowEmptyContent: true,
-                allowTrailingComma: true,
-                disallowComments: false
-            });
-            if (parseErrors.length > 0) {
-                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
-                    parseErrors.map(x => {
-                        return {
-                            message: printParseErrorCode(x.error),
-                            offset: x.offset,
-                            length: x.length
-                        };
-                    })
-                ));
-            }
-        }
-        return fileOptions;
     }
 }
 

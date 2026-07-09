@@ -7,10 +7,10 @@ const request = r;
 import * as JSZip from 'jszip';
 import * as errors from './Errors';
 import * as xml2js from 'xml2js';
-import { parse as parseJsonc } from 'jsonc-parser';
+import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { FileEntry } from './RokuDeployOptions';
-import { logger, type LogLevel } from '@rokucommunity/logger';
+import type { FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import { logger } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
@@ -30,11 +30,63 @@ export class RokuDeploy {
     };
 
     /**
+     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     */
+    public loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
+        const cwd = options?.cwd ?? process.cwd();
+        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
+
+        if (fsExtra.existsSync(configPath)) {
+            const configFileText = fsExtra.readFileSync(configPath).toString();
+            const parseErrors: ParseError[] = [];
+            const fileOptions = parseJsonc(configFileText, parseErrors, {
+                allowEmptyContent: true,
+                allowTrailingComma: true,
+                disallowComments: false
+            });
+            if (parseErrors.length > 0) {
+                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                    parseErrors.map(x => {
+                        return {
+                            message: printParseErrorCode(x.error),
+                            offset: x.offset,
+                            length: x.length
+                        };
+                    })
+                ));
+            }
+            return fileOptions;
+        }
+        return {};
+    }
+
+    /**
+     * Instance-level default options merged into every method call
+     */
+    private readonly options: RokuDeployConstructorOptions;
+
+    /**
+     * The logger instance for this RokuDeploy instance
+     */
+    public readonly logger: typeof logger;
+
+    /**
+     * Create a new RokuDeploy instance with optional default options
+     */
+    constructor(options?: RokuDeployConstructorOptions) {
+        this.options = options ?? {};
+
+        // Use custom logger if provided, otherwise use global logger
+        this.logger = this.options.logger ?? logger;
+    }
+
+    /**
      * Copies all of the referenced files to the staging folder
      * @param options
      */
     public async stage(options: StageOptions) {
-        logger.info('Beginning to copy files to staging folder');
+        options = { ...this.options, ...options };
+        this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
 
         // Set defaults and resolve paths
@@ -73,7 +125,7 @@ export class RokuDeploy {
                 });
             }, 10);
         }));
-        logger.info('Relevant files copied to:', out);
+        this.logger.info('Relevant files copied to:', out);
         return out;
     }
 
@@ -81,7 +133,8 @@ export class RokuDeploy {
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zip(options: ZipOptions): Promise<string> {
+    public async zip(options: ZipOptions) {
+        options = { ...this.options, ...options };
         logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
 
@@ -111,8 +164,10 @@ export class RokuDeploy {
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
         }
+      
+        //create a zip of the folder
         await this.makeZip(dir, out, files);
-        logger.info('Zip created at:', out);
+        this.logger.info('Zip created at:', out);
         return out;
     }
 
@@ -157,6 +212,7 @@ export class RokuDeploy {
     * Get all file paths for the specified options
     */
     public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
+        options = { ...this.options, ...options } as GetFilePathsOptions;
         let rootDir = options.rootDir;
         const files = options.files;
 
@@ -198,18 +254,20 @@ export class RokuDeploy {
     }
 
     private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
+        // Merge constructor options with call options
+        const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
-        const packagePort = options.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-        const username = options.username ?? 'rokudev';
+        const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
+        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const username = mergedOptions.username ?? 'rokudev';
 
-        let url = `http://${options.host}:${packagePort}/${requestPath}`;
+        let url = `http://${mergedOptions.host}:${packagePort}/${requestPath}`;
         let baseRequestOptions = {
             url: url,
             timeout: timeout,
             auth: {
                 user: username,
-                pass: options.password,
+                pass: mergedOptions.password,
                 sendImmediately: false
             },
             formData: formData,
@@ -219,6 +277,7 @@ export class RokuDeploy {
     }
 
     public async keyPress(options: KeyPressOptions) {
+        options = { ...this.options, ...options } as KeyPressOptions;
         return this.sendKeyEvent({
             ...options,
             key: options.key,
@@ -227,6 +286,7 @@ export class RokuDeploy {
     }
 
     public async keyUp(options: KeyUpOptions) {
+        options = { ...this.options, ...options } as KeyUpOptions;
         return this.sendKeyEvent({
             ...options,
             action: 'keyup'
@@ -234,6 +294,7 @@ export class RokuDeploy {
     }
 
     public async keyDown(options: KeyDownOptions) {
+        options = { ...this.options, ...options } as KeyDownOptions;
         return this.sendKeyEvent({
             ...options,
             action: 'keydown'
@@ -241,6 +302,7 @@ export class RokuDeploy {
     }
 
     public async sendText(options: SendTextOptions) {
+        options = { ...this.options, ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['host', 'text']);
         const chars = options.text.split('');
         for (const char of chars) {
@@ -257,7 +319,8 @@ export class RokuDeploy {
      * This makes the roku return to the home screen
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
-        logger.info('Sending key event:', options.key);
+        options = { ...this.options, ...options } as SendKeyEventOptions;
+        this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
         // Set defaults
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
@@ -270,6 +333,7 @@ export class RokuDeploy {
     }
 
     public async closeChannel(options: CloseChannelOptions) {
+        options = { ...this.options, ...options } as CloseChannelOptions;
         // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
         await this.sendKeyEvent({
             ...options,
@@ -284,7 +348,8 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
-        logger.info('Beginning to sideload package');
+        options = { ...this.options, ...options } as SideloadOptions;
+        this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
 
         const cwd = options.cwd ?? process.cwd();
@@ -402,7 +467,7 @@ export class RokuDeploy {
             if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
-            logger.info('Successful sideload');
+            this.logger.info('Successful sideload');
             return { message: 'Successful sideload', results: response };
         } finally {
             //delete the zip file if we generated it from rootDir
@@ -413,7 +478,7 @@ export class RokuDeploy {
             try {
                 readStream?.close();
             } catch (e) {
-                logger.warn('Error closing read stream', e);
+                this.logger.warn('Error closing read stream', e);
             }
         }
     }
@@ -444,6 +509,7 @@ export class RokuDeploy {
      * @param options
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+        options = { ...this.options, ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
             archive: '',
@@ -464,7 +530,7 @@ export class RokuDeploy {
                         return results;
                     }
                 } catch (e) {
-                    logger.warn('Error converting to squashfs:', error);
+                    this.logger.warn('Error converting to squashfs:', error);
                     throw error;
                 }
             } else {
@@ -481,6 +547,7 @@ export class RokuDeploy {
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
+        options = { ...this.options, ...options } as RekeyDeviceOptions;
         this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
         const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
@@ -528,7 +595,8 @@ export class RokuDeploy {
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
-        logger.info('Creating signed package');
+        options = { ...this.options, ...options } as CreateSignedPackageOptions;
+        this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
         const cwd = options.cwd ?? process.cwd();
 
@@ -598,7 +666,7 @@ export class RokuDeploy {
             const url = pkgSearchMatches[1];
             let requestOptions2 = this.generateBaseRequestOptions(url, options);
             await this.downloadFile(requestOptions2, out);
-            logger.info('Signed package created at:', out);
+            this.logger.info('Signed package created at:', out);
             return out;
         }
 
@@ -645,7 +713,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
-        logger.info('handling POST request to', params.url);
+        this.logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -668,7 +736,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: requestType.OptionsWithUrl) {
-        logger.info('handling GET request to', params.url);
+        this.logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -819,7 +887,8 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
-        logger.info('Deleting dev channel...');
+        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['host', 'password']);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -834,6 +903,7 @@ export class RokuDeploy {
      * Delete the component library with the specified filename from the device
      */
     public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
+        options = { ...this.options, ...options } as { host: string; password: string; fileName: string; username?: string };
         this.checkRequiredOptions(options, ['host', 'password', 'fileName']);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -852,6 +922,7 @@ export class RokuDeploy {
      * Delete all component libraries from the device
      */
     public async deleteAllComponentLibraries(options: { host: string; password: string; username?: string }) {
+        options = { ...this.options, ...options } as { host: string; password: string; username?: string };
         const packages = await this.getInstalledPackages(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
@@ -867,6 +938,7 @@ export class RokuDeploy {
      * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
      */
     private async getInstalledPackages(options: { host: string; password: string; username?: string }): Promise<RokuPackage[]> {
+        options = { ...this.options, ...options } as { host: string; password: string; username?: string };
         this.checkRequiredOptions(options, ['host', 'password']);
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.qs ??= {};
@@ -881,7 +953,9 @@ export class RokuDeploy {
      * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
      * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
      */
+
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
+        options = { ...this.options, ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Ask for the device to make an image
@@ -1018,6 +1092,7 @@ export class RokuDeploy {
     public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        options = { ...this.options, ...options } as GetDeviceInfoOptions;
         this.checkRequiredOptions(options, ['host']);
 
         // Set defaults
@@ -1063,10 +1138,10 @@ export class RokuDeploy {
                 }
                 deviceInfo = result;
             }
-            logger.debug('Device info:', deviceInfo);
+            this.logger.debug('Device info:', deviceInfo);
             return deviceInfo;
         } catch (e) {
-            logger.warn('Error getting device info:', e);
+            this.logger.warn('Error getting device info:', e);
             throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
         }
     }
@@ -1083,6 +1158,7 @@ export class RokuDeploy {
      *   - 'permissive': Full access for internal networks
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
+        options = { ...this.options, ...options } as GetDeviceInfoOptions;
         try {
             const deviceInfo = await this.getDeviceInfo(options);
             return deviceInfo['ecp-setting-mode'];
@@ -1120,9 +1196,10 @@ export class RokuDeploy {
      * @returns
      */
     public async getDevId(options?: GetDevIdOptions) {
+        options = { ...this.options, ...options } as GetDevIdOptions;
         this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
-        logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
+        this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
         return deviceInfo['keyed-developer-id'];
     }
 
@@ -1153,6 +1230,7 @@ export class RokuDeploy {
     }
 
     public async rebootDevice(options: RebootDeviceOptions) {
+        options = { ...this.options, ...options } as RebootDeviceOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
@@ -1174,6 +1252,7 @@ export class RokuDeploy {
     }
 
     public async checkForUpdate(options: CheckForUpdateOptions) {
+        options = { ...this.options, ...options } as CheckForUpdateOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
 
         // Get device info to check software version
@@ -1385,7 +1464,6 @@ export interface BaseRequestOptions {
     password: string;
     packagePort?: number;
     timeout?: number;
-    logLevel?: LogLevel;
 }
 
 export interface BaseEcpOptions {

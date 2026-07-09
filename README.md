@@ -53,14 +53,12 @@ sample rokudeploy.json
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
 ### JavaScript functions don't load config files from disk
-In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `util.getOptionsFromJson` before calling the desired rokuDeploy function. This will default to load from `rokudeploy.json`. Here's an example:
+In v3, files like `roku-deploy.json` and `bsconfig.json` would be loaded anytime a rokuDeploy function was called through the NodeJS api. This functionality has been removed in v4 so that developers have more control over when the config files are loaded. If your script needs to load the config file values, you can simply call `RokuDeploy.loadOptionsFromJson` before calling the desired rokuDeploy function. This will default to load from `rokudeploy.json`. Here's an example:
 
 ```javascript
 const config = {
-    //get the default options
-    ...rokuDeploy.getOptions(),
-    //override with any values found in the `rokudeploy.json` file. You can specify current working directory here.
-    ...util.getOptionsFromJson({ cwd: process.cwd() })
+    //load options from the `rokudeploy.json` file. You can specify current working directory here.
+    ...RokuDeploy.loadOptionsFromJson({ cwd: process.cwd() })
 };
 await rokuDeploy.sideload(config);
 ```
@@ -70,10 +68,8 @@ We've removed support for loading `bsconfig.json` files. This was introduced in 
 
 ```javascript
 const config = {
-    //get the default options
-    ...rokuDeploy.getOptions(),
-    //override with any values found in config file
-    ...util.getOptionsFromJson({ configPath: './bsconfig.json' })
+    //load options from a custom config file
+    ...RokuDeploy.loadOptionsFromJson({ configPath: './bsconfig.json' })
 };
 //call some rokuDeploy function
 await rokuDeploy.sideload(config);
@@ -623,10 +619,6 @@ Here are the available options for customizing to your developer-specific workfl
 
 - **packageUploadOverrides?:**
     Overrides for values used during the zip upload process. You probably don't need to change these...
-
-- **logLevel?:** string = `"error"`
-    The level lof logging information printed in the console. You can read more information [here](https://github.com/rokucommunity/logger)
-
 
 Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployOptions.ts) to see the typescript interface for these options
 
