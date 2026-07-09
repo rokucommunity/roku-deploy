@@ -7,9 +7,9 @@ const request = r;
 import * as JSZip from 'jszip';
 import * as errors from './Errors';
 import * as xml2js from 'xml2js';
-import { parse as parseJsonc } from 'jsonc-parser';
+import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { logger } from '@rokucommunity/logger';
 import * as dayjs from 'dayjs';
 import * as lodash from 'lodash';
@@ -28,6 +28,37 @@ export class RokuDeploy {
         outDir: './out',
         outFile: 'roku-deploy.zip'
     };
+
+    /**
+     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     */
+    public loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
+        const cwd = options?.cwd ?? process.cwd();
+        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
+
+        if (fsExtra.existsSync(configPath)) {
+            const configFileText = fsExtra.readFileSync(configPath).toString();
+            const parseErrors: ParseError[] = [];
+            const fileOptions = parseJsonc(configFileText, parseErrors, {
+                allowEmptyContent: true,
+                allowTrailingComma: true,
+                disallowComments: false
+            });
+            if (parseErrors.length > 0) {
+                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                    parseErrors.map(x => {
+                        return {
+                            message: printParseErrorCode(x.error),
+                            offset: x.offset,
+                            length: x.length
+                        };
+                    })
+                ));
+            }
+            return fileOptions;
+        }
+        return {};
+    }
 
     /**
      * Instance-level default options merged into every method call

@@ -4953,6 +4953,78 @@ describe('RokuDeploy', () => {
 
         });
 
+        describe('loadConfigFile', () => {
+            it('should fill in options from rokudeploy.json', () => {
+                fsExtra.outputJsonSync(s`${rootDir}/rokudeploy.json`, { password: 'password' });
+                expect(
+                    rokuDeploy.loadConfigFile({ cwd: rootDir })
+                ).to.eql({
+                    password: 'password'
+                });
+            });
+
+            it('loads cwd from process', () => {
+                try {
+                    fsExtra.outputJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+                    expect(
+                        rokuDeploy.loadConfigFile()
+                    ).to.eql({
+                        host: '1.2.3.4'
+                    });
+                } finally {
+                    fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
+                }
+            });
+
+            it('catches invalid json with jsonc parser', () => {
+                fsExtra.writeJsonSync(s`${process.cwd()}/rokudeploy.json`, { host: '1.2.3.4' });
+                sinon.stub(fsExtra, 'readFileSync').returns(`
+                    {
+                        "rootDir": "src"
+                `);
+                let ex;
+                try {
+                    rokuDeploy.loadConfigFile();
+                } catch (e) {
+                    ex = e;
+                }
+                expect(ex).to.exist;
+                expect(ex.message.startsWith('Error parsing')).to.be.true;
+                fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
+            });
+
+            it('works when loading stagingDir from rokudeploy.json', () => {
+                sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                    return true;
+                });
+                sinon.stub(fsExtra, 'readFileSync').returns(`
+                    {
+                        "stagingDir": "./staging-dir"
+                    }
+                `);
+                let loadedOptions = rokuDeploy.loadConfigFile();
+                expect(loadedOptions.stagingDir.endsWith('staging-dir')).to.be.true;
+            });
+
+            it('supports jsonc for rokudeploy.json', () => {
+                fsExtra.writeFileSync(s`${tempDir}/rokudeploy.json`, `
+                    //leading comment
+                    {
+                        //inner comment
+                        "rootDir": "src" //trailing comment
+                    }
+                    //trailing comment
+                `);
+                let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(loadedOptions.rootDir).to.equal('src');
+            });
+
+            it('returns empty object when config file does not exist', () => {
+                const result = rokuDeploy.loadConfigFile({ cwd: '/nonexistent/path' });
+                expect(result).to.eql({});
+            });
+        });
+
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', () => {
                 const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });

@@ -6,7 +6,7 @@ export class RekeyDeviceCommand {
         args.cwd ??= process.cwd();
 
         let options = {
-            ...util.getOptionsFromJson(args),
+            ...rokuDeploy.loadConfigFile(args),
             ...args
         };
         if (args.pkg) {
