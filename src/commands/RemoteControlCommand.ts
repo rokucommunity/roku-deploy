@@ -1,11 +1,11 @@
 import * as readline from 'readline';
 import type { RokuKey } from '../index';
-import { rokuDeploy, RokuDeploy } from '../index';
+import { rokuDeploy } from '../index';
 
 export class RemoteControlCommand {
     run(args) {
         let options = {
-            ...RokuDeploy.loadConfigFile(args),
+            ...rokuDeploy.loadConfigFile(args),
             ...args
         };
 

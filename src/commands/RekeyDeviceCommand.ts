@@ -1,4 +1,4 @@
-import { rokuDeploy, RokuDeploy, util } from '../index';
+import { rokuDeploy, util } from '../index';
 import * as path from 'path';
 
 export class RekeyDeviceCommand {
@@ -6,7 +6,7 @@ export class RekeyDeviceCommand {
         args.cwd ??= process.cwd();
 
         let options = {
-            ...RokuDeploy.loadConfigFile(args),
+            ...rokuDeploy.loadConfigFile(args),
             ...args
         };
         if (args.pkg) {

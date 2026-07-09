@@ -1,9 +1,9 @@
-import { rokuDeploy, RokuDeploy, util } from '../index';
+import { rokuDeploy, util } from '../index';
 
 export class GetDeviceInfoCommand {
     async run(args) {
         let options = {
-            ...RokuDeploy.loadConfigFile(args),
+            ...rokuDeploy.loadConfigFile(args),
             ...args
         };
         const outputPath = await rokuDeploy.getDeviceInfo(options);

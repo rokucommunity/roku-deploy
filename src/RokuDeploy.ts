@@ -32,7 +32,7 @@ export class RokuDeploy {
     /**
      * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
      */
-    public static loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
+    public loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
