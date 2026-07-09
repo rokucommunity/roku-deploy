@@ -148,7 +148,7 @@ describe('cli', function cli() {
 
     it('Takes a screenshot', async () => {
         const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
-            return Promise.resolve('');
+            return Promise.resolve({ buffer: Buffer.from(''), filePath: '' });
         });
 
         const command = new CaptureScreenshotCommand();
