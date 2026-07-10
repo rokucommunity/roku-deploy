@@ -7,7 +7,8 @@ import * as semver from 'semver';
 import * as dotenv from 'dotenv';
 import * as rokuDeploy from './index';
 import * as errors from './Errors';
-import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, tempDir, writeFiles } from './testUtils.spec';
+import { expect } from 'chai';
+import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
@@ -107,6 +108,92 @@ describe('device', function device() {
     });
 
     this.timeout(20000);
+
+    /**
+     * Ask the device for the list of currently-installed packages (channels and component libraries).
+     * `getInstalledPackages` is a private method, so we access it via bracket notation.
+     */
+    async function getInstalledPackages() {
+        return rokuDeploy.rokuDeploy['getInstalledPackages']({
+            host: options.host,
+            password: options.password
+        });
+    }
+
+    function countByType(packages: Array<{ appType: string }>) {
+        return {
+            channels: packages.filter(x => x.appType === 'channel').length,
+            complibs: packages.filter(x => x.appType === 'dcl').length
+        };
+    }
+
+    /**
+     * Return the archiveFileNames of only the installed component libraries (DCLs)
+     */
+    async function getInstalledComponentLibraryFileNames() {
+        const packages = await getInstalledPackages();
+        return packages.filter(x => x.appType === 'dcl').map(x => x.archiveFileName);
+    }
+
+    /**
+     * Build and sideload a channel onto the device
+     */
+    async function installChannel() {
+        await rokuDeploy.rokuDeploy.deploy({
+            ...options,
+            appType: 'channel',
+            outFile: 'channel'
+        });
+    }
+
+    /**
+     * Build and sideload a component library onto the device. Each complib gets a unique
+     * name so they end up as distinct packages on the device.
+     */
+    async function installComponentLibrary(name: string) {
+        //a component library needs its own root dir with a manifest that declares the lib it provides
+        const libRootDir = `${tempDir}/${name}`;
+        writeFiles(libRootDir, [
+            ['manifest', undent`
+                title=${name}
+                major_version=1
+                minor_version=0
+                build_version=0
+                sg_component_libs_provided=${name}
+            `],
+            [`components/${name}.xml`, undent`
+                <?xml version="1.0" encoding="utf-8" ?>
+                <component name="${name}" extends="Group">
+                    <children>
+                        <Rectangle width="100" height="100" color="0xFF0000FF" />
+                    </children>
+                    <interface>
+                        <field id="exampleField" type="string" />
+                    </interface>
+                    <script uri="${name}.brs" />
+                </component>
+            `],
+            [`components/${name}.brs`, undent`
+                function init()
+                    print "init ${name}"
+                end function
+            `]
+        ]);
+
+        await rokuDeploy.rokuDeploy.createPackage({
+            ...options,
+            rootDir: libRootDir,
+            stagingDir: `${stagingDir}-${name}`,
+            outDir: outDir,
+            outFile: name
+        });
+        await rokuDeploy.rokuDeploy.publish({
+            ...options,
+            appType: 'dcl',
+            outDir: outDir,
+            outFile: name
+        });
+    }
 
     describe('deploy', () => {
         it('works', async () => {
@@ -323,6 +410,183 @@ describe('device', function device() {
                     `expected UnsupportedFirmwareVersionError, got ${thrown?.constructor?.name}: ${thrown?.message}`
                 );
             }
+        });
+    });
+
+    describe('deleteAll', function deleteAllTests() {
+        //these tests do several device round-trips (install + verify + delete), so give them extra time
+        this.timeout(60_000);
+
+        it('deletes a single channel', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installChannel();
+
+            //the channel should now be installed
+            expect(countByType(await getInstalledPackages())).to.eql({
+                channels: 1,
+                complibs: 0
+            });
+
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            //nothing should be installed anymore
+            expect(await getInstalledPackages()).to.eql([]);
+        });
+
+        it('deletes a single component library', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installComponentLibrary('complib1');
+
+            //the complib should now be installed
+            expect(countByType(await getInstalledPackages())).to.eql({
+                channels: 0,
+                complibs: 1
+            });
+
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            //nothing should be installed anymore
+            expect(await getInstalledPackages()).to.eql([]);
+        });
+
+        it('deletes a channel and a component library together', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installChannel();
+            await installComponentLibrary('complib1');
+
+            //both should now be installed
+            expect(countByType(await getInstalledPackages())).to.eql({
+                channels: 1,
+                complibs: 1
+            });
+
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            //nothing should be installed anymore
+            expect(await getInstalledPackages()).to.eql([]);
+        });
+
+        it('deletes a channel and two component libraries together', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installChannel();
+            await installComponentLibrary('complib1');
+            await installComponentLibrary('complib2');
+
+            //all three should now be installed
+            expect(countByType(await getInstalledPackages())).to.eql({
+                channels: 1,
+                complibs: 2
+            });
+
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            //nothing should be installed anymore
+            expect(await getInstalledPackages()).to.eql([]);
+        });
+    });
+
+    describe('deleteComponentLibrary', function deleteComponentLibraryTests() {
+        //these tests install several complibs and then delete them one at a time, so give them extra time
+        this.timeout(120_000);
+
+        it('deletes several component libraries one by one', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installComponentLibrary('complib1');
+            await installComponentLibrary('complib2');
+            await installComponentLibrary('complib3');
+
+            //all three complibs should now be installed
+            const fileNames = await getInstalledComponentLibraryFileNames();
+            expect(fileNames).to.have.lengthOf(3);
+
+            //delete them one at a time, verifying after each delete that the targeted complib is gone
+            //and that the count drops by exactly one (the others are left intact)
+            let expectedRemaining = fileNames.length;
+            for (const target of fileNames) {
+                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                    host: options.host,
+                    password: options.password,
+                    fileName: target
+                });
+                expectedRemaining--;
+
+                const afterDelete = await getInstalledComponentLibraryFileNames();
+                //the deleted complib should no longer be present...
+                expect(afterDelete).to.not.include(target);
+                //...and exactly one fewer complib should remain
+                expect(afterDelete).to.have.lengthOf(expectedRemaining);
+            }
+
+            //everything should be gone now
+            expect(await getInstalledComponentLibraryFileNames()).to.eql([]);
+        });
+
+        it('leaves other component libraries intact when deleting one', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            await installComponentLibrary('complib1');
+            await installComponentLibrary('complib2');
+
+            const fileNames = await getInstalledComponentLibraryFileNames();
+            expect(fileNames).to.have.lengthOf(2);
+
+            //delete just the first complib
+            const [toDelete, toKeep] = fileNames;
+            await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                host: options.host,
+                password: options.password,
+                fileName: toDelete
+            });
+
+            //only the second complib should remain
+            expect(await getInstalledComponentLibraryFileNames()).to.eql([toKeep]);
+
+            //clean up
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+        });
+
+        it('deletes a component library without affecting an installed channel', async () => {
+            //start clean
+            await rokuDeploy.rokuDeploy.deleteAll(options);
+
+            //install a channel alongside the complibs
+            await rokuDeploy.rokuDeploy.deploy({
+                ...options,
+                appType: 'channel',
+                outFile: 'channel'
+            });
+            await installComponentLibrary('complib1');
+            await installComponentLibrary('complib2');
+
+            expect(await getInstalledComponentLibraryFileNames()).to.have.lengthOf(2);
+
+            //delete the complibs one by one
+            for (const fileName of await getInstalledComponentLibraryFileNames()) {
+                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                    host: options.host,
+                    password: options.password,
+                    fileName: fileName
+                });
+            }
+
+            //all complibs gone, but the channel should still be installed
+            const packages = await getInstalledPackages();
+            expect(packages.filter(x => x.appType === 'dcl')).to.eql([]);
+            expect(packages.filter(x => x.appType === 'channel')).to.have.lengthOf(1);
+
+            //clean up
+            await rokuDeploy.rokuDeploy.deleteAll(options);
         });
     });
 });

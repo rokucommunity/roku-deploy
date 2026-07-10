@@ -979,6 +979,21 @@ export class RokuDeploy {
     }
 
     /**
+     * Deletes any installed dev channel, and any installed component libraries on the target Roku device
+     * @param options
+     */
+    public async deleteAll(options?: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'DeleteAll',
+            archive: ''
+        };
+        return this.doPostRequest(deleteOptions);
+    }
+
+    /**
      * Delete the component library with the specified filename from the device
      */
     public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
