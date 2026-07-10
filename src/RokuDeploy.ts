@@ -982,7 +982,7 @@ export class RokuDeploy {
      * Deletes any installed dev channel, and any installed component libraries on the target Roku device
      * @param options
      */
-    public async deleteAll(options?: RokuDeployOptions) {
+    public async deleteAllSideloadedPlugins(options?: RokuDeployOptions) {
         options = this.getOptions(options);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -1014,8 +1014,8 @@ export class RokuDeploy {
     /**
      * Delete all component libraries from the device
      */
-    public async deleteAllComponentLibraries(options: ListInstalledPackagesOptions) {
-        const packages = await this.listInstalledPackages(options);
+    public async deleteAllComponentLibraries(options: ListSideloadedPluginsOptions) {
+        const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
                 await this.deleteComponentLibrary({
@@ -1029,7 +1029,7 @@ export class RokuDeploy {
     /**
      * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
      */
-    public async listInstalledPackages(options: ListInstalledPackagesOptions): Promise<RokuPackage[]> {
+    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPackage[]> {
         options = this.getOptions(options) as any;
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.qs ??= {};
@@ -1579,7 +1579,7 @@ export interface RokuPackage {
     size: string;
 }
 
-export interface ListInstalledPackagesOptions {
+export interface ListSideloadedPluginsOptions {
 
     /**
      * The IP address or hostname of the target Roku device.

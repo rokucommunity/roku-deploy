@@ -21,7 +21,7 @@ let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
 let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDeploy);
-let listInstalledPackages = RokuDeploy.prototype.listInstalledPackages.bind(rokuDeploy);
+let listSideloadedPlugins = RokuDeploy.prototype.listSideloadedPlugins.bind(rokuDeploy);
 let normalizeFilesArray = RokuDeploy.prototype.normalizeFilesArray.bind(rokuDeploy);
 let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let parseManifest = RokuDeploy.prototype.parseManifest.bind(rokuDeploy);
@@ -48,7 +48,7 @@ export {
     getOptions,
     getOutputPkgFilePath,
     getOutputZipFilePath,
-    listInstalledPackages,
+    listSideloadedPlugins,
     normalizeFilesArray,
     normalizeRootDir,
     parseManifest,

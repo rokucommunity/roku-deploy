@@ -120,7 +120,7 @@ describe('device', function device() {
      * Return the archiveFileNames of only the installed component libraries (DCLs)
      */
     async function getInstalledComponentLibraryFileNames() {
-        const packages = await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password });
+        const packages = await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password });
         return packages.filter(x => x.appType === 'dcl').map(x => x.archiveFileName);
     }
 
@@ -408,77 +408,77 @@ describe('device', function device() {
 
         it('deletes a single channel', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installChannel();
 
             //the channel should now be installed
-            expect(countByType(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 0
             });
 
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
         });
 
         it('deletes a single component library', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installComponentLibrary('complib1');
 
             //the complib should now be installed
-            expect(countByType(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
                 channels: 0,
                 complibs: 1
             });
 
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
         });
 
         it('deletes a channel and a component library together', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installChannel();
             await installComponentLibrary('complib1');
 
             //both should now be installed
-            expect(countByType(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 1
             });
 
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
         });
 
         it('deletes a channel and two component libraries together', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installChannel();
             await installComponentLibrary('complib1');
             await installComponentLibrary('complib2');
 
             //all three should now be installed
-            expect(countByType(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 2
             });
 
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
         });
     });
 
@@ -488,7 +488,7 @@ describe('device', function device() {
 
         it('deletes several component libraries one by one', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installComponentLibrary('complib1');
             await installComponentLibrary('complib2');
@@ -522,7 +522,7 @@ describe('device', function device() {
 
         it('leaves other component libraries intact when deleting one', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             await installComponentLibrary('complib1');
             await installComponentLibrary('complib2');
@@ -542,12 +542,12 @@ describe('device', function device() {
             expect(await getInstalledComponentLibraryFileNames()).to.eql([toKeep]);
 
             //clean up
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
         });
 
         it('deletes a component library without affecting an installed channel', async () => {
             //start clean
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //install a channel alongside the complibs
             await rokuDeploy.rokuDeploy.deploy({
@@ -570,12 +570,12 @@ describe('device', function device() {
             }
 
             //all complibs gone, but the channel should still be installed
-            const packages = await rokuDeploy.rokuDeploy.listInstalledPackages({ host: options.host, password: options.password });
+            const packages = await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password });
             expect(packages.filter(x => x.appType === 'dcl')).to.eql([]);
             expect(packages.filter(x => x.appType === 'channel')).to.have.lengthOf(1);
 
             //clean up
-            await rokuDeploy.rokuDeploy.deleteAll(options);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
         });
     });
 });
