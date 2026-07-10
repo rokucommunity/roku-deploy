@@ -112,8 +112,8 @@ describe('device', function device() {
     /**
      * Ask the device for the list of currently-installed packages (channels and component libraries).
      */
-    async function getInstalledPackages() {
-        return rokuDeploy.rokuDeploy.getInstalledPackages({
+    async function listInstalledPackages() {
+        return rokuDeploy.rokuDeploy.listInstalledPackages({
             host: options.host,
             password: options.password
         });
@@ -130,7 +130,7 @@ describe('device', function device() {
      * Return the archiveFileNames of only the installed component libraries (DCLs)
      */
     async function getInstalledComponentLibraryFileNames() {
-        const packages = await getInstalledPackages();
+        const packages = await listInstalledPackages();
         return packages.filter(x => x.appType === 'dcl').map(x => x.archiveFileName);
     }
 
@@ -423,7 +423,7 @@ describe('device', function device() {
             await installChannel();
 
             //the channel should now be installed
-            expect(countByType(await getInstalledPackages())).to.eql({
+            expect(countByType(await listInstalledPackages())).to.eql({
                 channels: 1,
                 complibs: 0
             });
@@ -431,7 +431,7 @@ describe('device', function device() {
             await rokuDeploy.rokuDeploy.deleteAll(options);
 
             //nothing should be installed anymore
-            expect(await getInstalledPackages()).to.eql([]);
+            expect(await listInstalledPackages()).to.eql([]);
         });
 
         it('deletes a single component library', async () => {
@@ -441,7 +441,7 @@ describe('device', function device() {
             await installComponentLibrary('complib1');
 
             //the complib should now be installed
-            expect(countByType(await getInstalledPackages())).to.eql({
+            expect(countByType(await listInstalledPackages())).to.eql({
                 channels: 0,
                 complibs: 1
             });
@@ -449,7 +449,7 @@ describe('device', function device() {
             await rokuDeploy.rokuDeploy.deleteAll(options);
 
             //nothing should be installed anymore
-            expect(await getInstalledPackages()).to.eql([]);
+            expect(await listInstalledPackages()).to.eql([]);
         });
 
         it('deletes a channel and a component library together', async () => {
@@ -460,7 +460,7 @@ describe('device', function device() {
             await installComponentLibrary('complib1');
 
             //both should now be installed
-            expect(countByType(await getInstalledPackages())).to.eql({
+            expect(countByType(await listInstalledPackages())).to.eql({
                 channels: 1,
                 complibs: 1
             });
@@ -468,7 +468,7 @@ describe('device', function device() {
             await rokuDeploy.rokuDeploy.deleteAll(options);
 
             //nothing should be installed anymore
-            expect(await getInstalledPackages()).to.eql([]);
+            expect(await listInstalledPackages()).to.eql([]);
         });
 
         it('deletes a channel and two component libraries together', async () => {
@@ -480,7 +480,7 @@ describe('device', function device() {
             await installComponentLibrary('complib2');
 
             //all three should now be installed
-            expect(countByType(await getInstalledPackages())).to.eql({
+            expect(countByType(await listInstalledPackages())).to.eql({
                 channels: 1,
                 complibs: 2
             });
@@ -488,7 +488,7 @@ describe('device', function device() {
             await rokuDeploy.rokuDeploy.deleteAll(options);
 
             //nothing should be installed anymore
-            expect(await getInstalledPackages()).to.eql([]);
+            expect(await listInstalledPackages()).to.eql([]);
         });
     });
 
@@ -580,7 +580,7 @@ describe('device', function device() {
             }
 
             //all complibs gone, but the channel should still be installed
-            const packages = await getInstalledPackages();
+            const packages = await listInstalledPackages();
             expect(packages.filter(x => x.appType === 'dcl')).to.eql([]);
             expect(packages.filter(x => x.appType === 'channel')).to.have.lengthOf(1);
 

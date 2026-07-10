@@ -4763,16 +4763,16 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('getInstalledPackages', () => {
+    describe('listInstalledPackages', () => {
         it('is publicly accessible on the instance (not private)', () => {
             //this is a public API method, callable directly without bracket/`as any` access
-            expect(rokuDeploy.getInstalledPackages).to.be.a('function');
+            expect(rokuDeploy.listInstalledPackages).to.be.a('function');
         });
 
         it('sends the dcl_enabled qs flag', async () => {
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([]);
         });
@@ -4785,7 +4785,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
                 dcl_enabled: '1'
@@ -4797,7 +4797,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
             `);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([{
                 appType: 'channel',
@@ -4815,7 +4815,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"},{"appType":"dcl","archiveFileName":"lib1.zip","fileType":"zip","id":"1","location":"nvram","md5":"7221a9bfb63be42f4fc6b0de22584af6","pkgPath":"","size":"1231"},{"appType":"dcl","archiveFileName":"lib2.zip","fileType":"zip","id":"2","location":"nvram","md5":"7221a9bfb63be42f4fc6b0de22584af6","pkgPath":"","size":"1232"}]}');
             `);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(result.map(x => x.archiveFileName)).to.eql(['roku-deploy.zip', 'lib1.zip', 'lib2.zip']);
             expect(result.filter(x => x.appType === 'dcl').map(x => x.archiveFileName)).to.eql(['lib1.zip', 'lib2.zip']);
         });
@@ -4824,7 +4824,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
             `);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(result).to.eql([]);
         });
 
@@ -4832,7 +4832,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('123');
             `);
-            const result = await rokuDeploy.getInstalledPackages({} as any);
+            const result = await rokuDeploy.listInstalledPackages({} as any);
             expect(result).to.eql([]);
         });
     });
@@ -4889,7 +4889,7 @@ describe('RokuDeploy', () => {
     describe('deleteAllComponentLibraries', () => {
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 0 packages
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([]));
+            sinon.stub(rokuDeploy as any, 'listInstalledPackages').returns(Promise.resolve([]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
             await rokuDeploy.deleteAllComponentLibraries({} as any);
             expect(stub.called).to.be.false;
@@ -4897,7 +4897,7 @@ describe('RokuDeploy', () => {
 
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listInstalledPackages').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4914,7 +4914,7 @@ describe('RokuDeploy', () => {
 
         it('sends single request if only have one DCL to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listInstalledPackages').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4942,7 +4942,7 @@ describe('RokuDeploy', () => {
 
         it('sends one request for each DCL', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listInstalledPackages').returns(Promise.resolve([{
                 appType: 'dcl',
                 archiveFileName: 'lib1.zip',
                 fileType: 'zip',
