@@ -1890,11 +1890,21 @@ describe('RokuDeploy', () => {
                 <font color="red">Success.</font>
             </div>`;
             mockDoPostRequest(body);
+
+            //stub createReadStream so the test doesn't open a real fd against a temp file that the
+            //afterEach hook then deletes (that lazily-opened fd racing the delete was flaky in CI).
+            //Capturing the path here also lets us assert the relative path was resolved against rootDir.
+            let readStreamPath: string;
+            sinon.stub(fsExtra, 'createReadStream').callsFake((p) => {
+                readStreamPath = p as string;
+                return { close: () => { } } as any;
+            });
+
             options.rekeySignedPackage = s`../notReal.pkg`;
-            fsExtra.outputFileSync(s`${tempDir}/notReal.pkg`, '<file-contents>');
-            //small sleep to ensure the file exists (hack for testing!)
-            await util.sleep(10);
             await rokuDeploy.rekeyDevice(options);
+
+            //the relative path should have been resolved against rootDir
+            expect(readStreamPath).to.eql(path.join(rootDir, '../notReal.pkg'));
         });
 
         it('should work with absolute path', async () => {
@@ -2649,6 +2659,18 @@ describe('RokuDeploy', () => {
 
             let result = await rokuDeploy.deleteInstalledChannel(options);
             expect(result).not.to.be.undefined;
+        });
+    });
+
+    describe('deleteAllSideloadedPlugins', () => {
+        it('attempts to delete the dev channel and all component libraries on the device', async () => {
+            const stub = mockDoPostRequest();
+
+            let result = await rokuDeploy.deleteAllSideloadedPlugins(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.getCall(0).args[0].formData).to.include({
+                mysubmit: 'DeleteAll'
+            });
         });
     });
 
@@ -4751,11 +4773,16 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('getInstalledPackages', () => {
+    describe('listSideloadedPlugins', () => {
+        it('is publicly accessible on the instance (not private)', () => {
+            //this is a public API method, callable directly without bracket/`as any` access
+            expect(rokuDeploy.listSideloadedPlugins).to.be.a('function');
+        });
+
         it('sends the dcl_enabled qs flag', async () => {
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([]);
         });
@@ -4768,7 +4795,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
                 dcl_enabled: '1'
@@ -4780,7 +4807,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([{
                 appType: 'channel',
@@ -4794,11 +4821,20 @@ describe('RokuDeploy', () => {
             }]);
         });
 
+        it('parses multiple installed packages (channel and component libraries)', async () => {
+            mockDoGetRequest(`
+                var params = JSON.parse('{"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"},{"appType":"dcl","archiveFileName":"lib1.zip","fileType":"zip","id":"1","location":"nvram","md5":"7221a9bfb63be42f4fc6b0de22584af6","pkgPath":"","size":"1231"},{"appType":"dcl","archiveFileName":"lib2.zip","fileType":"zip","id":"2","location":"nvram","md5":"7221a9bfb63be42f4fc6b0de22584af6","pkgPath":"","size":"1232"}]}');
+            `);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
+            expect(result.map(x => x.archiveFileName)).to.eql(['roku-deploy.zip', 'lib1.zip', 'lib2.zip']);
+            expect(result.filter(x => x.appType === 'dcl').map(x => x.archiveFileName)).to.eql(['lib1.zip', 'lib2.zip']);
+        });
+
         it('handles when packages is not an array', async () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
             expect(result).to.eql([]);
         });
 
@@ -4806,7 +4842,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('123');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({} as any);
+            const result = await rokuDeploy.listSideloadedPlugins({} as any);
             expect(result).to.eql([]);
         });
     });
@@ -4863,7 +4899,7 @@ describe('RokuDeploy', () => {
     describe('deleteAllComponentLibraries', () => {
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 0 packages
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([]));
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
             await rokuDeploy.deleteAllComponentLibraries({} as any);
             expect(stub.called).to.be.false;
@@ -4871,7 +4907,7 @@ describe('RokuDeploy', () => {
 
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4888,7 +4924,7 @@ describe('RokuDeploy', () => {
 
         it('sends single request if only have one DCL to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4916,7 +4952,7 @@ describe('RokuDeploy', () => {
 
         it('sends one request for each DCL', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'dcl',
                 archiveFileName: 'lib1.zip',
                 fileType: 'zip',

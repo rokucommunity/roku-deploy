@@ -926,7 +926,7 @@ export class RokuDeploy {
      * @param body
      * @returns
      */
-    private getPackagesFromResponseBody(body: string): RokuPackage[] {
+    private getPackagesFromResponseBody(body: string): RokuPlugin[] {
         let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
         let jsonMatch: RegExpExecArray;
 
@@ -979,6 +979,21 @@ export class RokuDeploy {
     }
 
     /**
+     * Deletes any installed dev channel, and any installed component libraries on the target Roku device
+     * @param options
+     */
+    public async deleteAllSideloadedPlugins(options?: RokuDeployOptions) {
+        options = this.getOptions(options);
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'DeleteAll',
+            archive: ''
+        };
+        return this.doPostRequest(deleteOptions);
+    }
+
+    /**
      * Delete the component library with the specified filename from the device
      */
     public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
@@ -999,8 +1014,8 @@ export class RokuDeploy {
     /**
      * Delete all component libraries from the device
      */
-    public async deleteAllComponentLibraries(options: { host: string; password: string; username?: string }) {
-        const packages = await this.getInstalledPackages(options);
+    public async deleteAllComponentLibraries(options: ListSideloadedPluginsOptions) {
+        const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
                 await this.deleteComponentLibrary({
@@ -1014,7 +1029,7 @@ export class RokuDeploy {
     /**
      * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
      */
-    private async getInstalledPackages(options: { host: string; password: string; username?: string }): Promise<RokuPackage[]> {
+    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
         options = this.getOptions(options) as any;
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.qs ??= {};
@@ -1553,7 +1568,7 @@ export interface RokuMessages {
     successes: string[];
 }
 
-export interface RokuPackage {
+export interface RokuPlugin {
     appType: 'channel' | 'dcl';
     archiveFileName: string;
     fileType: string;
@@ -1562,6 +1577,25 @@ export interface RokuPackage {
     md5: string;
     pkgPath: string;
     size: string;
+}
+export type RokuPackage = RokuPlugin;
+export interface ListSideloadedPluginsOptions {
+
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host: string;
+
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password: string;
+
+    /**
+     * The username for logging in to the developer portal on the target Roku device. Defaults to `'rokudev'`
+     */
+    username?: string;
 }
 
 enum RokuMessageType {

@@ -11,6 +11,7 @@ export * from './DeviceInfo';
 export const rokuDeploy = new RokuDeploy();
 
 let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
+let deleteAllSideloadedPlugins = RokuDeploy.prototype.deleteAllSideloadedPlugins.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
@@ -21,6 +22,7 @@ let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
 let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDeploy);
+let listSideloadedPlugins = RokuDeploy.prototype.listSideloadedPlugins.bind(rokuDeploy);
 let normalizeFilesArray = RokuDeploy.prototype.normalizeFilesArray.bind(rokuDeploy);
 let normalizeRootDir = RokuDeploy.prototype.normalizeRootDir.bind(rokuDeploy);
 let parseManifest = RokuDeploy.prototype.parseManifest.bind(rokuDeploy);
@@ -37,6 +39,7 @@ let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
 
 export {
     createPackage,
+    deleteAllSideloadedPlugins,
     deleteInstalledChannel,
     deploy,
     deployAndSignPackage,
@@ -47,6 +50,7 @@ export {
     getOptions,
     getOutputPkgFilePath,
     getOutputZipFilePath,
+    listSideloadedPlugins,
     normalizeFilesArray,
     normalizeRootDir,
     parseManifest,
