@@ -2652,6 +2652,18 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('deleteAll', () => {
+        it('attempts to delete the dev channel and all component libraries on the device', async () => {
+            const stub = mockDoPostRequest();
+
+            let result = await rokuDeploy.deleteAll(options);
+            expect(result).not.to.be.undefined;
+            expect(stub.getCall(0).args[0].formData).to.include({
+                mysubmit: 'DeleteAll'
+            });
+        });
+    });
+
     describe('takeScreenshot', () => {
         let onHandler: any;
         let screenshotAddress: any;
