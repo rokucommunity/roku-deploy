@@ -111,10 +111,9 @@ describe('device', function device() {
 
     /**
      * Ask the device for the list of currently-installed packages (channels and component libraries).
-     * `getInstalledPackages` is a private method, so we access it via bracket notation.
      */
     async function getInstalledPackages() {
-        return rokuDeploy.rokuDeploy['getInstalledPackages']({
+        return rokuDeploy.rokuDeploy.getInstalledPackages({
             host: options.host,
             password: options.password
         });

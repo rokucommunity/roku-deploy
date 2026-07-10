@@ -18,6 +18,7 @@ let enhanceDeviceInfo = RokuDeploy.prototype.enhanceDeviceInfo.bind(rokuDeploy);
 let getDestPath = RokuDeploy.prototype.getDestPath.bind(rokuDeploy);
 let getDeviceInfo = RokuDeploy.prototype.getDeviceInfo.bind(rokuDeploy);
 let getFilePaths = RokuDeploy.prototype.getFilePaths.bind(rokuDeploy);
+let getInstalledPackages = RokuDeploy.prototype.getInstalledPackages.bind(rokuDeploy);
 let getOptions = RokuDeploy.prototype.getOptions.bind(rokuDeploy);
 let getOutputPkgFilePath = RokuDeploy.prototype.getOutputPkgFilePath.bind(rokuDeploy);
 let getOutputZipFilePath = RokuDeploy.prototype.getOutputZipFilePath.bind(rokuDeploy);
@@ -44,6 +45,7 @@ export {
     getDestPath,
     getDeviceInfo,
     getFilePaths,
+    getInstalledPackages,
     getOptions,
     getOutputPkgFilePath,
     getOutputZipFilePath,
