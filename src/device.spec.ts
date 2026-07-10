@@ -402,7 +402,7 @@ describe('device', function device() {
         });
     });
 
-    describe('deleteAll', function deleteAllTests() {
+    describe('deleteAllSideloadedPlugins', function deleteAllTests() {
         //these tests do several device round-trips (install + verify + delete), so give them extra time
         this.timeout(60_000);
 

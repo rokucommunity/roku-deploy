@@ -2662,7 +2662,7 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('deleteAll', () => {
+    describe('deleteAllSideloadedPlugins', () => {
         it('attempts to delete the dev channel and all component libraries on the device', async () => {
             const stub = mockDoPostRequest();
 

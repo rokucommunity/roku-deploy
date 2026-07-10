@@ -11,6 +11,7 @@ export * from './DeviceInfo';
 export const rokuDeploy = new RokuDeploy();
 
 let createPackage = RokuDeploy.prototype.createPackage.bind(rokuDeploy);
+let deleteAllSideloadedPlugins = RokuDeploy.prototype.deleteAllSideloadedPlugins.bind(rokuDeploy);
 let deleteInstalledChannel = RokuDeploy.prototype.deleteInstalledChannel.bind(rokuDeploy);
 let deploy = RokuDeploy.prototype.deploy.bind(rokuDeploy);
 let deployAndSignPackage = RokuDeploy.prototype.deployAndSignPackage.bind(rokuDeploy);
@@ -38,6 +39,7 @@ let zipPackage = RokuDeploy.prototype.zipPackage.bind(rokuDeploy);
 
 export {
     createPackage,
+    deleteAllSideloadedPlugins,
     deleteInstalledChannel,
     deploy,
     deployAndSignPackage,
