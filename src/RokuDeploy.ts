@@ -926,7 +926,7 @@ export class RokuDeploy {
      * @param body
      * @returns
      */
-    private getPackagesFromResponseBody(body: string): RokuPackage[] {
+    private getPackagesFromResponseBody(body: string): RokuPlugin[] {
         let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
         let jsonMatch: RegExpExecArray;
 
@@ -1029,7 +1029,7 @@ export class RokuDeploy {
     /**
      * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
      */
-    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPackage[]> {
+    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
         options = this.getOptions(options) as any;
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.qs ??= {};
@@ -1568,7 +1568,7 @@ export interface RokuMessages {
     successes: string[];
 }
 
-export interface RokuPackage {
+export interface RokuPlugin {
     appType: 'channel' | 'dcl';
     archiveFileName: string;
     fileType: string;
@@ -1578,7 +1578,7 @@ export interface RokuPackage {
     pkgPath: string;
     size: string;
 }
-
+export type RokuPackage = RokuPlugin;
 export interface ListSideloadedPluginsOptions {
 
     /**
