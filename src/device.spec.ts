@@ -10,6 +10,7 @@ import * as errors from './Errors';
 import { expect } from 'chai';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
+import { standardizePath as s } from './util';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
 //pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
@@ -107,8 +108,6 @@ describe('device', function device() {
         fsExtra.emptyDirSync(tempDir);
     });
 
-    this.timeout(20000);
-
     function countByType(packages: Array<{ appType: string }>) {
         return {
             channels: packages.filter(x => x.appType === 'channel').length,
@@ -175,6 +174,60 @@ describe('device', function device() {
             stagingDir: `${stagingDir}-${name}`,
             outDir: outDir,
             outFile: name
+        });
+        await rokuDeploy.rokuDeploy.publish({
+            ...options,
+            appType: 'dcl',
+            outDir: outDir,
+            outFile: name
+        });
+    }
+
+    /**
+     * Build and sideload a BrightScript library (bs_libs) onto the device, modeled after the
+     * `code-library` sample. Unlike SceneGraph complibs, these declare themselves with
+     * `bs_libs_provided` + `no_source=1` and pull in their dependencies via `bs_libs_required`, but
+     * they are hosted/installed the same way (published as their own `dcl` package) and deleted
+     * individually via `deleteComponentLibrary`.
+     *
+     * @param name the library name (also its provided symbol and .brs file name)
+     * @param requires the names of other libraries this one depends on (goes into bs_libs_required)
+     */
+    async function installBrightScriptLibrary(name: string, requires: string[] = []) {
+        const libRootDir = s`${tempDir}/${name}`;
+        //each library greets, then delegates to every library it requires, so the whole chain is exercised
+        const requiredLibraryStatements = requires.map(dep => `library "${dep}.brs"`).join('\n');
+        const delegationCalls = requires.map(dep => `    ${dep}_greet("Activated from ${name}")`).join('\n');
+        writeFiles(libRootDir, [
+            ['manifest', undent`
+                title=${name}
+                major_version=1
+                minor_version=0
+                build_version=1
+                bs_libs_provided=${name}
+                no_source=1
+                ${requires.length > 0 ? `bs_libs_required=${requires.join(',')}` : ''}
+                rsg_version=1.2
+                ui_resolutions=hd
+            `],
+            [`libsource/${name}.brs`, undent`
+                ${requiredLibraryStatements}
+                function ${name}_greet(message as string) as void
+                    ? "Hello from ${name}: " + message
+                ${delegationCalls}
+                end function
+            `]
+        ]);
+
+        await rokuDeploy.rokuDeploy.createPackage({
+            ...options,
+            rootDir: libRootDir,
+            stagingDir: `${stagingDir}-${name}`,
+            outDir: outDir,
+            outFile: name,
+            //the default file list only covers source/components/images/locale/manifest; a bs_libs
+            //library keeps its code under libsource/, so grab everything to be sure it's packaged
+            files: ['**/*']
         });
         await rokuDeploy.rokuDeploy.publish({
             ...options,
@@ -478,6 +531,324 @@ describe('device', function device() {
             await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+        });
+    });
+
+    describe.only('zip size install boundary', function zipSizeBoundary() {
+
+        //Roku firmware rejects dev zips below a hard minimum size with "Unzip failed. Invalid or corrupt
+        //zip archive." As of firmware 15.x that minimum is 512 bytes (>=512 installs, <512 fails), the same
+        //on every device. We probe around the known value; if it moved, we find and report the new one.
+        this.timeout(0);
+
+        //smallest zip size known to install. Update if the test discovers the firmware value changed.
+        // const KNOWN_BOUNDARY = 512;
+        const KNOWN_BOUNDARY = 512;
+
+        it(`rejects zips below ${KNOWN_BOUNDARY} bytes and accepts zips at/above it`, async () => {
+            //work out of the repo root (beforeEach parks us inside the shared .tmp)
+            process.chdir(cwd);
+            fsExtra.ensureDirSync(ZDIR);
+
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            //fast path: probe below/at/above. If they match (FAIL/OK/OK), the boundary is KNOWN_BOUNDARY.
+            console.log(`[zip-size] verifying known boundary=${KNOWN_BOUNDARY} on ${options.host}`);
+            const belowOk = await installs(KNOWN_BOUNDARY - 1);
+            const atOk = await installs(KNOWN_BOUNDARY);
+            const aboveOk = belowOk === false && atOk === true ? await installs(KNOWN_BOUNDARY + 1) : true;
+
+            //true smallest installable size: KNOWN_BOUNDARY if probes held, else walked/bisected
+            const actual = (belowOk === false && atOk === true && aboveOk === true)
+                ? KNOWN_BOUNDARY
+                : await findBoundary(atOk, belowOk);
+
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            assertBoundary('the minimum installable zip size', KNOWN_BOUNDARY, actual);
+        });
+
+        const WALK_STEP = 100;
+        const WALK_LIMIT = 20_000;
+
+        //dedicated scratch dir, never the shared .tmp
+        const ZDIR = s`${cwd}/.ziptest`;
+
+        //incompressible, non-repeating chars: ~1 char == 1 zip byte. Coarse size knob.
+        function noise(n: number): string {
+            const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let str = '';
+            /* eslint-disable no-bitwise */
+            let state = 0x1234_5678;
+            for (let i = 0; i < n; i++) {
+                state ^= state << 13;
+                state ^= state >>> 17;
+                state ^= state << 5;
+                str += alpha[(state >>> 0) % alpha.length];
+            }
+            /* eslint-enable no-bitwise */
+            return str;
+        }
+
+        //Build the app; comment = noise (coarse) + a run of 'A' (compressible, nudges the zip ~1 byte).
+        //Returns the zip size in bytes.
+        async function build(noiseLen: number, runLen: number): Promise<number> {
+            fsExtra.emptyDirSync(ZDIR);
+            fsExtra.outputFileSync(s`${ZDIR}/manifest`, 'title=a');
+            fsExtra.outputFileSync(s`${ZDIR}/source/main.brs`, [
+                'sub Main()',
+                `    '${noise(Math.max(0, noiseLen))}${'A'.repeat(Math.max(0, runLen))}`,
+                '    s = CreateObject("roSGScreen")',
+                '    p = CreateObject("roMessagePort")',
+                '',
+                '    while 1',
+                '        r = wait(0, p)',
+                '    end while',
+                '',
+                'end sub'
+            ].join('\n'));
+            await rokuDeploy.rokuDeploy.createPackage({
+                ...options,
+                rootDir: ZDIR,
+                stagingDir: s`${ZDIR}/staging`,
+                outDir: ZDIR,
+                outFile: 'app',
+                files: ['manifest', 'source/**/*']
+            });
+            return fsExtra.statSync(s`${ZDIR}/app.zip`).size;
+        }
+
+        //Produce a zip of exactly `target` bytes: converge noise, then fill the last few bytes with 'A's.
+        async function buildExact(target: number): Promise<boolean> {
+            let noiseLen = target;
+            let size = await build(noiseLen, 0);
+            for (let i = 0; i < 30 && size !== target; i++) {
+                noiseLen += target - size;
+                if (noiseLen < 0) {
+                    noiseLen = 0;
+                    break;
+                }
+                size = await build(noiseLen, 0);
+            }
+            if (size === target) {
+                return true;
+            }
+            for (let back = 0; back <= 80; back++) {
+                const base = noiseLen - back;
+                if (base < 0) {
+                    break;
+                }
+                for (let runLen = 0; runLen <= 200; runLen++) {
+                    const z = await build(base, runLen);
+                    if (z === target) {
+                        return true;
+                    }
+                    if (z > target) {
+                        break;
+                    }
+                }
+            }
+            return false;
+        }
+
+        const cache = new Map<number, boolean>();
+
+        //Install a zip of exactly `zip` bytes. true = installed OK. Memoized.
+        async function installs(zip: number): Promise<boolean> {
+            if (cache.has(zip)) {
+                return cache.get(zip);
+            }
+            if (!(await buildExact(zip))) {
+                throw new Error(`could not construct an exact ${zip}-byte zip`);
+            }
+            let ok: boolean;
+            try {
+                await rokuDeploy.rokuDeploy.publish({ ...options, outDir: ZDIR, outFile: 'app', appType: 'channel', failOnCompileError: true });
+                ok = true;
+            } catch {
+                ok = false;
+            }
+            cache.set(zip, ok);
+            console.log(`  [zip-size] zip=${zip} => ${ok ? 'OK' : 'FAIL'}`);
+            return ok;
+        }
+
+        //Binary search for the smallest installable size, given a failing and passing size (fail < pass).
+        async function bisect(failStart: number, passStart: number): Promise<number> {
+            let fail = failStart;
+            let pass = passStart;
+            while (pass - fail > 1) {
+                const mid = Math.floor((fail + pass) / 2);
+                let ok: boolean;
+                try {
+                    ok = await installs(mid);
+                } catch {
+                    //can't construct exactly `mid`; try its neighbor
+                    ok = await installs(mid + 1);
+                    if (ok) {
+                        pass = mid + 1;
+                    } else {
+                        fail = mid + 1;
+                    }
+                    continue;
+                }
+                if (ok) {
+                    pass = mid;
+                } else {
+                    fail = mid;
+                }
+            }
+            return pass;
+        }
+
+        //Find the true boundary when the probes didn't hold: walk to bracket it, then bisect.
+        async function findBoundary(atOk: boolean, belowOk: boolean): Promise<number> {
+            if (!atOk) {
+                //moved up: walk up until an install succeeds
+                let lastFail = KNOWN_BOUNDARY;
+                let firstPass = -1;
+                for (let z = KNOWN_BOUNDARY + WALK_STEP; z <= WALK_LIMIT; z += WALK_STEP) {
+                    if (await installs(z)) {
+                        firstPass = z;
+                        break;
+                    }
+                    lastFail = z;
+                }
+                if (firstPass < 0) {
+                    throw new Error(`no installable size found up to ${WALK_LIMIT} bytes`);
+                }
+                return bisect(lastFail, firstPass);
+            }
+            //moved down (belowOk): walk down until an install fails
+            let firstFail = -1;
+            let lastPass = KNOWN_BOUNDARY - 1;
+            for (let z = KNOWN_BOUNDARY - 1 - WALK_STEP; z >= 0; z -= WALK_STEP) {
+                if (!(await installs(z))) {
+                    firstFail = z;
+                    break;
+                }
+                lastPass = z;
+            }
+            //everything down to the smallest zip still installs
+            if (firstFail < 0) {
+                return lastPass;
+            }
+            return bisect(firstFail, lastPass);
+        }
+
+        //Standardized pass/fail: plain Error (no Chai -/+ diff) so the whole sentence is the message.
+        function assertBoundary(label: string, expected: number, actual: number) {
+            if (actual !== expected) {
+                throw new Error(
+                    `expected ${label} to be ${expected} bytes but it was ${actual} bytes. ` +
+                    `Update the hardcoded value in device.spec.ts (KNOWN_BOUNDARY) from ${expected} to ${actual}.`
+                );
+            }
+        }
+
+    });
+
+    describe.skip('install app + libs, then delete everything', function installDeleteEverything() {
+        //this reproduces an intermittent socket hangup seen when deleting component libraries. we install
+        //a chain of interdependent BrightScript libraries (modeled after the `code-library` sample) plus
+        //an app that requires them, then delete the app followed by each library one by one. after every
+        //delete we immediately list the installed plugins; a hung socket surfaces on that next request.
+        this.timeout(300_000);
+
+        //the dependency chain, modeled after the `code-library` sample: echo depends on delta, delta on
+        //charlie, charlie on beta, beta on alpha. alpha is the leaf. The app requires all five.
+        //install order is leaf-first so each library's dependencies already exist when it's built.
+        const LIB_DEPENDENCY_CHAIN = ['echo', 'delta', 'charlie', 'beta', 'alpha'];
+        //leaf-first: alpha (no deps) up to echo (depends on the whole chain below it)
+        const INSTALL_ORDER = [...LIB_DEPENDENCY_CHAIN].reverse();
+
+        it('deletes the app then each component library one by one without a socket hangup', async () => {
+            //start from a known-clean device so pre-existing plugins don't skew the assertions
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            //install each library leaf-first; each one requires the library immediately below it in the chain
+            for (let i = 0; i < INSTALL_ORDER.length; i++) {
+                const name = INSTALL_ORDER[i];
+                //everything already installed (leaf-first) is a valid dependency; wire up the immediate one
+                const requires = i > 0 ? [INSTALL_ORDER[i - 1]] : [];
+                await installBrightScriptLibrary(name, requires);
+            }
+
+            //now install the app that requires the whole chain of libraries
+            writeFiles(rootDir, [
+                ['manifest', undent`
+                    title=RokuDeployTestChannel
+                    major_version=1
+                    minor_version=0
+                    build_version=1
+                    bs_libs_required=${LIB_DEPENDENCY_CHAIN.join(',')}
+                    rsg_version=1.2
+                    ui_resolutions=hd
+                `]
+            ]);
+            await rokuDeploy.rokuDeploy.deploy({
+                ...options,
+                appType: 'channel',
+                outFile: 'channel',
+                //enable the debug protocol
+                remoteDebug: true,
+                //necessary for capturing compile errors from the protocol (has no effect on telnet)
+                remoteDebugConnectEarly: false,
+                //we don't want to fail if there were compile errors...we'll let our compile error processor handle that
+                failOnCompileError: true
+            });
+
+            //everything should be installed now: the channel plus all five component libraries
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+                channels: 1,
+                complibs: LIB_DEPENDENCY_CHAIN.length
+            });
+
+            //delete the app (the dev channel). the list afterward proves the request didn't hang the socket.
+            await rokuDeploy.deleteInstalledChannel(options);
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+                channels: 0,
+                complibs: LIB_DEPENDENCY_CHAIN.length
+            });
+
+            //delete the app AGAIN when there is no dev channel installed. this redundant delete is a
+            //suspected trigger for the flaky socket hangup, so exercise it explicitly and confirm the
+            //very next request still succeeds.
+            await rokuDeploy.deleteInstalledChannel(options);
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+                channels: 0,
+                complibs: LIB_DEPENDENCY_CHAIN.length
+            });
+
+            //now delete each component library one by one until they're all gone. after each delete we
+            //list the installed plugins right away; if deleting a complib hangs the socket, that list
+            //request is where it surfaces.
+            let remaining = await getInstalledComponentLibraryFileNames();
+            let expectedRemaining = remaining.length;
+            for (const fileName of remaining) {
+                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                    host: options.host,
+                    password: options.password,
+                    fileName: fileName
+                });
+                expectedRemaining--;
+
+                const afterDelete = await getInstalledComponentLibraryFileNames();
+                expect(afterDelete).to.not.include(fileName);
+                expect(afterDelete).to.have.lengthOf(expectedRemaining);
+            }
+
+            //everything is gone
+            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+
+            //one more delete against an already-empty device to be sure the "delete when nothing is
+            //installed" path doesn't hang the socket for the next caller
+            await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                host: options.host,
+                password: options.password,
+                fileName: remaining[0] ?? 'nonexistent.zip'
+            });
             expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
         });
     });
