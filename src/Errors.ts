@@ -56,16 +56,14 @@ export interface HttpDetails {
 export interface DeviceErrorDetails {
     httpDetails?: HttpDetails;
     rokuMessages?: RokuMessages;
-    host?: string;
 }
 
 /**
  * Details for network/connection errors
  */
 export interface ConnectionErrorDetails {
+    httpDetails?: HttpDetails;
     cause?: Error;
-    host?: string;
-    url?: string;
 }
 
 /**
@@ -158,13 +156,6 @@ export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
      */
     public get rokuMessages(): RokuMessages | undefined {
         return this.details?.rokuMessages;
-    }
-
-    /**
-     * The host/IP of the device
-     */
-    public get host(): string | undefined {
-        return this.details?.host;
     }
 }
 

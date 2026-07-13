@@ -48,8 +48,8 @@ describe('Errors', () => {
 
         it('stores details when provided', () => {
             const details: DeviceErrorDetails = {
-                host: '192.168.1.100',
                 httpDetails: {
+                    request: { url: 'http://192.168.1.100/plugin_install' },
                     response: {
                         statusCode: 500,
                         body: 'error body'
@@ -88,8 +88,8 @@ describe('Errors', () => {
         describe('toJSON()', () => {
             it('serializes the error to JSON', () => {
                 const details: DeviceErrorDetails = {
-                    host: '192.168.1.100',
                     httpDetails: {
+                        request: { url: 'http://192.168.1.100/plugin_install' },
                         response: {
                             statusCode: 500
                         }
@@ -131,13 +131,6 @@ describe('Errors', () => {
                 rokuMessages: rokuMessages
             });
             expect(error.rokuMessages).to.deep.equal(rokuMessages);
-        });
-
-        it('provides host getter', () => {
-            const error = new FailedDeviceResponseError('test', {
-                host: '192.168.1.100'
-            });
-            expect(error.host).to.equal('192.168.1.100');
         });
 
         it('returns undefined for missing rokuMessages', () => {
@@ -218,8 +211,10 @@ describe('Errors', () => {
 
             it('stores connection details', () => {
                 const details: ConnectionErrorDetails = {
-                    url: 'http://192.168.1.100/plugin_install',
-                    host: '192.168.1.100'
+                    httpDetails: {
+                        request: { url: 'http://192.168.1.100/plugin_install' },
+                        response: { statusCode: 577 }
+                    }
                 };
                 const error = new UpdateCheckRequiredError(details);
                 expect(error.details).to.deep.equal(details);
@@ -239,7 +234,7 @@ describe('Errors', () => {
 
             it('stores cause', () => {
                 const originalError = new Error('ECONNRESET');
-                const error = new ConnectionResetError({ host: '192.168.1.100' }, originalError);
+                const error = new ConnectionResetError({}, originalError);
                 expect(error.cause).to.equal(originalError);
             });
         });
