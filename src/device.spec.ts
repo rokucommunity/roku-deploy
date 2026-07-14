@@ -35,6 +35,9 @@ const REQUEST_TIMEOUT = 15_000;
 
 //these tests are run against an actual roku device and need to be run on our self-hosted runners.
 describe('device', function device() {
+    //device tests can take a long time. give extra margin for that
+    this.timeout(120_000);
+
     let options: rokuDeploy.RokuDeployOptions;
 
     before(() => {
@@ -135,6 +138,12 @@ describe('device', function device() {
         });
     }
 
+    //A bare complib zip lands around ~386 bytes, below the device's 512-byte minimum installable size,
+    //so the install fails as "Invalid or corrupt zip archive". We pad the component XML with this block of
+    //high-entropy (incompressible) text so the packaged zip clears the boundary. Hardcoded on purpose:
+    //a repeated/low-entropy string would compress away and give us no size gain.
+    const COMPLIB_PADDING = 'k7Jq2fVr9WpN4xZa1BcM6sTgL0oYhDeUuIiRt8vXnQwEyKlOpAzSdFgHjClZ3mBnV5cX8rT2wQ9eR7yU1iO0pAsDfGhJkLzXcVbNmQwErTyUiOpAsDfGhJkLzXcVbNmk7Jq2fVr9WpN4xZa1BcM6sTgL0oYhDeUuIiRt8vXnQwEyKlOpAzSdFgHjClZ3mBnV5cX8rT2wQ9eR7yU1iO0pAsDfGhJkLzXcVbNmQwErTyUiOpAsDfGhJkLzXcVbNm7pL3xQ9zW2eR8tY5uI1oP4aS6dF0gH7jK2lZ8xC3vB9nM4qW1eR6tY7uI0oP5aS8dF2gH9jK4lZ1xC6vB3nM';
+
     /**
      * Build and sideload a component library onto the device. Each complib gets a unique
      * name so they end up as distinct packages on the device.
@@ -149,6 +158,7 @@ describe('device', function device() {
             `],
             [`components/${name}.xml`, undent`
                 <component name="${name}">
+                    <!-- ${COMPLIB_PADDING} -->
                 </component>
             `]
         ]);
