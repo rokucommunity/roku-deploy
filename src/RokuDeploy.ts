@@ -553,11 +553,9 @@ export class RokuDeploy {
                     throw new errors.ConnectionResetError(e, requestOptions);
                 } else {
                     //a "corrupt zip" failure is often just an undersized zip; add a helpful hint if so
-                    if (this.isCorruptZipError(e?.message) || this.isCorruptZipError(e?.results?.body)) {
-                        const hint = this.getUndersizedZipHint(zipFilePath);
-                        if (hint) {
-                            e.message = `${e.message}${hint}`;
-                        }
+                    const errorText = `${e.message} ${e.results?.body ?? ''}`;
+                    if (this.isCorruptZipError(errorText)) {
+                        e.message = `${e.message}${this.getUndersizedZipHint(zipFilePath)}`;
                     }
                     throw e;
                 }
@@ -614,7 +612,7 @@ export class RokuDeploy {
      */
     private isCorruptZipError(text: string) {
         //device text (firmware 15.x): "Install Failure: Unzip failed. Invalid or corrupt zip archive.  Unloading."
-        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text ?? '');
+        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text);
     }
 
     /**
