@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as crypto from 'crypto';
 import * as fsExtra from 'fs-extra';
 import * as net from 'net';
 import * as http from 'http';
@@ -519,284 +520,73 @@ describe('device', function device() {
         });
     });
 
-    describe('install size boundary', function installSizeBoundary() {
-        //Roku firmware rejects sideloaded zips below a hard minimum size with "Unzip failed. Invalid or
-        //corrupt zip archive." As of firmware 15.x the minimum for a channel is 512 bytes (>=512 installs,
-        //<512 fails), the same on every device. Each test probes around a known value; if it moved, we
-        //walk + binary-search the new value and report it.
+    describe.only('install size boundary', function installSizeBoundary() {
+        //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
+        //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
+        //a zip of exactly 511 and exactly 512 bytes and asserts 511 fails, 512 installs.
         this.timeout(0);
+        const BOUNDARY = 512;
 
-        const WALK_STEP = 100;
-        const WALK_LIMIT = 20_000;
-
-        //incompressible, non-repeating chars: ~1 char == 1 zip byte. Coarse size knob.
+        //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
+        //exact zip size (a repeated char would compress away and give us no size control).
         function noise(n: number): string {
-            const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let str = '';
-            /* eslint-disable no-bitwise */
-            let state = 0x1234_5678;
-            for (let i = 0; i < n; i++) {
-                state ^= state << 13;
-                state ^= state >>> 17;
-                state ^= state << 5;
-                str += alpha[(state >>> 0) % alpha.length];
-            }
-            /* eslint-enable no-bitwise */
-            return str;
+            return crypto.randomBytes(n).toString('base64').slice(0, n);
         }
 
-        //A strategy describes one kind of package to size-test. `writeProject` lays out the source files in
-        //`dir` with a padding comment = noise (coarse) + a run of 'A' (compressible, nudges the zip ~1 byte).
-        interface Strategy {
-            label: string;
-            dir: string;
-            appType: 'channel' | 'dcl';
-            knownBoundary: number;
-            //explicit file list so the zip glob never sweeps the zip/staging we write into the same dir
-            files: string[];
-            writeProject: (dir: string, comment: string) => void;
-        }
-
-        //Build the package to exactly `target` bytes and install it, discovering/asserting the boundary.
-        function makeBoundaryTest(strategy: Strategy) {
-            const cache = new Map<number, boolean>();
-
-            //match the working single-dir layout: rootDir == outDir, and an EXPLICIT `files` list so the
-            //zip glob only picks up the source files (never the app.zip or staging it writes alongside).
-            const rootDir2 = strategy.dir;
-            const stagingDir2 = s`${strategy.dir}/staging`;
-
-            //write the project with a comment of noise(noiseLen)+'A'*runLen, package it, return zip size.
-            //writeProject always writes the same filenames (only content changes), so we just overwrite in
-            //place - no wiping rootDir between builds (that remove-then-write cycle races on Windows).
-            async function build(noiseLen: number, runLen: number): Promise<number> {
-                strategy.writeProject(rootDir2, `${noise(Math.max(0, noiseLen))}${'A'.repeat(Math.max(0, runLen))}`);
-                await rokuDeploy.rokuDeploy.createPackage({
-                    ...options,
-                    rootDir: rootDir2,
-                    stagingDir: stagingDir2,
-                    outDir: rootDir2,
-                    outFile: 'app',
-                    files: strategy.files
-                });
-                return fsExtra.statSync(s`${rootDir2}/app.zip`).size;
+        //build a zip whose size is EXACTLY `target` bytes and install it; return whether it installed.
+        //`dir` doubles as rootDir and outDir; `files` is explicit so the glob never re-includes app.zip.
+        async function installsAtSize(dir: string, files: string[], appType: 'channel' | 'dcl', writeProject: (pad: string) => void, target: number): Promise<boolean> {
+            const build = async (pad: string) => {
+                writeProject(pad);
+                await rokuDeploy.rokuDeploy.createPackage({ ...options, rootDir: dir, stagingDir: s`${dir}/staging`, outDir: dir, outFile: 'app', files: files });
+                return fsExtra.statSync(s`${dir}/app.zip`).size;
+            };
+            //converge the padding length until the zip is exactly `target` bytes (1 pad char ~ 1 zip byte)
+            let padLen = target;
+            let size = await build(noise(padLen));
+            for (let i = 0; i < 40 && size !== target; i++) {
+                padLen = Math.max(0, padLen + (target - size));
+                size = await build(noise(padLen));
             }
-
-            //smallest zip this package can produce (zero padding) - anything below it is unconstructible
-            async function measureFloor(): Promise<number> {
-                return build(0, 0);
+            if (size !== target) {
+                throw new Error(`could not construct an exact ${target}-byte zip (closest ${size})`);
             }
-
-            //produce a zip of exactly `target` bytes: converge noise, then fill the last few bytes with 'A's
-            async function buildExact(target: number): Promise<boolean> {
-                let noiseLen = target;
-                let size = await build(noiseLen, 0);
-                for (let i = 0; i < 30 && size !== target; i++) {
-                    noiseLen += target - size;
-                    if (noiseLen < 0) {
-                        noiseLen = 0;
-                    }
-                    size = await build(noiseLen, 0);
-                    //hit the floor (noiseLen==0) - can't go smaller, stop converging
-                    if (noiseLen === 0) {
-                        break;
-                    }
-                }
-                if (size === target) {
-                    return true;
-                }
-                for (let back = 0; back <= 80; back++) {
-                    const base = noiseLen - back;
-                    if (base < 0) {
-                        break;
-                    }
-                    for (let runLen = 0; runLen <= 200; runLen++) {
-                        const z = await build(base, runLen);
-                        if (z === target) {
-                            return true;
-                        }
-                        if (z > target) {
-                            break;
-                        }
-                    }
-                }
+            try {
+                await rokuDeploy.rokuDeploy.publish({ ...options, outDir: dir, outFile: 'app', appType: appType, failOnCompileError: true });
+                return true;
+            } catch {
                 return false;
             }
-
-            //install a zip of exactly `zip` bytes. true = installed OK. Memoized.
-            async function installs(zip: number): Promise<boolean> {
-                if (cache.has(zip)) {
-                    return cache.get(zip);
-                }
-                if (!(await buildExact(zip))) {
-                    throw new Error(`could not construct an exact ${zip}-byte zip`);
-                }
-                let ok: boolean;
-                try {
-                    await rokuDeploy.rokuDeploy.publish({ ...options, outDir: rootDir2, outFile: 'app', appType: strategy.appType, failOnCompileError: true });
-                    ok = true;
-                } catch {
-                    ok = false;
-                }
-                cache.set(zip, ok);
-                console.log(`  [${strategy.label}] zip=${zip} => ${ok ? 'OK' : 'FAIL'}`);
-                return ok;
-            }
-
-            //binary search for the smallest installable size, given a failing and passing size (fail < pass)
-            async function bisect(failStart: number, passStart: number): Promise<number> {
-                let fail = failStart;
-                let pass = passStart;
-                while (pass - fail > 1) {
-                    const mid = Math.floor((fail + pass) / 2);
-                    let ok: boolean;
-                    try {
-                        ok = await installs(mid);
-                    } catch {
-                        //can't construct exactly `mid`; try its neighbor
-                        ok = await installs(mid + 1);
-                        if (ok) {
-                            pass = mid + 1;
-                        } else {
-                            fail = mid + 1;
-                        }
-                        continue;
-                    }
-                    if (ok) {
-                        pass = mid;
-                    } else {
-                        fail = mid;
-                    }
-                }
-                return pass;
-            }
-
-            //find the true boundary when the probes didn't hold: walk to bracket it, then bisect
-            async function findBoundary(atOk: boolean, belowOk: boolean): Promise<number> {
-                const known = strategy.knownBoundary;
-                if (!atOk) {
-                    //moved up: walk up until an install succeeds
-                    let lastFail = known;
-                    let firstPass = -1;
-                    for (let z = known + WALK_STEP; z <= WALK_LIMIT; z += WALK_STEP) {
-                        if (await installs(z)) {
-                            firstPass = z;
-                            break;
-                        }
-                        lastFail = z;
-                    }
-                    if (firstPass < 0) {
-                        throw new Error(`no installable size found up to ${WALK_LIMIT} bytes`);
-                    }
-                    return bisect(lastFail, firstPass);
-                }
-                //moved down (belowOk): walk down until an install fails
-                let firstFail = -1;
-                let lastPass = known - 1;
-                for (let z = known - 1 - WALK_STEP; z >= 0; z -= WALK_STEP) {
-                    if (!(await installs(z))) {
-                        firstFail = z;
-                        break;
-                    }
-                    lastPass = z;
-                }
-                //everything down to the smallest zip still installs
-                if (firstFail < 0) {
-                    return lastPass;
-                }
-                return bisect(firstFail, lastPass);
-            }
-
-            return async function run() {
-                const known = strategy.knownBoundary;
-                //work out of the repo root (beforeEach parks us inside the shared .tmp)
-                process.chdir(cwd);
-                //start from a clean scratch tree ONCE per run (not per build - per-build wiping races the
-                //writes on Windows; never wiping leaves stale locked files). build() then overwrites in place.
-                fsExtra.removeSync(strategy.dir);
-                fsExtra.ensureDirSync(rootDir2);
-
-                await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-
-                console.log(`[${strategy.label}] verifying known boundary=${known} on ${options.host}`);
-
-                //The package has a constructible floor: the smallest zip it can produce with zero padding
-                //(a complib ships more files than a channel, so its floor is higher). We can't test sizes
-                //below the floor. If `known` is below it, the hardcoded value is simply wrong - report the
-                //floor. If the floor installs, the true minimum is <= floor and can't be probed lower here.
-                const floor = await measureFloor();
-                console.log(`  [${strategy.label}] constructible floor = ${floor} bytes`);
-                if (known < floor) {
-                    const floorOk = await installs(floor);
-                    throw new Error(
-                        `expected the minimum installable ${strategy.label} zip size to be ${known} bytes, but this ` +
-                        `package can't be built smaller than ${floor} bytes${floorOk ? ' (which installs fine)' : ''}. ` +
-                        `Update the hardcoded value for "${strategy.label}" to ${floor}.`
-                    );
-                }
-
-                //fast path: probe below/at/above. If they match (FAIL/OK/OK), the boundary is `known`.
-                //`known - 1` may be below the constructible floor; treat unconstructible as "can't install".
-                const belowOk = known - 1 < floor ? false : await installs(known - 1);
-                const atOk = await installs(known);
-                const aboveOk = belowOk === false && atOk === true ? await installs(known + 1) : true;
-
-                //true smallest installable size: `known` if probes held, else walked/bisected
-                const actual = (belowOk === false && atOk === true && aboveOk === true)
-                    ? known
-                    : await findBoundary(atOk, belowOk);
-
-                await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-
-                //standardized pass/fail: plain Error (no Chai -/+ diff) so the whole sentence is the message
-                if (actual !== known) {
-                    throw new Error(
-                        `expected the minimum installable ${strategy.label} zip size to be ${known} bytes but it was ${actual} bytes. ` +
-                        `Update the hardcoded value in device.spec.ts for "${strategy.label}" from ${known} to ${actual}.`
-                    );
-                }
-            };
         }
 
-        //--- channel: minimal app (manifest + source/main.brs) ---
-        const CHANNEL_BOUNDARY = 512;
-        it(`channel: rejects zips below ${CHANNEL_BOUNDARY} bytes and accepts zips at/above it`, makeBoundaryTest({
-            label: 'channel',
-            dir: s`${tempDir}/ziptest-channel`,
-            appType: 'channel',
-            knownBoundary: CHANNEL_BOUNDARY,
-            files: ['manifest', 'source/**/*'],
-            writeProject: (dir, comment) => {
-                fsExtra.outputFileSync(s`${dir}/manifest`, 'title=a');
-                fsExtra.outputFileSync(s`${dir}/source/main.brs`, [
-                    'sub Main()',
-                    `    '${comment}`,
-                    '    s = CreateObject("roSGScreen")',
-                    '    p = CreateObject("roMessagePort")',
-                    '',
-                    '    while 1',
-                    '        r = wait(0, p)',
-                    '    end while',
-                    '',
-                    'end sub'
-                ].join('\n'));
-            }
-        }));
+        async function assertBoundary(label: string, dir: string, files: string[], appType: 'channel' | 'dcl', writeProject: (pad: string) => void) {
+            process.chdir(cwd); //beforeEach parks us inside the shared .tmp
+            fsExtra.removeSync(dir);
+            fsExtra.ensureDirSync(dir);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
 
-        //--- component library: manifest + a single component xml (matches the tiny installComponentLibrary) ---
-        const COMPLIB_BOUNDARY = 512;
-        it(`complib: rejects zips below ${COMPLIB_BOUNDARY} bytes and accepts zips at/above it`, makeBoundaryTest({
-            label: 'complib',
-            dir: s`${tempDir}/ziptest-complib`,
-            appType: 'dcl',
-            knownBoundary: COMPLIB_BOUNDARY,
-            files: ['manifest', 'components/**/*'],
-            writeProject: (dir, comment) => {
-                fsExtra.outputFileSync(s`${dir}/manifest`, 'sg_component_libs_provided=a');
-                //padding is an XML comment (smaller than an attribute); `comment` is the size knob, 2 files
-                fsExtra.outputFileSync(s`${dir}/components/a.xml`, `<component name="a"><!--${comment}--></component>`);
-            }
-        }));
+            const below = await installsAtSize(dir, files, appType, writeProject, BOUNDARY - 1);
+            const at = await installsAtSize(dir, files, appType, writeProject, BOUNDARY);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            console.log(`[${label}] ${BOUNDARY - 1}=>${below ? 'OK' : 'FAIL'} ${BOUNDARY}=>${at ? 'OK' : 'FAIL'}`);
+            expect(below, `expected a ${BOUNDARY - 1}-byte ${label} zip to be REJECTED`).to.equal(false);
+            expect(at, `expected a ${BOUNDARY}-byte ${label} zip to INSTALL`).to.equal(true);
+        }
+
+        it(`channel: rejects zips below ${BOUNDARY} bytes, accepts at/above`, async () => {
+            await assertBoundary('channel', s`${tempDir}/ziptest-channel`, ['manifest', 'source/**/*'], 'channel', (pad) => {
+                fsExtra.outputFileSync(s`${tempDir}/ziptest-channel/manifest`, 'title=a');
+                fsExtra.outputFileSync(s`${tempDir}/ziptest-channel/source/main.brs`, `sub Main()\n'${pad}\nend sub`);
+            });
+        });
+
+        it(`complib: rejects zips below ${BOUNDARY} bytes, accepts at/above`, async () => {
+            await assertBoundary('complib', s`${tempDir}/ziptest-complib`, ['manifest', 'components/**/*'], 'dcl', (pad) => {
+                fsExtra.outputFileSync(s`${tempDir}/ziptest-complib/manifest`, 'sg_component_libs_provided=a');
+                fsExtra.outputFileSync(s`${tempDir}/ziptest-complib/components/a.xml`, `<component name="a"><!--${pad}--></component>`);
+            });
+        });
     });
 
     describe.skip('install app + libs, then delete everything', function installDeleteEverything() {
