@@ -520,12 +520,12 @@ describe('device', function device() {
         });
     });
 
-    describe.only('install size boundary', function installSizeBoundary() {
+    describe('install size boundary', function installSizeBoundary() {
         //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
         //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
-        //a zip of exactly 511 and exactly 512 bytes and asserts 511 fails, 512 installs.
+        //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
         this.timeout(0);
-        const BOUNDARY = 512;
+        const BOUNDARY = rokuDeploy.RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
         //exact zip size (a repeated char would compress away and give us no size control).
@@ -533,9 +533,9 @@ describe('device', function device() {
             return crypto.randomBytes(n).toString('base64').slice(0, n);
         }
 
-        //build a zip whose size is EXACTLY `target` bytes and install it; return whether it installed.
+        //build a zip in `dir` whose size is EXACTLY `target` bytes.
         //`dir` doubles as rootDir and outDir; `files` is explicit so the glob never re-includes app.zip.
-        async function installsAtSize(dir: string, files: string[], appType: 'channel' | 'dcl', writeProject: (pad: string) => void, target: number): Promise<boolean> {
+        async function buildExactZip(dir: string, files: string[], writeProject: (pad: string) => void, target: number): Promise<void> {
             const build = async (pad: string) => {
                 writeProject(pad);
                 await rokuDeploy.rokuDeploy.createPackage({ ...options, rootDir: dir, stagingDir: s`${dir}/staging`, outDir: dir, outFile: 'app', files: files });
@@ -551,6 +551,11 @@ describe('device', function device() {
             if (size !== target) {
                 throw new Error(`could not construct an exact ${target}-byte zip (closest ${size})`);
             }
+        }
+
+        //build a zip of exactly `target` bytes and publish it; return whether it installed.
+        async function installsAtSize(dir: string, files: string[], appType: 'channel' | 'dcl', writeProject: (pad: string) => void, target: number): Promise<boolean> {
+            await buildExactZip(dir, files, writeProject, target);
             try {
                 await rokuDeploy.rokuDeploy.publish({ ...options, outDir: dir, outFile: 'app', appType: appType, failOnCompileError: true });
                 return true;
@@ -586,6 +591,34 @@ describe('device', function device() {
                 fsExtra.outputFileSync(s`${tempDir}/ziptest-complib/manifest`, 'sg_component_libs_provided=a');
                 fsExtra.outputFileSync(s`${tempDir}/ziptest-complib/components/a.xml`, `<component name="a"><!--${pad}--></component>`);
             });
+        });
+
+        it('publish() of an undersized zip throws an error explaining the size limit', async () => {
+            process.chdir(cwd); //beforeEach parks us inside the shared .tmp
+            const dir = s`${tempDir}/ziptest-undersized`;
+            fsExtra.removeSync(dir);
+            fsExtra.ensureDirSync(dir);
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            //a zip below the minimum installable size; the device rejects it as a corrupt zip
+            const size = BOUNDARY - 1;
+            await buildExactZip(dir, ['manifest', 'source/**/*'], (pad) => {
+                fsExtra.outputFileSync(s`${dir}/manifest`, 'title=a');
+                fsExtra.outputFileSync(s`${dir}/source/main.brs`, `sub Main()\n'${pad}\nend sub`);
+            }, size);
+
+            let thrown: Error;
+            try {
+                await rokuDeploy.rokuDeploy.publish({ ...options, outDir: dir, outFile: 'app', appType: 'channel', failOnCompileError: true });
+            } catch (e) {
+                thrown = e as Error;
+            }
+
+            expect(thrown, 'expected publish() to throw for an undersized zip').to.be.ok;
+            //the device's corrupt-zip failure, plus our appended size hint
+            expect(thrown.message).to.contain('Invalid or corrupt zip archive');
+            expect(thrown.message).to.contain(`Your zip is ${size} bytes`);
+            expect(thrown.message).to.contain(`minimum installable size of ${BOUNDARY} bytes`);
         });
     });
 
