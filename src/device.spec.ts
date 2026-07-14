@@ -627,8 +627,8 @@ describe('device', function device() {
             expect(thrown, 'expected publish() to throw for an undersized zip').to.be.ok;
             //the device's corrupt-zip failure, plus our appended size hint
             expect(thrown.message).to.contain('Invalid or corrupt zip archive');
-            expect(thrown.message).to.contain(`Your zip is ${size} bytes`);
-            expect(thrown.message).to.contain(`minimum installable size of ${BOUNDARY} bytes`);
+            expect(thrown.message).to.contain(`The supplied zip is ${size} bytes`);
+            expect(thrown.message).to.contain(`Zips smaller than ${BOUNDARY} bytes`);
         });
     });
 

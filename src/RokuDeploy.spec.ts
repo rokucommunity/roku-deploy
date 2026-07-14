@@ -1511,8 +1511,8 @@ describe('RokuDeploy', () => {
             const zipSize = fsExtra.statSync(rokuDeploy.getOutputZipFilePath(options)).size;
             await expectThrowsAsync(
                 rokuDeploy.publish(options),
-                `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. Your zip is ${zipSize} bytes, ` +
-                `which is smaller than the minimum installable size of ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes - this is likely the problem.`
+                `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. ` +
+                `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`
             );
         });
 
@@ -1529,7 +1529,7 @@ describe('RokuDeploy', () => {
                 thrown = e as Error;
             }
             expect(thrown?.message).to.contain('Invalid or corrupt zip archive');
-            expect(thrown?.message).to.contain(`Your zip is ${zipSize} bytes`);
+            expect(thrown?.message).to.contain(`The supplied zip is ${zipSize} bytes`);
         });
 
         it('appends an undersized-zip hint when the thrown error carries the corrupt-zip text in results.body', async () => {
@@ -1546,7 +1546,7 @@ describe('RokuDeploy', () => {
             } catch (e) {
                 thrown = e as Error;
             }
-            expect(thrown?.message).to.contain(`Your zip is ${zipSize} bytes`);
+            expect(thrown?.message).to.contain(`The supplied zip is ${zipSize} bytes`);
         });
 
         it('does NOT append a hint to a thrown corrupt-zip error when the zip is large enough', async () => {

@@ -627,8 +627,7 @@ export class RokuDeploy {
             return '';
         }
         if (size < RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE) {
-            return ` Your zip is ${size} bytes, which is smaller than the minimum installable size of ` +
-                `${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes - this is likely the problem.`;
+            return ` The supplied zip is ${size} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`;
         }
         return '';
     }
