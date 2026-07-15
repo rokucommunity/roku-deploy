@@ -207,6 +207,7 @@ describe('device', function device() {
             `],
             [`libsource/${name}.brs`, undent`
                 ${requiredLibraryStatements}
+                '${COMPLIB_PADDING}
                 function ${name}_greet(message as string) as void
                     ? "Hello from ${name}: " + message
                 ${delegationCalls}
@@ -736,6 +737,154 @@ describe('device', function device() {
         });
     });
 
+    describe.skip('delete-order reboot hunt', function deleteOrderRebootHunt() {
+        //Bug hunt: an interdependent app + library chain (modeled after the `code-library` sample) is
+        //suspected of rebooting the device when its pieces are deleted in certain orders. We install the
+        //full set in the ONLY valid build order (leaf-first: charlie, beta, alpha, then the app that
+        //requires all three) and then try EVERY deletion permutation of the four pieces, watching for an
+        //unexpected reboot after each individual delete.
+        //
+        //The dependency shape mirrors the sample exactly:
+        //  - charlie: leaf, requires nothing
+        //  - beta:    requires charlie
+        //  - alpha:   requires beta AND charlie
+        //  - app:     a channel that requires alpha, beta, and charlie
+        //
+        //24 permutations x (reinstall the whole set + 4 deletes) against a real device is slow; give it lots of room.
+        this.timeout(30 * 60 * 1000);
+
+        const CHARLIE = 'charlie';
+        const BETA = 'beta';
+        const ALPHA = 'alpha';
+        const APP = 'app';
+
+        //map of library name -> the archiveFileName the device assigned it, captured at install time so we
+        //can target each complib in deleteComponentLibrary regardless of how the device names the file.
+        let libFileNames: Record<string, string>;
+
+        //install the whole set in the only valid order (leaf-first), capturing each complib's archiveFileName.
+        //Returns once the app (channel) + all three libraries are installed.
+        async function installFullSet() {
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+            libFileNames = {};
+
+            //leaf-first so each library's dependencies already exist when it's built/installed
+            for (const [name, requires] of [
+                [CHARLIE, []],
+                [BETA, [CHARLIE]],
+                [ALPHA, [BETA, CHARLIE]]
+            ] as Array<[string, string[]]>) {
+                const before = new Set(await getInstalledComponentLibraryFileNames());
+                await installBrightScriptLibrary(name, requires);
+                const after = await getInstalledComponentLibraryFileNames();
+                const added = after.filter(x => !before.has(x));
+                //exactly one new complib should have appeared: the one we just installed
+                expect(added, `expected installing "${name}" to add exactly one complib`).to.have.lengthOf(1);
+                libFileNames[name] = added[0];
+            }
+
+            //now the app: a channel that requires the whole library chain
+            writeFiles(rootDir, [
+                ['manifest', undent`
+                    title=RokuDeployTestChannel
+                    major_version=1
+                    minor_version=0
+                    build_version=1
+                    bs_libs_required=${[ALPHA, BETA, CHARLIE].join(',')}
+                    rsg_version=1.2
+                    ui_resolutions=hd
+                `]
+            ]);
+            await rokuDeploy.rokuDeploy.deploy({
+                ...options,
+                appType: 'channel',
+                outFile: 'channel',
+                failOnCompileError: true
+            });
+
+            //sanity: channel + all three complibs are present
+            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+                channels: 1,
+                complibs: 3
+            });
+        }
+
+        //delete a single piece by name. The app is a channel (deleteInstalledChannel); the libs are
+        //complibs (deleteComponentLibrary by their captured archiveFileName).
+        async function deletePiece(name: string) {
+            if (name === APP) {
+                await rokuDeploy.rokuDeploy.deleteInstalledChannel({ ...options, timeout: REQUEST_TIMEOUT });
+            } else {
+                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
+                    host: options.host,
+                    password: options.password,
+                    fileName: libFileNames[name]
+                });
+            }
+        }
+
+        //all 24 delete orderings of the four pieces
+        function permutations<T>(items: T[]): T[][] {
+            if (items.length <= 1) {
+                return [items];
+            }
+            const result: T[][] = [];
+            for (let i = 0; i < items.length; i++) {
+                const rest = [...items.slice(0, i), ...items.slice(i + 1)];
+                for (const p of permutations(rest)) {
+                    result.push([items[i], ...p]);
+                }
+            }
+            return result;
+        }
+
+        it('does not reboot the device under any deletion order', async () => {
+            const orders = permutations([APP, ALPHA, BETA, CHARLIE]);
+            //orders whose deletion caused an unexpected reboot, with the exact step that triggered it
+            const rebootTriggers: Array<{ order: string[]; afterDeleting: string; step: number }> = [];
+
+            for (let orderIndex = 0; orderIndex < orders.length; orderIndex++) {
+                const order = orders[orderIndex];
+                console.log(`[reboot-hunt] permutation ${orderIndex + 1}/${orders.length}: installing full set, then deleting in order [${order.join(', ')}]`);
+                await installFullSet();
+                console.log(`[reboot-hunt]   full set installed (charlie, beta, alpha, app)`);
+
+                //baseline uptime; a later read that is LOWER means the device rebooted in between
+                let priorUptime = await getDeviceUptime(options.host);
+
+                for (let step = 0; step < order.length; step++) {
+                    const piece = order[step];
+                    console.log(`[reboot-hunt]   step ${step + 1}/${order.length}: deleting "${piece}"...`);
+                    await deletePiece(piece);
+
+                    const nowUptime = await getDeviceUptime(options.host);
+                    //undefined = device unreachable (very likely mid-reboot); a drop in uptime = it rebooted
+                    const rebooted = nowUptime === undefined || (priorUptime !== undefined && nowUptime < priorUptime);
+                    if (rebooted) {
+                        console.log(`[reboot-hunt]   !! REBOOT DETECTED after deleting "${piece}" (step ${step + 1}) in order [${order.join(', ')}]; waiting for device to come back...`);
+                        rebootTriggers.push({ order: order, afterDeleting: piece, step: step + 1 });
+                        //let the device fully recover before the next permutation so we don't test mid-reboot
+                        await waitForDeviceOnline(options.host);
+                        console.log(`[reboot-hunt]   device back online; moving to next permutation`);
+                        break;
+                    }
+                    console.log(`[reboot-hunt]   deleted "${piece}" OK (uptime ${nowUptime ?? 'n/a'}s, no reboot)`);
+                    priorUptime = nowUptime;
+                }
+            }
+
+            console.log(`[reboot-hunt] done: ${orders.length} permutations tested, ${rebootTriggers.length} caused a reboot`);
+            //leave the device clean for the next test
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            expect(
+                rebootTriggers,
+                `these deletion orders rebooted the device:\n` +
+                rebootTriggers.map(t => `  - after deleting "${t.afterDeleting}" (step ${t.step}) in [${t.order.join(', ')}]`).join('\n')
+            ).to.eql([]);
+        });
+    });
+
     describe('deleteComponentLibrary', function deleteComponentLibraryTests() {
         //these tests install several complibs and then delete them one at a time, so give them extra time
         this.timeout(120_000);
@@ -925,6 +1074,21 @@ async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs
         }
     }
     throw new Error(`Device ${host} did not come back online within ${timeoutMs}ms. Last error: ${lastError?.message}`);
+}
+
+/**
+ * Read the device's current uptime (seconds since boot) via ECP. Used to detect an unexpected reboot:
+ * if uptime goes DOWN between two reads, the device rebooted in between. Returns undefined if the
+ * device is unreachable (e.g. mid-reboot), which the caller can treat as a reboot in progress.
+ */
+async function getDeviceUptime(host: string): Promise<number | undefined> {
+    try {
+        const info = await rokuDeploy.rokuDeploy.getDeviceInfo({ host: host, enhance: true, timeout: 15_000 });
+        //`enhance` coerces uptime to a number; guard anyway in case a device omits it
+        return typeof info.uptime === 'number' ? info.uptime : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
