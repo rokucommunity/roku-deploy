@@ -1,8 +1,10 @@
-import { util, standardizePath as s } from './util';
+import { util, standardizePath as s, defer } from './util';
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
 import { cwd, tempDir, rootDir } from './testUtils.spec';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 import * as dns from 'dns';
 import { createSandbox } from 'sinon';
 const sinon = createSandbox();
@@ -284,6 +286,146 @@ describe('util', () => {
             expect(
                 await util.fileExistsCaseInsensitive(s`${tempDir}/not-there`)
             ).to.be.false;
+        });
+    });
+
+    describe('tempDir', () => {
+        it('returns the realpath-resolved OS temp directory', () => {
+            expect(util.tempDir).to.equal(fs.realpathSync(os.tmpdir()));
+        });
+
+        it('caches the value after first access', () => {
+            const stub = sinon.stub(fs, 'realpathSync').returns('/fake/tmp' as any);
+            //force a fresh resolution
+            util['_tempDir'] = undefined;
+            expect(util.tempDir).to.equal('/fake/tmp');
+            //second access should be cached (realpathSync not called again)
+            expect(util.tempDir).to.equal('/fake/tmp');
+            expect(stub.callCount).to.equal(1);
+        });
+    });
+
+    describe('camelCase', () => {
+        it('defaults nullish input to empty string', () => {
+            expect(util.camelCase(undefined as any)).to.equal('');
+            expect(util.camelCase(null as any)).to.equal('');
+            expect(util.camelCase('')).to.equal('');
+        });
+
+        it('matches lodash across the full Roku device-info key set and edge cases', () => {
+            const cases: Array<[string, string]> = [
+                ['udn', 'udn'],
+                ['device-id', 'deviceId'],
+                ['serial-number', 'serialNumber'],
+                ['advertising-id', 'advertisingId'],
+                ['is-tv', 'isTv'],
+                ['mobile-has-live-tv', 'mobileHasLiveTv'],
+                ['ui-resolution', 'uiResolution'],
+                ['wifi-mac', 'wifiMac'],
+                ['has-wifi-extender', 'hasWifiExtender'],
+                ['has-wifi-5g-support', 'hasWifi5GSupport'],
+                ['ethernet-mac', 'ethernetMac'],
+                ['time-zone-offset', 'timeZoneOffset'],
+                ['supports-find-remote', 'supportsFindRemote'],
+                ['find-remote-is-possible', 'findRemoteIsPossible'],
+                ['supports-rva', 'supportsRva'],
+                ['keyed-developer-id', 'keyedDeveloperId'],
+                ['supports-ecs-textedit', 'supportsEcsTextedit'],
+                ['supports-wake-on-wlan', 'supportsWakeOnWlan'],
+                ['has-play-on-roku', 'hasPlayOnRoku'],
+                ['support-url', 'supportUrl'],
+                ['trc-version', 'trcVersion'],
+                ['av-sync-calibration-enabled', 'avSyncCalibrationEnabled'],
+                ['brightscript-debugger-version', 'brightscriptDebuggerVersion'],
+                //edge cases: word boundaries on case/digit transitions and separators
+                ['foo_bar', 'fooBar'],
+                ['FOO_BAR', 'fooBar'],
+                ['fooBar', 'fooBar'],
+                ['XMLHttpRequest', 'xmlHttpRequest'],
+                ['foo3bar', 'foo3Bar'],
+                ['3foo', '3Foo'],
+                ['foo--bar', 'fooBar'],
+                ['  leading-space', 'leadingSpace'],
+                ['a1b2c3', 'a1B2C3'],
+                ['IPAddress', 'ipAddress'],
+                ['parseHTML5Video', 'parseHtml5Video'],
+                ['wifi5g', 'wifi5G'],
+                ['AB1CD', 'ab1Cd'],
+                ['a', 'a']
+            ];
+            for (const [input, expected] of cases) {
+                expect(util.camelCase(input), input).to.equal(expected);
+            }
+        });
+    });
+
+    describe('defer', () => {
+        it('resolves the promise', async () => {
+            const deferred = defer<number>();
+            deferred.resolve(42);
+            expect(await deferred.promise).to.equal(42);
+            expect(deferred.isResolved).to.be.true;
+            expect(deferred.isCompleted).to.be.true;
+        });
+
+        it('rejects the promise', async () => {
+            const deferred = defer<void>();
+            deferred.reject(new Error('boom'));
+            let caught: Error;
+            try {
+                await deferred.promise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('boom');
+            expect(deferred.isRejected).to.be.true;
+            expect(deferred.isCompleted).to.be.true;
+        });
+
+        it('tryResolve is a no-op once completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryResolve(1);
+            deferred.tryResolve(2);
+            expect(await deferred.promise).to.equal(1);
+        });
+
+        it('tryReject is a no-op once completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryResolve(1);
+            deferred.tryReject(new Error('should not surface'));
+            expect(await deferred.promise).to.equal(1);
+        });
+
+        it('tryReject rejects when not yet completed', async () => {
+            const deferred = defer<number>();
+            deferred.tryReject(new Error('boom'));
+            let caught: Error;
+            try {
+                await deferred.promise;
+            } catch (e) {
+                caught = e as Error;
+            }
+            expect(caught?.message).to.equal('boom');
+        });
+
+        it('throws when reject is called twice', () => {
+            const deferred = defer<number>();
+            deferred.reject(new Error('first'));
+            //swallow the unhandled rejection
+            deferred.promise.catch(() => { });
+            expect(() => deferred.reject(new Error('second'))).to.throw(/already rejected/);
+        });
+
+        it('throws when resolve is called twice', () => {
+            const deferred = defer<number>();
+            deferred.resolve(1);
+            expect(() => deferred.resolve(2)).to.throw(/already resolved/);
+        });
+
+        it('throws when reject is called after resolve', () => {
+            const deferred = defer<number>();
+            deferred.resolve(1);
+            expect(() => deferred.reject(new Error('x'))).to.throw(/already resolved/);
         });
     });
 

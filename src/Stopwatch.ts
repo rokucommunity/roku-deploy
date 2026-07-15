@@ -1,5 +1,5 @@
-import * as parseMilliseconds from 'parse-ms';
 import { performance } from 'perf_hooks';
+import { parseMilliseconds } from './dateUtils';
 
 export class Stopwatch {
     public totalMilliseconds = 0;

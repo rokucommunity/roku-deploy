@@ -38,6 +38,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.18.0](https://github.com/rokucommunity/roku-deploy/compare/3.17.7...v3.18.0) - 2026-07-15
+### Added
+ - Add deleteAllSideloadedPlugins, expose listSideloadedPlugins ([#309](https://github.com/rokucommunity/roku-deploy/pull/309))
+### Changed
+ - Better undersized zip error handling ([#312](https://github.com/rokucommunity/roku-deploy/pull/312))
+ - Migrate networking library from `postman-request` to `needle` ([#282](https://github.com/rokucommunity/roku-deploy/pull/282))
+
+
+
+## [3.17.7](https://github.com/rokucommunity/roku-deploy/compare/3.17.6...v3.17.7) - 2026-07-06
+### Added
+ - normalizeDeviceInfo function ([#300](https://github.com/rokucommunity/roku-deploy/pull/300))
+### Changed
+ - Reduced dependency count ([#299](https://github.com/rokucommunity/roku-deploy/pull/299)) ([#298](https://github.com/rokucommunity/roku-deploy/pull/298)) ([#297](https://github.com/rokucommunity/roku-deploy/pull/297))
+### Fixed
+ - potential crash in when normalizing DeviceInfo fields when supplied non-string values ([#301](https://github.com/rokucommunity/roku-deploy/pull/301))
+
+
+
+## [3.17.6](https://github.com/rokucommunity/roku-deploy/compare/3.17.5...v3.17.6) - 2026-06-04
+### Fixed
+ - Fix case-insensitive matching for absolute `files.src` glob patterns on case-insensitive file systems ([#279](https://github.com/rokucommunity/roku-deploy/pull/279))
+
+
+
 ## [3.17.5](https://github.com/rokucommunity/roku-deploy/compare/3.17.4...v3.17.5) - 2026-05-30
 ### Fixed
  - Preserve `!` glob-negation prefix when using normalizeFilesArray ([#277](https://github.com/rokucommunity/roku-deploy/pull/277))
