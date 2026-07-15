@@ -96,8 +96,16 @@ export class Request {
         //roku-deploy requests never exits. Translate the old keepAlive:false intent into needle's
         //`connection: 'close'` so needle sends `Connection: close` and tears the socket down after each
         //response. Only skip this if the caller explicitly asked to keep the connection alive.
+        //
+        //ALSO pass `agent: false`. needle defaults `agent` to null, which makes Node use `http.globalAgent`
+        //- a POOLING agent. The `Connection: close` header alone does NOT stop that pooling: the request
+        //immediately following an on-device delete could be handed a POOLED keep-alive socket that the Roku
+        //had already closed, producing an instant ECONNRESET ("socket hang up"). `agent: false` tells Node to
+        //create a brand-new, un-pooled socket for every request and destroy it afterward, so a dead socket
+        //can never be handed to the next request. The `Connection: close` header stays as belt-and-suspenders.
         if (params.agentOptions?.keepAlive !== true) {
             needleOptions.connection = 'close';
+            needleOptions.agent = false;
         }
 
         //digest auth. `request` was configured with `auth.sendImmediately: false`, which performs the

@@ -25,6 +25,13 @@ export class RokuDeploy {
 
     private logger: Logger;
 
+    /**
+     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
+     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
+     * both channels and component libraries).
+     */
+    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
+
     //store the import on the class to make testing easier
     public fsExtra = _fsExtra;
 
@@ -545,6 +552,11 @@ export class RokuDeploy {
                 } else if (e.code === 'ECONNRESET') {
                     throw new errors.ConnectionResetError(e, requestOptions);
                 } else {
+                    //a "corrupt zip" failure is often just an undersized zip; add a helpful hint if so
+                    const errorText = `${e.message} ${e.results?.body ?? ''}`;
+                    if (this.isCorruptZipError(errorText)) {
+                        e.message = `${e.message}${this.getUndersizedZipHint(zipFilePath)}`;
+                    }
                     throw e;
                 }
             }
@@ -552,6 +564,14 @@ export class RokuDeploy {
             //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
             if (this.isUpdateCheckRequiredResponse(response.body)) {
                 throw new errors.UpdateCheckRequiredError(response, requestOptions);
+            }
+
+            //a "corrupt zip" failure can also come back in a non-error response body; add the size hint if so
+            if (this.isCorruptZipError(response.body)) {
+                const hint = this.getUndersizedZipHint(zipFilePath);
+                if (hint) {
+                    throw new Error(`Failed to publish: ${response.body}${hint}`);
+                }
             }
 
             if (options.failOnCompileError) {
@@ -583,6 +603,33 @@ export class RokuDeploy {
      */
     private isCompileError(responseHtml: string) {
         return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
+    }
+
+    /**
+     * Does the text look like the device's "corrupt/invalid zip" install failure? The Roku firmware
+     * returns this when a sideloaded zip can't be unzipped - most commonly because the zip is below the
+     * minimum installable size (see MINIMUM_INSTALLABLE_ZIP_SIZE).
+     */
+    private isCorruptZipError(text: string) {
+        //device text (firmware 15.x): "Install Failure: Unzip failed. Invalid or corrupt zip archive.  Unloading."
+        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text);
+    }
+
+    /**
+     * When a sideload fails with a "corrupt zip" error, check whether the zip is simply too small for the
+     * firmware to accept. If so, return a helpful hint to append to the error; otherwise return ''.
+     */
+    private getUndersizedZipHint(zipFilePath: string) {
+        let size: number;
+        try {
+            size = this.fsExtra.statSync(zipFilePath).size;
+        } catch {
+            return '';
+        }
+        if (size < RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE) {
+            return ` The supplied zip is ${size} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`;
+        }
+        return '';
     }
 
     /**
