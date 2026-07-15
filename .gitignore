@@ -7,3 +7,4 @@ out
 coverage
 .nyc_output
 *.zip
+.env
