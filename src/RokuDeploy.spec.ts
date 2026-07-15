@@ -740,7 +740,7 @@ describe('RokuDeploy', () => {
                 <keyed-developer-id>${expectedDevId}</keyed-developer-id>
             </device-info>`;
             mockDoGetRequest(body);
-            let devId = await rokuDeploy.getDevId({
+            let { devId } = await rokuDeploy.getDevId({
                 host: '1.2.3.4'
             });
             expect(devId).to.equal(expectedDevId);
@@ -757,8 +757,8 @@ describe('RokuDeploy', () => {
             it('uses constructor host when not provided in call', async () => {
                 const rd = new RokuDeploy({ host: 'constructor-host' });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'keyed-developer-id': 'abc123' } as any);
-                const result = await rd.getDevId();
-                expect(result).to.equal('abc123');
+                const { devId } = await rd.getDevId();
+                expect(devId).to.equal('abc123');
             });
 
             it('call host overrides constructor host', async () => {
@@ -862,7 +862,7 @@ describe('RokuDeploy', () => {
                 out: expectedPath
             });
 
-            expect(result).to.equal(expectedPath);
+            expect(result.zipPath).to.equal(expectedPath);
         });
 
         it('should return the default path when out is not specified', async () => {
@@ -873,7 +873,7 @@ describe('RokuDeploy', () => {
             });
 
             const expectedPath = path.resolve(process.cwd(), RokuDeploy['defaults'].outDir, RokuDeploy['defaults'].outFile);
-            expect(result).to.equal(expectedPath);
+            expect(result.zipPath).to.equal(expectedPath);
         });
 
     });
@@ -1803,7 +1803,7 @@ describe('RokuDeploy', () => {
             // Stub zip to create the file at the path sideload expects
             const zipStub = sinon.stub(rokuDeploy, 'zip').callsFake((zipOptions) => {
                 fsExtra.outputFileSync(zipOptions.out, 'dummy');
-                return Promise.resolve(zipOptions.out);
+                return Promise.resolve({ zipPath: zipOptions.out });
             });
             sinon.stub(rokuDeploy, 'closeChannel').resolves();
 
@@ -2299,14 +2299,14 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve('pkgs//P6953175d5df120c0069c53de12515b9a.pkg'));
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let result = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
                 out: s`${outDir}/roku-deploy.pkg`,
                 manifestPath: s`${tempDir}/manifest`
             });
-            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(result.pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs//P6953175d5df120c0069c53de12515b9a.pkg');
         });
 
@@ -2315,14 +2315,14 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let result = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
                 manifestPath: s`${tempDir}/manifest`,
                 out: s`${outDir}/roku-deploy.pkg`
             });
-            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(result.pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/sdcard0/Pae6cec1eab06a45ca1a7f5b69edd3a20.pkg');
         });
 
@@ -2334,14 +2334,14 @@ describe('RokuDeploy', () => {
 
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
-            let pkgPath = await rokuDeploy.createSignedPackage({
+            let result = await rokuDeploy.createSignedPackage({
                 host: '1.2.3.4',
                 password: 'password',
                 signingPassword: options.signingPassword,
                 manifestPath: s`${tempDir}/manifest`,
                 out: s`${outDir}/roku-deploy.pkg`
             });
-            expect(pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
+            expect(result.pkgPath).to.equal(s`${outDir}/roku-deploy.pkg`);
             expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:80/pkgs/P69f2e034f46a57a98bb35d387f22e1f3.pkg');
         });
 
@@ -5238,9 +5238,9 @@ describe('RokuDeploy', () => {
                 const currentDir = process.cwd();
                 writeFiles(currentDir, ['manifest']);
                 try {
-                    const result = await rokuDeploy.stage({ out: stagingDir });
+                    const { stagingDir: resultDir } = await rokuDeploy.stage({ out: stagingDir });
                     // If it doesn't throw, it found the manifest in cwd (default rootDir)
-                    expect(result).to.equal(stagingDir);
+                    expect(resultDir).to.equal(stagingDir);
                 } finally {
                     await fsExtra.remove(`${currentDir}/manifest`);
                 }
@@ -5248,8 +5248,8 @@ describe('RokuDeploy', () => {
 
             it('uses default outDir for staging', async () => {
                 writeFiles(rootDir, ['manifest']);
-                const result = await rokuDeploy.stage({ rootDir: rootDir });
-                expect(result).to.equal(s`${process.cwd()}/${RokuDeploy['defaults'].outDir}/.roku-deploy-staging`);
+                const { stagingDir: resultDir } = await rokuDeploy.stage({ rootDir: rootDir });
+                expect(resultDir).to.equal(s`${process.cwd()}/${RokuDeploy['defaults'].outDir}/.roku-deploy-staging`);
             });
         });
 
