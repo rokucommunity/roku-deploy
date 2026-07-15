@@ -5442,6 +5442,18 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', deleteDevChannel: false });
                 expect(deleteStub.called).to.be.false;
             });
+
+            it('does not delete the dev channel when sideloading a component library', async () => {
+                const deleteStub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves();
+                sinon.stub(rokuDeploy, 'closeChannel').resolves();
+                sinon.stub(fsExtra, 'pathExists').resolves(true);
+                sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
+                mockDoPostRequest('success');
+
+                //a `dcl` install lives in its own slot; deleting the dev channel would needlessly wipe an installed channel
+                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', appType: 'dcl' });
+                expect(deleteStub.called).to.be.false;
+            });
         });
     });
 

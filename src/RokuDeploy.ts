@@ -169,7 +169,7 @@ export class RokuDeploy {
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
         }
-      
+
         //create a zip of the folder
         await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
@@ -382,7 +382,10 @@ export class RokuDeploy {
             throw new Error('Either zip or dir must be provided');
         }
 
-        if (deleteDevChannel) {
+        //only delete the dev channel for channel sideloads; a component library (`dcl`) lives in a separate
+        //slot, so deleting the dev channel would needlessly wipe an installed channel that has nothing to do
+        //with the complib being installed.
+        if (deleteDevChannel && options.appType !== 'dcl') {
             try {
                 await this.deleteDevChannel(options);
             } catch (e) {
