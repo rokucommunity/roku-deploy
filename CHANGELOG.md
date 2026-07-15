@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.18.0](https://github.com/rokucommunity/roku-deploy/compare/3.17.7...v3.18.0) - 2026-07-15
+### Added
+ - Add deleteAllSideloadedPlugins, expose listSideloadedPlugins ([#309](https://github.com/rokucommunity/roku-deploy/pull/309))
+### Changed
+ - Better undersized zip error handling ([#312](https://github.com/rokucommunity/roku-deploy/pull/312))
+ - Migrate networking library from `postman-request` to `needle` ([#282](https://github.com/rokucommunity/roku-deploy/pull/282))
+
+
+
 ## [3.17.7](https://github.com/rokucommunity/roku-deploy/compare/3.17.6...v3.17.7) - 2026-07-06
 ### Added
  - normalizeDeviceInfo function ([#300](https://github.com/rokucommunity/roku-deploy/pull/300))
