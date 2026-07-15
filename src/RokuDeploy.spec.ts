@@ -1776,6 +1776,80 @@ describe('RokuDeploy', () => {
             assert.fail('Should not have succeeded');
         });
 
+        it('UpdateCheckRequiredError includes httpDetails from original error', async () => {
+            const mockHttpDetails = {
+                request: { url: 'http://1.2.3.4/plugin_install', method: 'POST' },
+                response: { statusCode: 577, body: 'test body' }
+            };
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                throw new errors.InvalidDeviceResponseCodeError('Test error', {
+                    httpDetails: mockHttpDetails
+                });
+            });
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    close: false
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                expect((e as errors.UpdateCheckRequiredError).details.httpDetails).to.eql(mockHttpDetails);
+                expect((e as errors.UpdateCheckRequiredError).cause).to.be.instanceof(errors.InvalidDeviceResponseCodeError);
+                return;
+            }
+            assert.fail('Should have thrown UpdateCheckRequiredError');
+        });
+
+        it('ConnectionResetError includes httpDetails from original error when available', async () => {
+            const mockHttpDetails = {
+                request: { url: 'http://1.2.3.4/plugin_install', method: 'POST' },
+                response: { statusCode: 200, body: 'partial response' }
+            };
+            const errorWithDetails = new ErrorWithConnectionResetCode() as any;
+            errorWithDetails.details = { httpDetails: mockHttpDetails };
+
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                throw errorWithDetails;
+            });
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    close: false
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConnectionResetError);
+                expect((e as errors.ConnectionResetError).details.httpDetails).to.eql(mockHttpDetails);
+                return;
+            }
+            assert.fail('Should have thrown ConnectionResetError');
+        });
+
+        it('ConnectionResetError has undefined httpDetails when original error has none', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                throw new ErrorWithConnectionResetCode();
+            });
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    close: false
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.ConnectionResetError);
+                expect((e as errors.ConnectionResetError).details.httpDetails).to.be.undefined;
+                return;
+            }
+            assert.fail('Should have thrown ConnectionResetError');
+        });
+
         it('succeeds when using a pre-built zip', async () => {
             mockDoPostRequest();
             const zipPath = `${outDir}/myapp.zip`;
