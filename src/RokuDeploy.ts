@@ -460,11 +460,15 @@ export class RokuDeploy {
             } catch (e: any) {
                 //if this is a 577 error, we have high confidence that the device needs to do an update check
                 if (this.isUpdateRequiredError(e)) {
-                    throw new UpdateCheckRequiredError({}, e);
+                    throw new UpdateCheckRequiredError({
+                        httpDetails: e.details?.httpDetails
+                    }, e);
 
                     //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
                 } else if (e.code === 'ECONNRESET') {
-                    throw new ConnectionResetError({}, e);
+                    throw new ConnectionResetError({
+                        httpDetails: e.details?.httpDetails
+                    }, e);
                 } else {
                     throw e;
                 }
