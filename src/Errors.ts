@@ -1,8 +1,8 @@
 import type { HttpResponse, RokuMessages } from './RokuDeploy';
-import type * as requestType from 'request';
+import type { RequestOptions, RequestResponse } from './request';
 
 export interface RequestResult {
-    response: requestType.Response;
+    response: RequestResponse;
     body: any;
 }
 export class InvalidDeviceResponseCodeError extends Error {
@@ -91,7 +91,7 @@ export class UpdateCheckRequiredError extends Error {
 
     constructor(
         public response: HttpResponse,
-        public requestOptions: requestType.OptionsWithUrl,
+        public requestOptions: RequestOptions,
         public cause?: Error
     ) {
         super();
@@ -111,7 +111,7 @@ export class ConnectionResetError extends Error {
 
     static MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 
-    constructor(error: Error, requestOptions: requestType.OptionsWithUrl) {
+    constructor(error: Error, requestOptions: RequestOptions) {
         super();
         this.message = ConnectionResetError.MESSAGE;
         this.cause = error;

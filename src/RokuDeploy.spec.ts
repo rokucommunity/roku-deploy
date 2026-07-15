@@ -13,10 +13,10 @@ import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
-import * as r from 'postman-request';
+import { request } from './request';
+import { httpClient } from './fetch';
 import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
-const request = r;
 
 const sinon = createSandbox();
 
@@ -729,6 +729,60 @@ describe('RokuDeploy', () => {
         it('decodes HTML entities', () => {
             expect(rokuDeploy['normalizeDeviceInfoFieldValue']('3&4')).to.eql('3&4');
             expect(rokuDeploy['normalizeDeviceInfoFieldValue']('3&amp;4')).to.eql('3&4');
+        });
+
+        it('returns non-string values unchanged', () => {
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](42)).to.eql(42);
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](0)).to.eql(0);
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](true)).to.eql(true);
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](false)).to.eql(false);
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](null)).to.be.null;
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](undefined)).to.be.undefined;
+            const obj = { name: 'roku' };
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](obj)).to.equal(obj);
+            const arr = [1, 2, 3];
+            expect(rokuDeploy['normalizeDeviceInfoFieldValue'](arr)).to.equal(arr);
+        });
+    });
+
+    describe('enhanceDeviceInfo', () => {
+        it('camel-cases keys and normalizes values', () => {
+            const result = rokuDeploy.enhanceDeviceInfo({
+                'serial-number': 'abc123',
+                'software-build': '4170',
+                'uptime': '19799',
+                'is-tv': 'false',
+                'supports-ethernet': 'true',
+                'support-url': '3&amp;4'
+            });
+            expect(result).to.eql({
+                serialNumber: 'abc123',
+                softwareBuild: 4170,
+                uptime: 19799,
+                isTv: false,
+                supportsEthernet: true,
+                supportUrl: '3&4'
+            });
+        });
+
+        it('produces the same result as getDeviceInfo with enhance enabled', async () => {
+            const deviceInfoBody = `<device-info>
+                <serial-number>abc123</serial-number>
+                <software-build>4170</software-build>
+                <is-tv>false</is-tv>
+                <developer-enabled>true</developer-enabled>
+                <support-url>3&amp;4</support-url>
+            </device-info>`;
+
+            mockDoGetRequest(deviceInfoBody);
+            const enhanced = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
+            const raw = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060 });
+
+            expect(rokuDeploy.enhanceDeviceInfo(raw)).to.eql(enhanced);
+        });
+
+        it('returns an empty object for an empty input', () => {
+            expect(rokuDeploy.enhanceDeviceInfo({})).to.eql({});
         });
     });
 
@@ -1882,6 +1936,97 @@ describe('RokuDeploy', () => {
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: 'success', response: { statusCode: 200 } });
                 await rd.sideload({ password: 'call-pass', zip: 'test.zip' } as any);
                 expect(stub.getCall(0).args[0].auth.pass).to.equal('call-pass');
+            });
+        });
+
+        describe('undersized zip hint', () => {
+            it('appends an undersized-zip hint when the response body reports a corrupt zip', async () => {
+                //the dummy zip written in beforeEach ('asdf') is well below the minimum installable size
+                mockDoPostRequest('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
+
+                const zipSize = fsExtra.statSync(zipFile).size;
+                await expectThrowsAsync(
+                    rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false }),
+                    `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. ` +
+                    `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`
+                );
+            });
+
+            it('appends an undersized-zip hint when the upload throws a corrupt-zip error', async () => {
+                sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                    return Promise.reject(new Error('Install Failure: Unzip failed. Invalid or corrupt zip archive.'));
+                });
+
+                const zipSize = fsExtra.statSync(zipFile).size;
+                let thrown: Error;
+                try {
+                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                } catch (e) {
+                    thrown = e as Error;
+                }
+                expect(thrown?.message).to.contain('Invalid or corrupt zip archive');
+                expect(thrown?.message).to.contain(`The supplied zip is ${zipSize} bytes`);
+            });
+
+            it('appends an undersized-zip hint when the thrown error carries the corrupt-zip text in results.body', async () => {
+                sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                    const err: any = new Error('some generic failure');
+                    err.results = { body: 'Install Failure: Unzip failed. Invalid or corrupt zip archive.' };
+                    return Promise.reject(err);
+                });
+
+                const zipSize = fsExtra.statSync(zipFile).size;
+                let thrown: Error;
+                try {
+                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                } catch (e) {
+                    thrown = e as Error;
+                }
+                expect(thrown?.message).to.contain(`The supplied zip is ${zipSize} bytes`);
+            });
+
+            it('does NOT append a hint to a thrown corrupt-zip error when the zip is large enough', async () => {
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                    return Promise.reject(new Error('Install Failure: Unzip failed. Invalid or corrupt zip archive.'));
+                });
+
+                let thrown: Error;
+                try {
+                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                } catch (e) {
+                    thrown = e as Error;
+                }
+                //error is rethrown unchanged (no size hint appended)
+                expect(thrown?.message).to.equal('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
+            });
+
+            it('rethrows a non-corrupt-zip upload error unchanged', async () => {
+                sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                    return Promise.reject(new Error('some unrelated failure'));
+                });
+
+                let thrown: Error;
+                try {
+                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                } catch (e) {
+                    thrown = e as Error;
+                }
+                expect(thrown?.message).to.equal('some unrelated failure');
+            });
+
+            it('does NOT append a hint when a corrupt-zip response comes from a large-enough zip', async () => {
+                //overwrite the dummy zip with one at/above the minimum installable size
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                mockDoPostRequest('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
+
+                //no hint => the corrupt-zip body is not turned into a thrown error, so sideload resolves normally
+                const result = await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                expect(result.message).to.equal('Successful sideload');
+            });
+
+            it('getUndersizedZipHint returns empty string when the zip cannot be stat-ed', () => {
+                expect(rokuDeploy['getUndersizedZipHint']('/does/not/exist.zip')).to.equal('');
             });
         });
     });
@@ -4734,11 +4879,23 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('getInstalledPackages', () => {
+    describe('deleteAllSideloadedPlugins', () => {
+        it('attempts to delete the dev channel and all component libraries on the device', async () => {
+            const stub = mockDoPostRequest();
+
+            let result = await rokuDeploy.deleteAllSideloadedPlugins({ ...options, host: 'localhost', password: 'password' });
+            expect(result).not.to.be.undefined;
+            expect(stub.getCall(0).args[0].formData).to.include({
+                mysubmit: 'DeleteAll'
+            });
+        });
+    });
+
+    describe('listSideloadedPlugins', () => {
         it('sends the dcl_enabled qs flag', async () => {
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([]);
         });
@@ -4751,7 +4908,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
                 dcl_enabled: '1'
@@ -4763,7 +4920,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([{
                 appType: 'channel',
@@ -4781,7 +4938,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
             expect(result).to.eql([]);
         });
 
@@ -4789,7 +4946,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('123');
             `);
-            const result = await rokuDeploy['getInstalledPackages']({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
             expect(result).to.eql([]);
         });
     });
@@ -4846,7 +5003,7 @@ describe('RokuDeploy', () => {
     describe('deleteAllComponentLibraries', () => {
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 0 packages
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([]));
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
             await rokuDeploy.deleteAllComponentLibraries({} as any);
             expect(stub.called).to.be.false;
@@ -4854,7 +5011,7 @@ describe('RokuDeploy', () => {
 
         it('sends no requests if there are no DCLs to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4871,7 +5028,7 @@ describe('RokuDeploy', () => {
 
         it('sends single request if only have one DCL to delete', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'channel',
                 archiveFileName: 'roku-deploy.zip',
                 fileType: 'zip',
@@ -4899,7 +5056,7 @@ describe('RokuDeploy', () => {
 
         it('sends one request for each DCL', async () => {
             //return 1 channel package
-            sinon.stub(rokuDeploy as any, 'getInstalledPackages').returns(Promise.resolve([{
+            sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([{
                 appType: 'dcl',
                 archiveFileName: 'lib1.zip',
                 fileType: 'zip',
@@ -5285,6 +5442,163 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', deleteDevChannel: false });
                 expect(deleteStub.called).to.be.false;
             });
+
+            it('does not delete the dev channel when sideloading a component library', async () => {
+                const deleteStub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves();
+                sinon.stub(rokuDeploy, 'closeChannel').resolves();
+                sinon.stub(fsExtra, 'pathExists').resolves(true);
+                sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
+                mockDoPostRequest('success');
+
+                //a `dcl` install lives in its own slot; deleting the dev channel would needlessly wipe an installed channel
+                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', appType: 'dcl' });
+                expect(deleteStub.called).to.be.false;
+            });
+        });
+    });
+
+    describe('validateDeveloperPassword', () => {
+        const CHALLENGE_HEADER = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
+
+        // Minimal Response-like stub — validateDeveloperPassword only reads status + headers.get
+        function fakeResponse(status: number, headers: Record<string, string> = {}): any {
+            const lower: Record<string, string> = {};
+            for (const [k, v] of Object.entries(headers)) {
+                lower[k.toLowerCase()] = v;
+            }
+            return {
+                status: status,
+                headers: {
+                    get: (name: string) => lower[name.toLowerCase()] ?? null
+                }
+            };
+        }
+
+        it('returns true when the device accepts the credentials', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result).to.be.true;
+            expect(fetchStub.callCount).to.equal(2);
+            // Second call carries the computed Authorization header
+            const secondCallHeaders = (fetchStub.secondCall.args[1] as any).headers;
+            expect(secondCallHeaders.Authorization).to.match(/^Digest /);
+            expect(secondCallHeaders.Authorization).to.include('realm="rokudev"');
+            expect(secondCallHeaders.Authorization).to.include('nonce="abc123"');
+            expect(secondCallHeaders.Authorization).to.include('uri="/plugin_install"');
+        });
+
+        it('returns false when the authenticated retry is rejected', async () => {
+            sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'wrong' });
+
+            expect(result).to.be.false;
+        });
+
+        it('throws DeviceUnreachableError when the first request throws', async () => {
+            sinon.stub(httpClient, 'fetch').rejects(new Error('ECONNREFUSED'));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('ECONNREFUSED');
+        });
+
+        it('throws InvalidDeviceResponseCodeError on an unexpected status (e.g. 500)', async () => {
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(500));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.InvalidDeviceResponseCodeError);
+            expect((thrown as Error).message).to.include('500');
+        });
+
+        it('returns false when a 401 has no WWW-Authenticate header', async () => {
+            sinon.stub(httpClient, 'fetch').resolves(fakeResponse(401));
+
+            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+
+            expect(result).to.be.false;
+        });
+
+        it('uses default port 80, username rokudev, and plugin_install path', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({ host: 'device.local', password: 'aaaa' });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:80/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
+            expect(authHeader).to.include('username="rokudev"');
+        });
+
+        it('honors custom username and port', async () => {
+            const fetchStub = sinon.stub(httpClient, 'fetch')
+                .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
+                .onSecondCall().resolves(fakeResponse(200));
+
+            await rokuDeploy.validateDeveloperPassword({
+                host: 'device.local',
+                password: 'aaaa',
+                username: 'somebody',
+                port: 8888
+            });
+
+            expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:8888/plugin_install');
+            const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
+            expect(authHeader).to.include('username="somebody"');
+        });
+
+        it('aborts the request when the timeout elapses', async () => {
+            sinon.stub(httpClient, 'fetch').callsFake((_url, init?: any) => {
+                return new Promise((resolve, reject) => {
+                    init?.signal?.addEventListener('abort', () => {
+                        const err: any = new Error('aborted');
+                        err.name = 'AbortError';
+                        reject(err);
+                    });
+                });
+            });
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({
+                    host: '1.2.3.4',
+                    password: 'aaaa',
+                    timeout: 20
+                });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+        });
+
+        it('stringifies non-Error fetch rejections', async () => {
+            sinon.stub(httpClient, 'fetch').callsFake(() => Promise.reject('boom'));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
+            expect((thrown as Error).message).to.include('boom');
         });
     });
 
