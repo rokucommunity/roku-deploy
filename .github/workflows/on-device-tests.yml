@@ -1,0 +1,17 @@
+name: on-device-tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  on-device-tests:
+    runs-on: [self-hosted, roku-latest, enabled]
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-node@master
+        with:
+          node-version: "18.20.4"
+      - run: npm ci
+      - run: npm run test:device
