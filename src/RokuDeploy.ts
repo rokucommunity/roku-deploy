@@ -1,9 +1,8 @@
 import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, ReadStream } from 'fs-extra';
-import * as r from 'postman-request';
-import type * as requestType from 'request';
-const request = r;
+import { request } from './request';
+import type { RequestOptions } from './request';
 import * as JSZip from 'jszip';
 import {
     CompileError,
@@ -24,11 +23,10 @@ import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc
 import { util } from './util';
 import type { FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { logger } from '@rokucommunity/logger';
-import * as dayjs from 'dayjs';
-import * as lodash from 'lodash';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
-import * as tempDir from 'temp-dir';
 import * as semver from 'semver';
+import { fetchWithDigest } from './fetch';
+import { formatTimestampForScreenshot } from './dateUtils';
 
 export class RokuDeploy {
     /**
@@ -41,6 +39,13 @@ export class RokuDeploy {
         outDir: './out',
         outFile: 'roku-deploy.zip'
     };
+
+    /**
+     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
+     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
+     * both channels and component libraries).
+     */
+    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
 
     /**
      * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
@@ -177,7 +182,7 @@ export class RokuDeploy {
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
         }
-      
+
         //create a zip of the folder
         await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
@@ -266,7 +271,7 @@ export class RokuDeploy {
         return [...result.values()];
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): requestType.OptionsWithUrl {
+    private generateBaseRequestOptions<T>(requestPath: string, options: BaseRequestOptions, formData = {} as T): RequestOptions {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
@@ -390,7 +395,10 @@ export class RokuDeploy {
             throw new Error('Either zip or dir must be provided');
         }
 
-        if (deleteDevChannel) {
+        //only delete the dev channel for channel sideloads; a component library (`dcl`) lives in a separate
+        //slot, so deleting the dev channel would needlessly wipe an installed channel that has nothing to do
+        //with the complib being installed.
+        if (deleteDevChannel && options.appType !== 'dcl') {
             try {
                 await this.deleteDevChannel(options);
             } catch (e) {
@@ -470,6 +478,11 @@ export class RokuDeploy {
                         httpDetails: e.details?.httpDetails
                     }, e);
                 } else {
+                    //a "corrupt zip" failure is often just an undersized zip; add a helpful hint if so
+                    const errorText = `${e.message} ${e.results?.body ?? ''}`;
+                    if (this.isCorruptZipError(errorText)) {
+                        e.message = `${e.message}${this.getUndersizedZipHint(zipFilePath)}`;
+                    }
                     throw e;
                 }
             }
@@ -479,6 +492,14 @@ export class RokuDeploy {
                 throw new UpdateCheckRequiredError({
                     httpDetails: extractHttpDetails(response.response, response.body)
                 });
+            }
+
+            //a "corrupt zip" failure can also come back in a non-error response body; add the size hint if so
+            if (this.isCorruptZipError(response.body)) {
+                const hint = this.getUndersizedZipHint(zipFilePath);
+                if (hint) {
+                    throw new Error(`Failed to publish: ${response.body}${hint}`);
+                }
             }
 
             if (failOnCompileError) {
@@ -515,6 +536,33 @@ export class RokuDeploy {
      */
     private isCompileError(responseHtml: string) {
         return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
+    }
+
+    /**
+     * Does the text look like the device's "corrupt/invalid zip" install failure? The Roku firmware
+     * returns this when a sideloaded zip can't be unzipped - most commonly because the zip is below the
+     * minimum installable size (see MINIMUM_INSTALLABLE_ZIP_SIZE).
+     */
+    private isCorruptZipError(text: string) {
+        //device text (firmware 15.x): "Install Failure: Unzip failed. Invalid or corrupt zip archive.  Unloading."
+        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text);
+    }
+
+    /**
+     * When a sideload fails with a "corrupt zip" error, check whether the zip is simply too small for the
+     * firmware to accept. If so, return a helpful hint to append to the error; otherwise return ''.
+     */
+    private getUndersizedZipHint(zipFilePath: string) {
+        let size: number;
+        try {
+            size = fsExtra.statSync(zipFilePath).size;
+        } catch {
+            return '';
+        }
+        if (size < RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE) {
+            return ` The supplied zip is ${size} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`;
+        }
+        return '';
     }
 
     /**
@@ -728,9 +776,9 @@ export class RokuDeploy {
      * @param params
      * @returns
      */
-    private setUserAgentIfMissing(params: requestType.OptionsWithUrl) {
+    private setUserAgentIfMissing(params: RequestOptions) {
         if (!params) {
-            params = {} as requestType.OptionsWithUrl;
+            params = {} as RequestOptions;
         }
         if (!params.headers) {
             params.headers = {};
@@ -762,7 +810,7 @@ export class RokuDeploy {
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: requestType.OptionsWithUrl, verify = true) {
+    private async doPostRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
@@ -785,7 +833,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: requestType.OptionsWithUrl) {
+    private async doGetRequest(params: RequestOptions) {
         this.logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
@@ -931,7 +979,7 @@ export class RokuDeploy {
      * @param body
      * @returns
      */
-    private getPackagesFromResponseBody(body: string): RokuPackage[] {
+    private getPackagesFromResponseBody(body: string): RokuPlugin[] {
         let jsonParseRegex = /JSON\.parse\(('.+')\);/igm;
         let jsonMatch: RegExpExecArray;
 
@@ -968,6 +1016,22 @@ export class RokuDeploy {
     }
 
     /**
+     * Deletes any installed dev channel, and any installed component libraries on the target Roku device
+     * @param options
+     */
+    public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
+        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        this.checkRequiredOptions(options, ['host', 'password']);
+
+        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
+        deleteOptions.formData = {
+            mysubmit: 'DeleteAll',
+            archive: ''
+        };
+        return this.doPostRequest(deleteOptions);
+    }
+
+    /**
      * Delete the component library with the specified filename from the device
      */
     public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
@@ -989,9 +1053,9 @@ export class RokuDeploy {
     /**
      * Delete all component libraries from the device
      */
-    public async deleteAllComponentLibraries(options: { host: string; password: string; username?: string }) {
-        options = { ...this.options, ...options } as { host: string; password: string; username?: string };
-        const packages = await this.getInstalledPackages(options);
+    public async deleteAllComponentLibraries(options: ListSideloadedPluginsOptions) {
+        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
+        const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
                 await this.deleteComponentLibrary({
@@ -1003,10 +1067,11 @@ export class RokuDeploy {
     }
 
     /**
-     * Fetch the full list of installed packages from the device. Useful for finding the file names of installed component libraries or the dev channel.
+     * Fetch the full list of installed plugins (side-loaded packages) from the device. Useful for finding the
+     * file names of installed component libraries or the dev channel.
      */
-    private async getInstalledPackages(options: { host: string; password: string; username?: string }): Promise<RokuPackage[]> {
-        options = { ...this.options, ...options } as { host: string; password: string; username?: string };
+    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
+        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.qs ??= {};
@@ -1054,12 +1119,12 @@ export class RokuDeploy {
             const cwd = options.cwd ?? process.cwd();
             const screenshotDir = options.screenshotDir
                 ? path.resolve(cwd, options.screenshotDir)
-                : path.join(tempDir, '/roku-deploy/screenshots/');
+                : path.join(util.tempDir, '/roku-deploy/screenshots/');
 
             let filePath: string;
             if (options.out === true) {
                 // Use default directory with generated filename
-                const defaultFilename = `screenshot-${dayjs().format('YYYY-MM-DD-HH.mm.ss.SSS')}${deviceExt}`;
+                const defaultFilename = `screenshot-${formatTimestampForScreenshot()}${deviceExt}`;
                 filePath = path.resolve(cwd, screenshotDir, defaultFilename);
             } else {
                 // User provided a path
@@ -1153,6 +1218,40 @@ export class RokuDeploy {
     }
 
     /**
+     * Check whether the given developer password is accepted by a Roku device.
+     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
+     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
+        options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+        const url = `http://${options.host}:${port}/plugin_install`;
+
+        let response: Response;
+        try {
+            response = await fetchWithDigest(url, {
+                method: 'HEAD',
+                username: username,
+                password: options.password,
+                timeout: timeout
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+        }
+
+        if (response.status === 200) {
+            return true;
+        }
+        if (response.status === 401) {
+            return false;
+        }
+        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
+    }
+
+    /**
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
@@ -1205,12 +1304,7 @@ export class RokuDeploy {
             } as Record<string, any>;
 
             if (options.enhance) {
-                const result = {};
-                // sanitize/normalize values to their native formats, and also convert property names to camelCase
-                for (let key in deviceInfo) {
-                    result[lodash.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
-                }
-                deviceInfo = result;
+                deviceInfo = this.enhanceDeviceInfo(deviceInfo as DeviceInfoRaw);
             }
             this.logger.debug('Device info:', deviceInfo);
             return deviceInfo;
@@ -1247,11 +1341,32 @@ export class RokuDeploy {
     }
 
     /**
+     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
+     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
+     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
+     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
+     * enhance it without making another request to the device.
+     * @param deviceInfo the raw device-info object to enhance
+     */
+    public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
+        const result = {} as DeviceInfo;
+        // sanitize/normalize values to their native formats, and also convert property names to camelCase
+        for (let key in deviceInfo) {
+            result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+        }
+        return result;
+    }
+
+    /**
      * Normalize a deviceInfo field value. This includes things like converting boolean strings to booleans, number strings to numbers,
      * decoding HtmlEntities, etc.
      * @param deviceInfo
      */
     private normalizeDeviceInfoFieldValue(value: any) {
+        // non-string values have nothing to normalize; return them unchanged
+        if (typeof value !== 'string') {
+            return value;
+        }
         let num: number;
         // convert 'true' and 'false' string values to boolean
         if (value === 'true') {
@@ -1386,7 +1501,7 @@ export interface RokuMessages {
     successes: string[];
 }
 
-export interface RokuPackage {
+export interface RokuPlugin {
     appType: 'channel' | 'dcl';
     archiveFileName: string;
     fileType: string;
@@ -1395,6 +1510,25 @@ export interface RokuPackage {
     md5: string;
     pkgPath: string;
     size: string;
+}
+export type RokuPackage = RokuPlugin;
+
+export interface ListSideloadedPluginsOptions {
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host: string;
+
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password: string;
+
+    /**
+     * The username for logging in to the developer portal on the target Roku device. Defaults to `'rokudev'`
+     */
+    username?: string;
 }
 
 enum RokuMessageType {
@@ -1466,6 +1600,23 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
      * @default false
      */
     enhance?: boolean;
+}
+
+export interface ValidateDeveloperPasswordOptions {
+    /** The hostname or IP of the Roku device */
+    host: string;
+
+    /** The developer password to check */
+    password: string;
+
+    /** Defaults to `'rokudev'` */
+    username?: string;
+
+    /** Defaults to `80` (the developer web-server port) */
+    port?: number;
+
+    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    timeout?: number;
 }
 
 export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
