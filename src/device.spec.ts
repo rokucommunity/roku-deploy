@@ -40,8 +40,11 @@ const REQUEST_TIMEOUT = 15_000;
 
 //these tests are run against an actual roku device and need to be run on our self-hosted runners.
 describe('device', function device() {
-    //device tests can take a long time. give extra margin for that
-    this.timeout(120_000);
+    //sane suite-wide default for the many quick ECP/HTTP calls (device-info, dev-id, press-home,
+    //etc.). Tests that legitimately take longer set their own `this.timeout(...)` inline, sized at
+    //roughly double their observed runtime. A tight default here means a broken device test fails
+    //fast instead of hanging the full old 120s.
+    this.timeout(10_000);
 
     //host/password are required by every v4 device method; the `before` hook guarantees they're set,
     //so narrow the type here (they're `string | undefined` on the base RokuDeployOptions) to avoid
@@ -236,8 +239,8 @@ describe('device', function device() {
             assert.equal(response.message, 'Successful sideload');
         });
 
-        it('Presents nice message for 401 unauthorized status code', async () => {
-            this.timeout(20000);
+        it('Presents nice message for 401 unauthorized status code', async function unauthorized() {
+            this.timeout(10_000);
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
                 rd.sideload({ ...options, dir: rootDir }),
@@ -349,7 +352,9 @@ describe('device', function device() {
 
     describe('takeScreenshot', () => {
         it('works', async function takeScreenshot() {
-            this.timeout(60000);
+            //this test waits on the debug console for a marker (up to 45s internally), so its ceiling
+            //is driven by that wait rather than the observed happy-path runtime.
+            this.timeout(60_000);
 
             //A screenshot only works when a side-loaded channel is actively running. Rather than
             //guessing that `deploy` left the app running, we make main.brs print a unique, timestamped
@@ -470,8 +475,9 @@ describe('device', function device() {
     });
 
     describe('deleteAllSideloadedPlugins', function deleteAllTests() {
-        //these tests do several device round-trips (install + verify + delete), so give them extra time
-        this.timeout(60_000);
+        //these tests do several device round-trips (install + verify + delete). ~2x the slowest
+        //observed case in this block (the multi-library delete, ~10s).
+        this.timeout(20_000);
 
         it('deletes a single channel', async () => {
             //start clean
@@ -553,7 +559,8 @@ describe('device', function device() {
         //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
         //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
-        this.timeout(0);
+        //~2x the slowest observed case in this block (~5.6s).
+        this.timeout(12_000);
         const BOUNDARY = rokuDeploy.RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
@@ -905,8 +912,9 @@ describe('device', function device() {
     });
 
     describe('deleteComponentLibrary', function deleteComponentLibraryTests() {
-        //these tests install several complibs and then delete them one at a time, so give them extra time
-        this.timeout(120_000);
+        //these tests install several complibs and then delete them one at a time. ~2x the slowest
+        //observed case in this block (~13s).
+        this.timeout(30_000);
 
         it('deletes several component libraries one by one', async () => {
             //start clean
