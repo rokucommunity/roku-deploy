@@ -35,8 +35,11 @@ const REQUEST_TIMEOUT = 15_000;
 
 //these tests are run against an actual roku device and need to be run on our self-hosted runners.
 describe('device', function device() {
-    //device tests can take a long time. give extra margin for that
-    this.timeout(120_000);
+    //sane suite-wide default for the many quick ECP/HTTP calls (device-info, dev-id, press-home,
+    //etc.). Tests that legitimately take longer set their own `this.timeout(...)` inline, sized at
+    //roughly double their observed runtime. A tight default here means a broken device test fails
+    //fast instead of hanging the full old 120s.
+    this.timeout(10_000);
 
     let options: rokuDeploy.RokuDeployOptions;
 
@@ -234,14 +237,15 @@ describe('device', function device() {
     }
 
     describe('deploy', () => {
-        it('works', async () => {
+        it('works', async function deployWorks() {
+            this.timeout(12_000);
             options.retainDeploymentArchive = true;
             let response = await rokuDeploy.deploy(options);
             assert.equal(response.message, 'Successful deploy');
         });
 
-        it('Presents nice message for 401 unauthorized status code', async () => {
-            this.timeout(20000);
+        it('Presents nice message for 401 unauthorized status code', async function unauthorized() {
+            this.timeout(10_000);
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
                 rokuDeploy.deploy(options),
@@ -251,7 +255,8 @@ describe('device', function device() {
     });
 
     describe('publish', () => {
-        it('works', async () => {
+        it('works', async function publishWorks() {
+            this.timeout(6_000);
             await rokuDeploy.createPackage(options);
             let response = await rokuDeploy.publish(options);
             assert.equal(response.message, 'Successful deploy');
@@ -259,7 +264,8 @@ describe('device', function device() {
     });
 
     describe('deployAndSignPackage', () => {
-        it('works', async () => {
+        it('works', async function deployAndSignPackageWorks() {
+            this.timeout(12_000);
             await rokuDeploy.deleteInstalledChannel(options);
             await rokuDeploy.rekeyDevice(options);
             expectPathExists(
@@ -332,7 +338,9 @@ describe('device', function device() {
 
     describe('takeScreenshot', () => {
         it('works', async function takeScreenshot() {
-            this.timeout(60000);
+            //this test waits on the debug console for a marker (up to 45s internally), so its ceiling
+            //is driven by that wait rather than the observed happy-path runtime.
+            this.timeout(60_000);
 
             //A screenshot only works when a side-loaded channel is actively running. Rather than
             //guessing that `deploy` left the app running, we make main.brs print a unique, timestamped
@@ -376,7 +384,8 @@ describe('device', function device() {
     });
 
     describe('convertToSquashfs', () => {
-        it('works', async () => {
+        it('works', async function convertToSquashfsWorks() {
+            this.timeout(15_000);
             await rokuDeploy.deploy(options);
             await rokuDeploy.rokuDeploy.convertToSquashfs(options);
         });
@@ -395,65 +404,10 @@ describe('device', function device() {
         });
     });
 
-    describe('rebootDevice', () => {
-        it('works', async function rebootDevice() {
-            //a reboot takes the device offline for a while; allow time for it to come back
-            this.timeout(180_000);
-            //use a short per-request timeout so the reboot POST can't hang open past the device going
-            //down; without this it would inherit the 150s default and could orphan a socket if mocha's
-            //test-timeout fired first.
-            await rokuDeploy.rokuDeploy.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
-            //wait until the device is reachable again so the next test doesn't run mid-reboot
-            await waitForDeviceOnline(options.host);
-        });
-    });
-
-    describe('checkForUpdate', () => {
-        //checkForUpdate requires firmware >= this version; below it, it throws UnsupportedFirmwareVersionError
-        const MIN_FIRMWARE = '15.0.4';
-
-        it('works', async function checkForUpdate() {
-            //triggers a real update check against Roku's servers, which can be slow and can sometimes
-            //trigger a reboot, so allow generous time for the device to come back afterward
-            this.timeout(240_000);
-
-            //Every device call below uses an explicit short `timeout` so no underlying needle request can
-            //hang open indefinitely (the default is 150s). This guarantees each request either resolves or
-            //rejects and closes its socket on its own, rather than being orphaned if mocha's test-timeout
-            //were to fire mid-request.
-            const reqOptions = { ...options, timeout: REQUEST_TIMEOUT };
-
-            //we don't know which device the suite runs against, so ask it what firmware it has and
-            //decide up-front whether checkForUpdate should succeed or be rejected by the version gate.
-            const softwareVersion = (await rokuDeploy.rokuDeploy.getDeviceInfo({ host: options.host, timeout: REQUEST_TIMEOUT }))['software-version'];
-            const supported = !!softwareVersion && semver.gte(semver.coerce(softwareVersion), MIN_FIRMWARE);
-
-            if (supported) {
-                console.log(`[checkForUpdate] device firmware ${softwareVersion} >= ${MIN_FIRMWARE}; expecting success`);
-                const result = await rokuDeploy.rokuDeploy.checkForUpdate(reqOptions);
-                assert.ok(result, 'expected a response from checkForUpdate');
-                //checkForUpdate can trigger a reboot; make sure the device is back before the next test
-                await waitForDeviceOnline(options.host);
-            } else {
-                console.log(`[checkForUpdate] device firmware ${softwareVersion} < ${MIN_FIRMWARE}; expecting UnsupportedFirmwareVersionError`);
-                let thrown: Error;
-                try {
-                    await rokuDeploy.rokuDeploy.checkForUpdate(reqOptions);
-                } catch (e) {
-                    thrown = e as Error;
-                }
-                assert.ok(thrown, 'expected checkForUpdate to throw on unsupported firmware');
-                assert.ok(
-                    thrown instanceof errors.UnsupportedFirmwareVersionError,
-                    `expected UnsupportedFirmwareVersionError, got ${thrown?.constructor?.name}: ${thrown?.message}`
-                );
-            }
-        });
-    });
-
     describe('deleteAllSideloadedPlugins', function deleteAllTests() {
-        //these tests do several device round-trips (install + verify + delete), so give them extra time
-        this.timeout(60_000);
+        //these tests do several device round-trips (install + verify + delete). ~2x the slowest
+        //observed case in this block (the multi-library delete, ~10s).
+        this.timeout(20_000);
 
         it('deletes a single channel', async () => {
             //start clean
@@ -535,7 +489,8 @@ describe('device', function device() {
         //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
         //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
-        this.timeout(0);
+        //~2x the slowest observed case in this block (~5.6s).
+        this.timeout(12_000);
         const BOUNDARY = rokuDeploy.RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
@@ -633,261 +588,10 @@ describe('device', function device() {
         });
     });
 
-    describe.skip('install app + libs, then delete everything', function installDeleteEverything() {
-        //this reproduces an intermittent socket hangup seen when deleting component libraries. we install
-        //a chain of interdependent BrightScript libraries (modeled after the `code-library` sample) plus
-        //an app that requires them, then delete the app followed by each library one by one. after every
-        //delete we immediately list the installed plugins; a hung socket surfaces on that next request.
-        this.timeout(300_000);
-
-        //the dependency chain, modeled after the `code-library` sample: echo depends on delta, delta on
-        //charlie, charlie on beta, beta on alpha. alpha is the leaf. The app requires all five.
-        //install order is leaf-first so each library's dependencies already exist when it's built.
-        const LIB_DEPENDENCY_CHAIN = ['echo', 'delta', 'charlie', 'beta', 'alpha'];
-        //leaf-first: alpha (no deps) up to echo (depends on the whole chain below it)
-        const INSTALL_ORDER = [...LIB_DEPENDENCY_CHAIN].reverse();
-
-        it('deletes the app then each component library one by one without a socket hangup', async () => {
-            //start from a known-clean device so pre-existing plugins don't skew the assertions
-            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-
-            //install each library leaf-first; each one requires the library immediately below it in the chain
-            for (let i = 0; i < INSTALL_ORDER.length; i++) {
-                const name = INSTALL_ORDER[i];
-                //everything already installed (leaf-first) is a valid dependency; wire up the immediate one
-                const requires = i > 0 ? [INSTALL_ORDER[i - 1]] : [];
-                await installBrightScriptLibrary(name, requires);
-            }
-
-            //now install the app that requires the whole chain of libraries
-            writeFiles(rootDir, [
-                ['manifest', undent`
-                    title=RokuDeployTestChannel
-                    major_version=1
-                    minor_version=0
-                    build_version=1
-                    bs_libs_required=${LIB_DEPENDENCY_CHAIN.join(',')}
-                    rsg_version=1.2
-                    ui_resolutions=hd
-                `]
-            ]);
-            await rokuDeploy.rokuDeploy.deploy({
-                ...options,
-                appType: 'channel',
-                outFile: 'channel',
-                //enable the debug protocol
-                remoteDebug: true,
-                //necessary for capturing compile errors from the protocol (has no effect on telnet)
-                remoteDebugConnectEarly: false,
-                //we don't want to fail if there were compile errors...we'll let our compile error processor handle that
-                failOnCompileError: true
-            });
-
-            //everything should be installed now: the channel plus all five component libraries
-            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
-                channels: 1,
-                complibs: LIB_DEPENDENCY_CHAIN.length
-            });
-
-            //delete the app (the dev channel). the list afterward proves the request didn't hang the socket.
-            await rokuDeploy.deleteInstalledChannel(options);
-            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
-                channels: 0,
-                complibs: LIB_DEPENDENCY_CHAIN.length
-            });
-
-            //delete the app AGAIN when there is no dev channel installed. this redundant delete is a
-            //suspected trigger for the flaky socket hangup, so exercise it explicitly and confirm the
-            //very next request still succeeds.
-            await rokuDeploy.deleteInstalledChannel(options);
-            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
-                channels: 0,
-                complibs: LIB_DEPENDENCY_CHAIN.length
-            });
-
-            //now delete each component library one by one until they're all gone. after each delete we
-            //list the installed plugins right away; if deleting a complib hangs the socket, that list
-            //request is where it surfaces.
-            let remaining = await getInstalledComponentLibraryFileNames();
-            let expectedRemaining = remaining.length;
-            for (const fileName of remaining) {
-                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
-                    host: options.host,
-                    password: options.password,
-                    fileName: fileName
-                });
-                expectedRemaining--;
-
-                const afterDelete = await getInstalledComponentLibraryFileNames();
-                expect(afterDelete).to.not.include(fileName);
-                expect(afterDelete).to.have.lengthOf(expectedRemaining);
-            }
-
-            //everything is gone
-            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
-
-            //one more delete against an already-empty device to be sure the "delete when nothing is
-            //installed" path doesn't hang the socket for the next caller
-            await rokuDeploy.rokuDeploy.deleteComponentLibrary({
-                host: options.host,
-                password: options.password,
-                fileName: remaining[0] ?? 'nonexistent.zip'
-            });
-            expect(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
-        });
-    });
-
-    describe.skip('delete-order reboot hunt', function deleteOrderRebootHunt() {
-        //Bug hunt: an interdependent app + library chain (modeled after the `code-library` sample) is
-        //suspected of rebooting the device when its pieces are deleted in certain orders. We install the
-        //full set in the ONLY valid build order (leaf-first: charlie, beta, alpha, then the app that
-        //requires all three) and then try EVERY deletion permutation of the four pieces, watching for an
-        //unexpected reboot after each individual delete.
-        //
-        //The dependency shape mirrors the sample exactly:
-        //  - charlie: leaf, requires nothing
-        //  - beta:    requires charlie
-        //  - alpha:   requires beta AND charlie
-        //  - app:     a channel that requires alpha, beta, and charlie
-        //
-        //24 permutations x (reinstall the whole set + 4 deletes) against a real device is slow; give it lots of room.
-        this.timeout(30 * 60 * 1000);
-
-        const CHARLIE = 'charlie';
-        const BETA = 'beta';
-        const ALPHA = 'alpha';
-        const APP = 'app';
-
-        //map of library name -> the archiveFileName the device assigned it, captured at install time so we
-        //can target each complib in deleteComponentLibrary regardless of how the device names the file.
-        let libFileNames: Record<string, string>;
-
-        //install the whole set in the only valid order (leaf-first), capturing each complib's archiveFileName.
-        //Returns once the app (channel) + all three libraries are installed.
-        async function installFullSet() {
-            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-            libFileNames = {};
-
-            //leaf-first so each library's dependencies already exist when it's built/installed
-            for (const [name, requires] of [
-                [CHARLIE, []],
-                [BETA, [CHARLIE]],
-                [ALPHA, [BETA, CHARLIE]]
-            ] as Array<[string, string[]]>) {
-                const before = new Set(await getInstalledComponentLibraryFileNames());
-                await installBrightScriptLibrary(name, requires);
-                const after = await getInstalledComponentLibraryFileNames();
-                const added = after.filter(x => !before.has(x));
-                //exactly one new complib should have appeared: the one we just installed
-                expect(added, `expected installing "${name}" to add exactly one complib`).to.have.lengthOf(1);
-                libFileNames[name] = added[0];
-            }
-
-            //now the app: a channel that requires the whole library chain
-            writeFiles(rootDir, [
-                ['manifest', undent`
-                    title=RokuDeployTestChannel
-                    major_version=1
-                    minor_version=0
-                    build_version=1
-                    bs_libs_required=${[ALPHA, BETA, CHARLIE].join(',')}
-                    rsg_version=1.2
-                    ui_resolutions=hd
-                `]
-            ]);
-            await rokuDeploy.rokuDeploy.deploy({
-                ...options,
-                appType: 'channel',
-                outFile: 'channel',
-                failOnCompileError: true
-            });
-
-            //sanity: channel + all three complibs are present
-            expect(countByType(await rokuDeploy.rokuDeploy.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
-                channels: 1,
-                complibs: 3
-            });
-        }
-
-        //delete a single piece by name. The app is a channel (deleteInstalledChannel); the libs are
-        //complibs (deleteComponentLibrary by their captured archiveFileName).
-        async function deletePiece(name: string) {
-            if (name === APP) {
-                await rokuDeploy.rokuDeploy.deleteInstalledChannel({ ...options, timeout: REQUEST_TIMEOUT });
-            } else {
-                await rokuDeploy.rokuDeploy.deleteComponentLibrary({
-                    host: options.host,
-                    password: options.password,
-                    fileName: libFileNames[name]
-                });
-            }
-        }
-
-        //all 24 delete orderings of the four pieces
-        function permutations<T>(items: T[]): T[][] {
-            if (items.length <= 1) {
-                return [items];
-            }
-            const result: T[][] = [];
-            for (let i = 0; i < items.length; i++) {
-                const rest = [...items.slice(0, i), ...items.slice(i + 1)];
-                for (const p of permutations(rest)) {
-                    result.push([items[i], ...p]);
-                }
-            }
-            return result;
-        }
-
-        it('does not reboot the device under any deletion order', async () => {
-            const orders = permutations([APP, ALPHA, BETA, CHARLIE]);
-            //orders whose deletion caused an unexpected reboot, with the exact step that triggered it
-            const rebootTriggers: Array<{ order: string[]; afterDeleting: string; step: number }> = [];
-
-            for (let orderIndex = 0; orderIndex < orders.length; orderIndex++) {
-                const order = orders[orderIndex];
-                console.log(`[reboot-hunt] permutation ${orderIndex + 1}/${orders.length}: installing full set, then deleting in order [${order.join(', ')}]`);
-                await installFullSet();
-                console.log(`[reboot-hunt]   full set installed (charlie, beta, alpha, app)`);
-
-                //baseline uptime; a later read that is LOWER means the device rebooted in between
-                let priorUptime = await getDeviceUptime(options.host);
-
-                for (let step = 0; step < order.length; step++) {
-                    const piece = order[step];
-                    console.log(`[reboot-hunt]   step ${step + 1}/${order.length}: deleting "${piece}"...`);
-                    await deletePiece(piece);
-
-                    const nowUptime = await getDeviceUptime(options.host);
-                    //undefined = device unreachable (very likely mid-reboot); a drop in uptime = it rebooted
-                    const rebooted = nowUptime === undefined || (priorUptime !== undefined && nowUptime < priorUptime);
-                    if (rebooted) {
-                        console.log(`[reboot-hunt]   !! REBOOT DETECTED after deleting "${piece}" (step ${step + 1}) in order [${order.join(', ')}]; waiting for device to come back...`);
-                        rebootTriggers.push({ order: order, afterDeleting: piece, step: step + 1 });
-                        //let the device fully recover before the next permutation so we don't test mid-reboot
-                        await waitForDeviceOnline(options.host);
-                        console.log(`[reboot-hunt]   device back online; moving to next permutation`);
-                        break;
-                    }
-                    console.log(`[reboot-hunt]   deleted "${piece}" OK (uptime ${nowUptime ?? 'n/a'}s, no reboot)`);
-                    priorUptime = nowUptime;
-                }
-            }
-
-            console.log(`[reboot-hunt] done: ${orders.length} permutations tested, ${rebootTriggers.length} caused a reboot`);
-            //leave the device clean for the next test
-            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-
-            expect(
-                rebootTriggers,
-                `these deletion orders rebooted the device:\n` +
-                rebootTriggers.map(t => `  - after deleting "${t.afterDeleting}" (step ${t.step}) in [${t.order.join(', ')}]`).join('\n')
-            ).to.eql([]);
-        });
-    });
-
     describe('deleteComponentLibrary', function deleteComponentLibraryTests() {
-        //these tests install several complibs and then delete them one at a time, so give them extra time
-        this.timeout(120_000);
+        //these tests install several complibs and then delete them one at a time. ~2x the slowest
+        //observed case in this block (~13s).
+        this.timeout(30_000);
 
         it('deletes several component libraries one by one', async () => {
             //start clean
@@ -979,6 +683,66 @@ describe('device', function device() {
 
             //clean up
             await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+        });
+    });
+
+    //these tests are slow (and can reboot the device), so they run last so as many other tests as
+    //possible finish and report before we hit them.
+    describe('rebootDevice', () => {
+        it('works', async function rebootDevice() {
+            //a reboot takes the device offline for a while; the ceiling is driven by
+            //waitForDeviceOnline (up to ~120s) plus the reboot POST, not the observed happy-path time.
+            this.timeout(150_000);
+            //use a short per-request timeout so the reboot POST can't hang open past the device going
+            //down; without this it would inherit the 150s default and could orphan a socket if mocha's
+            //test-timeout fired first.
+            await rokuDeploy.rokuDeploy.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
+            //wait until the device is reachable again so the next test doesn't run mid-reboot
+            await waitForDeviceOnline(options.host);
+        });
+    });
+
+    describe('checkForUpdate', () => {
+        //checkForUpdate requires firmware >= this version; below it, it throws UnsupportedFirmwareVersionError
+        const MIN_FIRMWARE = '15.0.4';
+
+        it('works', async function checkForUpdate() {
+            //triggers a real update check against Roku's servers, which can be slow and can sometimes
+            //trigger a reboot; the ceiling is the update check plus a possible reboot + waitForDeviceOnline
+            //(up to ~120s), so keep it generous rather than sizing to the observed happy-path time.
+            this.timeout(180_000);
+
+            //Every device call below uses an explicit short `timeout` so no underlying needle request can
+            //hang open indefinitely (the default is 150s). This guarantees each request either resolves or
+            //rejects and closes its socket on its own, rather than being orphaned if mocha's test-timeout
+            //were to fire mid-request.
+            const reqOptions = { ...options, timeout: REQUEST_TIMEOUT };
+
+            //we don't know which device the suite runs against, so ask it what firmware it has and
+            //decide up-front whether checkForUpdate should succeed or be rejected by the version gate.
+            const softwareVersion = (await rokuDeploy.rokuDeploy.getDeviceInfo({ host: options.host, timeout: REQUEST_TIMEOUT }))['software-version'];
+            const supported = !!softwareVersion && semver.gte(semver.coerce(softwareVersion), MIN_FIRMWARE);
+
+            if (supported) {
+                console.log(`[checkForUpdate] device firmware ${softwareVersion} >= ${MIN_FIRMWARE}; expecting success`);
+                const result = await rokuDeploy.rokuDeploy.checkForUpdate(reqOptions);
+                assert.ok(result, 'expected a response from checkForUpdate');
+                //checkForUpdate can trigger a reboot; make sure the device is back before the next test
+                await waitForDeviceOnline(options.host);
+            } else {
+                console.log(`[checkForUpdate] device firmware ${softwareVersion} < ${MIN_FIRMWARE}; expecting UnsupportedFirmwareVersionError`);
+                let thrown: Error;
+                try {
+                    await rokuDeploy.rokuDeploy.checkForUpdate(reqOptions);
+                } catch (e) {
+                    thrown = e as Error;
+                }
+                assert.ok(thrown, 'expected checkForUpdate to throw on unsupported firmware');
+                assert.ok(
+                    thrown instanceof errors.UnsupportedFirmwareVersionError,
+                    `expected UnsupportedFirmwareVersionError, got ${thrown?.constructor?.name}: ${thrown?.message}`
+                );
+            }
         });
     });
 });
