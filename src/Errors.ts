@@ -75,6 +75,17 @@ export class MissingRequiredOptionError extends Error {
     }
 }
 
+export class InvalidOptionError extends Error {
+    constructor(
+        message: string,
+        public optionName?: string,
+        public providedValue?: unknown
+    ) {
+        super(message);
+        Object.setPrototypeOf(this, InvalidOptionError.prototype);
+    }
+}
+
 export class UnsupportedFirmwareVersionError extends Error {
     constructor(message: string) {
         super(message);

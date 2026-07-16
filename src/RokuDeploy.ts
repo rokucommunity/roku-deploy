@@ -327,6 +327,8 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as SendKeyEventOptions;
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['host', 'key']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
         // Set defaults
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
@@ -356,6 +358,9 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['host', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
+        this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
@@ -559,6 +564,8 @@ export class RokuDeploy {
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = { ...this.options, ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
         let requestOptions = this.generateBaseRequestOptions('plugin_install', options, {
             archive: '',
             mysubmit: 'Convert to squashfs'
@@ -597,6 +604,8 @@ export class RokuDeploy {
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...options } as RekeyDeviceOptions;
         this.checkRequiredOptions(options, ['host', 'password', 'pkg', 'signingPassword']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
         const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
         let pkgPath = options.pkg;
@@ -646,6 +655,8 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
         const cwd = options.cwd ?? process.cwd();
 
         // Resolve output pkg path - use 'out' if provided, otherwise derive from default
@@ -938,6 +949,8 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['host', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
         deleteOptions.formData = {
@@ -1022,6 +1035,8 @@ export class RokuDeploy {
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['host', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
@@ -1150,6 +1165,54 @@ export class RokuDeploy {
     }
 
     /**
+     * Validate that a port number is a valid integer between 1 and 65535
+     */
+    private validatePort(value: unknown, name: string): void {
+        if (value === undefined) {
+            return; // Optional ports use defaults
+        }
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
+            throw new errors.InvalidOptionError(
+                `Invalid ${name}: must be an integer between 1 and 65535, received '${value}'`,
+                name,
+                value
+            );
+        }
+    }
+
+    /**
+     * Validate that a timeout is a positive integer
+     */
+    private validateTimeout(value: unknown): void {
+        if (value === undefined) {
+            return; // Optional timeout uses default
+        }
+        if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+            throw new errors.InvalidOptionError(
+                `Invalid timeout: must be a positive integer in milliseconds, received '${value}'`,
+                'timeout',
+                value
+            );
+        }
+    }
+
+    /**
+     * Validate that a value is one of the allowed enum values
+     */
+    private validateEnum<T>(value: unknown, name: string, allowedValues: readonly T[]): void {
+        if (value === undefined || value === null) {
+            return; // Optional enums are allowed, null means "don't include"
+        }
+        if (!allowedValues.includes(value as T)) {
+            throw new errors.InvalidOptionError(
+                `Invalid ${name}: must be one of ${allowedValues.map(v => `'${v}'`).join(', ')}, received '${value}'`,
+                name,
+                value
+            );
+        }
+    }
+
+    /**
      * Check whether the given developer password is accepted by a Roku device.
      * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
      * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
@@ -1193,6 +1256,8 @@ export class RokuDeploy {
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
         this.checkRequiredOptions(options, ['host']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
 
         // Set defaults
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
