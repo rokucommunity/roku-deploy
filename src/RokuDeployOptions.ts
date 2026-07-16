@@ -1,4 +1,4 @@
-import type { LogLevel } from './Logger';
+import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 
 export interface RokuDeployOptions {
     /**
@@ -165,7 +165,7 @@ export interface RokuDeployOptions {
      * The log level.
      * @default LogLevel.log
      */
-    logLevel?: LogLevel;
+    logLevel?: LogLevel | LogLevelNumeric;
 
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one

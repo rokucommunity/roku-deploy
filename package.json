@@ -19,6 +19,7 @@
         "package": "npm run build && npm pack"
     },
     "dependencies": {
+        "@rokucommunity/logger": "^0.4.0",
         "chalk": "^2.4.2",
         "fast-glob": "^3.2.12",
         "fs-extra": "^7.0.1",

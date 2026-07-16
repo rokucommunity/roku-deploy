@@ -11,7 +11,8 @@ import type { ParseError } from 'jsonc-parser';
 import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser';
 import { util } from './util';
 import type { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
-import { Logger, LogLevel } from './Logger';
+import type { Logger } from '@rokucommunity/logger';
+import { createLogger, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
@@ -20,7 +21,7 @@ import { formatTimestampForPackage, formatTimestampForScreenshot } from './dateU
 export class RokuDeploy {
 
     constructor() {
-        this.logger = new Logger();
+        this.logger = createLogger('[roku-deploy]');
     }
 
     private logger: Logger;
@@ -1224,7 +1225,7 @@ export class RokuDeploy {
             rootDir: './',
             files: [...DefaultFiles],
             username: 'rokudev',
-            logLevel: LogLevel.log
+            logLevel: LogLevelNumeric.log
         };
 
         //override the defaults with any found or provided options
