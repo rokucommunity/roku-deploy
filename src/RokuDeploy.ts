@@ -8,6 +8,7 @@ import {
     CompileError,
     ConnectionResetError,
     ConvertError,
+    DeviceUnreachableError,
     EcpNetworkAccessModeDisabledError,
     extractHttpDetails,
     FailedDeviceResponseError,
@@ -1239,7 +1240,7 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+            throw new DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
         }
 
         if (response.status === 200) {
@@ -1248,7 +1249,7 @@ export class RokuDeploy {
         if (response.status === 401) {
             return false;
         }
-        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
     }
 
     /**
