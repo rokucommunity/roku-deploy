@@ -13,6 +13,7 @@ import {
     extractHttpDetails,
     FailedDeviceResponseError,
     InvalidDeviceResponseCodeError,
+    InvalidOptionError,
     UnauthorizedDeviceResponseError,
     UnknownDeviceResponseError,
     UnparsableDeviceResponseError,
@@ -1241,10 +1242,9 @@ export class RokuDeploy {
             return; // Optional ports use defaults
         }
         if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid ${name}: must be an integer between 1 and 65535, received '${value}'`,
-                name,
-                value
+                { optionName: name, providedValue: value }
             );
         }
     }
@@ -1257,10 +1257,9 @@ export class RokuDeploy {
             return; // Optional timeout uses default
         }
         if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid timeout: must be a positive integer in milliseconds, received '${value}'`,
-                'timeout',
-                value
+                { optionName: 'timeout', providedValue: value }
             );
         }
     }
@@ -1273,10 +1272,9 @@ export class RokuDeploy {
             return; // Optional enums are allowed, null means "don't include"
         }
         if (!allowedValues.includes(value as T)) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid ${name}: must be one of ${allowedValues.map(v => `'${v}'`).join(', ')}, received '${value}'`,
-                name,
-                value
+                { optionName: name, providedValue: value }
             );
         }
     }
