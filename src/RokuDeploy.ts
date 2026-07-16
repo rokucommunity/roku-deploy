@@ -4,7 +4,22 @@ import type { WriteStream, ReadStream } from 'fs-extra';
 import { request } from './request';
 import type { RequestOptions } from './request';
 import * as JSZip from 'jszip';
-import * as errors from './Errors';
+import {
+    CompileError,
+    ConnectionResetError,
+    ConvertError,
+    DeviceUnreachableError,
+    EcpNetworkAccessModeDisabledError,
+    extractHttpDetails,
+    FailedDeviceResponseError,
+    InvalidDeviceResponseCodeError,
+    InvalidOptionError,
+    UnauthorizedDeviceResponseError,
+    UnknownDeviceResponseError,
+    UnparsableDeviceResponseError,
+    UnsupportedFirmwareVersionError,
+    UpdateCheckRequiredError
+} from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
@@ -445,7 +460,11 @@ export class RokuDeploy {
                 } catch (replaceError: any) {
                     //fail if this is a compile error
                     if (this.isCompileError(replaceError.message) && failOnCompileError) {
-                        throw new errors.CompileError('Compile error', replaceError, replaceError.results);
+                        const rokuMessages = this.getRokuMessagesFromResponseBody(replaceError.results?.body ?? '');
+                        throw new CompileError('Compile error', {
+                            httpDetails: extractHttpDetails(replaceError.results?.response, replaceError.results?.body),
+                            rokuMessages: rokuMessages
+                        }, replaceError);
                     } else if (this.isUpdateRequiredError(replaceError)) {
                         throw replaceError;
                     } else {
@@ -456,11 +475,15 @@ export class RokuDeploy {
             } catch (e: any) {
                 //if this is a 577 error, we have high confidence that the device needs to do an update check
                 if (this.isUpdateRequiredError(e)) {
-                    throw new errors.UpdateCheckRequiredError(response, requestOptions, e);
+                    throw new UpdateCheckRequiredError({
+                        httpDetails: e.details?.httpDetails
+                    }, e);
 
                     //a reset connection could be cause by several things, but most likely it's due to the device needing to check for updates
                 } else if (e.code === 'ECONNRESET') {
-                    throw new errors.ConnectionResetError(e, requestOptions);
+                    throw new ConnectionResetError({
+                        httpDetails: e.details?.httpDetails
+                    }, e);
                 } else {
                     //a "corrupt zip" failure is often just an undersized zip; add a helpful hint if so
                     const errorText = `${e.message} ${e.results?.body ?? ''}`;
@@ -473,7 +496,9 @@ export class RokuDeploy {
 
             //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
             if (this.isUpdateCheckRequiredResponse(response.body)) {
-                throw new errors.UpdateCheckRequiredError(response, requestOptions);
+                throw new UpdateCheckRequiredError({
+                    httpDetails: extractHttpDetails(response.response, response.body)
+                });
             }
 
             //a "corrupt zip" failure can also come back in a non-error response body; add the size hint if so
@@ -486,7 +511,11 @@ export class RokuDeploy {
 
             if (failOnCompileError) {
                 if (this.isCompileError(response.body)) {
-                    throw new errors.CompileError('Compile error', response, this.getRokuMessagesFromResponseBody(response.body));
+                    const rokuMessages = this.getRokuMessagesFromResponseBody(response.body);
+                    throw new CompileError('Compile error', {
+                        httpDetails: extractHttpDetails(response.response, response.body),
+                        rokuMessages: rokuMessages
+                    });
                 }
             }
 
@@ -554,7 +583,10 @@ export class RokuDeploy {
      * Checks to see if the exception is due to the device needing to check for updates
      */
     private isUpdateRequiredError(e: any): boolean {
-        return e.results?.response?.statusCode === 577 || (typeof e.results?.body === 'string' && this.isUpdateCheckRequiredResponse(e.results.body));
+        // Check for 577 status code in the new error format (details.httpDetails.response.statusCode)
+        const statusCode = e.details?.httpDetails?.response?.statusCode;
+        const body = e.details?.httpDetails?.response?.body;
+        return statusCode === 577 || (typeof body === 'string' && this.isUpdateCheckRequiredResponse(body));
     }
 
     /**
@@ -593,7 +625,10 @@ export class RokuDeploy {
             }
         }
         if (results.body.indexOf('Conversion succeeded') === -1) {
-            throw new errors.ConvertError('Squashfs conversion failed');
+            throw new ConvertError('Squashfs conversion failed', {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
         }
     }
 
@@ -631,18 +666,29 @@ export class RokuDeploy {
 
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
-            throw new errors.UnparsableDeviceResponseError('Unknown Rekey Failure');
+            throw new UnparsableDeviceResponseError('Unknown Rekey Failure', {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
         }
 
         if (resultTextSearch[1] !== 'Success.') {
-            throw new errors.FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1]);
+            throw new FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1], {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
         }
 
         if (options.devId) {
             const { devId } = await this.getDevId(options);
 
             if (devId !== options.devId) {
-                throw new errors.UnknownDeviceResponseError('Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"');
+                throw new UnknownDeviceResponseError(
+                    'Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"',
+                    {
+                        httpDetails: extractHttpDetails(results.response, results.body)
+                    }
+                );
             }
         }
     }
@@ -712,7 +758,10 @@ export class RokuDeploy {
 
         let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
         if (failedSearchMatches) {
-            throw new errors.FailedDeviceResponseError(failedSearchMatches[1], results);
+            throw new FailedDeviceResponseError(failedSearchMatches[1], {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
         }
 
         //grab the package url from the JSON on the page if it exists (https://regex101.com/r/1HUXgk/1)
@@ -729,7 +778,10 @@ export class RokuDeploy {
             return { pkgPath: out };
         }
 
-        throw new errors.UnknownDeviceResponseError('Unknown error signing package', results);
+        throw new UnknownDeviceResponseError('Unknown error signing package', {
+            httpDetails: extractHttpDetails(results.response, results.body),
+            rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+        });
     }
 
     /**
@@ -811,24 +863,42 @@ export class RokuDeploy {
         return results as HttpResponse;
     }
 
-    private checkRequest(results) {
+    private checkRequest(results: { response?: any; body?: any }) {
         if (!results || !results.response || typeof results.body !== 'string') {
-            throw new errors.UnparsableDeviceResponseError('Invalid response', results);
+            throw new UnparsableDeviceResponseError('Invalid response', {
+                httpDetails: extractHttpDetails(results?.response, results?.body)
+            });
         }
 
+        const host = results.response.request?.host?.toString?.();
+        const httpDetails = extractHttpDetails(results.response, results.body);
+
         if (results.response.statusCode === 401) {
-            const host = results.response.request?.host?.toString?.();
-            throw new errors.UnauthorizedDeviceResponseError(`Unauthorized. Please verify credentials for host '${host}'`, results);
+            throw new UnauthorizedDeviceResponseError(
+                `Unauthorized. Please verify credentials for host '${host}'`,
+                {
+                    httpDetails: httpDetails
+                }
+            );
         }
 
         let rokuMessages = this.getRokuMessagesFromResponseBody(results.body);
 
         if (rokuMessages.errors.length > 0) {
-            throw new errors.FailedDeviceResponseError(rokuMessages.errors[0], rokuMessages);
+            throw new FailedDeviceResponseError(rokuMessages.errors[0], {
+                httpDetails: httpDetails,
+                rokuMessages: rokuMessages
+            });
         }
 
         if (results.response.statusCode !== 200) {
-            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.statusCode, results);
+            throw new InvalidDeviceResponseCodeError(
+                'Invalid response code: ' + results.response.statusCode,
+                {
+                    httpDetails: httpDetails,
+                    rokuMessages: rokuMessages
+                }
+            );
         }
     }
 
@@ -1172,10 +1242,9 @@ export class RokuDeploy {
             return; // Optional ports use defaults
         }
         if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid ${name}: must be an integer between 1 and 65535, received '${value}'`,
-                name,
-                value
+                { optionName: name, providedValue: value }
             );
         }
     }
@@ -1188,10 +1257,9 @@ export class RokuDeploy {
             return; // Optional timeout uses default
         }
         if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid timeout: must be a positive integer in milliseconds, received '${value}'`,
-                'timeout',
-                value
+                { optionName: 'timeout', providedValue: value }
             );
         }
     }
@@ -1204,10 +1272,9 @@ export class RokuDeploy {
             return; // Optional enums are allowed, null means "don't include"
         }
         if (!allowedValues.includes(value as T)) {
-            throw new errors.InvalidOptionError(
+            throw new InvalidOptionError(
                 `Invalid ${name}: must be one of ${allowedValues.map(v => `'${v}'`).join(', ')}, received '${value}'`,
-                name,
-                value
+                { optionName: name, providedValue: value }
             );
         }
     }
@@ -1234,7 +1301,7 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new errors.DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+            throw new DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
         }
 
         if (response.status === 200) {
@@ -1243,7 +1310,7 @@ export class RokuDeploy {
         if (response.status === 401) {
             return false;
         }
-        throw new errors.InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${options.host}`, response as any);
     }
 
     /**
@@ -1273,15 +1340,21 @@ export class RokuDeploy {
 
         const url = `http://${host}:${ecpPort}/query/device-info`;
 
-        let response;
+        let response: HttpResponse | undefined;
         try {
             response = await this.doGetRequest({
                 url: url,
                 timeout: timeout
             });
         } catch (e) {
-            if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
-                throw new errors.EcpNetworkAccessModeDisabledError(`Unable to access device-info because ecp-setting-mode is 'disabled'`, response);
+            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                throw new EcpNetworkAccessModeDisabledError(
+                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
+                    {
+                        httpDetails: (e as any)?.details?.httpDetails
+                    },
+                    e instanceof Error ? e : undefined
+                );
             }
             throw e;
         }
@@ -1301,7 +1374,9 @@ export class RokuDeploy {
             return deviceInfo;
         } catch (e) {
             this.logger.warn('Error getting device info:', e);
-            throw new errors.UnparsableDeviceResponseError('Could not retrieve device info', response);
+            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
+                httpDetails: extractHttpDetails(response?.response, response?.body)
+            }, e instanceof Error ? e : undefined);
         }
     }
 
@@ -1322,12 +1397,11 @@ export class RokuDeploy {
             const deviceInfo = await this.getDeviceInfo(options);
             return deviceInfo['ecp-setting-mode'];
         } catch (e) {
-            if ((e as any)?.results?.response?.headers?.server?.includes('Roku')) {
+            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
                 return 'disabled';
             }
-            throw new errors.UnknownDeviceResponseError('Could not retrieve device ECP setting');
+            throw new UnknownDeviceResponseError('Could not retrieve device ECP setting', {}, e instanceof Error ? e : undefined);
         }
-
     }
 
     /**
@@ -1419,7 +1493,14 @@ export class RokuDeploy {
 
         // Check if device version is at least 15.0.4
         if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`);
+            throw new UnsupportedFirmwareVersionError(
+                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`,
+                {
+                    currentVersion: softwareVersion,
+                    minimumVersion: '15.0.4',
+                    operation: 'reboot'
+                }
+            );
         }
 
         return this.doPostRequest({
@@ -1441,7 +1522,14 @@ export class RokuDeploy {
 
         // Check if device version is at least 15.0.4
         if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new errors.UnsupportedFirmwareVersionError(`Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`);
+            throw new UnsupportedFirmwareVersionError(
+                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`,
+                {
+                    currentVersion: softwareVersion,
+                    minimumVersion: '15.0.4',
+                    operation: 'checkForUpdate'
+                }
+            );
         }
 
         return this.doPostRequest({
