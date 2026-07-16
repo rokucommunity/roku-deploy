@@ -89,7 +89,7 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    public async stage(options: StageOptions) {
+    public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
@@ -131,14 +131,14 @@ export class RokuDeploy {
             }, 10);
         }));
         this.logger.info('Relevant files copied to:', out);
-        return out;
+        return { stagingDir: out };
     }
 
     /**
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
      */
-    public async zip(options: ZipOptions) {
+    public async zip(options: ZipOptions): Promise<ZipResult> {
         options = { ...this.options, ...options };
         logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
@@ -173,7 +173,7 @@ export class RokuDeploy {
         //create a zip of the folder
         await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
-        return out;
+        return { zipPath: out };
     }
 
     /**
@@ -639,7 +639,7 @@ export class RokuDeploy {
         }
 
         if (options.devId) {
-            let devId = await this.getDevId(options);
+            const { devId } = await this.getDevId(options);
 
             if (devId !== options.devId) {
                 throw new errors.UnknownDeviceResponseError('Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"');
@@ -651,7 +651,7 @@ export class RokuDeploy {
      * Sign a pre-existing package using Roku and return path to it locally
      * @param options
      */
-    public async createSignedPackage(options: CreateSignedPackageOptions): Promise<string> {
+    public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
         options = { ...this.options, ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['host', 'password', 'signingPassword']);
@@ -695,7 +695,7 @@ export class RokuDeploy {
 
         //prevent devId mismatch (if devId is specified)
         if (options.devId) {
-            const deviceDevId = await this.getDevId(options);
+            const { devId: deviceDevId } = await this.getDevId(options);
             if (options.devId !== deviceDevId) {
                 throw new Error(`Package signing cancelled: provided devId '${options.devId}' does not match on-device devId '${deviceDevId}'`);
             }
@@ -726,7 +726,7 @@ export class RokuDeploy {
             let requestOptions2 = this.generateBaseRequestOptions(url, options);
             await this.downloadFile(requestOptions2, out);
             this.logger.info('Signed package created at:', out);
-            return out;
+            return { pkgPath: out };
         }
 
         throw new errors.UnknownDeviceResponseError('Unknown error signing package', results);
@@ -1375,12 +1375,12 @@ export class RokuDeploy {
      * @param options
      * @returns
      */
-    public async getDevId(options?: GetDevIdOptions) {
+    public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
         options = { ...this.options, ...options } as GetDevIdOptions;
         this.checkRequiredOptions(options, ['host']);
         const deviceInfo = await this.getDeviceInfo(options);
         this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
-        return deviceInfo['keyed-developer-id'];
+        return { devId: deviceInfo['keyed-developer-id'] };
     }
 
     private async parseManifest(manifestPath: string): Promise<ManifestData> {
@@ -1734,6 +1734,34 @@ export interface DeployOptions extends BaseRequestOptions {
 }
 
 export type GetDevIdOptions = BaseEcpOptions;
+
+export interface ZipResult {
+    /**
+     * The path to the created zip file
+     */
+    zipPath: string;
+}
+
+export interface CreateSignedPackageResult {
+    /**
+     * The path to the created signed package file
+     */
+    pkgPath: string;
+}
+
+export interface StageResult {
+    /**
+     * The path to the staging directory
+     */
+    stagingDir: string;
+}
+
+export interface GetDevIdResult {
+    /**
+     * The developer ID from the device
+     */
+    devId: string;
+}
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 export const rokuDeploy = new RokuDeploy();

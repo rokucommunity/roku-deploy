@@ -6,7 +6,7 @@ export class GetDevIdCommand {
             ...rokuDeploy.loadConfigFile(args),
             ...args
         };
-        const devId = await rokuDeploy.getDevId(options);
+        const { devId } = await rokuDeploy.getDevId(options);
         console.log(devId);
     }
 }

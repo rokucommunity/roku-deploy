@@ -173,7 +173,7 @@ describe('device', function device() {
             `]
         ]);
 
-        const staged = await rd.stage({ rootDir: libRootDir, files: options.files, out: `${stagingDir}-${name}` });
+        const { stagingDir: staged } = await rd.stage({ rootDir: libRootDir, files: options.files, out: `${stagingDir}-${name}` });
         await rd.zip({ dir: staged, out: `${outDir}/${name}.zip`, files: options.files });
         await rd.sideload({
             ...options,
@@ -221,7 +221,7 @@ describe('device', function device() {
 
         //the default file list only covers source/components/images/locale/manifest; a bs_libs
         //library keeps its code under libsource/, so grab everything to be sure it's packaged
-        const staged = await rd.stage({ rootDir: libRootDir, files: ['**/*'], out: `${stagingDir}-${name}` });
+        const { stagingDir: staged } = await rd.stage({ rootDir: libRootDir, files: ['**/*'], out: `${stagingDir}-${name}` });
         await rd.zip({ dir: staged, out: `${outDir}/${name}.zip`, files: ['**/*'] });
         await rd.sideload({
             ...options,
@@ -248,7 +248,7 @@ describe('device', function device() {
 
     describe('publish', () => {
         it('works', async () => {
-            const staged = await rd.stage({ rootDir: rootDir, files: options.files, out: stagingDir });
+            const { stagingDir: staged } = await rd.stage({ rootDir: rootDir, files: options.files, out: stagingDir });
             const zipPath = `${outDir}/roku-deploy.zip`;
             await rd.zip({ dir: staged, out: zipPath, files: options.files });
             let response = await rd.sideload({ ...options, zip: zipPath });
@@ -270,19 +270,18 @@ describe('device', function device() {
                 devId: options.devId
             });
             //stage+zip+sideload the app so there is a dev channel on the device to sign
-            const staged = await rd.stage({ rootDir: rootDir, files: options.files, out: stagingDir });
+            const { stagingDir: staged } = await rd.stage({ rootDir: rootDir, files: options.files, out: stagingDir });
             const zipPath = `${outDir}/roku-deploy.zip`;
             await rd.zip({ dir: staged, out: zipPath, files: options.files });
             await rd.sideload({ ...options, zip: zipPath });
-            expectPathExists(
-                await rd.createSignedPackage({
-                    host: options.host,
-                    password: options.password,
-                    signingPassword: options.signingPassword,
-                    devId: options.devId,
-                    manifestPath: `${rootDir}/manifest`
-                })
-            );
+            const { pkgPath } = await rd.createSignedPackage({
+                host: options.host,
+                password: options.password,
+                signingPassword: options.signingPassword,
+                devId: options.devId,
+                manifestPath: `${rootDir}/manifest`
+            });
+            expectPathExists(pkgPath);
         });
     });
 
@@ -568,7 +567,7 @@ describe('device', function device() {
         async function buildExactZip(dir: string, files: string[], writeProject: (pad: string) => void, target: number): Promise<void> {
             const build = async (pad: string) => {
                 writeProject(pad);
-                const staged = await rd.stage({ rootDir: dir, files: files, out: s`${dir}/staging` });
+                const { stagingDir: staged } = await rd.stage({ rootDir: dir, files: files, out: s`${dir}/staging` });
                 await rd.zip({ dir: staged, out: s`${dir}/app.zip`, files: files });
                 return fsExtra.statSync(s`${dir}/app.zip`).size;
             };
