@@ -105,7 +105,7 @@ describe('cli', function cli() {
 
     it('Signs an existing package', async () => {
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
-            return Promise.resolve('');
+            return Promise.resolve({ pkgPath: '' });
         });
 
         const command = new CreateSignedPackageCommand();
@@ -214,7 +214,7 @@ describe('cli', function cli() {
 
     it('Gets dev id', async () => {
         const stub = sinon.stub(rokuDeploy, 'getDevId').callsFake(async () => {
-            return Promise.resolve('');
+            return Promise.resolve({ devId: '' });
         });
 
         const command = new GetDevIdCommand();
