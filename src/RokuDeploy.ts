@@ -37,7 +37,7 @@ export class RokuDeploy {
     /**
      * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
      */
-    public loadConfigFile(options?: { cwd?: string; configPath?: string }): RokuDeployOptions {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
@@ -979,8 +979,8 @@ export class RokuDeploy {
     /**
      * Delete the component library with the specified filename from the device
      */
-    public async deleteComponentLibrary(options?: { host: string; password: string; fileName: string; username?: string }) {
-        options = { ...this.options, ...options } as { host: string; password: string; fileName: string; username?: string };
+    public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
+        options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
         this.checkRequiredOptions(options, ['host', 'password', 'fileName']);
 
         let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
@@ -998,8 +998,8 @@ export class RokuDeploy {
     /**
      * Delete all component libraries from the device
      */
-    public async deleteAllComponentLibraries(options: ListSideloadedPluginsOptions) {
-        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
+    public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
+        options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
         const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
@@ -1734,6 +1734,28 @@ export interface DeployOptions extends BaseRequestOptions {
 }
 
 export type GetDevIdOptions = BaseEcpOptions;
+
+export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
+    /**
+     * The filename of the component library to delete
+     */
+    fileName: string;
+}
+
+export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
+
+export type GetInstalledPackagesOptions = BaseRequestOptions;
+
+export interface LoadConfigFileOptions {
+    /**
+     * The current working directory to use for relative paths
+     */
+    cwd?: string;
+    /**
+     * Path to the config file. Defaults to `rokudeploy.json` in the cwd.
+     */
+    configPath?: string;
+}
 
 export interface ZipResult {
     /**
