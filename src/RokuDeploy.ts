@@ -1690,6 +1690,8 @@ export interface LoadConfigFileOptions {
      * Path to the config file. Defaults to `rokudeploy.json` in the cwd.
      */
     configPath?: string;
+}
+
 export interface ZipResult {
     /**
      * The path to the created zip file
