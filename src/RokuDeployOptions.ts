@@ -1,22 +1,52 @@
-import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
+import type { Logger, LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
+
+/**
+ * Options that can be passed to the RokuDeploy constructor to set defaults
+ * that will be merged into every method call.
+ */
+export interface RokuDeployConstructorOptions {
+    /**
+     * A custom logger instance. If not provided, the global logger will be used.
+     */
+    logger?: Logger;
+    /**
+     * The IP address or hostname of the target Roku device.
+     * @example '192.168.1.21'
+     */
+    host?: string;
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password?: string;
+    /**
+     * The username for the roku box. This will always be 'rokudev', but allows to be overridden
+     * just in case roku adds support for custom usernames in the future
+     * @default 'rokudev'
+     */
+    username?: string;
+    /**
+     * The port that should be used when installing the package. Defaults to 80.
+     */
+    packagePort?: number;
+    /**
+     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
+     */
+    ecpPort?: number;
+    /**
+     * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
+     */
+    timeout?: number;
+}
 
 export interface RokuDeployOptions {
     /**
-     * Path to a bsconfig.json project file
+     * A custom logger instance. If not provided, the global logger will be used.
      */
-    project?: string;
-
+    logger?: Logger;
     /**
-     * A full path to the folder where the zip/pkg package should be placed
-     * @default './out'
+     * The working directory where the command should be executed
      */
-    outDir?: string;
-
-    /**
-     * The base filename the zip/pkg file should be given (excluding the extension)
-     * @default 'roku-deploy'
-     */
-    outFile?: string;
+    cwd?: string;
 
     /**
      * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
@@ -43,31 +73,6 @@ export interface RokuDeployOptions {
         ],
      */
     files?: FileEntry[];
-
-    /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @default false
-     * @deprecated use `retainStagingDir` instead
-     */
-    retainStagingFolder?: boolean;
-
-    /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @default false
-     */
-    retainStagingDir?: boolean;
-
-    /**
-     * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
-     * @default true
-     */
-    retainDeploymentArchive?: boolean;
-
-    /**
-     * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
-     * @deprecated since 3.9.0. use `stagingDir` instead
-     */
-    stagingFolderPath?: string;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
@@ -110,7 +115,12 @@ export interface RokuDeployOptions {
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
      */
-    remotePort?: number;
+    ecpPort?: number;
+
+    /**
+     * The directory where screenshots should be saved. Will use the OS temp directory by default
+     */
+    screenshotDir?: string;
 
     /**
      * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
@@ -139,22 +149,12 @@ export interface RokuDeployOptions {
     /**
      * Path to a copy of the signed package you want to use for rekeying
      */
-    rekeySignedPackage?: string;
+    pkg?: string;
 
     /**
      * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
      */
     devId?: string;
-
-    /**
-     * If true we increment the build number to be a timestamp in the format yymmddHHMM
-     */
-    incrementBuildNumber?: boolean;
-
-    /**
-     * If true we convert to squashfs before creating the pkg file
-     */
-    convertToSquashfs?: boolean;
 
     /**
      * If true, the publish will fail on compile error
@@ -170,7 +170,7 @@ export interface RokuDeployOptions {
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one
      */
-    deleteInstalledChannel?: boolean;
+    deleteDevChannel?: boolean;
 
     /**
      * Overrides for values used during the zip upload process. You probably don't need to change these...
@@ -189,4 +189,4 @@ export interface RokuDeployOptions {
     };
 }
 
-export type FileEntry = (string | { src: string | string[]; dest?: string });
+export type FileEntry = (string | { src: string[] | string; dest?: string });
