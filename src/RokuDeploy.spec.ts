@@ -4807,6 +4807,210 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('option validation', () => {
+        beforeEach(() => {
+            //make a dummy output file for tests that need a valid zip
+            zipFile = `${outDir}/temp${fileCounter++}.zip`;
+            try {
+                fsExtra.outputFileSync(zipFile, 'asdf');
+            } catch (e) { }
+        });
+
+        describe('validatePort', () => {
+            it('throws for non-integer port', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        packagePort: 80.5,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid packagePort');
+                }
+            });
+
+            it('throws for port less than 1', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        packagePort: 0,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid packagePort');
+                }
+            });
+
+            it('throws for port greater than 65535', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        packagePort: 65536,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid packagePort');
+                }
+            });
+
+            it('throws for string port', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        packagePort: '80' as any,
+                        close: false
+                    });
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid packagePort');
+                }
+            });
+
+            it('allows valid port numbers', async () => {
+                mockDoPostRequest();
+                // Should not throw - valid port
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'test',
+                    zip: zipFile,
+                    packagePort: 8080,
+                    close: false
+                });
+            });
+        });
+
+        describe('validateTimeout', () => {
+            it('throws for non-integer timeout', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        timeout: 1000.5,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid timeout');
+                }
+            });
+
+            it('throws for negative timeout', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        timeout: -1,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid timeout');
+                }
+            });
+
+            it('throws for zero timeout', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        timeout: 0,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid timeout');
+                }
+            });
+        });
+
+        describe('validateEnum', () => {
+            it('throws for invalid appType', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        host: '1.2.3.4',
+                        password: 'test',
+                        zip: 'test.zip',
+                        appType: 'invalid' as any,
+                        close: false
+                    });
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid appType');
+                }
+            });
+
+            it('allows valid appType values', async () => {
+                mockDoPostRequest();
+                // Should not throw
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'test',
+                    zip: zipFile,
+                    appType: 'channel',
+                    close: false
+                });
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'test',
+                    zip: zipFile,
+                    appType: 'dcl',
+                    close: false
+                });
+            });
+
+            it('allows undefined appType', async () => {
+                mockDoPostRequest();
+                // Should not throw
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'test',
+                    zip: zipFile,
+                    close: false
+                });
+            });
+
+            it('allows null appType', async () => {
+                mockDoPostRequest();
+                // Should not throw - null means "don't include"
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'test',
+                    zip: zipFile,
+                    appType: null,
+                    close: false
+                } as any);
+            });
+        });
+
+        describe('ecpPort validation', () => {
+            it('throws for invalid ecpPort in getDeviceInfo', async () => {
+                try {
+                    await rokuDeploy.getDeviceInfo({
+                        host: '1.2.3.4',
+                        ecpPort: 'invalid' as any
+                    });
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include('Invalid ecpPort');
+                }
+            });
+        });
+    });
+
     describe('downloadFile', () => {
         it('waits for the write stream to finish writing before resolving', async () => {
             let downloadFileIsResolved = false;
