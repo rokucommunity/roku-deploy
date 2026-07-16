@@ -181,61 +181,6 @@ describe('device', function device() {
         });
     }
 
-    /**
-     * Build and sideload a BrightScript library (bs_libs) onto the device, modeled after the
-     * `code-library` sample. Unlike SceneGraph complibs, these declare themselves with
-     * `bs_libs_provided` + `no_source=1` and pull in their dependencies via `bs_libs_required`, but
-     * they are hosted/installed the same way (published as their own `dcl` package) and deleted
-     * individually via `deleteComponentLibrary`.
-     *
-     * @param name the library name (also its provided symbol and .brs file name)
-     * @param requires the names of other libraries this one depends on (goes into bs_libs_required)
-     */
-    async function installBrightScriptLibrary(name: string, requires: string[] = []) {
-        const libRootDir = s`${tempDir}/${name}`;
-        //each library greets, then delegates to every library it requires, so the whole chain is exercised
-        const requiredLibraryStatements = requires.map(dep => `library "${dep}.brs"`).join('\n');
-        const delegationCalls = requires.map(dep => `    ${dep}_greet("Activated from ${name}")`).join('\n');
-        writeFiles(libRootDir, [
-            ['manifest', undent`
-                title=${name}
-                major_version=1
-                minor_version=0
-                build_version=1
-                bs_libs_provided=${name}
-                no_source=1
-                ${requires.length > 0 ? `bs_libs_required=${requires.join(',')}` : ''}
-                rsg_version=1.2
-                ui_resolutions=hd
-            `],
-            [`libsource/${name}.brs`, undent`
-                ${requiredLibraryStatements}
-                '${COMPLIB_PADDING}
-                function ${name}_greet(message as string) as void
-                    ? "Hello from ${name}: " + message
-                ${delegationCalls}
-                end function
-            `]
-        ]);
-
-        await rokuDeploy.rokuDeploy.createPackage({
-            ...options,
-            rootDir: libRootDir,
-            stagingDir: `${stagingDir}-${name}`,
-            outDir: outDir,
-            outFile: name,
-            //the default file list only covers source/components/images/locale/manifest; a bs_libs
-            //library keeps its code under libsource/, so grab everything to be sure it's packaged
-            files: ['**/*']
-        });
-        await rokuDeploy.rokuDeploy.publish({
-            ...options,
-            appType: 'dcl',
-            outDir: outDir,
-            outFile: name
-        });
-    }
-
     describe('deploy', () => {
         it('works', async function deployWorks() {
             this.timeout(12_000);
@@ -838,21 +783,6 @@ async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs
         }
     }
     throw new Error(`Device ${host} did not come back online within ${timeoutMs}ms. Last error: ${lastError?.message}`);
-}
-
-/**
- * Read the device's current uptime (seconds since boot) via ECP. Used to detect an unexpected reboot:
- * if uptime goes DOWN between two reads, the device rebooted in between. Returns undefined if the
- * device is unreachable (e.g. mid-reboot), which the caller can treat as a reboot in progress.
- */
-async function getDeviceUptime(host: string): Promise<number | undefined> {
-    try {
-        const info = await rokuDeploy.rokuDeploy.getDeviceInfo({ host: host, enhance: true, timeout: 15_000 });
-        //`enhance` coerces uptime to a number; guard anyway in case a device omits it
-        return typeof info.uptime === 'number' ? info.uptime : undefined;
-    } catch {
-        return undefined;
-    }
 }
 
 /**
