@@ -75,70 +75,50 @@ describe('fetch module', () => {
             expect(result).to.not.include('opaque');
         });
 
-        it('handles MD5-SESS algorithm', () => {
-            const result = buildDigestAuthorization({
+        it('handles digest auth edge cases (MD5-SESS, missing qop, default algorithm, empty values)', () => {
+            //MD5-SESS algorithm
+            const md5SessResult = buildDigestAuthorization({
                 username: 'rokudev',
                 password: 'aaaa',
                 method: 'HEAD',
                 uri: '/plugin_install',
-                challenge: {
-                    realm: 'rokudev',
-                    nonce: 'abc123',
-                    qop: 'auth',
-                    algorithm: 'MD5-SESS'
-                }
+                challenge: { realm: 'rokudev', nonce: 'abc123', qop: 'auth', algorithm: 'MD5-SESS' }
             });
+            expect(md5SessResult).to.include('algorithm=MD5-SESS');
+            expect(md5SessResult).to.match(/^Digest /);
 
-            expect(result).to.include('algorithm=MD5-SESS');
-            expect(result).to.match(/^Digest /);
-        });
-
-        it('handles missing qop parameter', () => {
-            const result = buildDigestAuthorization({
+            //missing qop parameter
+            const noQopResult = buildDigestAuthorization({
                 username: 'rokudev',
                 password: 'aaaa',
                 method: 'HEAD',
                 uri: '/plugin_install',
-                challenge: {
-                    realm: 'rokudev',
-                    nonce: 'abc123'
-                }
+                challenge: { realm: 'rokudev', nonce: 'abc123' }
             });
+            expect(noQopResult).to.not.include('qop=');
+            expect(noQopResult).to.not.include('nc=');
+            expect(noQopResult).to.not.include('cnonce=');
 
-            expect(result).to.not.include('qop=');
-            expect(result).to.not.include('nc=');
-            expect(result).to.not.include('cnonce=');
-            expect(result).to.match(/^Digest /);
-        });
-
-        it('defaults to MD5 algorithm when not specified', () => {
-            const result = buildDigestAuthorization({
+            //defaults to MD5 algorithm when not specified
+            const defaultAlgoResult = buildDigestAuthorization({
                 username: 'rokudev',
                 password: 'aaaa',
                 method: 'HEAD',
                 uri: '/plugin_install',
-                challenge: {
-                    realm: 'rokudev',
-                    nonce: 'abc123',
-                    qop: 'auth'
-                }
+                challenge: { realm: 'rokudev', nonce: 'abc123', qop: 'auth' }
             });
+            expect(defaultAlgoResult).to.include('algorithm=MD5');
 
-            expect(result).to.include('algorithm=MD5');
-        });
-
-        it('handles empty realm and nonce', () => {
-            const result = buildDigestAuthorization({
+            //empty realm and nonce
+            const emptyValuesResult = buildDigestAuthorization({
                 username: 'rokudev',
                 password: 'aaaa',
                 method: 'HEAD',
                 uri: '/plugin_install',
                 challenge: {}
             });
-
-            expect(result).to.include('realm=""');
-            expect(result).to.include('nonce=""');
-            expect(result).to.match(/^Digest /);
+            expect(emptyValuesResult).to.include('realm=""');
+            expect(emptyValuesResult).to.include('nonce=""');
         });
     });
 

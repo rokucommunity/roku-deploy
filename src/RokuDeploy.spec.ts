@@ -667,8 +667,8 @@ describe('RokuDeploy', () => {
             expect(thrown.message).to.include('Could not retrieve device info');
         });
 
-        it('throws EcpNetworkAccessModeDisabledError with non-Error cause', async () => {
-            //throw a non-Error object that matches the ECP disabled pattern
+        it('handles non-Error causes (EcpNetworkAccessModeDisabledError and UnparsableDeviceResponseError)', async () => {
+            //test 1: throws EcpNetworkAccessModeDisabledError with non-Error cause
             sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => {
                 const notAnError: any = {
                     message: 'not an error',
@@ -687,15 +687,36 @@ describe('RokuDeploy', () => {
             });
             sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
 
-            let thrown: any;
+            let thrown1: any;
             try {
                 await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
             } catch (e) {
-                thrown = e;
+                thrown1 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.EcpNetworkAccessModeDisabledError);
-            //cause should be undefined since the thrown value wasn't an Error
-            expect(thrown.cause).to.be.undefined;
+            expect(thrown1).to.be.instanceOf(errors.EcpNetworkAccessModeDisabledError);
+            expect(thrown1.cause).to.be.undefined;
+
+            //test 2: throws UnparsableDeviceResponseError with non-Error cause when XML parsing fails
+            sinon.restore();
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                body: 'not valid xml {{{{',
+                response: { statusCode: 200, headers: {} }
+            });
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+            const xml2js = require('xml2js');
+            sinon.stub(xml2js, 'parseStringPromise').callsFake(() => {
+                // eslint-disable-next-line @typescript-eslint/no-throw-literal
+                throw 'not an error';
+            });
+
+            let thrown2: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown2 = e;
+            }
+            expect(thrown2).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown2.cause).to.be.undefined;
         });
 
 
@@ -715,32 +736,6 @@ describe('RokuDeploy', () => {
             }
             expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
             expect(thrown.details.httpDetails).to.exist;
-        });
-
-        it('throws UnparsableDeviceResponseError with non-Error cause when XML parsing fails', async () => {
-            //stub doGetRequest to return valid response
-            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
-                body: 'not valid xml {{{{',
-                response: { statusCode: 200, headers: {} }
-            });
-            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
-
-            //stub xml2js to throw a non-Error object
-            const xml2js = require('xml2js');
-            sinon.stub(xml2js, 'parseStringPromise').callsFake(() => {
-                // eslint-disable-next-line @typescript-eslint/no-throw-literal
-                throw 'not an error';
-            });
-
-            let thrown: any;
-            try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
-            } catch (e) {
-                thrown = e;
-            }
-            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
-            //cause should be undefined since it wasn't an Error
-            expect(thrown.cause).to.be.undefined;
         });
 
         it('throws UnparsableDeviceResponseError with undefined response when XML parsing fails', async () => {
@@ -1505,15 +1500,14 @@ describe('RokuDeploy', () => {
             });
         });
 
-        it('rejects as CompileError with undefined results in error', async () => {
-            //stub doPostRequest to throw an error without results property
+        it('rejects as CompileError with and without results in error', async () => {
+            //test with undefined results (tests ?? '' and ?. branches)
             sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
                 const err: any = new Error('Install Failure: Compilation Failed.');
-                //no results property - this tests the ?? '' and ?. branches
                 throw err;
             });
 
-            let thrown: any;
+            let thrown1: any;
             try {
                 await rokuDeploy.sideload({
                     host: '1.2.3.4',
@@ -1523,13 +1517,12 @@ describe('RokuDeploy', () => {
                     close: false
                 });
             } catch (e) {
-                thrown = e;
+                thrown1 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.CompileError);
-        });
+            expect(thrown1).to.be.instanceOf(errors.CompileError);
 
-        it('rejects as CompileError with results containing body and response', async () => {
-            //stub doPostRequest to throw an error WITH results property
+            //restore and test WITH results property containing body and response
+            sinon.restore();
             sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
                 const err: any = new Error('Install Failure: Compilation Failed.');
                 err.results = {
@@ -1539,7 +1532,7 @@ describe('RokuDeploy', () => {
                 throw err;
             });
 
-            let thrown: any;
+            let thrown2: any;
             try {
                 await rokuDeploy.sideload({
                     host: '1.2.3.4',
@@ -1549,10 +1542,10 @@ describe('RokuDeploy', () => {
                     close: false
                 });
             } catch (e) {
-                thrown = e;
+                thrown2 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.CompileError);
-            expect(thrown.details.httpDetails).to.exist;
+            expect(thrown2).to.be.instanceOf(errors.CompileError);
+            expect(thrown2.details.httpDetails).to.exist;
         });
 
         it('rejects when response contains compile error wording', () => {
@@ -1588,35 +1581,34 @@ describe('RokuDeploy', () => {
             doTest({ body: 'something', response: { statusCode: 401, request: undefined } });
         });
 
-        it('checkRequest throws UnparsableDeviceResponseError when results is null', () => {
-            let thrown: any;
+        it('checkRequest throws UnparsableDeviceResponseError for invalid inputs (null, missing response, non-string body)', () => {
+            //null results
+            let thrown1: any;
             try {
                 rokuDeploy['checkRequest'](null as any);
             } catch (e) {
-                thrown = e;
+                thrown1 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
-            expect(thrown.message).to.equal('Invalid response');
-        });
+            expect(thrown1).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown1.message).to.equal('Invalid response');
 
-        it('checkRequest throws UnparsableDeviceResponseError when response is undefined', () => {
-            let thrown: any;
+            //missing response property
+            let thrown2: any;
             try {
                 rokuDeploy['checkRequest']({ body: 'test' } as any);
             } catch (e) {
-                thrown = e;
+                thrown2 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
-        });
+            expect(thrown2).to.be.instanceOf(errors.UnparsableDeviceResponseError);
 
-        it('checkRequest throws UnparsableDeviceResponseError when body is not a string', () => {
-            let thrown: any;
+            //non-string body
+            let thrown3: any;
             try {
                 rokuDeploy['checkRequest']({ response: {}, body: undefined } as any);
             } catch (e) {
-                thrown = e;
+                thrown3 = e;
             }
-            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown3).to.be.instanceOf(errors.UnparsableDeviceResponseError);
         });
 
         it('rejects when response contains invalid password status code', () => {
