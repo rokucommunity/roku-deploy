@@ -1699,8 +1699,7 @@ export interface RokuPlugin {
 }
 export type RokuPackage = RokuPlugin;
 
-export interface ListSideloadedPluginsOptions extends BaseRequestOptions {
-}
+export type ListSideloadedPluginsOptions = BaseRequestOptions;
 
 enum RokuMessageType {
     success = 'success',
