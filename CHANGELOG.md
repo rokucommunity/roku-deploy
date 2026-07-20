@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.18.2](https://github.com/rokucommunity/roku-deploy/compare/3.18.1...v3.18.2) - 2026-07-20
+### Changed
+ - Restore dist/Logger as a compatibility shim ([#327](https://github.com/rokucommunity/roku-deploy/pull/327))
+
+
+
 ## [3.18.1](https://github.com/rokucommunity/roku-deploy/compare/3.18.0...v3.18.1) - 2026-07-20
 ### Changed
  - Migrate to @rokucommunity/logger ([#318](https://github.com/rokucommunity/roku-deploy/pull/318))
