@@ -5801,7 +5801,8 @@ describe('RokuDeploy', () => {
         });
 
         it('throws DeviceUnreachableError when the first request throws', async () => {
-            sinon.stub(httpClient, 'fetch').rejects(new Error('ECONNREFUSED'));
+            const originalError = new Error('ECONNREFUSED');
+            sinon.stub(httpClient, 'fetch').rejects(originalError);
 
             let thrown: unknown;
             try {
@@ -5811,6 +5812,7 @@ describe('RokuDeploy', () => {
             }
             expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
             expect((thrown as Error).message).to.include('ECONNREFUSED');
+            expect((thrown as errors.DeviceUnreachableError).cause).to.equal(originalError);
         });
 
         it('throws InvalidDeviceResponseCodeError on an unexpected status (e.g. 500)', async () => {
@@ -5898,6 +5900,7 @@ describe('RokuDeploy', () => {
             }
             expect(thrown).to.be.instanceOf(errors.DeviceUnreachableError);
             expect((thrown as Error).message).to.include('boom');
+            expect((thrown as errors.DeviceUnreachableError).cause).to.be.undefined;
         });
     });
 

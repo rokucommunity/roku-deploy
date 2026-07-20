@@ -1301,7 +1301,11 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new DeviceUnreachableError(`Device ${options.host} was unreachable: ${message}`, err);
+            throw new DeviceUnreachableError(
+                `Device ${options.host} was unreachable: ${message}`,
+                {},
+                err instanceof Error ? err : undefined
+            );
         }
 
         if (response.status === 200) {
