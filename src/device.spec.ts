@@ -208,6 +208,76 @@ describe('device', function device() {
         });
     });
 
+    describe('large zip uploads', function largeZipUploads() {
+        //a large upload takes several seconds per digest-auth leg on wifi, and publish() may attempt
+        //Replace + Install; keep this generous
+        this.timeout(120_000);
+
+        //Large enough that the multipart body cannot fit in the OS socket buffers, so the upload is
+        //still mid-write when the device responds to the request. Random bytes are incompressible, so
+        //the zip stays this size instead of deflating away.
+        const LARGE_FILE_SIZE = 10 * 1024 * 1024;
+
+        it('publishes a large channel zip', async () => {
+            //bulk the standard test channel up with a large incompressible asset
+            fsExtra.outputFileSync(s`${rootDir}/assets/noise.bin`, crypto.randomBytes(LARGE_FILE_SIZE));
+
+            await rokuDeploy.createPackage({
+                ...options,
+                files: ['manifest', 'source/**/*', 'components/**/*', 'assets/**/*']
+            });
+            expect(fsExtra.statSync(rokuDeploy.rokuDeploy.getOutputZipFilePath(options)).size).to.be.greaterThan(LARGE_FILE_SIZE);
+
+            const response = await rokuDeploy.publish(options);
+            assert.equal(response.message, 'Successful deploy');
+        });
+
+        //Mirrors roku-debug's component-library launch flow: delete every sideloaded plugin, then
+        //install a complib whose zip is several megabytes (like a real-world complib)
+        it('installs a large component library after deleting all sideloaded plugins', async () => {
+            //start clean, like roku-debug does at launch
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+
+            const libName = 'largecomplib';
+            const libRootDir = `${tempDir}/${libName}`;
+            writeFiles(libRootDir, [
+                ['manifest', undent`
+                    title=${libName}
+                    sg_component_libs_provided=${libName}
+                `],
+                [`components/${libName}.xml`, undent`
+                    <component name="${libName}">
+                        <!-- ${COMPLIB_PADDING} -->
+                    </component>
+                `]
+            ]);
+            //bulk the complib up with a large incompressible asset
+            fsExtra.outputFileSync(s`${libRootDir}/assets/noise.bin`, crypto.randomBytes(LARGE_FILE_SIZE));
+
+            await rokuDeploy.rokuDeploy.createPackage({
+                ...options,
+                rootDir: libRootDir,
+                stagingDir: `${stagingDir}-${libName}`,
+                outDir: outDir,
+                outFile: libName,
+                files: ['manifest', 'components/**/*', 'assets/**/*']
+            });
+            const response = await rokuDeploy.rokuDeploy.publish({
+                ...options,
+                appType: 'dcl',
+                outDir: outDir,
+                outFile: libName
+            });
+            assert.equal(response.message, 'Successful deploy');
+
+            //the complib should now be installed on the device
+            expect(await getInstalledComponentLibraryFileNames()).to.have.lengthOf(1);
+
+            //clean up
+            await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
+        });
+    });
+
     describe('deployAndSignPackage', () => {
         it('works', async function deployAndSignPackageWorks() {
             this.timeout(12_000);

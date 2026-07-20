@@ -2,6 +2,7 @@
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
+import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
 
 /**
  * A thin compatibility shim over `needle` that mimics the small slice of the
@@ -24,13 +25,69 @@ export class Request {
      */
     public post(params: RequestOptions, callback: RequestCallback) {
         const { url, data, needleOptions } = this.translateOptions(params, 'POST');
-        return needle.post(url, data, needleOptions, (error, response, body) => {
+        //Never let needle's own digest dance send a request body: needle sends the FULL body on the
+        //unauthenticated first leg, but the Roku answers that leg's 401 without reading the body and closes
+        //the socket. A body still being written at that moment dies with a raw `write EPIPE`, and needle
+        //fails the whole request before its 401 retry can run. (Bodies small enough to fit in the socket
+        //buffers finish writing before the close, which is why only large zips ever hit this.)
+        //`request`/`postman-request` never had this problem because they never sent the body
+        //unauthenticated: the first leg was a bodyless probe, and the body only went out WITH the
+        //Authorization header. Replicate that here for any authenticated POST that has a body.
+        if (data && needleOptions.auth === 'digest') {
+            return this.postWithDigestPreflight(url, data, needleOptions, callback);
+        }
+        return needle.post(url, data, needleOptions, this.createNeedleCallback(url, callback));
+    }
+
+    /**
+     * POST a request whose body is only ever sent WITH an Authorization header: a bodyless probe collects
+     * the device's digest challenge, we compute the `Authorization` header ourselves, and the real request
+     * goes out pre-authorized (needle sees the header and skips its own 401 dance). If the probe doesn't
+     * yield a usable challenge (endpoint not auth-protected, unexpected status), the real request is sent
+     * unchanged and needle's own 401 dance remains as the fallback.
+     */
+    private postWithDigestPreflight(url: string, data: any, needleOptions: needle.NeedleOptions, callback: RequestCallback) {
+        //probe with no body and NO credentials: we want the raw 401 challenge back, not needle answering it
+        //(which would consume the challenge before the real request could use it)
+        const probeOptions: needle.NeedleOptions = { ...needleOptions };
+        delete probeOptions.multipart;
+        delete probeOptions.username;
+        delete probeOptions.password;
+        delete probeOptions.auth;
+
+        return needle.post(url, null, probeOptions, (probeError, probeResponse) => {
+            if (probeError) {
+                return callback(probeError, undefined, undefined);
+            }
+            const authorizedOptions: needle.NeedleOptions = { ...needleOptions };
+            const challengeHeader = probeResponse?.headers?.['www-authenticate'];
+            if (probeResponse?.statusCode === 401 && typeof challengeHeader === 'string') {
+                const authorization = buildDigestAuthorization({
+                    username: needleOptions.username,
+                    password: needleOptions.password ?? '',
+                    method: 'POST',
+                    //the digest uri must match the request line, which includes any query string
+                    uri: urlModule.parse(url).path,
+                    challenge: parseDigestChallenge(challengeHeader)
+                });
+                authorizedOptions.headers = { ...authorizedOptions.headers, authorization: authorization };
+            }
+            needle.post(url, data, authorizedOptions, this.createNeedleCallback(url, callback));
+        });
+    }
+
+    /**
+     * Build the needle callback that reshapes `(error, response, body)` into the `request`-style
+     * `(error, response, body)` the rest of roku-deploy consumes.
+     */
+    private createNeedleCallback(url: string, callback: RequestCallback) {
+        return (error: Error | null, response: any, body: any) => {
             if (error) {
                 return callback(error, undefined, undefined);
             }
             const coerced = this.coerceBody(body);
             return callback(null, this.buildResponse(response, url, coerced), coerced);
-        });
+        };
     }
 
     /**

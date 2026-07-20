@@ -347,6 +347,138 @@ describe('request (needle shim)', () => {
         });
     });
 
+    describe('digest preflight for bodied POSTs', () => {
+        //needle's own digest dance sends the body on the unauthenticated first leg, which the Roku kills
+        //mid-write for large bodies (write EPIPE). The shim therefore probes bodyless first and only sends
+        //the body WITH a computed Authorization header. These tests pin that two-request sequence down.
+
+        const CHALLENGE = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
+
+        /** Stub needle.post so each successive call gets the next canned result; returns the captured calls */
+        function stubPostSequence(results: Array<{ error?: any; response?: any; body?: any }>) {
+            const calls: Array<{ url: string; data: any; options: any }> = [];
+            sinon.stub(needle, 'post').callsFake(((url: string, data: any, options: any, callback: any) => {
+                const canned = results[Math.min(calls.length, results.length - 1)];
+                calls.push({ url: url, data: data, options: options });
+                process.nextTick(callback, canned.error ?? null, canned.response, canned.body);
+                return {} as any;
+            }) as any);
+            return calls;
+        }
+
+        it('sends a bodyless credential-free probe, then the real request with a computed Authorization header', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 401, headers: { 'www-authenticate': CHALLENGE } }, body: Buffer.alloc(0) },
+                { response: { statusCode: 200, headers: {} }, body: 'ok' }
+            ]);
+            const { error, response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa', sendImmediately: false },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(2);
+            //the probe carries no body, no multipart flag, and no credentials (needle must not answer the challenge itself)
+            expect(calls[0].data).to.be.null;
+            expect(calls[0].options.multipart).to.be.undefined;
+            expect(calls[0].options.username).to.be.undefined;
+            expect(calls[0].options.auth).to.be.undefined;
+            //the real request carries the body and the computed digest header
+            expect(calls[1].data).to.eql({ mysubmit: 'Replace' });
+            expect(calls[1].options.multipart).to.equal(true);
+            const authorization = calls[1].options.headers.authorization as string;
+            expect(authorization).to.match(/^Digest /);
+            expect(authorization).to.include('username="rokudev"');
+            expect(authorization).to.include('realm="rokudev"');
+            expect(authorization).to.include('nonce="abc123"');
+            expect(authorization).to.include('uri="/plugin_install"');
+            expect(error).to.be.null;
+            expect(response.statusCode).to.equal(200);
+        });
+
+        it('includes the query string in the digest uri', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 401, headers: { 'www-authenticate': CHALLENGE } }, body: Buffer.alloc(0) },
+                { response: { statusCode: 200, headers: {} }, body: 'ok' }
+            ]);
+            await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                qs: { dcl_enabled: '1' },
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Delete', fileName: 'a.zip' }
+            });
+            const authorization = calls[1].options.headers.authorization as string;
+            expect(authorization).to.include('uri="/plugin_install?dcl_enabled=1"');
+        });
+
+        it('sends the real request unchanged (credentials intact) when the probe is not a 401', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 200, headers: {} }, body: 'no auth required' }
+            ]);
+            const { error, response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(2);
+            //no Authorization header was computed, and needle's own dance stays available as the fallback
+            expect(calls[1].options.headers?.authorization).to.be.undefined;
+            expect(calls[1].options.auth).to.equal('digest');
+            expect(calls[1].options.username).to.equal('rokudev');
+            expect(error).to.be.null;
+            expect(response.statusCode).to.equal(200);
+        });
+
+        it('sends the real request unchanged when the 401 carries no challenge header', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 401, headers: {} }, body: Buffer.alloc(0) }
+            ]);
+            const { response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(2);
+            expect(calls[1].options.headers?.authorization).to.be.undefined;
+            //the real request's own response is what gets surfaced
+            expect(response.statusCode).to.equal(401);
+        });
+
+        it('propagates a probe failure without sending the real request', async () => {
+            const networkError = new Error('ECONNREFUSED');
+            const calls = stubPostSequence([{ error: networkError }]);
+            const { error, response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(1);
+            expect(error).to.equal(networkError);
+            expect(response).to.be.undefined;
+        });
+
+        it('does NOT preflight a bodyless POST (e.g. ECP keypress with credentials)', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 200, headers: {} }, body: '' }
+            ]);
+            await callPost({
+                url: 'http://1.2.3.4:8060/keypress/Home',
+                auth: { user: 'rokudev', pass: 'aaaa' }
+            });
+            expect(calls).to.have.lengthOf(1);
+        });
+
+        it('does NOT preflight a bodied POST without credentials', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 200, headers: {} }, body: 'ok' }
+            ]);
+            await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(1);
+        });
+    });
+
     describe('error passthrough', () => {
         it('forwards a needle error to the callback with undefined response/body (post)', async () => {
             const networkError = new Error('socket hang up');
