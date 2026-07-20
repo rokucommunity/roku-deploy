@@ -410,6 +410,22 @@ describe('request (needle shim)', () => {
             expect(authorization).to.include('uri="/plugin_install?dcl_enabled=1"');
         });
 
+        it('computes the Authorization header with an empty password when none was supplied', async () => {
+            const calls = stubPostSequence([
+                { response: { statusCode: 401, headers: { 'www-authenticate': CHALLENGE } }, body: Buffer.alloc(0) },
+                { response: { statusCode: 200, headers: {} }, body: 'ok' }
+            ]);
+            const { error } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev' },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(error).to.be.null;
+            const authorization = calls[1].options.headers.authorization as string;
+            expect(authorization).to.match(/^Digest /);
+            expect(authorization).to.include('username="rokudev"');
+        });
+
         it('sends the real request unchanged (credentials intact) when the probe is not a 401', async () => {
             const calls = stubPostSequence([
                 { response: { statusCode: 200, headers: {} }, body: 'no auth required' }
