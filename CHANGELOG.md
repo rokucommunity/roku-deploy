@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.18.1](https://github.com/rokucommunity/roku-deploy/compare/3.18.0...v3.18.1) - 2026-07-20
+### Changed
+ - Migrate to @rokucommunity/logger ([#318](https://github.com/rokucommunity/roku-deploy/pull/318))
+### Fixed
+ - Write EPIPE error when uploading large zips through digest auth ([#324](https://github.com/rokucommunity/roku-deploy/pull/324))
+ - Device test timeout durations and remove dead code ([#319](https://github.com/rokucommunity/roku-deploy/pull/319))
+
+
+
 ## [3.18.0](https://github.com/rokucommunity/roku-deploy/compare/3.17.7...v3.18.0) - 2026-07-15
 ### Added
  - Add deleteAllSideloadedPlugins, expose listSideloadedPlugins ([#309](https://github.com/rokucommunity/roku-deploy/pull/309))
