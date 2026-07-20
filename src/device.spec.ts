@@ -46,10 +46,10 @@ describe('device', function device() {
     //fast instead of hanging the full old 120s.
     this.timeout(10_000);
 
-    //host/password are required by every v4 device method; the `before` hook guarantees they're set,
-    //so narrow the type here (they're `string | undefined` on the base RokuDeployOptions) to avoid
-    //spreading an optional host/password into methods that require them.
-    let options: rokuDeploy.RokuDeployOptions & { host: string; password: string };
+    //device/password are required by every v4 device method; the `before` hook guarantees they're set,
+    //so narrow the type here (they're optional on the base RokuDeployOptions) to avoid
+    //spreading an optional device/password into methods that require them.
+    let options: rokuDeploy.RokuDeployOptions & { device: { host: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
     //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
@@ -71,7 +71,7 @@ describe('device', function device() {
         process.chdir(rootDir);
         rd = new RokuDeploy();
         options = {
-            host: HOST,
+            device: { host: HOST },
             password: PASSWORD,
             devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
             signingPassword: 'drRCEVWP/++K5TYnTtuAfQ=='
@@ -136,7 +136,7 @@ describe('device', function device() {
      * Return the archiveFileNames of only the installed component libraries (DCLs)
      */
     async function getInstalledComponentLibraryFileNames() {
-        const packages = await rd.listSideloadedPlugins({ host: options.host, password: options.password });
+        const packages = await rd.listSideloadedPlugins({ device: options.device, password: options.password });
         return packages.filter(x => x.appType === 'dcl').map(x => x.archiveFileName);
     }
 
@@ -244,7 +244,7 @@ describe('device', function device() {
             options.password = 'NOT_THE_PASSWORD';
             await expectThrowsAsync(
                 rd.sideload({ ...options, dir: rootDir }),
-                `Unauthorized. Please verify credentials for host '${options.host}'`
+                `Unauthorized. Please verify credentials for host '${options.device.host}'`
             );
         });
     });
@@ -264,9 +264,9 @@ describe('device', function device() {
         //stage+zip+sideload followed by `createSignedPackage`; confirm the device is left rekeyed and
         //the returned pkg path exists.
         it('works', async () => {
-            await rd.deleteDevChannel({ host: options.host, password: options.password });
+            await rd.deleteDevChannel({ device: options.device, password: options.password });
             await rd.rekeyDevice({
-                host: options.host,
+                device: options.device,
                 password: options.password,
                 pkg: rekeySignedPackage,
                 signingPassword: options.signingPassword,
@@ -278,7 +278,7 @@ describe('device', function device() {
             await rd.zip({ dir: staged, out: zipPath, files: options.files });
             await rd.sideload({ ...options, zip: zipPath });
             const { pkgPath } = await rd.createSignedPackage({
-                host: options.host,
+                device: options.device,
                 password: options.password,
                 signingPassword: options.signingPassword,
                 devId: options.devId,
@@ -291,7 +291,7 @@ describe('device', function device() {
     describe('validateDeveloperPassword', () => {
         it('returns true when the password is correct', async () => {
             const result = await rd.validateDeveloperPassword({
-                host: options.host,
+                device: options.device,
                 password: options.password
             });
             assert.strictEqual(result, true);
@@ -299,7 +299,7 @@ describe('device', function device() {
 
         it('returns false when the password is wrong', async () => {
             const result = await rd.validateDeveloperPassword({
-                host: options.host,
+                device: options.device,
                 password: 'NOT_THE_PASSWORD'
             });
             assert.strictEqual(result, false);
@@ -308,7 +308,7 @@ describe('device', function device() {
         it('throws DeviceUnreachableError for an offline host', async () => {
             await expectThrowsAsync(async () => {
                 await rd.validateDeveloperPassword({
-                    host: '192.168.254.254',
+                    device: { host: '192.168.254.254' },
                     password: 'aaaa',
                     timeout: 2000
                 });
@@ -318,13 +318,13 @@ describe('device', function device() {
 
     describe('getDeviceInfo', () => {
         it('works', async () => {
-            const info = await rd.getDeviceInfo({ host: options.host });
+            const info = await rd.getDeviceInfo({ device: options.device });
             assert.ok(info);
             assert.ok(info['software-version']);
         });
 
         it('normalizes types when enhanced', async () => {
-            const info = await rd.getDeviceInfo({ host: options.host, enhance: true });
+            const info = await rd.getDeviceInfo({ device: options.device, enhance: true });
             assert.ok(info.softwareVersion);
             assert.strictEqual(typeof info.supportsEthernet, 'boolean');
         });
@@ -339,14 +339,14 @@ describe('device', function device() {
 
     describe('getEcpNetworkAccessMode', () => {
         it('works', async () => {
-            const mode = await rd.getEcpNetworkAccessMode({ host: options.host });
+            const mode = await rd.getEcpNetworkAccessMode({ device: options.device });
             assert.ok([undefined, 'enabled', 'disabled', 'limited', 'permissive'].includes(mode));
         });
     });
 
     describe('pressHomeButton', () => {
         it('works', async () => {
-            await rd.keyPress({ host: options.host, key: 'home' });
+            await rd.keyPress({ device: options.device, key: 'home' });
         });
     });
 
@@ -381,7 +381,7 @@ describe('device', function device() {
 
             //start listening on the debug console BEFORE deploying so we don't miss the marker.
             //(the socket's teardown is registered in `cleanups` and drained by afterEach)
-            const sawMarker = waitForConsoleOutput(options.host, marker, 45000);
+            const sawMarker = waitForConsoleOutput(options.device.host, marker, 45000);
 
             await rd.sideload({ ...options, dir: rootDir });
 
@@ -389,11 +389,11 @@ describe('device', function device() {
             await sawMarker;
 
             //belt-and-suspenders: confirm the dev channel is the active app via ECP
-            const activeApp = await getActiveApp(options.host);
+            const activeApp = await getActiveApp(options.device.host);
             assert.ok(/dev/i.test(activeApp), `expected the dev channel to be the active app, got: ${activeApp}`);
 
             //v4 captureScreenshot returns { buffer, filePath? }; pass `out: true` to also save to disk so we can assert the path exists
-            const result = await rd.captureScreenshot({ host: options.host, password: options.password, out: true });
+            const result = await rd.captureScreenshot({ device: options.device, password: options.password, out: true });
             expectPathExists(result.filePath);
         });
     });
@@ -401,20 +401,20 @@ describe('device', function device() {
     describe('convertToSquashfs', () => {
         it('works', async () => {
             await rd.sideload({ ...options, dir: rootDir });
-            await rd.convertToSquashfs({ host: options.host, password: options.password });
+            await rd.convertToSquashfs({ device: options.device, password: options.password });
         });
     });
 
     describe('deleteAllComponentLibraries', () => {
         it('works', async () => {
-            await rd.deleteAllComponentLibraries({ host: options.host, password: options.password });
+            await rd.deleteAllComponentLibraries({ device: options.device, password: options.password });
         });
     });
 
     describe('deleteInstalledChannel', () => {
         it('works', async () => {
             await rd.sideload({ ...options, dir: rootDir });
-            await rd.deleteDevChannel({ host: options.host, password: options.password });
+            await rd.deleteDevChannel({ device: options.device, password: options.password });
         });
     });
 
@@ -427,7 +427,7 @@ describe('device', function device() {
             //test-timeout fired first.
             await rd.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
             //wait until the device is reachable again so the next test doesn't run mid-reboot
-            await waitForDeviceOnline(options.host);
+            await waitForDeviceOnline(options.device.host);
         });
     });
 
@@ -448,7 +448,7 @@ describe('device', function device() {
 
             //we don't know which device the suite runs against, so ask it what firmware it has and
             //decide up-front whether checkForUpdate should succeed or be rejected by the version gate.
-            const softwareVersion = (await rd.getDeviceInfo({ host: options.host, timeout: REQUEST_TIMEOUT }))['software-version'];
+            const softwareVersion = (await rd.getDeviceInfo({ device: options.device, timeout: REQUEST_TIMEOUT }))['software-version'];
             const supported = !!softwareVersion && semver.gte(semver.coerce(softwareVersion), MIN_FIRMWARE);
 
             if (supported) {
@@ -456,7 +456,7 @@ describe('device', function device() {
                 const result = await rd.checkForUpdate(reqOptions);
                 assert.ok(result, 'expected a response from checkForUpdate');
                 //checkForUpdate can trigger a reboot; make sure the device is back before the next test
-                await waitForDeviceOnline(options.host);
+                await waitForDeviceOnline(options.device.host);
             } else {
                 console.log(`[checkForUpdate] device firmware ${softwareVersion} < ${MIN_FIRMWARE}; expecting UnsupportedFirmwareVersionError`);
                 let thrown: Error;
@@ -486,7 +486,7 @@ describe('device', function device() {
             await installChannel();
 
             //the channel should now be installed
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 0
             });
@@ -494,7 +494,7 @@ describe('device', function device() {
             await rd.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
         });
 
         it('deletes a single component library', async () => {
@@ -504,7 +504,7 @@ describe('device', function device() {
             await installComponentLibrary('a');
 
             //the complib should now be installed
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 0,
                 complibs: 1
             });
@@ -512,7 +512,7 @@ describe('device', function device() {
             await rd.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
         });
 
         it('deletes a channel and a component library together', async () => {
@@ -523,7 +523,7 @@ describe('device', function device() {
             await installComponentLibrary('complib1');
 
             //both should now be installed
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 1
             });
@@ -531,7 +531,7 @@ describe('device', function device() {
             await rd.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
         });
 
         it('deletes a channel and two component libraries together', async () => {
@@ -543,7 +543,7 @@ describe('device', function device() {
             await installComponentLibrary('complib2');
 
             //all three should now be installed
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 2
             });
@@ -551,7 +551,7 @@ describe('device', function device() {
             await rd.deleteAllSideloadedPlugins(options);
 
             //nothing should be installed anymore
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
         });
     });
 
@@ -710,14 +710,14 @@ describe('device', function device() {
             });
 
             //everything should be installed now: the channel plus all five component libraries
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: LIB_DEPENDENCY_CHAIN.length
             });
 
             //delete the app (the dev channel). the list afterward proves the request didn't hang the socket.
-            await rd.deleteDevChannel({ host: options.host, password: options.password });
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            await rd.deleteDevChannel({ device: options.device, password: options.password });
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 0,
                 complibs: LIB_DEPENDENCY_CHAIN.length
             });
@@ -725,8 +725,8 @@ describe('device', function device() {
             //delete the app AGAIN when there is no dev channel installed. this redundant delete is a
             //suspected trigger for the flaky socket hangup, so exercise it explicitly and confirm the
             //very next request still succeeds.
-            await rd.deleteDevChannel({ host: options.host, password: options.password });
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            await rd.deleteDevChannel({ device: options.device, password: options.password });
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 0,
                 complibs: LIB_DEPENDENCY_CHAIN.length
             });
@@ -738,7 +738,7 @@ describe('device', function device() {
             let expectedRemaining = remaining.length;
             for (const fileName of remaining) {
                 await rd.deleteComponentLibrary({
-                    host: options.host,
+                    device: options.device,
                     password: options.password,
                     fileName: fileName
                 });
@@ -750,16 +750,16 @@ describe('device', function device() {
             }
 
             //everything is gone
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
 
             //one more delete against an already-empty device to be sure the "delete when nothing is
             //installed" path doesn't hang the socket for the next caller
             await rd.deleteComponentLibrary({
-                host: options.host,
+                device: options.device,
                 password: options.password,
                 fileName: remaining[0] ?? 'nonexistent.zip'
             });
-            expect(await rd.listSideloadedPlugins({ host: options.host, password: options.password })).to.eql([]);
+            expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
         });
     });
 
@@ -829,7 +829,7 @@ describe('device', function device() {
             });
 
             //sanity: channel + all three complibs are present
-            expect(countByType(await rd.listSideloadedPlugins({ host: options.host, password: options.password }))).to.eql({
+            expect(countByType(await rd.listSideloadedPlugins({ device: options.device, password: options.password }))).to.eql({
                 channels: 1,
                 complibs: 3
             });
@@ -839,10 +839,10 @@ describe('device', function device() {
         //complibs (deleteComponentLibrary by their captured archiveFileName).
         async function deletePiece(name: string) {
             if (name === APP) {
-                await rd.deleteDevChannel({ host: options.host, password: options.password, timeout: REQUEST_TIMEOUT });
+                await rd.deleteDevChannel({ device: options.device, password: options.password, timeout: REQUEST_TIMEOUT });
             } else {
                 await rd.deleteComponentLibrary({
-                    host: options.host,
+                    device: options.device,
                     password: options.password,
                     fileName: libFileNames[name]
                 });
@@ -876,21 +876,21 @@ describe('device', function device() {
                 console.log(`[reboot-hunt]   full set installed (charlie, beta, alpha, app)`);
 
                 //baseline uptime; a later read that is LOWER means the device rebooted in between
-                let priorUptime = await getDeviceUptime(options.host);
+                let priorUptime = await getDeviceUptime(options.device.host);
 
                 for (let step = 0; step < order.length; step++) {
                     const piece = order[step];
                     console.log(`[reboot-hunt]   step ${step + 1}/${order.length}: deleting "${piece}"...`);
                     await deletePiece(piece);
 
-                    const nowUptime = await getDeviceUptime(options.host);
+                    const nowUptime = await getDeviceUptime(options.device.host);
                     //undefined = device unreachable (very likely mid-reboot); a drop in uptime = it rebooted
                     const rebooted = nowUptime === undefined || (priorUptime !== undefined && nowUptime < priorUptime);
                     if (rebooted) {
                         console.log(`[reboot-hunt]   !! REBOOT DETECTED after deleting "${piece}" (step ${step + 1}) in order [${order.join(', ')}]; waiting for device to come back...`);
                         rebootTriggers.push({ order: order, afterDeleting: piece, step: step + 1 });
                         //let the device fully recover before the next permutation so we don't test mid-reboot
-                        await waitForDeviceOnline(options.host);
+                        await waitForDeviceOnline(options.device.host);
                         console.log(`[reboot-hunt]   device back online; moving to next permutation`);
                         break;
                     }
@@ -933,7 +933,7 @@ describe('device', function device() {
             let expectedRemaining = fileNames.length;
             for (const target of fileNames) {
                 await rd.deleteComponentLibrary({
-                    host: options.host,
+                    device: options.device,
                     password: options.password,
                     fileName: target
                 });
@@ -963,7 +963,7 @@ describe('device', function device() {
             //delete just the first complib
             const [toDelete, toKeep] = fileNames;
             await rd.deleteComponentLibrary({
-                host: options.host,
+                device: options.device,
                 password: options.password,
                 fileName: toDelete
             });
@@ -993,14 +993,14 @@ describe('device', function device() {
             //delete the complibs one by one
             for (const fileName of await getInstalledComponentLibraryFileNames()) {
                 await rd.deleteComponentLibrary({
-                    host: options.host,
+                    device: options.device,
                     password: options.password,
                     fileName: fileName
                 });
             }
 
             //all complibs gone, but the channel should still be installed
-            const packages = await rd.listSideloadedPlugins({ host: options.host, password: options.password });
+            const packages = await rd.listSideloadedPlugins({ device: options.device, password: options.password });
             expect(packages.filter(x => x.appType === 'dcl')).to.eql([]);
             expect(packages.filter(x => x.appType === 'channel')).to.have.lengthOf(1);
 
@@ -1092,7 +1092,7 @@ async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs
     let lastError: Error;
     while (Date.now() < deadline) {
         try {
-            await helperRd.getDeviceInfo({ host: host, timeout: intervalMs });
+            await helperRd.getDeviceInfo({ device: { host: host }, timeout: intervalMs });
             //a successful device-info query means ECP is up and the device is responsive again
             return;
         } catch (e) {
@@ -1110,7 +1110,7 @@ async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs
  */
 async function getDeviceUptime(host: string): Promise<number | undefined> {
     try {
-        const info = await helperRd.getDeviceInfo({ host: host, enhance: true, timeout: 15_000 });
+        const info = await helperRd.getDeviceInfo({ device: { host: host }, enhance: true, timeout: 15_000 });
         //`enhance` coerces uptime to a number; guard anyway in case a device omits it
         return typeof info.uptime === 'number' ? info.uptime : undefined;
     } catch {

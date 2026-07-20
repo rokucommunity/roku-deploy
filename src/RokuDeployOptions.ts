@@ -1,4 +1,27 @@
 import type { Logger, LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
+import type { DeviceOption } from './DeviceConfig';
+
+/**
+ * A device entry in the devices registry.
+ * Contains device addressing info plus optional per-device settings.
+ */
+export interface DeviceRegistryEntry {
+    // One of these identifies the device
+    host?: string;
+    esn?: string;
+    id?: string;
+    instanceUrl?: string;
+
+    // Optional RCE token (can be injected at runtime)
+    rceToken?: string;
+
+    // Optional per-device settings
+    password?: string;
+    username?: string;
+    packagePort?: number;
+    ecpPort?: number;
+    timeout?: number;
+}
 
 /**
  * Options that can be passed to the RokuDeploy constructor to set defaults
@@ -10,10 +33,16 @@ export interface RokuDeployConstructorOptions {
      */
     logger?: Logger;
     /**
-     * The IP address or hostname of the target Roku device.
-     * @example '192.168.1.21'
+     * The target device. Can be a registry name (string) or an inline device config.
+     * @example 'living-room'
+     * @example { host: '192.168.1.21' }
      */
-    host?: string;
+    device?: DeviceOption;
+    /**
+     * A registry of named devices. Keys are device names, values are device configurations.
+     * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
+     */
+    devices?: Record<string, DeviceRegistryEntry>;
     /**
      * The password for logging in to the developer portal on the target Roku device
      */
@@ -80,10 +109,17 @@ export interface RokuDeployOptions {
     stagingDir?: string;
 
     /**
-     * The IP address or hostname of the target Roku device.
-     * @example '192.168.1.21'
+     * The target device. Can be a registry name (string) or an inline device config.
+     * @example 'living-room'
+     * @example { host: '192.168.1.21' }
      */
-    host?: string;
+    device?: DeviceOption;
+
+    /**
+     * A registry of named devices. Keys are device names, values are device configurations.
+     * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
+     */
+    devices?: Record<string, DeviceRegistryEntry>;
 
     /**
      * The port that should be used when installing the package. Defaults to 80.
