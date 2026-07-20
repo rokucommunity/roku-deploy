@@ -1351,7 +1351,8 @@ export class RokuDeploy {
                 throw new EcpNetworkAccessModeDisabledError(
                     `Unable to access device-info because ecp-setting-mode is 'disabled'`,
                     {
-                        httpDetails: (e as any)?.details?.httpDetails
+                        // The condition above guarantees details.httpDetails exists
+                        httpDetails: (e as any).details.httpDetails
                     },
                     e instanceof Error ? e : undefined
                 );

@@ -630,6 +630,140 @@ describe('RokuDeploy', () => {
             }
         });
 
+        it('throws EcpNetworkAccessModeDisabledError when ECP is disabled', async () => {
+            const error: any = new Error('Forbidden');
+            error.details = {
+                httpDetails: {
+                    response: {
+                        headers: {
+                            server: 'Roku UPnP/1.0 MiniUPnPd/1.4'
+                        }
+                    }
+                }
+            };
+            sinon.stub(rokuDeploy as any, 'doGetRequest').rejects(error);
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.EcpNetworkAccessModeDisabledError);
+        });
+
+        it('throws UnparsableDeviceResponseError when XML parsing fails', async () => {
+            mockDoGetRequest('not valid xml {{{{');
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown.message).to.include('Could not retrieve device info');
+        });
+
+        it('throws EcpNetworkAccessModeDisabledError with non-Error cause', async () => {
+            //throw a non-Error object that matches the ECP disabled pattern
+            sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => {
+                const notAnError: any = {
+                    message: 'not an error',
+                    details: {
+                        httpDetails: {
+                            response: {
+                                headers: {
+                                    server: 'Roku UPnP/1.0 MiniUPnPd/1.4'
+                                }
+                            }
+                        }
+                    }
+                };
+                // eslint-disable-next-line @typescript-eslint/no-throw-literal
+                throw notAnError;
+            });
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.EcpNetworkAccessModeDisabledError);
+            //cause should be undefined since the thrown value wasn't an Error
+            expect(thrown.cause).to.be.undefined;
+        });
+
+
+        it('throws UnparsableDeviceResponseError with response details when XML parsing fails', async () => {
+            //return a response object with response property to test extractHttpDetails branch
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                body: 'not valid xml {{{{',
+                response: { statusCode: 200, headers: {} }
+            });
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown.details.httpDetails).to.exist;
+        });
+
+        it('throws UnparsableDeviceResponseError with non-Error cause when XML parsing fails', async () => {
+            //stub doGetRequest to return valid response
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                body: 'not valid xml {{{{',
+                response: { statusCode: 200, headers: {} }
+            });
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            //stub xml2js to throw a non-Error object
+            const xml2js = require('xml2js');
+            sinon.stub(xml2js, 'parseStringPromise').callsFake(() => {
+                // eslint-disable-next-line @typescript-eslint/no-throw-literal
+                throw 'not an error';
+            });
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            //cause should be undefined since it wasn't an Error
+            expect(thrown.cause).to.be.undefined;
+        });
+
+        it('throws UnparsableDeviceResponseError with undefined response when XML parsing fails', async () => {
+            //stub doGetRequest to return undefined (edge case)
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves(undefined);
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+
+            let thrown: any;
+            try {
+                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+        });
+
+        it('uses provided timeout option', async () => {
+            const stub = mockDoGetRequest('<device-info><udn>test</udn></device-info>');
+            sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
+            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', timeout: 5000 });
+            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
+        });
+
         describe('constructor defaults', () => {
             it('fails when host not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
@@ -949,6 +1083,27 @@ describe('RokuDeploy', () => {
 
             const expectedPath = path.resolve(process.cwd(), RokuDeploy['defaults'].outDir, RokuDeploy['defaults'].outFile);
             expect(result.zipPath).to.equal(expectedPath);
+        });
+
+        it('should throw error when dir is not provided', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.zip({
+                    out: `${outDir}/roku-deploy.zip`
+                } as any),
+                '"dir" is required for zip'
+            );
+        });
+
+        it('should append .zip extension when out path does not end in .zip', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+
+            const result = await rokuDeploy.zip({
+                dir: rootDir,
+                out: `${outDir}/my-package`
+            });
+
+            expect(result.zipPath).to.equal(s`${outDir}/my-package.zip`);
+            expectPathExists(result.zipPath);
         });
 
     });
@@ -1350,6 +1505,56 @@ describe('RokuDeploy', () => {
             });
         });
 
+        it('rejects as CompileError with undefined results in error', async () => {
+            //stub doPostRequest to throw an error without results property
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                const err: any = new Error('Install Failure: Compilation Failed.');
+                //no results property - this tests the ?? '' and ?. branches
+                throw err;
+            });
+
+            let thrown: any;
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    failOnCompileError: true,
+                    close: false
+                });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.CompileError);
+        });
+
+        it('rejects as CompileError with results containing body and response', async () => {
+            //stub doPostRequest to throw an error WITH results property
+            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
+                const err: any = new Error('Install Failure: Compilation Failed.');
+                err.results = {
+                    body: '<div>Some error content</div>',
+                    response: { statusCode: 200 }
+                };
+                throw err;
+            });
+
+            let thrown: any;
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    failOnCompileError: true,
+                    close: false
+                });
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.CompileError);
+            expect(thrown.details.httpDetails).to.exist;
+        });
+
         it('rejects when response contains compile error wording', () => {
             let body = 'Install Failure: Compilation Failed.';
             mockDoPostRequest(body);
@@ -1381,6 +1586,37 @@ describe('RokuDeploy', () => {
             doTest({ body: 'something', response: { statusCode: 401, request: { host: '1.1.1.1' } } }, '1.1.1.1');
             doTest({ body: 'something', response: { statusCode: 401, request: { host: undefined } } });
             doTest({ body: 'something', response: { statusCode: 401, request: undefined } });
+        });
+
+        it('checkRequest throws UnparsableDeviceResponseError when results is null', () => {
+            let thrown: any;
+            try {
+                rokuDeploy['checkRequest'](null as any);
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+            expect(thrown.message).to.equal('Invalid response');
+        });
+
+        it('checkRequest throws UnparsableDeviceResponseError when response is undefined', () => {
+            let thrown: any;
+            try {
+                rokuDeploy['checkRequest']({ body: 'test' } as any);
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
+        });
+
+        it('checkRequest throws UnparsableDeviceResponseError when body is not a string', () => {
+            let thrown: any;
+            try {
+                rokuDeploy['checkRequest']({ response: {}, body: undefined } as any);
+            } catch (e) {
+                thrown = e;
+            }
+            expect(thrown).to.be.instanceOf(errors.UnparsableDeviceResponseError);
         });
 
         it('rejects when response contains invalid password status code', () => {
@@ -1857,6 +2093,33 @@ describe('RokuDeploy', () => {
             assert.fail('Should have thrown UpdateCheckRequiredError');
         });
 
+        it('UpdateCheckRequiredError handles error without details property', async () => {
+            //create an error that matches isUpdateRequiredError but has no details property
+            const doPostStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            doPostStub.callsFake(() => {
+                const err: any = new Error('Update required');
+                //no details property at all
+                throw err;
+            });
+            //stub isUpdateRequiredError to return true for this specific error
+            sinon.stub(rokuDeploy as any, 'isUpdateRequiredError').returns(true);
+
+            try {
+                await rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    zip: zipFile,
+                    close: false
+                });
+            } catch (e) {
+                expect(e).to.be.instanceof(errors.UpdateCheckRequiredError);
+                //httpDetails should be undefined since e.details was undefined
+                expect((e as errors.UpdateCheckRequiredError).details.httpDetails).to.be.undefined;
+                return;
+            }
+            assert.fail('Should have thrown UpdateCheckRequiredError');
+        });
+
         it('ConnectionResetError includes httpDetails from original error when available', async () => {
             const mockHttpDetails = {
                 request: { url: 'http://1.2.3.4/plugin_install', method: 'POST' },
@@ -2123,6 +2386,32 @@ describe('RokuDeploy', () => {
             it('getUndersizedZipHint returns empty string when the zip cannot be stat-ed', () => {
                 expect(rokuDeploy['getUndersizedZipHint']('/does/not/exist.zip')).to.equal('');
             });
+        });
+
+        it('throws when neither zip nor dir is provided', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.sideload({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    close: false
+                } as any),
+                'Either zip or dir must be provided'
+            );
+        });
+
+        it('uses provided cwd option', async () => {
+            mockDoPostRequest();
+            const customCwd = tempDir;
+            fsExtra.outputFileSync(s`${customCwd}/test.zip`, 'test');
+
+            await rokuDeploy.sideload({
+                host: '1.2.3.4',
+                password: 'password',
+                zip: 'test.zip',
+                cwd: customCwd,
+                close: false
+            });
+            // If we got here without error, the cwd was used to resolve the zip path
         });
     });
 
@@ -2656,6 +2945,86 @@ describe('RokuDeploy', () => {
             );
         });
 
+        it('should throw error when only appTitle is provided without appVersion', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    appTitle: 'MyApp'
+                }),
+                'Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.'
+            );
+        });
+
+        it('should throw error when only appVersion is provided without appTitle', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.createSignedPackage({
+                    host: '1.2.3.4',
+                    password: 'password',
+                    signingPassword: options.signingPassword,
+                    appVersion: '1.0.0'
+                }),
+                'Either appTitle and appVersion is missing; both must be provided, or a manifestPath can be provided instead.'
+            );
+        });
+
+        it('should convert .zip extension to .pkg in out path', async () => {
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+            sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
+            let result = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                out: s`${outDir}/myapp.zip`,
+                appTitle: 'MyApp',
+                appVersion: '1.0.0'
+            });
+            expect(result.pkgPath).to.equal(s`${outDir}/myapp.pkg`);
+        });
+
+        it('should append .pkg extension when out path has no extension', async () => {
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+            sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
+            let result = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                out: s`${outDir}/myapp`,
+                appTitle: 'MyApp',
+                appVersion: '1.0.0'
+            });
+            expect(result.pkgPath).to.equal(s`${outDir}/myapp.pkg`);
+        });
+
+        it('uses provided cwd option', async () => {
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+            sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
+            let result = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                out: 'output/myapp.pkg',
+                cwd: tempDir,
+                appTitle: 'MyApp',
+                appVersion: '1.0.0'
+            });
+            expect(result.pkgPath).to.include(tempDir);
+            expect(result.pkgPath).to.include('output/myapp.pkg');
+        });
+
         it('returns a pkg file path on success', async () => {
             //the write stream should return null, which causes a specific branch to be executed
             createWriteStreamStub.callsFake(() => {
@@ -2711,6 +3080,26 @@ describe('RokuDeploy', () => {
                 }),
                 'Some error'
             );
+        });
+
+        it('succeeds when provided devId matches device devId', async () => {
+            mockDoGetRequest(`<device-info><keyed-developer-id>matching-id</keyed-developer-id></device-info>`);
+
+            let body = `var pkgDiv = document.createElement('div');
+                        pkgDiv.innerHTML = '<label>Currently Packaged Application:</label><div><font face="Courier"><a href="pkgs//P6953175d5df120c0069c53de12515b9a.pkg">P6953175d5df120c0069c53de12515b9a.pkg</a> <br> package file (7360 bytes)</font></div>';
+                        node.appendChild(pkgDiv);`;
+            mockDoPostRequest(body);
+            sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
+
+            let result = await rokuDeploy.createSignedPackage({
+                host: '1.2.3.4',
+                password: 'password',
+                signingPassword: options.signingPassword,
+                devId: 'matching-id',
+                appTitle: 'MyApp',
+                appVersion: '1.0.0'
+            });
+            expect(result.pkgPath).to.exist;
         });
 
         describe('constructor defaults', () => {
@@ -3178,6 +3567,37 @@ describe('RokuDeploy', () => {
                 }),
                 'fake error thrown as part of the unit test'
             );
+        });
+
+        it('throws when rootDir does not exist', async () => {
+            let thrown: Error | undefined;
+            try {
+                await rokuDeploy.stage({
+                    rootDir: s`${tempDir}/does-not-exist`,
+                    out: stagingDir,
+                    files: ['manifest']
+                });
+            } catch (e) {
+                thrown = e as Error;
+            }
+            expect(thrown).to.exist;
+            expect(thrown.message).to.include('rootDir does not exist');
+        });
+
+        it('uses provided cwd option', async () => {
+            const customCwd = s`${tempDir}/custom-cwd`;
+            fsExtra.outputFileSync(s`${customCwd}/manifest`, 'title=Test');
+            fsExtra.outputFileSync(s`${customCwd}/source/main.brs`, 'sub main()\nend sub');
+
+            await rokuDeploy.stage({
+                files: ['manifest', 'source/**/*'],
+                rootDir: './',
+                out: s`${customCwd}/staging`,
+                cwd: customCwd
+            });
+
+            expectPathExists(s`${customCwd}/staging/manifest`);
+            expectPathExists(s`${customCwd}/staging/source/main.brs`);
         });
     });
 
@@ -3914,6 +4334,36 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+        });
+
+        it('uses provided cwd and screenshotDir when out is true', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({ statusCode: 200 });
+                } else if (event === 'data') {
+                    callback(Buffer.from('fake-image-data'));
+                } else if (event === 'end') {
+                    callback();
+                }
+            };
+
+            mockDoPostRequest(body);
+            let result = await rokuDeploy.captureScreenshot({
+                host: options.host,
+                password: 'password',
+                out: true,
+                cwd: tempDir,
+                screenshotDir: 'custom-screenshots'
+            });
+            expect(result.filePath).to.include('custom-screenshots');
+            expect(result.filePath).to.include('screenshot-');
         });
 
         describe('constructor defaults', () => {
@@ -5055,6 +5505,118 @@ describe('RokuDeploy', () => {
             await finalPromise;
             expect(downloadFileIsResolved).to.be.true;
         });
+
+        it('rejects when the write stream emits an error', async () => {
+            let onWriteStreamError = defer<(error: Error) => void>();
+
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        if (event === 'response') {
+                            callback({ statusCode: 200 });
+                        }
+                        return req;
+                    },
+                    pipe: () => req
+                };
+                return req;
+            });
+
+            //intercept fsExtra.createWriteStream to capture the error handler
+            createWriteStreamStub.restore();
+            sinon.stub(fsExtra, 'createWriteStream').callsFake(() => {
+                const stream: any = {
+                    on: (event, callback) => {
+                        if (event === 'error') {
+                            onWriteStreamError.resolve(callback);
+                        }
+                        return stream;
+                    },
+                    close: () => { }
+                };
+                return stream;
+            });
+
+            const downloadPromise = rokuDeploy['downloadFile']({}, s`${tempDir}/out/test.txt`);
+
+            const errorCallback = await onWriteStreamError.promise;
+            errorCallback(new Error('Write stream failed'));
+
+            await expectThrowsAsync(downloadPromise, 'Write stream failed');
+        });
+
+        it('rejects when the response status code is not 200', async () => {
+            let onResponseCallback = defer<(res) => void>();
+
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        if (event === 'response') {
+                            onResponseCallback.resolve(callback);
+                        }
+                        return req;
+                    },
+                    pipe: () => req
+                };
+                return req;
+            });
+
+            const downloadPromise = rokuDeploy['downloadFile']({}, s`${tempDir}/out/test.txt`);
+
+            const responseCallback = await onResponseCallback.promise;
+            responseCallback({ statusCode: 404 });
+
+            await expectThrowsAsync(downloadPromise, 'Invalid response code: 404');
+        });
+
+        it('rejects when the request emits an error', async () => {
+            let onRequestError = defer<(error: Error) => void>();
+
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        if (event === 'error') {
+                            onRequestError.resolve(callback);
+                        }
+                        return req;
+                    },
+                    pipe: () => req
+                };
+                return req;
+            });
+
+            const downloadPromise = rokuDeploy['downloadFile']({}, s`${tempDir}/out/test.txt`);
+
+            const errorCallback = await onRequestError.promise;
+            errorCallback(new Error('Network error'));
+
+            await expectThrowsAsync(downloadPromise, 'Network error');
+        });
+    });
+
+    describe('downloadToBuffer', () => {
+        it('rejects when the request emits an error', async () => {
+            let onRequestError = defer<(error: Error) => void>();
+
+            sinon.stub(request, 'get').callsFake(() => {
+                let req: any = {
+                    on: (event, callback) => {
+                        if (event === 'error') {
+                            onRequestError.resolve(callback);
+                        }
+                        return req;
+                    }
+                };
+                return req;
+            });
+
+            const downloadPromise = rokuDeploy['downloadToBuffer']({});
+
+            const errorCallback = await onRequestError.promise;
+            errorCallback(new Error('Network error'));
+
+            await expectThrowsAsync(downloadPromise, 'Network error');
+        });
     });
 
     describe('setUserAgentIfMissing', () => {
@@ -5609,6 +6171,12 @@ describe('RokuDeploy', () => {
             it('returns empty object when config file does not exist', () => {
                 const result = rokuDeploy.loadConfigFile({ cwd: '/nonexistent/path' });
                 expect(result).to.eql({});
+            });
+
+            it('uses provided configPath instead of default', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/custom-config.json`, { host: 'custom-host' });
+                const result = rokuDeploy.loadConfigFile({ configPath: s`${tempDir}/custom-config.json` });
+                expect(result).to.eql({ host: 'custom-host' });
             });
         });
 

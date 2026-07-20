@@ -287,6 +287,55 @@ describe('util', () => {
                 await util.fileExistsCaseInsensitive(s`${tempDir}/not-there`)
             ).to.be.false;
         });
+
+        it('returns false when parent directory does not exist', async () => {
+            expect(
+                await util.fileExistsCaseInsensitive(s`${tempDir}/nonexistent-dir/some-file.txt`)
+            ).to.be.false;
+        });
+
+        it('returns true when file exists with matching case', async () => {
+            const filePath = s`${tempDir}/test-file.txt`;
+            fsExtra.outputFileSync(filePath, 'content');
+            expect(
+                await util.fileExistsCaseInsensitive(filePath)
+            ).to.be.true;
+        });
+
+        it('returns true when file exists with different case', async () => {
+            const filePath = s`${tempDir}/Test-File.txt`;
+            fsExtra.outputFileSync(filePath, 'content');
+            expect(
+                await util.fileExistsCaseInsensitive(s`${tempDir}/test-file.txt`)
+            ).to.be.true;
+        });
+
+        it('finds file in directory with multiple files', async () => {
+            //create multiple files to ensure the loop iterates and finds the match
+            fsExtra.outputFileSync(s`${tempDir}/aaa.txt`, 'content');
+            fsExtra.outputFileSync(s`${tempDir}/bbb.txt`, 'content');
+            fsExtra.outputFileSync(s`${tempDir}/target.txt`, 'content');
+            fsExtra.outputFileSync(s`${tempDir}/zzz.txt`, 'content');
+
+            //search for the target file - this will iterate through files and find it
+            const result = await util.fileExistsCaseInsensitive(s`${tempDir}/target.txt`);
+            expect(result).to.be.true;
+        });
+    });
+
+    describe('getIsFileSystemCaseSensitive', () => {
+        it('defaults to case-sensitive when filesystem probe fails', async () => {
+            //clear the cache to force a fresh probe
+            util['isFileSystemCaseSensitiveCache'].clear();
+
+            //stub outputFile to throw a permissions error
+            sinon.stub(fsExtra, 'outputFile').rejects(new Error('EACCES: permission denied'));
+
+            const result = await util['getIsFileSystemCaseSensitive'](tempDir);
+
+            //should default to true (case-sensitive) when probe fails
+            expect(result).to.be.true;
+        });
     });
 
     describe('tempDir', () => {
