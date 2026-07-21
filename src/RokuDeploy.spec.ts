@@ -3014,7 +3014,7 @@ describe('RokuDeploy', () => {
                 appVersion: '1.0.0'
             });
             expect(result.pkgPath).to.include(tempDir);
-            expect(result.pkgPath).to.include('output/myapp.pkg');
+            expect(result.pkgPath).to.include(s`output/myapp.pkg`);
         });
 
         it('returns a pkg file path on success', async () => {
