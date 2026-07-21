@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
+import * as xml2js from 'xml2js';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -703,7 +704,6 @@ describe('RokuDeploy', () => {
                 response: { statusCode: 200, headers: {} }
             });
             sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
-            const xml2js = require('xml2js');
             sinon.stub(xml2js, 'parseStringPromise').callsFake(() => {
                 // eslint-disable-next-line @typescript-eslint/no-throw-literal
                 throw 'not an error';
