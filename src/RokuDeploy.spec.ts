@@ -845,6 +845,94 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('defaults', () => {
+        it('exposes the common default values', () => {
+            expect(RokuDeploy.defaults.outDir).to.equal('./out');
+            expect(RokuDeploy.defaults.outFile).to.equal('roku-deploy.zip');
+            expect(RokuDeploy.defaults.stagingDirName).to.equal('.roku-deploy-staging');
+            expect(RokuDeploy.defaults.username).to.equal('rokudev');
+            expect(RokuDeploy.defaults.files).to.include('manifest');
+        });
+    });
+
+    describe('getStagingDir', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getStagingDir({ out: `${outDir}/custom-staging` })
+            ).to.equal(s`${outDir}/custom-staging`);
+        });
+
+        it('composes outDir with the default staging dir name', () => {
+            expect(
+                rokuDeploy.getStagingDir({ outDir: outDir })
+            ).to.equal(s`${outDir}/.roku-deploy-staging`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getStagingDir()
+            ).to.equal(s`${process.cwd()}/out/.roku-deploy-staging`);
+        });
+
+        it('resolves relative paths against cwd', () => {
+            expect(
+                rokuDeploy.getStagingDir({ outDir: 'output', cwd: tempDir })
+            ).to.equal(s`${tempDir}/output/.roku-deploy-staging`);
+        });
+    });
+
+    describe('getOutputZipPath', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ out: `${outDir}/app.zip` })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('composes outDir and outFile', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ outDir: outDir, outFile: 'app.zip' })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('appends the zip extension when missing', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ outDir: outDir, outFile: 'app' })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getOutputZipPath()
+            ).to.equal(s`${process.cwd()}/out/roku-deploy.zip`);
+        });
+    });
+
+    describe('getOutputPkgPath', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ out: `${outDir}/app.pkg` })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('swaps a zip extension for pkg', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ outDir: outDir, outFile: 'app.zip' })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('appends the pkg extension when missing', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ outDir: outDir, outFile: 'app' })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath()
+            ).to.equal(s`${process.cwd()}/out/roku-deploy.pkg`);
+        });
+    });
+
     describe('zip', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
