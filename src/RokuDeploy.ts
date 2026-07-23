@@ -26,6 +26,8 @@ import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { isRceDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption } from './DeviceConfig';
+import { RceDevice } from './RceDevice';
+import type { KeyAction } from './RceDevice';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
@@ -348,12 +350,16 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
-
-        // Set defaults
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-        // press the home button to return to the main screen
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances take key input over ECP2 rather than the HTTP ECP port
+            await new RceDevice(deviceConfig).sendKey(options.action as KeyAction, options.key, { timeout: timeout });
+            return;
+        }
+
+        const host = this.getHost(deviceConfig);
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         return this.doPostRequest({
             url: `http://${host}:${ecpPort}/${options.action}/${options.key}`,
             timeout: timeout
@@ -1441,41 +1447,48 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        let host = this.getHost(deviceConfig);
-
-        // Set defaults
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
 
-        //if the host is a DNS name, look up the IP address
-        try {
-            host = await util.dnsLookup(host);
-        } catch (e) {
-            //try using the host as-is (it'll probably fail...)
-        }
-
-        const url = `http://${host}:${ecpPort}/query/device-info`;
-
         let response: HttpResponse | undefined;
-        try {
-            response = await this.doGetRequest({
-                url: url,
-                timeout: timeout
-            });
-        } catch (e) {
-            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
-                throw new EcpNetworkAccessModeDisabledError(
-                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
-                    {
-                        httpDetails: (e as any)?.details?.httpDetails
-                    },
-                    e instanceof Error ? e : undefined
-                );
+        let deviceInfoXml: string;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances serve device-info over the ECP2 WebSocket rather than the HTTP ECP port
+            deviceInfoXml = await new RceDevice(deviceConfig).getDeviceInfoXml({ timeout: timeout });
+        } else {
+            let host = this.getHost(deviceConfig);
+            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+
+            //if the host is a DNS name, look up the IP address
+            try {
+                host = await util.dnsLookup(host);
+            } catch (e) {
+                //try using the host as-is (it'll probably fail...)
             }
-            throw e;
+
+            const url = `http://${host}:${ecpPort}/query/device-info`;
+
+            try {
+                response = await this.doGetRequest({
+                    url: url,
+                    timeout: timeout
+                });
+            } catch (e) {
+                if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                    throw new EcpNetworkAccessModeDisabledError(
+                        `Unable to access device-info because ecp-setting-mode is 'disabled'`,
+                        {
+                            httpDetails: (e as any)?.details?.httpDetails
+                        },
+                        e instanceof Error ? e : undefined
+                    );
+                }
+                throw e;
+            }
+            deviceInfoXml = response.body;
         }
         try {
-            const parsedContent = await xml2js.parseStringPromise(response.body, {
+            const parsedContent = await xml2js.parseStringPromise(deviceInfoXml, {
                 explicitArray: false
             });
             // clone the data onto an object because xml2js somehow makes this object not an object???
