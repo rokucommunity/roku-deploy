@@ -14,14 +14,17 @@ import { RceManagementClient } from './RceManagementClient';
  * document in `content`; input responses carry only a status.
  */
 export class RceDevice {
-    constructor(config: RceDeviceConfig) {
+    constructor(config: RceDeviceConfig, options: RceDeviceOptions = {}) {
         this.config = config;
         this.token = config.rceToken;
+        this.createWebSocket = options.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, requestOptions));
     }
 
     private readonly config: RceDeviceConfig;
 
     private readonly token: string | undefined;
+
+    private readonly createWebSocket: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
 
     private resolvedInstanceUrl: string | undefined;
 
@@ -37,7 +40,7 @@ export class RceDevice {
         const requestId = String(++RceDevice.requestCounter);
 
         return new Promise<EcpResponse>((resolve, reject) => {
-            const socket = new WebSocket(url, { headers: this.buildHeaders() });
+            const socket = this.createWebSocket(url, { headers: this.buildHeaders() });
             let settled = false;
 
             const finish = (error: Error | undefined, response?: EcpResponse) => {
@@ -108,6 +111,54 @@ export class RceDevice {
      */
     public sendKey(action: KeyAction, key: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
         return this.ecp(RceDevice.keyActionToEcp2Request[action], { 'param-key': key }, options);
+    }
+
+    /**
+     * Launch a channel. Maps to the ECP2 'launch' verb.
+     */
+    public launch(channelId: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('launch', { 'param-channel-id': channelId }, options);
+    }
+
+    /**
+     * Query a channel's running/exited state. Maps to the ECP2 'query-app-state' verb.
+     */
+    public queryAppState(channelId: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('query-app-state', { 'param-channel-id': channelId }, options);
+    }
+
+    /**
+     * Exit a running channel. Maps to the ECP2 'exit-app' verb.
+     */
+    public exitApp(channelId: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('exit-app', { 'param-channel-id': channelId }, options);
+    }
+
+    /**
+     * Query a channel's registry contents. Maps to the ECP2 'query-registry' verb.
+     * Deliberately different from the other channel-scoped verbs above: query-registry identifies the
+     * channel with a 'param-id' field, not 'param-channel-id'.
+     */
+    public queryRegistry(channelId: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('query-registry', { 'param-id': channelId }, options);
+    }
+
+    /**
+     * Query the current SceneGraph rendezvous state. Maps to the ECP2 'query-sgrendezvous' verb, which
+     * takes no params.
+     */
+    public queryRendezvous(options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('query-sgrendezvous', {}, options);
+    }
+
+    /**
+     * Turn SceneGraph rendezvous tracking on or off. Deliberately different from the other verbs
+     * above: this is the bare 'sgrendezvous' verb, and the on/off state is carried as the VALUE of a
+     * 'param-track' field ('track' or 'untrack'), mirroring the local HTTP ECP path
+     * `/sgrendezvous/{track|untrack}` rather than a boolean-ish param.
+     */
+    public setRendezvousTracking(enabled: boolean, options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('sgrendezvous', { 'param-track': enabled ? 'track' : 'untrack' }, options);
     }
 
     /**
@@ -217,6 +268,14 @@ export class RceDevice {
 }
 
 export type KeyAction = 'keypress' | 'keydown' | 'keyup';
+
+export interface RceDeviceOptions {
+    /**
+     * Factory for the WebSocket used by ecp(). Defaults to a real `ws` WebSocket; tests supply a fake
+     * so they can exercise the ECP2 request/response flow without a real network connection.
+     */
+    createWebSocket?: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
+}
 
 export interface EcpRequestOptions {
     /**
