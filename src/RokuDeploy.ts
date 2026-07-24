@@ -507,6 +507,83 @@ export class RokuDeploy {
     }
 
     /**
+     * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
+     * @param options
+     */
+    public async launchApp(options: LaunchAppOptions): Promise<void> {
+        options = { ...this.options, ...options } as LaunchAppOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE: the ECP2 'launch' verb only accepts the channel id today, so deep-link params
+            //(contentId, mediaType, params) are not yet forwarded to RCE instances.
+            await this.getRceDevice(deviceConfig).launch(options.appId, { timeout: timeout });
+            return;
+        }
+
+        const host = this.getHost(deviceConfig);
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+        const queryString = this.buildLaunchQueryString(options);
+        await this.doPostRequest({
+            url: `http://${host}:${ecpPort}/launch/${options.appId}${queryString}`,
+            timeout: timeout
+        });
+    }
+
+    /**
+     * Build the deep-link query string (contentId, mediaType, and any additional params) for a local `launch/{appId}` request.
+     * @param options
+     */
+    private buildLaunchQueryString(options: LaunchAppOptions): string {
+        const queryParams: Record<string, string> = { ...options.params };
+        if (options.contentId !== undefined) {
+            queryParams.contentId = options.contentId;
+        }
+        if (options.mediaType !== undefined) {
+            queryParams.mediaType = options.mediaType;
+        }
+        const queryEntries = Object.entries(queryParams);
+        if (queryEntries.length === 0) {
+            return '';
+        }
+        const serializedParams = queryEntries.map(([paramName, paramValue]) => `${encodeURIComponent(paramName)}=${encodeURIComponent(paramValue)}`).join('&');
+        return `?${serializedParams}`;
+    }
+
+    /**
+     * Exit a running channel on the device (the ECP `exit-app/{appId}` endpoint).
+     * @param options
+     */
+    public async exitApp(options: ExitAppOptions): Promise<void> {
+        options = { ...this.options, ...options } as ExitAppOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE: the ECP2 'exit-app' verb has no force concept, so `force` is ignored for RCE devices.
+            await this.getRceDevice(deviceConfig).exitApp(options.appId, { timeout: timeout });
+            return;
+        }
+
+        const host = this.getHost(deviceConfig);
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+        const forceSegment = options.force ? '/true' : '';
+        await this.doPostRequest({
+            url: `http://${host}:${ecpPort}/exit-app/${options.appId}${forceSegment}`,
+            timeout: timeout
+        });
+    }
+
+    /**
      * Sideload a zip to a remote Roku. Either `zip` (path to a pre-built zip) or `dir` (directory
      * to zip on-the-fly) must be provided.
      * @param options
@@ -1659,6 +1736,132 @@ export class RokuDeploy {
     }
 
     /**
+     * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
+     * @param options
+     */
+    public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
+        options = { ...this.options, ...options } as QueryAppsOptions;
+        this.checkRequiredOptions(options, ['device']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+
+        let response: HttpResponse | undefined;
+        let appsXml: string;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances serve query-apps over the ECP2 WebSocket rather than the HTTP ECP port
+            appsXml = (await this.getRceDevice(deviceConfig).queryApps({ timeout: timeout })).content;
+        } else {
+            const host = this.getHost(deviceConfig);
+            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+            response = await this.doGetRequest({
+                url: `http://${host}:${ecpPort}/query/apps`,
+                timeout: timeout
+            });
+            appsXml = response.body;
+        }
+
+        try {
+            const parsedContent = await xml2js.parseStringPromise(appsXml, {
+                explicitArray: false
+            });
+            const rawAppNodes = parsedContent?.apps?.app;
+            if (!rawAppNodes) {
+                return [];
+            }
+            const appNodes = Array.isArray(rawAppNodes) ? rawAppNodes : [rawAppNodes];
+            return appNodes.map((appNode) => {
+                const parsedApp = this.parseEcpAppElement(appNode);
+                return {
+                    id: parsedApp.id ?? '',
+                    title: parsedApp.title ?? '',
+                    type: parsedApp.type,
+                    subtype: parsedApp.subtype,
+                    version: parsedApp.version
+                };
+            });
+        } catch (e) {
+            this.logger.warn('Error parsing installed app list:', e);
+            throw new UnparsableDeviceResponseError('Could not retrieve installed app list', {
+                httpDetails: extractHttpDetails(response?.response, response?.body)
+            }, e instanceof Error ? e : undefined);
+        }
+    }
+
+    /**
+     * Query the currently active app on the device (the ECP `query/active-app` endpoint). The active
+     * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
+     * @param options
+     */
+    public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
+        options = { ...this.options, ...options } as QueryActiveAppOptions;
+        this.checkRequiredOptions(options, ['device']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+
+        let response: HttpResponse | undefined;
+        let activeAppXml: string;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances serve query-active-app over the ECP2 WebSocket rather than the HTTP ECP port
+            activeAppXml = (await this.getRceDevice(deviceConfig).queryActiveApp({ timeout: timeout })).content;
+        } else {
+            const host = this.getHost(deviceConfig);
+            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+            response = await this.doGetRequest({
+                url: `http://${host}:${ecpPort}/query/active-app`,
+                timeout: timeout
+            });
+            activeAppXml = response.body;
+        }
+
+        try {
+            const parsedContent = await xml2js.parseStringPromise(activeAppXml, {
+                explicitArray: false
+            });
+            const rawActiveAppNode = parsedContent?.['active-app']?.app;
+            if (!rawActiveAppNode) {
+                return {};
+            }
+            return this.parseEcpAppElement(rawActiveAppNode);
+        } catch (e) {
+            this.logger.warn('Error parsing active app:', e);
+            throw new UnparsableDeviceResponseError('Could not retrieve active app', {
+                httpDetails: extractHttpDetails(response?.response, response?.body)
+            }, e instanceof Error ? e : undefined);
+        }
+    }
+
+    /**
+     * Parse a single `<app>` element from a `query/apps` or `query/active-app` response. With
+     * `explicitArray: false`, an app node with attributes and a title is `{ _: 'Title', $: { id, type, subtype, version } }`;
+     * an attribute-less app node (for example the home screen) collapses to a plain string.
+     * @param appElement
+     */
+    private parseEcpAppElement(appElement: any): RokuActiveApp {
+        if (appElement === undefined || appElement === null) {
+            return {};
+        }
+        if (typeof appElement === 'string') {
+            return { title: appElement };
+        }
+        const attributes = appElement.$ ?? {};
+        return {
+            id: attributes.id,
+            title: appElement._,
+            type: attributes.type,
+            subtype: attributes.subtype,
+            version: attributes.version
+        };
+    }
+
+    /**
      * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
      * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
      * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
@@ -1897,6 +2100,10 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
 
+export type QueryAppsOptions = BaseEcpOptions;
+
+export type QueryActiveAppOptions = BaseEcpOptions;
+
 export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
     device: DeviceOption;
@@ -1939,6 +2146,27 @@ export interface SendTextOptions extends BaseEcpOptions {
 }
 
 export type CloseChannelOptions = BaseEcpOptions;
+
+export interface LaunchAppOptions extends BaseEcpOptions {
+    /** The channel id to launch (for example 'dev' for the sideloaded dev channel). */
+    appId: string;
+    /** An optional deep-link content id, forwarded as the `contentId` query param on the local ECP request. */
+    contentId?: string;
+    /** An optional deep-link media type, forwarded as the `mediaType` query param on the local ECP request. */
+    mediaType?: string;
+    /** Additional deep-link params, forwarded as-is as query params on the local ECP request. */
+    params?: Record<string, string>;
+}
+
+export interface ExitAppOptions extends BaseEcpOptions {
+    /** The channel id to exit (for example 'dev' for the sideloaded dev channel). */
+    appId: string;
+    /**
+     * When true, appends `/true` to the local ECP request, matching `exit-app/{appId}/true`.
+     * Has no effect on RCE devices, since the ECP2 'exit-app' verb has no force concept.
+     */
+    force?: boolean;
+}
 
 export interface GetFilePathsOptions {
     files: FileEntry[];
@@ -2139,3 +2367,32 @@ export interface GetDevIdResult {
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
 export const rokuDeploy = new RokuDeploy();
 export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';
+
+export interface RokuAppDescriptor {
+    /** The channel id, for example 'dev' for the sideloaded dev channel. */
+    id: string;
+    /** The channel's display title. */
+    title: string;
+    /** The channel type, for example 'appl' for a sideloaded channel. */
+    type?: string;
+    /** The channel subtype, for example 'sdka' or 'rsga'. */
+    subtype?: string;
+    /** The channel version. */
+    version?: string;
+}
+
+export interface RokuActiveApp {
+    /**
+     * The active channel's id. Undefined when the active "app" is the Roku home screen or a screensaver,
+     * which have no id.
+     */
+    id?: string;
+    /** The active channel's display title, or the home screen / screensaver's title text. */
+    title?: string;
+    /** The active channel's type, for example 'appl' for a sideloaded channel. */
+    type?: string;
+    /** The active channel's subtype, for example 'sdka' or 'rsga'. */
+    subtype?: string;
+    /** The active channel's version. */
+    version?: string;
+}

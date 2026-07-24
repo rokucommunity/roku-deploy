@@ -17,6 +17,7 @@ import { request } from './request';
 import { httpClient } from './fetch';
 import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
+import { RceDevice } from './RceDevice';
 
 const sinon = createSandbox();
 
@@ -716,6 +717,113 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('queryApps', () => {
+        it('parses the installed app list from the local ECP query/apps response', async () => {
+            const stub = mockDoGetRequest(`
+                <apps>
+                    <app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app>
+                    <app id="11" type="appl" subtype="sdka" version="2.3.0">Netflix</app>
+                </apps>
+            `);
+            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/apps');
+            expect(apps).to.eql([
+                { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' },
+                { id: '11', title: 'Netflix', type: 'appl', subtype: 'sdka', version: '2.3.0' }
+            ]);
+        });
+
+        it('normalizes a single installed app into an array', async () => {
+            mockDoGetRequest(`
+                <apps>
+                    <app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app>
+                </apps>
+            `);
+            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+
+            expect(apps).to.eql([
+                { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
+            ]);
+        });
+
+        it('returns an empty array when no apps are installed', async () => {
+            mockDoGetRequest('<apps></apps>');
+            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+
+            expect(apps).to.eql([]);
+        });
+
+        it('routes an RCE device through the ECP2 query-apps verb instead of an HTTP request', async () => {
+            const getRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
+            const rceStub = sinon.stub(RceDevice.prototype, 'queryApps').resolves({
+                response: 'query-apps',
+                status: 200,
+                content: '<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>'
+            } as any);
+
+            const apps = await rokuDeploy.queryApps({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
+            });
+
+            expect(apps).to.eql([
+                { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
+            ]);
+            expect(rceStub.called).to.be.true;
+            expect(getRequestStub.called).to.be.false;
+        });
+    });
+
+    describe('queryActiveApp', () => {
+        it('parses the active app from the local ECP query/active-app response', async () => {
+            const stub = mockDoGetRequest(`
+                <active-app>
+                    <app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app>
+                </active-app>
+            `);
+            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/active-app');
+            expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
+        });
+
+        it('returns an empty object when the device is on the home screen (no id attribute)', async () => {
+            mockDoGetRequest(`
+                <active-app>
+                    <app>Roku</app>
+                </active-app>
+            `);
+            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+
+            expect(activeApp.id).to.be.undefined;
+            expect(activeApp.title).to.equal('Roku');
+        });
+
+        it('returns an empty object when there is no app element', async () => {
+            mockDoGetRequest('<active-app></active-app>');
+            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+
+            expect(activeApp).to.eql({});
+        });
+
+        it('routes an RCE device through the ECP2 query-active-app verb instead of an HTTP request', async () => {
+            const getRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
+            const rceStub = sinon.stub(RceDevice.prototype, 'queryActiveApp').resolves({
+                response: 'query-active-app',
+                status: 200,
+                content: '<active-app><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></active-app>'
+            } as any);
+
+            const activeApp = await rokuDeploy.queryActiveApp({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
+            });
+
+            expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
+            expect(rceStub.called).to.be.true;
+            expect(getRequestStub.called).to.be.false;
+        });
+    });
+
     describe('getEcpNetworkAccessMode', () => {
         it('returns ecpSettingMode from device info', async () => {
             sinon.stub(rokuDeploy, 'getDeviceInfo').resolves({ 'ecp-setting-mode': 'enabled' } as any);
@@ -1292,6 +1400,93 @@ describe('RokuDeploy', () => {
                 await rd.closeChannel({ device: { host: 'call-host' } });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
+        });
+    });
+
+    describe('launchApp', () => {
+        it('fails when appId not provided', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.launchApp({ device: { host: '1.1.1.1' } } as any);
+            }, 'Missing required option: appId');
+        });
+
+        it('POSTs to launch/{appId} with no query string when no deep-link params are given', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.launchApp({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev');
+        });
+
+        it('appends contentId and mediaType to the query string', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.launchApp({ device: { host: '1.1.1.1' }, appId: 'dev', contentId: '123', mediaType: 'movie' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev?contentId=123&mediaType=movie');
+        });
+
+        it('appends additional deep-link params to the query string', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.launchApp({ device: { host: '1.1.1.1' }, appId: 'dev', params: { foo: 'bar' } });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev?foo=bar');
+        });
+
+        it('routes an RCE device through the ECP2 launch verb instead of an HTTP request', async () => {
+            const postRequestStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            const rceStub = sinon.stub(RceDevice.prototype, 'launch').resolves({
+                response: 'launch',
+                status: 200
+            } as any);
+
+            //RCE: the ECP2 'launch' verb only accepts the channel id, so contentId is ignored here
+            await rokuDeploy.launchApp({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                appId: 'dev',
+                contentId: '123'
+            });
+
+            expect(rceStub.getCall(0).args[0]).to.equal('dev');
+            expect(postRequestStub.called).to.be.false;
+        });
+    });
+
+    describe('exitApp', () => {
+        it('fails when appId not provided', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.exitApp({ device: { host: '1.1.1.1' } } as any);
+            }, 'Missing required option: appId');
+        });
+
+        it('POSTs to exit-app/{appId} without a force segment by default', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.exitApp({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/exit-app/dev');
+        });
+
+        it('appends /true to the url when force is set', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.exitApp({ device: { host: '1.1.1.1' }, appId: 'dev', force: true });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/exit-app/dev/true');
+        });
+
+        it('routes an RCE device through the ECP2 exit-app verb instead of an HTTP request', async () => {
+            const postRequestStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            const rceStub = sinon.stub(RceDevice.prototype, 'exitApp').resolves({
+                response: 'exit-app',
+                status: 200
+            } as any);
+
+            //RCE: the ECP2 'exit-app' verb has no force concept, so force is ignored here
+            await rokuDeploy.exitApp({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                appId: 'dev',
+                force: true
+            });
+
+            expect(rceStub.getCall(0).args[0]).to.equal('dev');
+            expect(postRequestStub.called).to.be.false;
         });
     });
 

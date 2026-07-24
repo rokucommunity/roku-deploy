@@ -203,6 +203,30 @@ describe('RceDevice', () => {
             expect(response.content).to.equal('<launch-response/>');
         });
 
+        it('queryApps sends the bare query-apps verb with no params', async () => {
+            const device = createDevice();
+            const responsePromise = device.queryApps();
+            await resolveWithResponse('query-apps', '<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>');
+            const response = await responsePromise;
+
+            const sentRequest = lastSentRequest(fakeWebSocket);
+            expect(sentRequest.request).to.equal('query-apps');
+            expect(Object.keys(sentRequest)).to.eql(['request', 'request-id']);
+            expect(response.content).to.equal('<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>');
+        });
+
+        it('queryActiveApp sends the bare query-active-app verb with no params', async () => {
+            const device = createDevice();
+            const responsePromise = device.queryActiveApp();
+            await resolveWithResponse('query-active-app', '<active-app><app id="dev">Dev Channel</app></active-app>');
+            const response = await responsePromise;
+
+            const sentRequest = lastSentRequest(fakeWebSocket);
+            expect(sentRequest.request).to.equal('query-active-app');
+            expect(Object.keys(sentRequest)).to.eql(['request', 'request-id']);
+            expect(response.content).to.equal('<active-app><app id="dev">Dev Channel</app></active-app>');
+        });
+
         it('queryAppState sends the query-app-state verb with param-channel-id', async () => {
             const device = createDevice();
             const responsePromise = device.queryAppState('dev');

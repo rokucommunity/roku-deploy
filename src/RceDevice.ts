@@ -114,6 +114,22 @@ export class RceDevice {
     }
 
     /**
+     * Query the list of channels installed on the device. Maps to the ECP2 'query-apps' verb, which takes
+     * no params.
+     */
+    public queryApps(options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('query-apps', {}, options);
+    }
+
+    /**
+     * Query the currently active app (or the home screen, or a screensaver). Maps to the ECP2
+     * 'query-active-app' verb, which takes no params.
+     */
+    public queryActiveApp(options: EcpRequestOptions = {}): Promise<EcpResponse> {
+        return this.ecp('query-active-app', {}, options);
+    }
+
+    /**
      * Launch a channel. Maps to the ECP2 'launch' verb.
      */
     public launch(channelId: string, options: EcpRequestOptions = {}): Promise<EcpResponse> {
