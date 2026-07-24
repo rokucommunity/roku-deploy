@@ -213,6 +213,8 @@ export type CreatableDeviceType = 'tv' | 'stb';
 
 export type DeviceStatus = 'shutdown' | 'pending' | 'running';
 
+export type DeviceInstanceStatus = 'created' | 'pending' | 'running' | 'completed' | 'failed' | 'crashed' | 'unknown';
+
 export interface IceServer {
     urls: string[];
     username?: string | null;
@@ -277,10 +279,33 @@ export interface DeviceUpdate {
 
 export interface DeviceRun {
     id: number;
+    /**
+     * ID of the device instance.
+     */
+    instance_id?: number;
+    /**
+     * The ID of the user who started the device.
+     */
+    creator_id?: string;
+    /**
+     * The username of the user who started the device.
+     */
+    creator_username?: string;
     snapshot_id?: number;
-    status?: string;
+    snapshot_name?: string;
+    status?: DeviceInstanceStatus;
     created_at?: string;
     started_at?: string | null;
+    ended_at?: string | null;
+    /**
+     * Runtime of the device instance, in seconds.
+     */
+    runtime?: number;
+    firmware_version_id?: string | null;
+    /**
+     * The maximum runtime allowed for the device instance, in seconds.
+     */
+    max_runtime?: number;
     [key: string]: unknown;
 }
 
