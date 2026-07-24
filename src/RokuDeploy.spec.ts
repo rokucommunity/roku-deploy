@@ -165,6 +165,42 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('scrubAccessToken', () => {
+        it('redacts the access_token value from a url', () => {
+            const scrubbed = rokuDeploy['scrubAccessToken']('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=super-secret-token');
+            expect(scrubbed).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=<redacted>');
+        });
+
+        it('leaves a url without an access_token unchanged', () => {
+            const url = 'http://1.2.3.4:80/plugin_install';
+            expect(rokuDeploy['scrubAccessToken'](url)).to.equal(url);
+        });
+
+        it('scrubs the url logged for POST requests', async () => {
+            const infoStub = sinon.stub(rokuDeploy.logger, 'info');
+            sinon.stub(request, 'post').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, { statusCode: 200 }, '');
+                return {} as any;
+            });
+            await rokuDeploy['doPostRequest']({
+                url: 'https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=super-secret-token'
+            } as any, false);
+            expect(infoStub.getCall(0).args[1]).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=<redacted>');
+        });
+
+        it('scrubs the url logged for GET requests', async () => {
+            const infoStub = sinon.stub(rokuDeploy.logger, 'info');
+            sinon.stub(request, 'get').callsFake((_, callback) => {
+                process.nextTick(callback, undefined, { statusCode: 200 }, '');
+                return {} as any;
+            });
+            await rokuDeploy['doGetRequest']({
+                url: 'https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=super-secret-token'
+            } as any);
+            expect(infoStub.getCall(0).args[1]).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=<redacted>');
+        });
+    });
+
     describe('getRokuMessagesFromResponseBody', () => {
         it('exits on unknown message type', () => {
             const result = rokuDeploy['getRokuMessagesFromResponseBody'](`
@@ -845,6 +881,94 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('defaults', () => {
+        it('exposes the common default values', () => {
+            expect(RokuDeploy.defaults.outDir).to.equal('./out');
+            expect(RokuDeploy.defaults.outFile).to.equal('roku-deploy.zip');
+            expect(RokuDeploy.defaults.stagingDirName).to.equal('.roku-deploy-staging');
+            expect(RokuDeploy.defaults.username).to.equal('rokudev');
+            expect(RokuDeploy.defaults.files).to.include('manifest');
+        });
+    });
+
+    describe('getStagingDir', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getStagingDir({ out: `${outDir}/custom-staging` })
+            ).to.equal(s`${outDir}/custom-staging`);
+        });
+
+        it('composes outDir with the default staging dir name', () => {
+            expect(
+                rokuDeploy.getStagingDir({ outDir: outDir })
+            ).to.equal(s`${outDir}/.roku-deploy-staging`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getStagingDir()
+            ).to.equal(s`${process.cwd()}/out/.roku-deploy-staging`);
+        });
+
+        it('resolves relative paths against cwd', () => {
+            expect(
+                rokuDeploy.getStagingDir({ outDir: 'output', cwd: tempDir })
+            ).to.equal(s`${tempDir}/output/.roku-deploy-staging`);
+        });
+    });
+
+    describe('getOutputZipPath', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ out: `${outDir}/app.zip` })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('composes outDir and outFile', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ outDir: outDir, outFile: 'app.zip' })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('appends the zip extension when missing', () => {
+            expect(
+                rokuDeploy.getOutputZipPath({ outDir: outDir, outFile: 'app' })
+            ).to.equal(s`${outDir}/app.zip`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getOutputZipPath()
+            ).to.equal(s`${process.cwd()}/out/roku-deploy.zip`);
+        });
+    });
+
+    describe('getOutputPkgPath', () => {
+        it('uses out when provided', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ out: `${outDir}/app.pkg` })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('swaps a zip extension for pkg', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ outDir: outDir, outFile: 'app.zip' })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('appends the pkg extension when missing', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath({ outDir: outDir, outFile: 'app' })
+            ).to.equal(s`${outDir}/app.pkg`);
+        });
+
+        it('falls back to all defaults when no options are provided', () => {
+            expect(
+                rokuDeploy.getOutputPkgPath()
+            ).to.equal(s`${process.cwd()}/out/roku-deploy.pkg`);
+        });
+    });
+
     describe('zip', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
@@ -961,12 +1085,26 @@ describe('RokuDeploy', () => {
     });
 
     describe('generateBaseRequestOptions', () => {
-        it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', '1.2.3.4', { device: { host: '1.2.3.4' }, password: 'password' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+        it('uses default port', async () => {
+            const result = await rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }, { device: { host: '1.2.3.4' }, password: 'password' });
+            expect(result.url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
-        it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', '1.2.3.4', { device: { host: '1.2.3.4' }, packagePort: 999, password: 'password' }).url).to.equal('http://1.2.3.4:999/a_b_c');
+        it('uses overridden port', async () => {
+            const result = await rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }, { device: { host: '1.2.3.4' }, packagePort: 999, password: 'password' });
+            expect(result.url).to.equal('http://1.2.3.4:999/a_b_c');
+        });
+
+        it('builds an RCE sideload url with the access_token query param', async () => {
+            const result = await rokuDeploy['generateBaseRequestOptions']('plugin_install', { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' }, { device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' }, password: 'password' });
+            expect(result.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+        });
+
+        it('throws a clear error for an RCE device config without an rceToken', async () => {
+            await expectThrowsAsync(
+                rokuDeploy['generateBaseRequestOptions']('plugin_install', { instanceUrl: 'https://device.rce.roku.com/instance/abc' }, { device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' }, password: 'password' }),
+                'An rceToken is required to reach the installer on an RCE device'
+            );
         });
     });
 
@@ -1180,6 +1318,33 @@ describe('RokuDeploy', () => {
                 }
             });
             expect(stub.getCall(1).args[0].url).to.eql('http://0.0.0.0:80/alt_path');
+        });
+
+        it('routes an RCE device through the instance sideload proxy with the access_token query param', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.sideload({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
+                password: 'devpassword',
+                zip: zipFile,
+                close: false
+            });
+            const requestOptions = stub.getCall(1).args[0];
+            expect(requestOptions.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+            expect(requestOptions.auth).to.eql({
+                user: 'rokudev',
+                pass: 'devpassword',
+                sendImmediately: false
+            });
+        });
+
+        it('throws a clear error when an RCE device config has no rceToken', async () => {
+            await expectThrowsAsync(rokuDeploy.sideload({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' },
+                password: 'devpassword',
+                zip: zipFile,
+                close: false,
+                deleteDevChannel: false
+            }), 'An rceToken is required to reach the installer on an RCE device');
         });
 
         it('overrides formData', async () => {
@@ -3457,6 +3622,22 @@ describe('RokuDeploy', () => {
             expect(result).not.to.be.undefined;
         });
 
+        it('routes an RCE device through the instance sideload proxy with the access_token query param', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.deleteDevChannel({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
+                password: 'password'
+            });
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+        });
+
+        it('throws a clear error when an RCE device config has no rceToken', async () => {
+            await expectThrowsAsync(rokuDeploy.deleteDevChannel({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' },
+                password: 'password'
+            }), 'An rceToken is required to reach the installer on an RCE device');
+        });
+
         describe('constructor defaults', () => {
             it('fails when host not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ password: 'pass' });
@@ -3621,6 +3802,37 @@ describe('RokuDeploy', () => {
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.jpg');
             expect(fsExtra.existsSync(result.filePath));
+        });
+
+        it('routes an RCE device through the instance sideload proxy for both the inspect request and the image download', async () => {
+            let body = getFakeResponseBody(`
+                Shell.create('Roku.Message').trigger('Set message type', 'success').trigger('Set message content', 'Screenshot ok').trigger('Render', node);
+
+                var screenshoot = document.createElement('div');
+                screenshoot.innerHTML = '<hr /><img src="pkgs/dev.jpg?time=1649939615">';
+                node.appendChild(screenshoot);
+            `);
+
+            const testImageData = Buffer.from('fake-jpg-data');
+            onHandler = (event, callback) => {
+                if (event === 'response') {
+                    callback({ statusCode: 200 });
+                } else if (event === 'data') {
+                    callback(testImageData);
+                } else if (event === 'end') {
+                    callback();
+                }
+            };
+
+            const postStub = mockDoPostRequest(body);
+            await rokuDeploy.captureScreenshot({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
+                password: 'password'
+            });
+
+            expect(postStub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=token-value');
+            const getCallArgs = (request.get as sinon.SinonStub).getCall(0).args[0];
+            expect(getCallArgs.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/pkgs/dev.jpg?time=1649939615&access_token=token-value');
         });
 
         it('take a screenshot from the device and saves to supplied dir', async () => {
@@ -5492,21 +5704,21 @@ describe('RokuDeploy', () => {
             });
 
             describe('packagePort option', () => {
-                it('uses static default when not provided anywhere', () => {
+                it('uses static default when not provided anywhere', async () => {
                     const rd = new RokuDeploy();
-                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                     expect(result.url).to.include(':80/');
                 });
 
-                it('uses constructor value when not provided in call', () => {
+                it('uses constructor value when not provided in call', async () => {
                     const rd = new RokuDeploy({ packagePort: 8080 });
-                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                     expect(result.url).to.include(':8080/');
                 });
 
-                it('call value overrides constructor value', () => {
+                it('call value overrides constructor value', async () => {
                     const rd = new RokuDeploy({ packagePort: 8080 });
-                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', packagePort: 9090 });
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', packagePort: 9090 });
                     expect(result.url).to.include(':9090/');
                 });
             });
@@ -5613,33 +5825,33 @@ describe('RokuDeploy', () => {
         });
 
         describe('generateBaseRequestOptions', () => {
-            it('uses default timeout', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
+            it('uses default timeout', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                 expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
             });
 
-            it('uses default packagePort', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
+            it('uses default packagePort', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                 expect(result.url).to.equal(`http://localhost:${RokuDeploy['defaults'].packagePort}/test`);
             });
 
-            it('uses default username of rokudev', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
+            it('uses default username of rokudev', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                 expect(result.auth.user).to.equal('rokudev');
             });
 
-            it('allows overriding timeout', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', timeout: 5000 });
+            it('allows overriding timeout', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', timeout: 5000 });
                 expect(result.timeout).to.equal(5000);
             });
 
-            it('allows overriding packagePort', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', packagePort: 8080 });
+            it('allows overriding packagePort', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', packagePort: 8080 });
                 expect(result.url).to.equal('http://localhost:8080/test');
             });
 
-            it('allows overriding username', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', username: 'admin' });
+            it('allows overriding username', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', username: 'admin' });
                 expect(result.auth.user).to.equal('admin');
             });
         });

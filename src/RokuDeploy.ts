@@ -24,24 +24,45 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isRceDeviceConfig } from './DeviceConfig';
-import type { DeviceConfig, DeviceOption } from './DeviceConfig';
+import { isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
+import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
+import { RceDevice } from './RceDevice';
+import type { KeyAction } from './RceDevice';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
+export const DefaultFiles = [
+    'source/**/*.*',
+    'components/**/*.*',
+    'images/**/*.*',
+    'locale/**/*',
+    'fonts/**/*',
+    'manifest',
+    '!node_modules',
+    '!**/*.{md,DS_Store,db}'
+];
+
 export class RokuDeploy {
     /**
-     * Default values for common options used across multiple functions
+     * Default values for common options used across multiple functions.
+     * Public so consumers can resolve the same defaults roku-deploy uses internally
+     * instead of hardcoding them (see also `getStagingDir`, `getOutputZipPath` and `getOutputPkgPath`).
      */
-    private static readonly defaults = {
+    public static readonly defaults = {
         timeout: 150000,
         packagePort: 80,
         ecpPort: 8060,
+        username: 'rokudev',
         outDir: './out',
-        outFile: 'roku-deploy.zip'
+        outFile: 'roku-deploy.zip',
+        /**
+         * The name of the staging folder that gets created inside `outDir`
+         */
+        stagingDirName: '.roku-deploy-staging',
+        files: DefaultFiles
     };
 
     /**
@@ -93,6 +114,14 @@ export class RokuDeploy {
     public readonly logger: typeof logger;
 
     /**
+     * One `RceDevice` per unique RCE device config, cached for the lifetime of this `RokuDeploy` instance.
+     * `RceDevice` itself memoizes the resolved instance url, so reusing the same instance across a
+     * multi-request flow (for example sideload's closeChannel -> deleteDevChannel -> plugin_install) avoids
+     * re-resolving the instance url through the management api on every request.
+     */
+    private readonly rceDevicesByCacheKey = new Map<string, RceDevice>();
+
+    /**
      * Create a new RokuDeploy instance with optional default options
      */
     constructor(options?: RokuDeployConstructorOptions) {
@@ -106,6 +135,53 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
+    /**
+     * Resolve the path to the staging folder the same way `stage` does: `out` wins when provided,
+     * otherwise the default staging folder inside `outDir`.
+     */
+    public getStagingDir(options?: GetStagingDirOptions): string {
+        const cwd = options?.cwd ?? process.cwd();
+        return options?.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, RokuDeploy.defaults.stagingDirName);
+    }
+
+    /**
+     * Resolve the path to the output zip file the same way `zip` does: `out` wins when provided,
+     * otherwise `outFile` inside `outDir`. Always ends with `.zip`.
+     */
+    public getOutputZipPath(options?: GetOutputPathOptions): string {
+        const cwd = options?.cwd ?? process.cwd();
+        let out = options?.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
+
+        // Ensure .zip extension
+        if (!out.toLowerCase().endsWith('.zip')) {
+            out += '.zip';
+        }
+        return out;
+    }
+
+    /**
+     * Resolve the path to the output pkg file the same way `createSignedPackage` does: `out` wins when
+     * provided, otherwise `outFile` inside `outDir`. Always ends with `.pkg` (a `.zip` extension is swapped).
+     */
+    public getOutputPkgPath(options?: GetOutputPathOptions): string {
+        const cwd = options?.cwd ?? process.cwd();
+        let out = options?.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
+
+        // Ensure .pkg extension
+        if (out.toLowerCase().endsWith('.zip')) {
+            out = out.replace(/\.zip$/i, '.pkg');
+        } else if (!out.toLowerCase().endsWith('.pkg')) {
+            out += '.pkg';
+        }
+        return out;
+    }
+
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
@@ -116,9 +192,7 @@ export class RokuDeploy {
         const files = options.files ?? [...DefaultFiles];
 
         // Resolve output directory - use 'out' if provided, otherwise default to staging dir
-        const out = options.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
+        const out = this.getStagingDir({ out: options.out, cwd: cwd });
 
         //clean the staging directory
         await fsExtra.remove(out);
@@ -168,14 +242,7 @@ export class RokuDeploy {
         const dir = path.resolve(cwd, options.dir);
 
         // Resolve output zip path - use 'out' if provided, otherwise default
-        let out = options.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
-
-        // Ensure .zip extension
-        if (!out.toLowerCase().endsWith('.zip')) {
-            out += '.zip';
-        }
+        const out = this.getOutputZipPath({ out: options.out, cwd: cwd });
 
         // Get files to include - use provided files array or default to everything
         const files = options.files ?? ['**/*'];
@@ -275,15 +342,21 @@ export class RokuDeploy {
         return [...result.values()];
     }
 
-    private generateBaseRequestOptions<T>(requestPath: string, host: string, options: BaseRequestOptions, formData = {} as T): RequestOptions {
+    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T): Promise<RequestOptions> {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
         const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
-        const username = mergedOptions.username ?? 'rokudev';
+        const username = mergedOptions.username ?? RokuDeploy.defaults.username;
 
-        let url = `http://${host}:${packagePort}/${requestPath}`;
+        const { baseUrl, query } = await this.getInstallerBaseUrl(deviceConfig, packagePort);
+        let url = `${baseUrl}/${requestPath}`;
+        //append the query string (if any) rather than assuming the base has none, since `requestPath` can
+        //itself already carry a query string (for example the screenshot image path returned by the device)
+        if (query) {
+            url += (url.includes('?') ? '&' : '?') + query;
+        }
         let baseRequestOptions = {
             url: url,
             timeout: timeout,
@@ -296,6 +369,65 @@ export class RokuDeploy {
             agentOptions: { 'keepAlive': false }
         };
         return baseRequestOptions;
+    }
+
+    /**
+     * Resolve the installer base url (and any query string that must be appended to every request) for a
+     * device config. Local devices hit the classic port-80 dev installer directly; RCE devices are reached
+     * through the instance api's `/sideload` proxy, which forwards to the emulated device's installer.
+     *
+     * The RCE instance api sits behind a service mesh that authenticates via the `access_token` query
+     * parameter (rather than the `Authorization` header, which is reserved for the installer's own HTTP
+     * Digest challenge) - see the RCE sideload recipe notes for the full explanation of why both auth layers
+     * are needed and why they can't share the `Authorization` header.
+     */
+    private async getInstallerBaseUrl(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; query: string }> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            return {
+                baseUrl: `http://${deviceConfig.host}:${packagePort}`,
+                query: ''
+            };
+        }
+        if (!deviceConfig.rceToken) {
+            throw new Error('An rceToken is required to reach the installer on an RCE device');
+        }
+        const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+        return {
+            baseUrl: `${instanceUrl}/sideload`,
+            query: `access_token=${deviceConfig.rceToken}`
+        };
+    }
+
+    /**
+     * Get (or create) the `RceDevice` for a given RCE device config. Devices are cached by their
+     * identifying fields so repeated calls for the same logical device - even across separately-resolved
+     * `DeviceConfig` objects, as happens with registry-name lookups - reuse the same instance and its
+     * memoized instance url.
+     */
+    private getRceDevice(deviceConfig: RceDeviceConfig): RceDevice {
+        const cacheKey = this.getRceDeviceCacheKey(deviceConfig);
+        let rceDevice = this.rceDevicesByCacheKey.get(cacheKey);
+        if (!rceDevice) {
+            rceDevice = new RceDevice(deviceConfig);
+            this.rceDevicesByCacheKey.set(cacheKey, rceDevice);
+        }
+        return rceDevice;
+    }
+
+    /**
+     * Build a stable cache key for an RCE device config from its identifying field (whichever of
+     * `instanceUrl`, `id`, or `esn` is present) plus its token, so a differently-tokened config for the
+     * same identifier does not reuse another config's cached device.
+     */
+    private getRceDeviceCacheKey(deviceConfig: RceDeviceConfig): string {
+        const token = deviceConfig.rceToken ?? '';
+        if (isRceByUrl(deviceConfig)) {
+            return `instanceUrl:${deviceConfig.instanceUrl}:${token}`;
+        }
+        if (isRceById(deviceConfig)) {
+            return `id:${deviceConfig.id}:${token}`;
+        }
+        return `esn:${deviceConfig.esn}:${token}`;
     }
 
     public async keyPress(options: KeyPressOptions) {
@@ -348,12 +480,16 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
-
-        // Set defaults
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-        // press the home button to return to the main screen
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances take key input over ECP2 rather than the HTTP ECP port
+            await this.getRceDevice(deviceConfig).sendKey(options.action as KeyAction, options.key, { timeout: timeout });
+            return;
+        }
+
+        const host = this.getHost(deviceConfig);
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         return this.doPostRequest({
             url: `http://${host}:${ecpPort}/${options.action}/${options.key}`,
             timeout: timeout
@@ -384,7 +520,6 @@ export class RokuDeploy {
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
@@ -404,7 +539,7 @@ export class RokuDeploy {
             zipFilePath = path.resolve(cwd, options.zip);
         } else if ('dir' in options && options.dir) {
             // Generate zip from directory to a temp location
-            zipFilePath = path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
+            zipFilePath = this.getOutputZipPath({ cwd: cwd });
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
         } else {
@@ -434,7 +569,7 @@ export class RokuDeploy {
             });
 
             const route = options.packageUploadOverrides?.route ?? 'plugin_install';
-            let requestOptions = this.generateBaseRequestOptions(route, host, options, {
+            let requestOptions = await this.generateBaseRequestOptions(route, deviceConfig, options, {
                 mysubmit: 'Replace',
                 archive: readStream,
                 ...(options.appType ? { 'app_type': options.appType } : {})
@@ -609,9 +744,8 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', host, options, {
+        let requestOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options, {
             archive: '',
             mysubmit: 'Convert to squashfs'
         });
@@ -656,7 +790,6 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
@@ -664,7 +797,7 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.pkg)) {
             pkgPath = path.resolve(cwd, options.pkg);
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', host, options as any, {
+        let requestOptions = await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options as any, {
             mysubmit: 'Rekey',
             passwd: options.signingPassword,
             archive: null as ReadStream
@@ -722,21 +855,11 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         const cwd = options.cwd ?? process.cwd();
 
         // Resolve output pkg path - use 'out' if provided, otherwise derive from default
-        let out = options.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, RokuDeploy.defaults.outDir, 'roku-deploy.pkg');
-
-        // Ensure .pkg extension
-        if (out.toLowerCase().endsWith('.zip')) {
-            out = out.replace(/\.zip$/i, '.pkg');
-        } else if (!out.toLowerCase().endsWith('.pkg')) {
-            out += '.pkg';
-        }
+        const out = this.getOutputPkgPath({ out: options.out, cwd: cwd });
 
         // Process options for app title and app version
         if (options.appTitle || options.appVersion) {
@@ -768,7 +891,7 @@ export class RokuDeploy {
             }
         }
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', host, options, {
+        let requestOptions = await this.generateBaseRequestOptions('plugin_package', deviceConfig, options, {
             mysubmit: 'Package',
             pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
             passwd: options.signingPassword,
@@ -793,7 +916,7 @@ export class RokuDeploy {
         }
         if (pkgSearchMatches) {
             const url = pkgSearchMatches[1];
-            let requestOptions2 = this.generateBaseRequestOptions(url, host, options);
+            let requestOptions2 = await this.generateBaseRequestOptions(url, deviceConfig, options);
             await this.downloadFile(requestOptions2, out);
             this.logger.info('Signed package created at:', out);
             return { pkgPath: out };
@@ -845,7 +968,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: RequestOptions, verify = true) {
-        this.logger.info('handling POST request to', params.url);
+        this.logger.info('handling POST request to', this.scrubAccessToken(params.url));
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -868,7 +991,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: RequestOptions) {
-        this.logger.info('handling GET request to', params.url);
+        this.logger.info('handling GET request to', this.scrubAccessToken(params.url));
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -882,6 +1005,15 @@ export class RokuDeploy {
         });
         this.checkRequest(results);
         return results as HttpResponse;
+    }
+
+    /**
+     * Redact the RCE management-api token (the `access_token` query parameter on RCE installer urls) before
+     * logging a url, so it never ends up in logs.
+     */
+    private scrubAccessToken(url: string): string {
+        //some callers exercise these request helpers with incomplete params (no url at all); leave those untouched
+        return url ? url.replace(/access_token=[^&]*/i, 'access_token=<redacted>') : url;
     }
 
     private checkRequest(results: { response?: any; body?: any }) {
@@ -1044,9 +1176,8 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', host, options);
+        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
         deleteOptions.formData = {
             mysubmit: 'Delete',
             archive: ''
@@ -1063,9 +1194,8 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', host, options);
+        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
         deleteOptions.formData = {
             mysubmit: 'DeleteAll',
             archive: ''
@@ -1081,9 +1211,8 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', host, options);
+        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
         deleteOptions.formData = {
             mysubmit: 'Delete',
             'app_type': 'dcl',
@@ -1120,9 +1249,8 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', host, options);
+        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
         deleteOptions.qs ??= {};
         // eslint-disable-next-line camelcase
         deleteOptions.qs.dcl_enabled = '1';
@@ -1143,11 +1271,10 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_inspect', host, options),
+            ...(await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options)),
             formData: {
                 mysubmit: 'Screenshot',
                 archive: ''
@@ -1161,7 +1288,7 @@ export class RokuDeploy {
             throw new Error('No screenshot url returned from device');
         }
 
-        const requestParams = this.generateBaseRequestOptions(imageUrlOnDevice, host, options);
+        const requestParams = await this.generateBaseRequestOptions(imageUrlOnDevice, deviceConfig, options);
 
         // Always download to buffer
         const buffer = await this.downloadToBuffer(requestParams);
@@ -1398,12 +1525,16 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
-        const username = options.username ?? 'rokudev';
+        const username = options.username ?? RokuDeploy.defaults.username;
         const port = options.port ?? 80;
         const timeout = options.timeout ?? 3000;
-        const url = `http://${host}:${port}/plugin_install`;
+
+        const { baseUrl, query } = await this.getInstallerBaseUrl(deviceConfig, port);
+        const url = query ? `${baseUrl}/plugin_install?${query}` : `${baseUrl}/plugin_install`;
+        //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
+        //from before), an RCE device by its installer base url (never includes the access_token query param)
+        const displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
 
         let response: Response;
         try {
@@ -1415,7 +1546,7 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new DeviceUnreachableError(`Device ${host} was unreachable: ${message}`, err);
+            throw new DeviceUnreachableError(`Device ${displayTarget} was unreachable: ${message}`, err);
         }
 
         if (response.status === 200) {
@@ -1424,7 +1555,7 @@ export class RokuDeploy {
         if (response.status === 401) {
             return false;
         }
-        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${host}`, response as any);
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${displayTarget}`, response as any);
     }
 
     /**
@@ -1441,41 +1572,48 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        let host = this.getHost(deviceConfig);
-
-        // Set defaults
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
 
-        //if the host is a DNS name, look up the IP address
-        try {
-            host = await util.dnsLookup(host);
-        } catch (e) {
-            //try using the host as-is (it'll probably fail...)
-        }
-
-        const url = `http://${host}:${ecpPort}/query/device-info`;
-
         let response: HttpResponse | undefined;
-        try {
-            response = await this.doGetRequest({
-                url: url,
-                timeout: timeout
-            });
-        } catch (e) {
-            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
-                throw new EcpNetworkAccessModeDisabledError(
-                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
-                    {
-                        httpDetails: (e as any)?.details?.httpDetails
-                    },
-                    e instanceof Error ? e : undefined
-                );
+        let deviceInfoXml: string;
+
+        if (isRceDeviceConfig(deviceConfig)) {
+            //RCE instances serve device-info over the ECP2 WebSocket rather than the HTTP ECP port
+            deviceInfoXml = await this.getRceDevice(deviceConfig).getDeviceInfoXml({ timeout: timeout });
+        } else {
+            let host = this.getHost(deviceConfig);
+            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+
+            //if the host is a DNS name, look up the IP address
+            try {
+                host = await util.dnsLookup(host);
+            } catch (e) {
+                //try using the host as-is (it'll probably fail...)
             }
-            throw e;
+
+            const url = `http://${host}:${ecpPort}/query/device-info`;
+
+            try {
+                response = await this.doGetRequest({
+                    url: url,
+                    timeout: timeout
+                });
+            } catch (e) {
+                if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                    throw new EcpNetworkAccessModeDisabledError(
+                        `Unable to access device-info because ecp-setting-mode is 'disabled'`,
+                        {
+                            httpDetails: (e as any)?.details?.httpDetails
+                        },
+                        e instanceof Error ? e : undefined
+                    );
+                }
+                throw e;
+            }
+            deviceInfoXml = response.body;
         }
         try {
-            const parsedContent = await xml2js.parseStringPromise(response.body, {
+            const parsedContent = await xml2js.parseStringPromise(deviceInfoXml, {
                 explicitArray: false
             });
             // clone the data onto an object because xml2js somehow makes this object not an object???
@@ -1604,7 +1742,6 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -1623,7 +1760,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', host, options),
+            ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
             formData: {
                 mysubmit: 'Reboot',
                 archive: ''
@@ -1636,7 +1773,6 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const host = this.getHost(deviceConfig);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -1655,7 +1791,7 @@ export class RokuDeploy {
         }
 
         return this.doPostRequest({
-            ...this.generateBaseRequestOptions('plugin_swup', host, options),
+            ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
             formData: {
                 mysubmit: 'CheckUpdate',
                 archive: ''
@@ -1706,17 +1842,6 @@ enum RokuMessageType {
     info = 'info',
     error = 'error'
 }
-
-export const DefaultFiles = [
-    'source/**/*.*',
-    'components/**/*.*',
-    'images/**/*.*',
-    'locale/**/*',
-    'fonts/**/*',
-    'manifest',
-    '!node_modules',
-    '!**/*.{md,DS_Store,db}'
-];
 
 export interface HttpResponse {
     response: any;
@@ -1887,7 +2012,10 @@ export type ConvertToSquashfsOptions = BaseRequestOptions;
 export interface RekeyDeviceOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
-    devId: string;
+    /**
+     * If specified, rekeying will fail if the resulting devId is different than this value
+     */
+    devId?: string;
     cwd?: string;
 }
 
@@ -1913,8 +2041,37 @@ export type RebootDeviceOptions = BaseRequestOptions;
 
 export type CheckForUpdateOptions = BaseRequestOptions;
 
-export interface GetOutputZipFilePathOptions {
+export interface GetStagingDirOptions {
+    /**
+     * The staging folder path. When provided, this wins over `outDir`.
+     */
     out?: string;
+    /**
+     * The output directory that contains the default staging folder. Defaults to `'./out'`.
+     */
+    outDir?: string;
+    /**
+     * The current working directory to use for relative paths
+     */
+    cwd?: string;
+}
+
+export interface GetOutputPathOptions {
+    /**
+     * The output file path. When provided, this wins over `outDir`/`outFile`.
+     */
+    out?: string;
+    /**
+     * The output directory. Defaults to `'./out'`.
+     */
+    outDir?: string;
+    /**
+     * The output file name. Defaults to `'roku-deploy.zip'`.
+     */
+    outFile?: string;
+    /**
+     * The current working directory to use for relative paths
+     */
     cwd?: string;
 }
 
