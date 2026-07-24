@@ -8,3 +8,4 @@ export * from './DeviceConfig';
 export * from './RceDevice';
 export * from './RceManagementClient';
 export * from './RceVideoSignalingClient';
+export * from './TelnetSocket';
