@@ -7,3 +7,4 @@ export * from './DeviceInfo';
 export * from './DeviceConfig';
 export * from './RceDevice';
 export * from './RceManagementClient';
+export * from './RceVideoSignalingClient';
