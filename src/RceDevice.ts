@@ -1,4 +1,5 @@
 import * as WebSocket from 'ws';
+import * as needle from 'needle';
 import type { RceDeviceConfig } from './DeviceConfig';
 import { isRceByUrl, isRceById } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -109,6 +110,16 @@ export class RceDevice {
         return this.ecp(RceDevice.keyActionToEcp2Request[action], { 'param-key': key }, options);
     }
 
+    /**
+     * Enter the developer-settings key combo on the device (the same combo a physical remote's
+     * key sequence would send). The device then shows the on-screen developer setup wizard for the
+     * user to complete; this call only triggers that screen, it does not finish the setup itself.
+     */
+    public async sendDeveloperSettingsCombo(): Promise<void> {
+        const instanceUrl = await this.getInstanceUrl();
+        await this.postToInstanceApi(instanceUrl, '/api/v0/xi/developer-settings-combo');
+    }
+
     private parseResponse(message: EcpRawMessage): EcpResponse {
         const statusNumber = Number.parseInt(message.status, 10);
         return {
@@ -168,6 +179,32 @@ export class RceDevice {
             headers.Authorization = `Bearer ${this.token}`;
         }
         return headers;
+    }
+
+    /**
+     * POST to a bodyless instance-api endpoint (bearer-authed like everything else on the instance
+     * api). Single choke point so tests can stub one method rather than the network.
+     */
+    private postToInstanceApi(instanceUrl: string, apiPath: string): Promise<void> {
+        const url = instanceUrl + apiPath;
+        const needleOptions: needle.NeedleOptions = {
+            json: true,
+            headers: this.buildHeaders()
+        };
+        return new Promise<void>((resolve, reject) => {
+            needle.request('post', url, null, needleOptions, (error, response) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const statusCode = response.statusCode ?? 0;
+                if (statusCode < 200 || statusCode >= 300) {
+                    reject(new Error(`RCE instance POST ${apiPath} failed (status ${statusCode})`));
+                    return;
+                }
+                resolve();
+            });
+        });
     }
 
     private static requestCounter = 0;
