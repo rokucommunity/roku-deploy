@@ -647,7 +647,7 @@ describe('RokuDeploy', () => {
 
             let thrown: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown = e;
             }
@@ -660,7 +660,7 @@ describe('RokuDeploy', () => {
 
             let thrown: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown = e;
             }
@@ -690,7 +690,7 @@ describe('RokuDeploy', () => {
 
             let thrown1: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown1 = e;
             }
@@ -711,7 +711,7 @@ describe('RokuDeploy', () => {
 
             let thrown2: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown2 = e;
             }
@@ -730,7 +730,7 @@ describe('RokuDeploy', () => {
 
             let thrown: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown = e;
             }
@@ -745,7 +745,7 @@ describe('RokuDeploy', () => {
 
             let thrown: any;
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 thrown = e;
             }
@@ -755,7 +755,7 @@ describe('RokuDeploy', () => {
         it('uses provided timeout option', async () => {
             const stub = mockDoGetRequest('<device-info><udn>test</udn></device-info>');
             sinon.stub(util, 'dnsLookup').resolves('1.1.1.1');
-            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', timeout: 5000 });
+            await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' }, timeout: 5000 });
             expect(stub.getCall(0).args[0].timeout).to.equal(5000);
         });
 
@@ -1510,7 +1510,7 @@ describe('RokuDeploy', () => {
             let thrown1: any;
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     failOnCompileError: true,
@@ -1535,7 +1535,7 @@ describe('RokuDeploy', () => {
             let thrown2: any;
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     failOnCompileError: true,
@@ -2098,7 +2098,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -2383,7 +2383,7 @@ describe('RokuDeploy', () => {
         it('throws when neither zip nor dir is provided', async () => {
             await expectThrowsAsync(
                 rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     close: false
                 } as any),
@@ -2397,7 +2397,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(s`${customCwd}/test.zip`, 'test');
 
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: 'test.zip',
                 cwd: customCwd,
@@ -2940,7 +2940,7 @@ describe('RokuDeploy', () => {
         it('should throw error when only appTitle is provided without appVersion', async () => {
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     appTitle: 'MyApp'
@@ -2952,7 +2952,7 @@ describe('RokuDeploy', () => {
         it('should throw error when only appVersion is provided without appTitle', async () => {
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     appVersion: '1.0.0'
@@ -2969,7 +2969,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 out: s`${outDir}/myapp.zip`,
@@ -2987,7 +2987,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 out: s`${outDir}/myapp`,
@@ -3005,7 +3005,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 out: 'output/myapp.pkg',
@@ -3084,7 +3084,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 devId: 'matching-id',
@@ -4348,7 +4348,7 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             let result = await rokuDeploy.captureScreenshot({
-                host: options.host,
+                device: { host: 'localhost' },
                 password: 'password',
                 out: true,
                 cwd: tempDir,
