@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
-import { buildDigestAuthorization } from './fetch';
+import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
+
 const sinon = createSandbox();
 
 describe('fetch module', () => {
@@ -124,7 +125,6 @@ describe('fetch module', () => {
 
     describe('parseDigestChallenge', () => {
         it('parses quoted values', () => {
-            const { parseDigestChallenge } = require('./fetch');
             const result = parseDigestChallenge('Digest realm="rokudev", nonce="abc123"');
 
             expect(result.realm).to.equal('rokudev');
@@ -132,7 +132,6 @@ describe('fetch module', () => {
         });
 
         it('parses unquoted values', () => {
-            const { parseDigestChallenge } = require('./fetch');
             const result = parseDigestChallenge('Digest realm=rokudev, qop=auth');
 
             expect(result.realm).to.equal('rokudev');
