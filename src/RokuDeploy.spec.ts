@@ -38,7 +38,7 @@ describe('RokuDeploy', () => {
             devId: 'abcde',
             out: `${outDir}/roku-deploy.zip`,
             signingPassword: '12345',
-            host: 'localhost',
+            device: { host: 'localhost' },
             pkg: `${tempDir}/testSignedPackage.pkg`
         } as any;
         fsExtra.emptyDirSync(tempDir);
@@ -365,7 +365,7 @@ describe('RokuDeploy', () => {
 
         it('should return device info matching what was returned by ECP', async () => {
             mockDoGetRequest(body);
-            const deviceInfo = await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            const deviceInfo = await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             expect(deviceInfo['serial-number']).to.equal('123');
             expect(deviceInfo['device-id']).to.equal('456');
             expect(deviceInfo['keyed-developer-id']).to.equal('789');
@@ -373,13 +373,13 @@ describe('RokuDeploy', () => {
 
         it('should default to port 8060 if not provided', async () => {
             const stub = mockDoGetRequest(body);
-            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+            await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:8060/query/device-info');
         });
 
         it('should use given port if provided', async () => {
             const stub = mockDoGetRequest(body);
-            await rokuDeploy.getDeviceInfo({ host: '1.1.1.1', ecpPort: 9999 });
+            await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' }, ecpPort: 9999 });
             expect(stub.getCall(0).args[0].url).to.eql('http://1.1.1.1:9999/query/device-info');
         });
 
@@ -390,7 +390,7 @@ describe('RokuDeploy', () => {
                     <udn>29380007-0800-1025-80a4-d83154332d7e</udn>
                 </device-info>
                 `);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' }, ecpPort: 8060, enhance: true });
             expect(result.isStick).not.to.exist;
         });
 
@@ -400,13 +400,13 @@ describe('RokuDeploy', () => {
                     <has-mobile-screensaver>true</has-mobile-screensaver>
                 </device-info>
                 `);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10' });
+            const result = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' } });
             expect(result['has-mobile-screensaver']).to.eql('true');
         });
 
         it('should sanitize additional data when the host+param+format signature is triggered', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' }, ecpPort: 8060, enhance: true });
             expect(result).to.include({
                 // make sure the number fields are turned into numbers
                 softwareBuild: 4170,
@@ -445,7 +445,7 @@ describe('RokuDeploy', () => {
 
         it('converts keys to camel case when enabled', async () => {
             mockDoGetRequest(body);
-            const result = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
+            const result = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' }, ecpPort: 8060, enhance: true });
             const props = [
                 'udn',
                 'serialNumber',
@@ -528,7 +528,7 @@ describe('RokuDeploy', () => {
         it('should throw our error on failure', async () => {
             mockDoGetRequest();
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnparsableDeviceResponseError);
                 return;
@@ -544,7 +544,7 @@ describe('RokuDeploy', () => {
                 httpDetails: { response: { headers: { server: 'Roku' } } }
             }));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.be.instanceof(errors.EcpNetworkAccessModeDisabledError);
@@ -555,7 +555,7 @@ describe('RokuDeploy', () => {
                 httpDetails: { response: { headers: { server: 'Apache' } } }
             }));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.equal('Apache');
@@ -566,7 +566,7 @@ describe('RokuDeploy', () => {
                 httpDetails: { response: { headers: {} } }
             }));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.be.undefined;
@@ -577,7 +577,7 @@ describe('RokuDeploy', () => {
                 httpDetails: { response: { headers: { server: null as any } } }
             }));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers?.server).to.be.null;
@@ -588,7 +588,7 @@ describe('RokuDeploy', () => {
                 httpDetails: { response: {} }
             }));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails?.response?.headers).to.be.undefined;
@@ -597,7 +597,7 @@ describe('RokuDeploy', () => {
             // Reject with an error that has no httpDetails
             doGetRequestStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {}));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as errors.InvalidDeviceResponseCodeError).details.httpDetails).to.be.undefined;
@@ -606,7 +606,7 @@ describe('RokuDeploy', () => {
             // Reject with an empty object (not a proper error)
             doGetRequestStub.rejects({});
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect((e as any).details).to.be.undefined;
@@ -615,7 +615,7 @@ describe('RokuDeploy', () => {
             const err = new Error('Network error');
             doGetRequestStub.rejects(err);
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.equal(err);
@@ -624,7 +624,7 @@ describe('RokuDeploy', () => {
             // eslint-disable-next-line prefer-promise-reject-errors
             doGetRequestStub.callsFake(() => Promise.reject(null));
             try {
-                await rokuDeploy.getDeviceInfo({ host: '1.1.1.1' });
+                await rokuDeploy.getDeviceInfo({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.be.null;
@@ -760,15 +760,15 @@ describe('RokuDeploy', () => {
         });
 
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.getDeviceInfo();
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('constructor-host');
                 try {
@@ -777,18 +777,18 @@ describe('RokuDeploy', () => {
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('call-host');
                 try {
-                    await rd.getDeviceInfo({ host: 'call-host' });
+                    await rd.getDeviceInfo({ device: { host: 'call-host' } });
                 } catch (e) { /* ignore parse errors */ }
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
 
             it('uses constructor ecpPort when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost', ecpPort: 9000 });
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, ecpPort: 9000 });
                 const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('localhost');
                 try {
@@ -798,7 +798,7 @@ describe('RokuDeploy', () => {
             });
 
             it('call ecpPort overrides constructor ecpPort', async () => {
-                const rd = new RokuDeploy({ host: 'localhost', ecpPort: 9000 });
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, ecpPort: 9000 });
                 const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('localhost');
                 try {
@@ -812,7 +812,7 @@ describe('RokuDeploy', () => {
     describe('getEcpNetworkAccessMode', () => {
         it('returns ecpSettingMode from device info', async () => {
             sinon.stub(rokuDeploy, 'getDeviceInfo').resolves({ 'ecp-setting-mode': 'enabled' } as any);
-            const result = await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+            const result = await rokuDeploy.getEcpNetworkAccessMode({ device: { host: '1.1.1.1' } });
             expect(result).to.equal('enabled');
         });
 
@@ -822,7 +822,7 @@ describe('RokuDeploy', () => {
             getDeviceInfoStub.rejects(new errors.InvalidDeviceResponseCodeError('test', {
                 httpDetails: { response: { headers: { server: 'Roku' } } }
             }));
-            expect(await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' })).to.equal('disabled');
+            expect(await rokuDeploy.getEcpNetworkAccessMode({ device: { host: '1.1.1.1' } })).to.equal('disabled');
         });
 
         it('handles all error scenarios in catch block', async () => {
@@ -830,7 +830,7 @@ describe('RokuDeploy', () => {
             async function doTest(rejectionValue: any) {
                 getDeviceInfoStub.rejects(rejectionValue);
                 try {
-                    await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                    await rokuDeploy.getEcpNetworkAccessMode({ device: { host: '1.1.1.1' } });
                     assert.fail('Exception should have been thrown');
                 } catch (e) {
                     expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
@@ -851,7 +851,7 @@ describe('RokuDeploy', () => {
             const getDeviceInfoStub = sinon.stub(rokuDeploy, 'getDeviceInfo');
             getDeviceInfoStub.callsFake(() => Promise.reject(null));
             try {
-                await rokuDeploy.getEcpNetworkAccessMode({ host: '1.1.1.1' });
+                await rokuDeploy.getEcpNetworkAccessMode({ device: { host: '1.1.1.1' } });
                 assert.fail('Exception should have been thrown');
             } catch (e) {
                 expect(e).to.be.instanceof(errors.UnknownDeviceResponseError);
@@ -925,8 +925,8 @@ describe('RokuDeploy', () => {
             </device-info>`;
 
             mockDoGetRequest(deviceInfoBody);
-            const enhanced = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060, enhance: true });
-            const raw = await rokuDeploy.getDeviceInfo({ host: '192.168.1.10', ecpPort: 8060 });
+            const enhanced = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' }, ecpPort: 8060, enhance: true });
+            const raw = await rokuDeploy.getDeviceInfo({ device: { host: '192.168.1.10' }, ecpPort: 8060 });
 
             expect(rokuDeploy.enhanceDeviceInfo(raw)).to.eql(enhanced);
         });
@@ -945,31 +945,31 @@ describe('RokuDeploy', () => {
             </device-info>`;
             mockDoGetRequest(body);
             let { devId } = await rokuDeploy.getDevId({
-                host: '1.2.3.4'
+                device: { host: '1.2.3.4' }
             });
             expect(devId).to.equal(expectedDevId);
         });
 
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.getDevId();
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'keyed-developer-id': 'abc123' } as any);
                 const { devId } = await rd.getDevId();
                 expect(devId).to.equal('abc123');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd, 'getDeviceInfo').resolves({ 'keyed-developer-id': 'abc123' } as any);
-                await rd.getDevId({ host: 'call-host' });
-                expect(stub.getCall(0).args[0].host).to.equal('call-host');
+                await rd.getDevId({ device: { host: 'call-host' } });
+                expect((stub.getCall(0).args[0] as any).device.host).to.equal('call-host');
             });
         });
     });
@@ -1112,11 +1112,11 @@ describe('RokuDeploy', () => {
 
     describe('generateBaseRequestOptions', () => {
         it('uses default port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', password: 'password' }).url).to.equal('http://1.2.3.4:80/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', '1.2.3.4', { device: { host: '1.2.3.4' }, password: 'password' }).url).to.equal('http://1.2.3.4:80/a_b_c');
         });
 
         it('uses overridden port', () => {
-            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4', packagePort: 999, password: 'password' }).url).to.equal('http://1.2.3.4:999/a_b_c');
+            expect(rokuDeploy['generateBaseRequestOptions']('a_b_c', '1.2.3.4', { device: { host: '1.2.3.4' }, packagePort: 999, password: 'password' }).url).to.equal('http://1.2.3.4:999/a_b_c');
         });
     });
 
@@ -1127,7 +1127,7 @@ describe('RokuDeploy', () => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
-            return rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' }).then(() => {
+            return rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' }).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
                 expect(true).to.be.true;
@@ -1141,7 +1141,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' });
             await promise;
         });
 
@@ -1152,7 +1152,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', ecpPort: 987, key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'home' });
             await promise;
         });
 
@@ -1164,7 +1164,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' });
             await promise;
         });
 
@@ -1177,7 +1177,7 @@ describe('RokuDeploy', () => {
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, host: '1.2.3.4', ecpPort: 987, key: 'home', timeout: 1000 });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'home', timeout: 1000 });
             await promise;
         });
     });
@@ -1188,20 +1188,20 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyPress({ key: 'home' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                 await rd.keyPress({ key: 'home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyPress({ host: 'call-host', key: 'home' });
+                await rd.keyPress({ device: { host: 'call-host' }, key: 'home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1209,24 +1209,24 @@ describe('RokuDeploy', () => {
 
     describe('keyUp', () => {
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyUp({ key: 'home' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                 await rd.keyUp({ key: 'home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyUp({ host: 'call-host', key: 'home' });
+                await rd.keyUp({ device: { host: 'call-host' }, key: 'home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1234,24 +1234,24 @@ describe('RokuDeploy', () => {
 
     describe('keyDown', () => {
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyDown({ key: 'home' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                 await rd.keyDown({ key: 'home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyDown({ host: 'call-host', key: 'home' });
+                await rd.keyDown({ device: { host: 'call-host' }, key: 'home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1259,24 +1259,24 @@ describe('RokuDeploy', () => {
 
     describe('sendText', () => {
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.sendText({ text: 'a' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                 await rd.sendText({ text: 'a' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.sendText({ host: 'call-host', text: 'a' });
+                await rd.sendText({ device: { host: 'call-host' }, text: 'a' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1284,24 +1284,24 @@ describe('RokuDeploy', () => {
 
     describe('closeChannel', () => {
         describe('constructor defaults', () => {
-            it('fails when host not provided in constructor or call', async () => {
+            it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.closeChannel({} as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
-            it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('uses constructor device when not provided in call', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                 await rd.closeChannel({} as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
-            it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host' });
+            it('call device overrides constructor device', async () => {
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.closeChannel({ host: 'call-host' });
+                await rd.closeChannel({ device: { host: 'call-host' } });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1321,7 +1321,7 @@ describe('RokuDeploy', () => {
         it('uses overridden route', async () => {
             const stub = mockDoPostRequest();
             await rokuDeploy.sideload({
-                host: '0.0.0.0',
+                device: { host: '0.0.0.0' },
                 password: 'password',
                 zip: zipFile,
                 close: false,
@@ -1335,7 +1335,7 @@ describe('RokuDeploy', () => {
         it('overrides formData', async () => {
             const stub = mockDoPostRequest();
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 remoteDebug: true,
@@ -1358,7 +1358,7 @@ describe('RokuDeploy', () => {
             //the file should exist
             expect(fsExtra.pathExistsSync(zipFile)).to.be.true;
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 close: false
@@ -1373,7 +1373,7 @@ describe('RokuDeploy', () => {
             //the file should exist (created in beforeEach)
             expect(fsExtra.pathExistsSync(zipFile)).to.be.true;
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 dir: rootDir,
                 close: false
@@ -1400,7 +1400,7 @@ describe('RokuDeploy', () => {
             //the file should exist
             expect(fsExtra.pathExistsSync(zipFile)).to.be.true;
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 dir: rootDir,
                 close: false
@@ -1413,7 +1413,7 @@ describe('RokuDeploy', () => {
             const missingZip = s`${outDir}/fileThatDoesNotExist.zip`;
             await expectThrowsAsync(async () => {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: missingZip,
                     deleteDevChannel: false,
@@ -1422,13 +1422,13 @@ describe('RokuDeploy', () => {
             }, `Cannot sideload because file does not exist at '${missingZip}'`);
         });
 
-        it('fails when no host is provided', () => {
+        it('fails when no device is provided', () => {
             expectPathNotExists('rokudeploy.json');
             return rokuDeploy.sideload({
-                host: undefined,
+                device: undefined,
                 password: 'password',
                 zip: zipFile
-            }).then(() => {
+            } as any).then(() => {
                 assert.fail('Should not have succeeded');
             }, () => {
                 expect(true).to.be.true;
@@ -1450,7 +1450,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -1469,7 +1469,7 @@ describe('RokuDeploy', () => {
             `);
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1488,7 +1488,7 @@ describe('RokuDeploy', () => {
             `);
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1553,7 +1553,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1615,7 +1615,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest('', 401);
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1635,7 +1635,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.sideload(
                     {
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'password',
                         zip: zipFile,
                         close: false
@@ -1665,7 +1665,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.sideload(
                     {
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'password',
                         zip: zipFile,
                         deleteDevChannel: false,
@@ -1697,7 +1697,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.sideload(
                     {
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'password',
                         zip: zipFile,
                         deleteDevChannel: false,
@@ -1717,7 +1717,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest();
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1733,7 +1733,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1752,7 +1752,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1775,7 +1775,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipFile, 'asdf');
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 deleteDevChannel: false,
@@ -1790,7 +1790,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipFile, 'asdf');
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 deleteDevChannel: false,
@@ -1806,7 +1806,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipFile, 'asdf');
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 deleteDevChannel: false,
@@ -1822,7 +1822,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipFile, 'asdf');
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 deleteDevChannel: false,
@@ -1838,7 +1838,7 @@ describe('RokuDeploy', () => {
             options.failOnCompileError = false;
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1856,7 +1856,7 @@ describe('RokuDeploy', () => {
 
             const result = await rokuDeploy.sideload({
                 appType: null,
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1874,7 +1874,7 @@ describe('RokuDeploy', () => {
 
             const result = await rokuDeploy.sideload({
                 appType: 'channel',
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1892,7 +1892,7 @@ describe('RokuDeploy', () => {
 
             const result = await rokuDeploy.sideload({
                 appType: 'dcl',
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: true,
@@ -1910,7 +1910,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
 
             return rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipFile,
                 failOnCompileError: false,
@@ -1928,7 +1928,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     failOnCompileError: true,
                     zip: zipFile,
@@ -1946,7 +1946,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     failOnCompileError: true,
                     zip: zipFile,
@@ -1964,7 +1964,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     failOnCompileError: true,
                     zip: zipFile,
@@ -1983,7 +1983,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     deleteDevChannel: false,
@@ -2013,7 +2013,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     deleteDevChannel: false,
@@ -2045,7 +2045,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -2071,7 +2071,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -2126,7 +2126,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -2146,7 +2146,7 @@ describe('RokuDeploy', () => {
 
             try {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     zip: zipFile,
                     close: false
@@ -2165,7 +2165,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipPath, 'zip contents');
 
             const result = await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipPath,
                 close: false
@@ -2180,7 +2180,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipPath, 'zip contents');
 
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipPath
             });
@@ -2194,7 +2194,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(zipPath, 'zip contents');
 
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 zip: zipPath,
                 close: false
@@ -2212,7 +2212,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy, 'closeChannel').resolves();
 
             await rokuDeploy.sideload({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 dir: rootDir
             });
@@ -2222,7 +2222,7 @@ describe('RokuDeploy', () => {
         it('fails when no password is provided', async () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: undefined,
                     zip: zipFile
                 });
@@ -2234,18 +2234,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.sideload({ zip: 'test.zip' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.sideload({ zip: 'test.zip' } as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'deleteDevChannel').resolves();
                 sinon.stub(rd, 'closeChannel').resolves();
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
@@ -2256,18 +2256,18 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'deleteDevChannel').resolves();
                 sinon.stub(rd, 'closeChannel').resolves();
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
                 sinon.stub(fsExtra, 'createReadStream').returns({ close: () => { }, on: (event, cb) => cb() } as any);
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: 'success', response: { statusCode: 200 } });
-                await rd.sideload({ host: 'call-host', zip: 'test.zip' } as any);
+                await rd.sideload({ device: { host: 'call-host' }, zip: 'test.zip' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
 
             it('uses constructor password when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'constructor-pass' });
                 sinon.stub(rd, 'deleteDevChannel').resolves();
                 sinon.stub(rd, 'closeChannel').resolves();
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
@@ -2278,7 +2278,7 @@ describe('RokuDeploy', () => {
             });
 
             it('call password overrides constructor password', async () => {
-                const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'constructor-pass' });
                 sinon.stub(rd, 'deleteDevChannel').resolves();
                 sinon.stub(rd, 'closeChannel').resolves();
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
@@ -2296,7 +2296,7 @@ describe('RokuDeploy', () => {
 
                 const zipSize = fsExtra.statSync(zipFile).size;
                 await expectThrowsAsync(
-                    rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false }),
+                    rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false }),
                     `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. ` +
                     `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`
                 );
@@ -2310,7 +2310,7 @@ describe('RokuDeploy', () => {
                 const zipSize = fsExtra.statSync(zipFile).size;
                 let thrown: Error;
                 try {
-                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                    await rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false });
                 } catch (e) {
                     thrown = e as Error;
                 }
@@ -2328,7 +2328,7 @@ describe('RokuDeploy', () => {
                 const zipSize = fsExtra.statSync(zipFile).size;
                 let thrown: Error;
                 try {
-                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                    await rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false });
                 } catch (e) {
                     thrown = e as Error;
                 }
@@ -2343,7 +2343,7 @@ describe('RokuDeploy', () => {
 
                 let thrown: Error;
                 try {
-                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                    await rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false });
                 } catch (e) {
                     thrown = e as Error;
                 }
@@ -2358,7 +2358,7 @@ describe('RokuDeploy', () => {
 
                 let thrown: Error;
                 try {
-                    await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                    await rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false });
                 } catch (e) {
                     thrown = e as Error;
                 }
@@ -2371,7 +2371,7 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
 
                 //no hint => the corrupt-zip body is not turned into a thrown error, so sideload resolves normally
-                const result = await rokuDeploy.sideload({ host: '1.2.3.4', password: 'password', zip: zipFile, close: false });
+                const result = await rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false });
                 expect(result.message).to.equal('Successful sideload');
             });
 
@@ -2411,7 +2411,7 @@ describe('RokuDeploy', () => {
         it('should not return an error if successful', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
             await rokuDeploy.convertToSquashfs({
-                host: options.host,
+                device: options.device,
                 password: 'password'
             });
         });
@@ -2420,7 +2420,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest();
             try {
                 await rokuDeploy.convertToSquashfs({
-                    host: options.host,
+                    device: options.device,
                     password: 'password'
                 });
             } catch (e) {
@@ -2439,7 +2439,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.convertToSquashfs({
                     ...options,
-                    host: options.host,
+                    device: options.device,
                     password: 'password'
                 });
             } catch (e) {
@@ -2455,7 +2455,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.convertToSquashfs({
                     ...options,
-                    host: options.host,
+                    device: options.device,
                     password: 'password'
                 });
             } catch (e) {
@@ -2475,7 +2475,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.convertToSquashfs({
                     ...options,
-                    host: options.host,
+                    device: options.device,
                     password: 'password'
                 });
             } catch (e) {
@@ -2496,7 +2496,7 @@ describe('RokuDeploy', () => {
             try {
                 await rokuDeploy.convertToSquashfs({
                     ...options,
-                    host: options.host,
+                    device: options.device,
                     password: 'password'
                 });
             } catch (e) {
@@ -2511,27 +2511,27 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.convertToSquashfs({} as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.convertToSquashfs({} as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: 'Conversion succeeded' });
                 await rd.convertToSquashfs({} as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: 'Conversion succeeded' });
-                await rd.convertToSquashfs({ host: 'call-host' } as any);
+                await rd.convertToSquashfs({ device: { host: 'call-host' } } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -2561,7 +2561,7 @@ describe('RokuDeploy', () => {
             let actualError: Error;
             try {
                 await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     pkg: options.pkg,
                     signingPassword: options.signingPassword,
@@ -2583,7 +2583,7 @@ describe('RokuDeploy', () => {
             //small sleep to ensure the file exists (hack for testing!)
             await util.sleep(10);
             await rokuDeploy.rekeyDevice({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 cwd: rootDir,
                 pkg: s`../notReal.pkg`,
@@ -2598,7 +2598,7 @@ describe('RokuDeploy', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 pkg: s`${tempDir}/testSignedPackage.pkg`,
                 signingPassword: options.signingPassword,
@@ -2612,7 +2612,7 @@ describe('RokuDeploy', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 pkg: options.pkg,
                 signingPassword: options.signingPassword,
@@ -2626,7 +2626,7 @@ describe('RokuDeploy', () => {
             </div>`;
             mockDoPostRequest(body);
             await rokuDeploy.rekeyDevice({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 pkg: options.pkg,
                 signingPassword: options.signingPassword,
@@ -2638,7 +2638,7 @@ describe('RokuDeploy', () => {
             try {
                 mockDoPostRequest();
                 await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     pkg: options.pkg,
                     signingPassword: options.signingPassword,
@@ -2658,7 +2658,7 @@ describe('RokuDeploy', () => {
                 </div>`;
                 mockDoPostRequest(body);
                 await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     pkg: options.pkg,
                     signingPassword: options.signingPassword,
@@ -2678,7 +2678,7 @@ describe('RokuDeploy', () => {
                 </div>`;
                 mockDoPostRequest(body);
                 await rokuDeploy.rekeyDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     pkg: options.pkg,
                     signingPassword: options.signingPassword,
@@ -2696,18 +2696,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.rekeyDevice({ pkg: 'test.pkg', signingPassword: 'sign' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.rekeyDevice({ pkg: 'test.pkg', signingPassword: 'sign' } as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<font color="red">Success.</font>' });
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
                 sinon.stub(fsExtra, 'createReadStream').returns({} as any);
@@ -2716,11 +2716,11 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<font color="red">Success.</font>' });
                 sinon.stub(fsExtra, 'pathExists').resolves(true);
                 sinon.stub(fsExtra, 'createReadStream').returns({} as any);
-                await rd.rekeyDevice({ host: 'call-host', pkg: 'test.pkg', signingPassword: 'sign' } as any);
+                await rd.rekeyDevice({ device: { host: 'call-host' }, pkg: 'test.pkg', signingPassword: 'sign' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -2766,7 +2766,7 @@ describe('RokuDeploy', () => {
                     return {} as any;
                 });
                 await rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -2782,7 +2782,7 @@ describe('RokuDeploy', () => {
             try {
                 mockDoPostRequest(null);
                 await rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -2803,7 +2803,7 @@ describe('RokuDeploy', () => {
 
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -2821,7 +2821,7 @@ describe('RokuDeploy', () => {
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve('pkgs//P6953175d5df120c0069c53de12515b9a.pkg'));
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 out: s`${outDir}/roku-deploy.pkg`,
@@ -2837,7 +2837,7 @@ describe('RokuDeploy', () => {
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 manifestPath: s`${tempDir}/manifest`,
@@ -2856,7 +2856,7 @@ describe('RokuDeploy', () => {
             const stub = sinon.stub(rokuDeploy as any, 'downloadFile').returns(Promise.resolve());
 
             let result = await rokuDeploy.createSignedPackage({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password',
                 signingPassword: options.signingPassword,
                 manifestPath: s`${tempDir}/manifest`,
@@ -2870,7 +2870,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest();
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -2887,7 +2887,7 @@ describe('RokuDeploy', () => {
                 `);
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     devId: '123',
@@ -2900,7 +2900,7 @@ describe('RokuDeploy', () => {
         it('should return error if neither manifestPath nor appTitle and appVersion are provided', async () => {
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     devId: '123'
@@ -2913,7 +2913,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(`${tempDir}/manifest`, `title=AwesomeApp`);
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     devId: '123',
@@ -2927,7 +2927,7 @@ describe('RokuDeploy', () => {
             fsExtra.outputFileSync(`${tempDir}/manifest`, `major_version=1\nminor_version=0`);
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     devId: '123',
@@ -3040,7 +3040,7 @@ describe('RokuDeploy', () => {
             let error: Error;
             try {
                 await rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -3065,7 +3065,7 @@ describe('RokuDeploy', () => {
 
             await expectThrowsAsync(
                 rokuDeploy.createSignedPackage({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'aaaa',
                     signingPassword: options.signingPassword,
                     manifestPath: s`${tempDir}/manifest`
@@ -3099,18 +3099,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.createSignedPackage({ signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.createSignedPackage({ signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<a href="pkgs/package.pkg">' });
                 sinon.stub(rd as any, 'downloadFile').resolves();
                 await rd.createSignedPackage({ signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
@@ -3118,10 +3118,10 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<a href="pkgs/package.pkg">' });
                 sinon.stub(rd as any, 'downloadFile').resolves();
-                await rd.createSignedPackage({ host: 'call-host', signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
+                await rd.createSignedPackage({ device: { host: 'call-host' }, signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -3733,7 +3733,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo('15.0.4');
             let stub = mockDoPostRequest();
             let result = await rokuDeploy.rebootDevice({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password'
             });
             expect(result).not.to.be.undefined;
@@ -3745,7 +3745,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo('15.0.4');
             let stub = mockDoPostRequest();
             let result = await rokuDeploy.checkForUpdate({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password'
             });
             expect(result).not.to.be.undefined;
@@ -3757,7 +3757,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo('15.0.3');
             await assertThrowsAsync(async () => {
                 await rokuDeploy.rebootDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password'
                 });
             });
@@ -3767,7 +3767,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo(null);
             await assertThrowsAsync(async () => {
                 await rokuDeploy.rebootDevice({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password'
                 });
             });
@@ -3777,7 +3777,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo('15.0.3');
             await assertThrowsAsync(async () => {
                 await rokuDeploy.checkForUpdate({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password'
                 });
             });
@@ -3787,7 +3787,7 @@ describe('RokuDeploy', () => {
             mockGetDeviceInfo(null);
             await assertThrowsAsync(async () => {
                 await rokuDeploy.checkForUpdate({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'password'
                 });
             });
@@ -3798,18 +3798,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.rebootDevice({} as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.rebootDevice({} as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'software-version': '15.0.4' } as any);
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '' });
                 await rd.rebootDevice({} as any);
@@ -3817,10 +3817,10 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'software-version': '15.0.4' } as any);
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '' });
-                await rd.rebootDevice({ host: 'call-host' } as any);
+                await rd.rebootDevice({ device: { host: 'call-host' } } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -3830,18 +3830,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.checkForUpdate({} as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.checkForUpdate({} as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'software-version': '15.0.4' } as any);
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '' });
                 await rd.checkForUpdate({} as any);
@@ -3849,10 +3849,10 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 sinon.stub(rd, 'getDeviceInfo').resolves({ 'software-version': '15.0.4' } as any);
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '' });
-                await rd.checkForUpdate({ host: 'call-host' } as any);
+                await rd.checkForUpdate({ device: { host: 'call-host' } } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -3863,7 +3863,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest();
 
             let result = await rokuDeploy.deleteDevChannel({
-                host: '1.2.3.4',
+                device: { host: '1.2.3.4' },
                 password: 'password'
             });
             expect(result).not.to.be.undefined;
@@ -3874,27 +3874,27 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.deleteDevChannel();
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.deleteDevChannel();
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
                 await rd.deleteDevChannel();
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
-                await rd.deleteDevChannel({ host: 'call-host' } as any);
+                await rd.deleteDevChannel({ device: { host: 'call-host' } } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -3943,19 +3943,19 @@ describe('RokuDeploy', () => {
             `);
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ device: options.device, password: 'password' }));
         });
 
         it('throws when there is no response body', async () => {
             // missing body
             mockDoPostRequest(null);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ device: options.device, password: 'password' }));
         });
 
         it('throws when there is an empty response body', async () => {
             // empty body
             mockDoPostRequest();
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ device: options.device, password: 'password' }));
         });
 
         it('throws when there is an error downloading the image from device', async () => {
@@ -3976,7 +3976,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ device: options.device, password: 'password' }));
         });
 
         it('handles the device returning a png', async () => {
@@ -4000,7 +4000,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.png');
@@ -4028,7 +4028,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.jpg');
@@ -4056,7 +4056,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/myScreenShots/screenshot` });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/myScreenShots/screenshot` });
             expect(result.filePath).not.to.be.undefined;
             expect(util.standardizePath(`${tempDir}/myScreenShots`)).to.equal(path.dirname(result.filePath));
             expect(fsExtra.existsSync(result.filePath));
@@ -4083,7 +4083,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/my` });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/my` });
             expect(result.filePath).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result.filePath));
             expect(fsExtra.existsSync(path.join(tempDir, 'my')));
@@ -4110,7 +4110,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/my.jpg` });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/my.jpg` });
             expect(result.filePath).not.to.be.undefined;
             expect(util.standardizePath(tempDir)).to.equal(path.dirname(result.filePath));
             // Without autoExtension, file is saved exactly as specified
@@ -4138,7 +4138,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password' });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password' });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.buffer.toString()).to.equal('fake-image-data');
             expect(result.filePath).to.be.undefined;
@@ -4166,7 +4166,7 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             // With autoExtension: false (default), user-provided filename is used exactly
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/myFile` });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/myFile` });
             expect(result.filePath).not.to.be.undefined;
             expect(path.basename(result.filePath)).to.equal('myFile');
             expect(fsExtra.existsSync(result.filePath));
@@ -4193,7 +4193,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/myFile`, autoExtension: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/myFile`, autoExtension: true });
             expect(result.filePath).not.to.be.undefined;
             expect(path.basename(result.filePath)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result.filePath));
@@ -4221,7 +4221,7 @@ describe('RokuDeploy', () => {
 
             mockDoPostRequest(body);
             // User provides .png but device returns .jpg - should swap to .jpg
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/myFile.png`, autoExtension: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/myFile.png`, autoExtension: true });
             expect(result.filePath).not.to.be.undefined;
             expect(path.basename(result.filePath)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result.filePath));
@@ -4248,7 +4248,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/myFile.jpg`, autoExtension: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/myFile.jpg`, autoExtension: true });
             expect(result.filePath).not.to.be.undefined;
             expect(path.basename(result.filePath)).to.equal('myFile.jpg');
             expect(fsExtra.existsSync(result.filePath));
@@ -4275,7 +4275,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: true });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.filePath).not.to.be.undefined;
             expect(fsExtra.existsSync(result.filePath)).to.be.true;
@@ -4302,7 +4302,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            let result = await rokuDeploy.captureScreenshot({ host: options.host, password: 'password', out: `${tempDir}/screenshot.png` });
+            let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: `${tempDir}/screenshot.png` });
             expect(result.buffer).to.be.instanceOf(Buffer);
             expect(result.buffer.toString()).to.equal('fake-image-data');
             expect(result.filePath).to.equal(path.join(tempDir, 'screenshot.png'));
@@ -4325,7 +4325,7 @@ describe('RokuDeploy', () => {
             };
 
             mockDoPostRequest(body);
-            await expectThrowsAsync(rokuDeploy.captureScreenshot({ host: options.host, password: 'password' }));
+            await expectThrowsAsync(rokuDeploy.captureScreenshot({ device: options.device, password: 'password' }));
         });
 
         it('uses provided cwd and screenshotDir when out is true', async () => {
@@ -4363,18 +4363,18 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.captureScreenshot({} as any);
-                }, 'Missing required option: host');
+                }, 'Missing required option: device');
             });
 
             it('fails when password not provided in constructor or call', async () => {
-                const rd = new RokuDeploy({ host: 'localhost' });
+                const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.captureScreenshot({} as any);
                 }, 'Missing required option: password');
             });
 
             it('uses constructor host when not provided in call', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<img src="pkgs/dev.jpg?time=1234">' });
                 sinon.stub(rd as any, 'downloadToBuffer').resolves(Buffer.from('test'));
                 await rd.captureScreenshot({} as any);
@@ -4382,10 +4382,10 @@ describe('RokuDeploy', () => {
             });
 
             it('call host overrides constructor host', async () => {
-                const rd = new RokuDeploy({ host: 'constructor-host', password: 'pass' });
+                const rd = new RokuDeploy({ device: { host: 'constructor-host' }, password: 'pass' });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '<img src="pkgs/dev.jpg?time=1234">' });
                 sinon.stub(rd as any, 'downloadToBuffer').resolves(Buffer.from('test'));
-                await rd.captureScreenshot({ host: 'call-host' } as any);
+                await rd.captureScreenshot({ device: { host: 'call-host' } } as any);
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -5194,58 +5194,58 @@ describe('RokuDeploy', () => {
         }
 
         it('throws error when sendKeyEvent is missing required options', async () => {
-            const requiredOptions: Partial<SendKeyEventOptions> = { host: '1.2.3.4', key: 'up' };
-            await testRequiredOptions('sendKeyEvent', requiredOptions, 'host');
+            const requiredOptions: Partial<SendKeyEventOptions> = { device: { host: '1.2.3.4' }, key: 'up' };
+            await testRequiredOptions('sendKeyEvent', requiredOptions, 'device');
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
         });
 
         it('throws error when sideload is missing required options', async () => {
-            const requiredOptions: Partial<SideloadOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('sideload', requiredOptions, 'host');
+            const requiredOptions: Partial<SideloadOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            await testRequiredOptions('sideload', requiredOptions, 'device');
             await testRequiredOptions('sideload', requiredOptions, 'password');
         });
 
         it('throws error when convertToSquashfs is missing required options', async () => {
-            const requiredOptions: Partial<ConvertToSquashfsOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('convertToSquashfs', requiredOptions, 'host');
+            const requiredOptions: Partial<ConvertToSquashfsOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            await testRequiredOptions('convertToSquashfs', requiredOptions, 'device');
             await testRequiredOptions('convertToSquashfs', requiredOptions, 'password');
         });
 
         it('throws error when rekeyDevice is missing required options', async () => {
-            const requiredOptions: Partial<RekeyDeviceOptions> = { host: '1.2.3.4', password: 'abcd', pkg: 'abcd', signingPassword: 'abcd' };
-            await testRequiredOptions('rekeyDevice', requiredOptions, 'host');
+            const requiredOptions: Partial<RekeyDeviceOptions> = { device: { host: '1.2.3.4' }, password: 'abcd', pkg: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('rekeyDevice', requiredOptions, 'device');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'password');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'pkg');
             await testRequiredOptions('rekeyDevice', requiredOptions, 'signingPassword');
         });
 
         it('throws error when createSignedPackage is missing required options', async () => {
-            const requiredOptions: Partial<CreateSignedPackageOptions> = { host: '1.2.3.4', password: 'abcd', signingPassword: 'abcd' };
-            await testRequiredOptions('createSignedPackage', requiredOptions, 'host');
+            const requiredOptions: Partial<CreateSignedPackageOptions> = { device: { host: '1.2.3.4' }, password: 'abcd', signingPassword: 'abcd' };
+            await testRequiredOptions('createSignedPackage', requiredOptions, 'device');
             await testRequiredOptions('createSignedPackage', requiredOptions, 'password');
             await testRequiredOptions('createSignedPackage', requiredOptions, 'signingPassword');
         });
 
         it('throws error when deleteDevChannel is missing required options', async () => {
-            const requiredOptions: Partial<DeleteDevChannelOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('deleteDevChannel', requiredOptions, 'host');
+            const requiredOptions: Partial<DeleteDevChannelOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            await testRequiredOptions('deleteDevChannel', requiredOptions, 'device');
             await testRequiredOptions('deleteDevChannel', requiredOptions, 'password');
         });
 
         it('throws error when captureScreenshot is missing required options', async () => {
-            const requiredOptions: Partial<CaptureScreenshotOptions> = { host: '1.2.3.4', password: 'abcd' };
-            await testRequiredOptions('captureScreenshot', requiredOptions, 'host');
+            const requiredOptions: Partial<CaptureScreenshotOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            await testRequiredOptions('captureScreenshot', requiredOptions, 'device');
             await testRequiredOptions('captureScreenshot', requiredOptions, 'password');
         });
 
         it('throws error when getDeviceInfo is missing required options', async () => {
-            const requiredOptions: Partial<GetDeviceInfoOptions> = { host: '1.2.3.4' };
-            await testRequiredOptions('getDeviceInfo', requiredOptions, 'host');
+            const requiredOptions: Partial<GetDeviceInfoOptions> = { device: { host: '1.2.3.4' } };
+            await testRequiredOptions('getDeviceInfo', requiredOptions, 'device');
         });
 
         it('throws error when getDevId is missing required options', async () => {
-            const requiredOptions: Partial<GetDevIdOptions> = { host: '1.2.3.4' };
-            await testRequiredOptions('getDevId', requiredOptions, 'host');
+            const requiredOptions: Partial<GetDevIdOptions> = { device: { host: '1.2.3.4' } };
+            await testRequiredOptions('getDevId', requiredOptions, 'device');
         });
     });
 
@@ -5262,7 +5262,7 @@ describe('RokuDeploy', () => {
             it('throws for non-integer port', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         packagePort: 80.5,
@@ -5277,7 +5277,7 @@ describe('RokuDeploy', () => {
             it('throws for port less than 1', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         packagePort: 0,
@@ -5292,7 +5292,7 @@ describe('RokuDeploy', () => {
             it('throws for port greater than 65535', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         packagePort: 65536,
@@ -5307,7 +5307,7 @@ describe('RokuDeploy', () => {
             it('throws for string port', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         packagePort: '80' as any,
@@ -5323,7 +5323,7 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest();
                 // Should not throw - valid port
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
                     packagePort: 8080,
@@ -5336,7 +5336,7 @@ describe('RokuDeploy', () => {
             it('throws for non-integer timeout', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         timeout: 1000.5,
@@ -5351,7 +5351,7 @@ describe('RokuDeploy', () => {
             it('throws for negative timeout', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         timeout: -1,
@@ -5366,7 +5366,7 @@ describe('RokuDeploy', () => {
             it('throws for zero timeout', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         timeout: 0,
@@ -5383,7 +5383,7 @@ describe('RokuDeploy', () => {
             it('throws for invalid appType', async () => {
                 try {
                     await rokuDeploy.sideload({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
                         appType: 'invalid' as any,
@@ -5399,14 +5399,14 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest();
                 // Should not throw
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
                     appType: 'channel',
                     close: false
                 });
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
                     appType: 'dcl',
@@ -5418,7 +5418,7 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest();
                 // Should not throw
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
                     close: false
@@ -5429,7 +5429,7 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest();
                 // Should not throw - null means "don't include"
                 await rokuDeploy.sideload({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
                     appType: null,
@@ -5442,7 +5442,7 @@ describe('RokuDeploy', () => {
             it('throws for invalid ecpPort in getDeviceInfo', async () => {
                 try {
                     await rokuDeploy.getDeviceInfo({
-                        host: '1.2.3.4',
+                        device: { host: '1.2.3.4' },
                         ecpPort: 'invalid' as any
                     });
                     assert.fail('Should have thrown');
@@ -5736,7 +5736,7 @@ describe('RokuDeploy', () => {
         it('attempts to delete the dev channel and all component libraries on the device', async () => {
             const stub = mockDoPostRequest();
 
-            let result = await rokuDeploy.deleteAllSideloadedPlugins({ ...options, host: 'localhost', password: 'password' });
+            let result = await rokuDeploy.deleteAllSideloadedPlugins({ ...options, device: { host: 'localhost' }, password: 'password' });
             expect(result).not.to.be.undefined;
             expect(stub.getCall(0).args[0].formData).to.include({
                 mysubmit: 'DeleteAll'
@@ -5748,7 +5748,7 @@ describe('RokuDeploy', () => {
         it('sends the dcl_enabled qs flag', async () => {
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ device: { host: 'localhost' }, password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([]);
         });
@@ -5761,7 +5761,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoGetRequest();
             sinon.stub(rokuDeploy as any, 'getPackagesFromResponseBody').returns([]);
-            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ device: { host: 'localhost' }, password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
                 dcl_enabled: '1'
@@ -5773,7 +5773,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages":[{"appType":"channel","archiveFileName":"roku-deploy.zip","fileType":"zip","id":"0","location":"nvram","md5":"a8d2f9974e2736174c1033b8a7183288","pkgPath":"","size":"2267547"}]}');
             `);
-            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ device: { host: 'localhost' }, password: 'test' } as any);
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
             expect(result).to.eql([{
                 appType: 'channel',
@@ -5791,7 +5791,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('{"messages":null,"metadata":{"dev_id":"12345","dev_key":true,"voice_sdk":false},"packages": 123}');
             `);
-            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ device: { host: 'localhost' }, password: 'test' } as any);
             expect(result).to.eql([]);
         });
 
@@ -5799,7 +5799,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest(`
                 var params = JSON.parse('123');
             `);
-            const result = await rokuDeploy.listSideloadedPlugins({ host: 'localhost', password: 'test' } as any);
+            const result = await rokuDeploy.listSideloadedPlugins({ device: { host: 'localhost' }, password: 'test' } as any);
             expect(result).to.eql([]);
         });
     });
@@ -5809,7 +5809,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             sinon.stub(rokuDeploy as any, 'generateBaseRequestOptions').returns({} as any);
-            await rokuDeploy.deleteComponentLibrary({ host: 'localhost', password: 'test', fileName: 'test.zip' } as any);
+            await rokuDeploy.deleteComponentLibrary({ device: { host: 'localhost' }, password: 'test', fileName: 'test.zip' } as any);
 
             expect(stub.getCall(0).args[0].qs.dcl_enabled).to.eql('1');
         });
@@ -5822,7 +5822,7 @@ describe('RokuDeploy', () => {
             } as any);
             const stub = mockDoPostRequest();
 
-            await rokuDeploy.deleteComponentLibrary({ host: 'localhost', password: 'test', fileName: 'test.zip' } as any);
+            await rokuDeploy.deleteComponentLibrary({ device: { host: 'localhost' }, password: 'test', fileName: 'test.zip' } as any);
 
             expect(stub.getCall(0).args[0].qs).to.eql({
                 existing: 'value',
@@ -5837,7 +5837,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             await rokuDeploy.deleteComponentLibrary({
-                host: '0.0.0.0',
+                device: { host: '0.0.0.0' },
                 password: 'aaaa',
                 fileName: 'fakeFile.zip'
             });
@@ -5969,16 +5969,16 @@ describe('RokuDeploy', () => {
 
     describe('defaults', () => {
         describe('constructor defaults', () => {
-            describe('host option', () => {
+            describe('device option', () => {
                 it('fails when not provided in constructor or call', async () => {
                     const rd = new RokuDeploy();
                     await expectThrowsAsync(async () => {
                         await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
-                    }, 'Missing required option: host');
+                    }, 'Missing required option: device');
                 });
 
                 it('uses constructor value when not provided in call', async () => {
-                    const rd = new RokuDeploy({ host: 'constructor-host' });
+                    const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
                     await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
                     expect(stub.getCall(0).args[0].url).to.include('constructor-host');
@@ -5987,35 +5987,35 @@ describe('RokuDeploy', () => {
                 it('uses call value when not provided in constructor', async () => {
                     const rd = new RokuDeploy();
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ host: 'call-host', key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include('call-host');
                 });
 
                 it('call value overrides constructor value', async () => {
-                    const rd = new RokuDeploy({ host: 'constructor-host' });
+                    const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ host: 'call-host', key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include('call-host');
                 });
             });
 
             describe('password option', () => {
                 it('fails when not provided in constructor or call', async () => {
-                    const rd = new RokuDeploy();
+                    const rd = new RokuDeploy({ device: { host: 'localhost' } });
                     await expectThrowsAsync(async () => {
-                        await rd.deleteDevChannel({ host: 'localhost' } as any);
+                        await rd.deleteDevChannel();
                     }, 'Missing required option: password');
                 });
 
                 it('uses constructor value when not provided in call', async () => {
-                    const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                    const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'constructor-pass' });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
                     await rd.deleteDevChannel();
                     expect(stub.getCall(0).args[0].auth.pass).to.equal('constructor-pass');
                 });
 
                 it('call value overrides constructor value', async () => {
-                    const rd = new RokuDeploy({ host: 'localhost', password: 'constructor-pass' });
+                    const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'constructor-pass' });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', response: { statusCode: 200 } });
                     await rd.deleteDevChannel({ password: 'call-pass' } as any);
                     expect(stub.getCall(0).args[0].auth.pass).to.equal('call-pass');
@@ -6026,21 +6026,21 @@ describe('RokuDeploy', () => {
                 it('uses static default when not provided anywhere', async () => {
                     const rd = new RokuDeploy();
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include(':8060/');
                 });
 
                 it('uses constructor value when not provided in call', async () => {
                     const rd = new RokuDeploy({ ecpPort: 9000 });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include(':9000/');
                 });
 
                 it('call value overrides constructor value', async () => {
                     const rd = new RokuDeploy({ ecpPort: 9000 });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress', ecpPort: 9999 });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress', ecpPort: 9999 });
                     expect(stub.getCall(0).args[0].url).to.include(':9999/');
                 });
             });
@@ -6048,19 +6048,19 @@ describe('RokuDeploy', () => {
             describe('packagePort option', () => {
                 it('uses static default when not provided anywhere', () => {
                     const rd = new RokuDeploy();
-                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
                     expect(result.url).to.include(':80/');
                 });
 
                 it('uses constructor value when not provided in call', () => {
                     const rd = new RokuDeploy({ packagePort: 8080 });
-                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
                     expect(result.url).to.include(':8080/');
                 });
 
                 it('call value overrides constructor value', () => {
                     const rd = new RokuDeploy({ packagePort: 8080 });
-                    const result = rd['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', packagePort: 9090 });
+                    const result = rd['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', packagePort: 9090 });
                     expect(result.url).to.include(':9090/');
                 });
             });
@@ -6174,32 +6174,32 @@ describe('RokuDeploy', () => {
 
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
                 expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
             });
 
             it('uses default packagePort', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
                 expect(result.url).to.equal(`http://localhost:${RokuDeploy['defaults'].packagePort}/test`);
             });
 
             it('uses default username of rokudev', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test' });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test' });
                 expect(result.auth.user).to.equal('rokudev');
             });
 
             it('allows overriding timeout', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', timeout: 5000 });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', timeout: 5000 });
                 expect(result.timeout).to.equal(5000);
             });
 
             it('allows overriding packagePort', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', packagePort: 8080 });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', packagePort: 8080 });
                 expect(result.url).to.equal('http://localhost:8080/test');
             });
 
             it('allows overriding username', () => {
-                const result = rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost', password: 'test', username: 'admin' });
+                const result = rokuDeploy['generateBaseRequestOptions']('test', 'localhost', { device: { host: 'localhost' }, password: 'test', username: 'admin' });
                 expect(result.auth.user).to.equal('admin');
             });
         });
@@ -6207,19 +6207,19 @@ describe('RokuDeploy', () => {
         describe('sendKeyEvent', () => {
             it('uses default ecpPort', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
                 expect(stub.getCall(0).args[0].url).to.include(`:${RokuDeploy['defaults'].ecpPort}/`);
             });
 
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress' });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
                 expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
             });
 
             it('allows overriding ecpPort', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ host: 'localhost', key: 'home', action: 'keypress', ecpPort: 9000 });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress', ecpPort: 9000 });
                 expect(stub.getCall(0).args[0].url).to.include(':9000/');
             });
         });
@@ -6229,7 +6229,7 @@ describe('RokuDeploy', () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('localhost');
                 try {
-                    await rokuDeploy.getDeviceInfo({ host: 'localhost' });
+                    await rokuDeploy.getDeviceInfo({ device: { host: 'localhost' } });
                 } catch (e) {
                     // ignore parse errors
                 }
@@ -6240,7 +6240,7 @@ describe('RokuDeploy', () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({ body: '<device-info></device-info>' });
                 sinon.stub(util, 'dnsLookup').resolves('localhost');
                 try {
-                    await rokuDeploy.getDeviceInfo({ host: 'localhost' });
+                    await rokuDeploy.getDeviceInfo({ device: { host: 'localhost' } });
                 } catch (e) {
                     // ignore parse errors
                 }
@@ -6287,7 +6287,7 @@ describe('RokuDeploy', () => {
                 sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
                 mockDoPostRequest('success');
 
-                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip' });
+                await rokuDeploy.sideload({ device: { host: 'localhost' }, password: 'test', zip: 'test.zip' });
                 expect(deleteStub.called).to.be.true;
             });
 
@@ -6298,7 +6298,7 @@ describe('RokuDeploy', () => {
                 sinon.stub(fsExtra, 'createReadStream').returns({ on: (event, cb) => cb() } as any);
                 mockDoPostRequest('success');
 
-                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', deleteDevChannel: false });
+                await rokuDeploy.sideload({ device: { host: 'localhost' }, password: 'test', zip: 'test.zip', deleteDevChannel: false });
                 expect(deleteStub.called).to.be.false;
             });
 
@@ -6310,7 +6310,7 @@ describe('RokuDeploy', () => {
                 mockDoPostRequest('success');
 
                 //a `dcl` install lives in its own slot; deleting the dev channel would needlessly wipe an installed channel
-                await rokuDeploy.sideload({ host: 'localhost', password: 'test', zip: 'test.zip', appType: 'dcl' });
+                await rokuDeploy.sideload({ device: { host: 'localhost' }, password: 'test', zip: 'test.zip', appType: 'dcl' });
                 expect(deleteStub.called).to.be.false;
             });
         });
@@ -6338,7 +6338,7 @@ describe('RokuDeploy', () => {
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            const result = await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'aaaa' });
 
             expect(result).to.be.true;
             expect(fetchStub.callCount).to.equal(2);
@@ -6355,7 +6355,7 @@ describe('RokuDeploy', () => {
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'wrong' });
+            const result = await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'wrong' });
 
             expect(result).to.be.false;
         });
@@ -6365,7 +6365,7 @@ describe('RokuDeploy', () => {
 
             let thrown: unknown;
             try {
-                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+                await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'aaaa' });
             } catch (e) {
                 thrown = e;
             }
@@ -6378,7 +6378,7 @@ describe('RokuDeploy', () => {
 
             let thrown: unknown;
             try {
-                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+                await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'aaaa' });
             } catch (e) {
                 thrown = e;
             }
@@ -6389,7 +6389,7 @@ describe('RokuDeploy', () => {
         it('returns false when a 401 has no WWW-Authenticate header', async () => {
             sinon.stub(httpClient, 'fetch').resolves(fakeResponse(401));
 
-            const result = await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+            const result = await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'aaaa' });
 
             expect(result).to.be.false;
         });
@@ -6399,7 +6399,7 @@ describe('RokuDeploy', () => {
                 .onFirstCall().resolves(fakeResponse(401, { 'www-authenticate': CHALLENGE_HEADER }))
                 .onSecondCall().resolves(fakeResponse(200));
 
-            await rokuDeploy.validateDeveloperPassword({ host: 'device.local', password: 'aaaa' });
+            await rokuDeploy.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa' });
 
             expect(fetchStub.firstCall.args[0]).to.equal('http://device.local:80/plugin_install');
             const authHeader = (fetchStub.secondCall.args[1] as any).headers.Authorization as string;
@@ -6412,7 +6412,7 @@ describe('RokuDeploy', () => {
                 .onSecondCall().resolves(fakeResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({
-                host: 'device.local',
+                device: { host: 'device.local' },
                 password: 'aaaa',
                 username: 'somebody',
                 port: 8888
@@ -6437,7 +6437,7 @@ describe('RokuDeploy', () => {
             let thrown: unknown;
             try {
                 await rokuDeploy.validateDeveloperPassword({
-                    host: '1.2.3.4',
+                    device: { host: '1.2.3.4' },
                     password: 'aaaa',
                     timeout: 20
                 });
@@ -6452,7 +6452,7 @@ describe('RokuDeploy', () => {
 
             let thrown: unknown;
             try {
-                await rokuDeploy.validateDeveloperPassword({ host: '1.2.3.4', password: 'aaaa' });
+                await rokuDeploy.validateDeveloperPassword({ device: { host: '1.2.3.4' }, password: 'aaaa' });
             } catch (e) {
                 thrown = e;
             }
