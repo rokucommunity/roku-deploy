@@ -17,7 +17,6 @@ import { request } from './request';
 import { httpClient } from './fetch';
 import { RokuDeploy } from './RokuDeploy';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
-import { RceDevice } from './RceDevice';
 
 const sinon = createSandbox();
 
@@ -717,6 +716,193 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('ecp', () => {
+        it('builds the LAN url from the host and ecp port, defaulting to GET, and parses the XML body', async () => {
+            const stub = mockDoGetRequest('<device-info><model-name>Roku</model-name></device-info>');
+
+            const result = await rokuDeploy.ecp({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/device-info');
+            expect(result.status).to.equal(200);
+            expect(result.json).to.eql({ 'device-info': { 'model-name': 'Roku' } });
+        });
+
+        it('sends POST requests with a custom ecp port and returns undefined json for an empty body', async () => {
+            const stub = mockDoPostRequest();
+
+            const result = await rokuDeploy.ecp({ host: '1.1.1.1' }, 'keypress/Home', { method: 'POST', ecpPort: 9060 });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:9060/keypress/Home');
+            expect(result.json).to.be.undefined;
+        });
+
+        it('routes an RCE device through the instance ecp1 proxy with the access_token query param', async () => {
+            const stub = mockDoGetRequest('<sgrendezvous><status>OK</status></sgrendezvous>');
+
+            const result = await rokuDeploy.ecp(
+                { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                'query/sgrendezvous'
+            );
+
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous?access_token=secret');
+            expect(result.json.sgrendezvous.status).to.equal('OK');
+        });
+
+        it('returns non-200 status bodies to the caller instead of throwing when verify is not set', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 202 },
+                body: '<plugin-registry><status>FAILED</status><error>Device not keyed</error></plugin-registry>'
+            });
+
+            const result = await rokuDeploy.ecp({ host: '1.1.1.1' }, 'query/registry/dev');
+
+            //verification must be off by default so the raw ECP status body comes back
+            expect(stub.getCall(0).args[1]).to.equal(false);
+            expect(result.status).to.equal(202);
+            expect(result.json['plugin-registry'].error).to.equal('Device not keyed');
+        });
+
+        it('passes verify through to the request layer when set', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 200 },
+                body: ''
+            });
+
+            await rokuDeploy.ecp({ host: '1.1.1.1' }, 'query/device-info', { verify: true });
+
+            expect(stub.getCall(0).args[1]).to.equal(true);
+        });
+
+        it('returns undefined json (with the body preserved) for a non-xml response', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 404 },
+                body: 'no healthy upstream'
+            });
+
+            const result = await rokuDeploy.ecp({ host: '1.1.1.1' }, 'query/does-not-exist');
+
+            expect(result.status).to.equal(404);
+            expect(result.body).to.equal('no healthy upstream');
+            expect(result.json).to.be.undefined;
+        });
+
+        it('throws when a response that looks like xml cannot be parsed', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 200 },
+                body: '<device-info><unclosed'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.ecp({ host: '1.1.1.1' }, 'query/device-info');
+            }, 'Could not parse ECP response');
+        });
+    });
+
+    describe('queryRegistry', () => {
+        it('refines the registry response into sections keyed by name', async () => {
+            const stub = mockDoGetRequest('<plugin-registry><registry><dev-id>12345</dev-id><plugins>dev</plugins><space-available>28000</space-available><sections><section><name>Section1</name><items><item><key>k1</key><value>v1</value></item><item><key>k2</key><value>v2</value></item></items></section></sections></registry><status>OK</status></plugin-registry>');
+
+            const registry = await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/registry/dev');
+            expect(registry).to.eql({
+                devId: '12345',
+                plugins: ['dev'],
+                spaceAvailable: '28000',
+                sections: { Section1: { k1: 'v1', k2: 'v2' } }
+            });
+        });
+
+        it('throws a FailedDeviceResponseError carrying the device error message', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 202 },
+                body: '<plugin-registry><status>FAILED</status><error>Device not keyed</error></plugin-registry>'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not retrieve registry: Device not keyed');
+        });
+
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 403 },
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not retrieve registry: ECP command not allowed in Limited mode.');
+        });
+    });
+
+    describe('queryAppState', () => {
+        it('refines the app-state response', async () => {
+            const stub = mockDoGetRequest('<app-state><app-id>dev</app-id><app-title>My App</app-title><app-version>1.0.0</app-version><app-dev-id>12345</app-dev-id><state>active</state><status>OK</status></app-state>');
+
+            const appState = await rokuDeploy.queryAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/app-state/dev');
+            expect(appState).to.eql({
+                appId: 'dev',
+                appDevId: '12345',
+                appTitle: 'My App',
+                appVersion: '1.0.0',
+                state: 'active'
+            });
+        });
+
+        it('maps an unrecognized state to unknown', async () => {
+            mockDoGetRequest('<app-state><app-id>dev</app-id><state>hibernating</state><status>OK</status></app-state>');
+
+            const appState = await rokuDeploy.queryAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(appState.state).to.equal('unknown');
+        });
+    });
+
+    describe('queryRendezvous', () => {
+        it('refines tracking state and normalizes a single rendezvous item to an array', async () => {
+            const stub = mockDoGetRequest('<sgrendezvous><data><tracking-enabled>true</tracking-enabled><item><id>1</id><start-tm>100</start-tm><end-tm>200</end-tm><line-number>5</line-number><file>pkg:/main.brs</file></item></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
+
+            const rendezvous = await rokuDeploy.queryRendezvous({ device: { host: '1.1.1.1' } });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/sgrendezvous');
+            expect(rendezvous).to.eql({
+                trackingEnabled: true,
+                items: [{ id: '1', startTime: '100', endTime: '200', lineNumber: '5', file: 'pkg:/main.brs' }]
+            });
+        });
+
+        it('returns no items and trackingEnabled false when tracking is off', async () => {
+            mockDoGetRequest('<sgrendezvous><data><tracking-enabled>false</tracking-enabled></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
+
+            const rendezvous = await rokuDeploy.queryRendezvous({ device: { host: '1.1.1.1' } });
+
+            expect(rendezvous).to.eql({ trackingEnabled: false, items: [] });
+        });
+    });
+
+    describe('setRendezvousTracking', () => {
+        it('POSTs sgrendezvous/track and returns the reported tracking state', async () => {
+            const stub = mockDoPostRequest('<sgrendezvous><tracking-enabled>true</tracking-enabled><status>OK</status></sgrendezvous>');
+
+            const trackingEnabled = await rokuDeploy.setRendezvousTracking({ device: { host: '1.1.1.1' }, enabled: true });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/sgrendezvous/track');
+            expect(trackingEnabled).to.be.true;
+        });
+
+        it('POSTs sgrendezvous/untrack when disabling', async () => {
+            const stub = mockDoPostRequest('<sgrendezvous><tracking-enabled>false</tracking-enabled><status>OK</status></sgrendezvous>');
+
+            const trackingEnabled = await rokuDeploy.setRendezvousTracking({ device: { host: '1.1.1.1' }, enabled: false });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/sgrendezvous/untrack');
+            expect(trackingEnabled).to.be.false;
+        });
+    });
+
     describe('queryApps', () => {
         it('parses the installed app list from the local ECP query/apps response', async () => {
             const stub = mockDoGetRequest(`
@@ -754,13 +940,19 @@ describe('RokuDeploy', () => {
             expect(apps).to.eql([]);
         });
 
-        it('routes an RCE device through the ECP2 query-apps verb instead of an HTTP request', async () => {
-            const getRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
-            const rceStub = sinon.stub(RceDevice.prototype, 'queryApps').resolves({
-                response: 'query-apps',
-                status: 200,
-                content: '<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>'
-            } as any);
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
+                response: { statusCode: 403 },
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            }, 'Invalid response code: 403: ECP command not allowed in Limited mode.');
+        });
+
+        it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
+            const stub = mockDoGetRequest('<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>');
 
             const apps = await rokuDeploy.queryApps({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
@@ -769,8 +961,7 @@ describe('RokuDeploy', () => {
             expect(apps).to.eql([
                 { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
             ]);
-            expect(rceStub.called).to.be.true;
-            expect(getRequestStub.called).to.be.false;
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/apps?access_token=secret');
         });
     });
 
@@ -806,21 +997,15 @@ describe('RokuDeploy', () => {
             expect(activeApp).to.eql({});
         });
 
-        it('routes an RCE device through the ECP2 query-active-app verb instead of an HTTP request', async () => {
-            const getRequestStub = sinon.stub(rokuDeploy as any, 'doGetRequest');
-            const rceStub = sinon.stub(RceDevice.prototype, 'queryActiveApp').resolves({
-                response: 'query-active-app',
-                status: 200,
-                content: '<active-app><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></active-app>'
-            } as any);
+        it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
+            const stub = mockDoGetRequest('<active-app><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></active-app>');
 
             const activeApp = await rokuDeploy.queryActiveApp({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
             });
 
             expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
-            expect(rceStub.called).to.be.true;
-            expect(getRequestStub.called).to.be.false;
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/active-app?access_token=secret');
         });
     });
 
@@ -1431,22 +1616,16 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev?foo=bar');
         });
 
-        it('routes an RCE device through the ECP2 launch verb instead of an HTTP request', async () => {
-            const postRequestStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
-            const rceStub = sinon.stub(RceDevice.prototype, 'launch').resolves({
-                response: 'launch',
-                status: 200
-            } as any);
+        it('routes an RCE device through the instance ecp1 proxy, forwarding deep-link params', async () => {
+            const stub = mockDoPostRequest();
 
-            //RCE: the ECP2 'launch' verb only accepts the channel id, so contentId is ignored here
             await rokuDeploy.launchApp({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
                 appId: 'dev',
                 contentId: '123'
             });
 
-            expect(rceStub.getCall(0).args[0]).to.equal('dev');
-            expect(postRequestStub.called).to.be.false;
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/launch/dev?contentId=123&access_token=secret');
         });
     });
 
@@ -1471,22 +1650,16 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/exit-app/dev/true');
         });
 
-        it('routes an RCE device through the ECP2 exit-app verb instead of an HTTP request', async () => {
-            const postRequestStub = sinon.stub(rokuDeploy as any, 'doPostRequest');
-            const rceStub = sinon.stub(RceDevice.prototype, 'exitApp').resolves({
-                response: 'exit-app',
-                status: 200
-            } as any);
+        it('routes an RCE device through the instance ecp1 proxy, keeping the force segment', async () => {
+            const stub = mockDoPostRequest();
 
-            //RCE: the ECP2 'exit-app' verb has no force concept, so force is ignored here
             await rokuDeploy.exitApp({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
                 appId: 'dev',
                 force: true
             });
 
-            expect(rceStub.getCall(0).args[0]).to.equal('dev');
-            expect(postRequestStub.called).to.be.false;
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/exit-app/dev/true?access_token=secret');
         });
     });
 

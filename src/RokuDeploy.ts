@@ -27,7 +27,6 @@ import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, Roku
 import { isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceDevice } from './RceDevice';
-import type { KeyAction } from './RceDevice';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
@@ -399,6 +398,105 @@ export class RokuDeploy {
     }
 
     /**
+     * Resolve the ECP base url (and any query string that must be appended to every request) for a
+     * device config. Local devices hit the HTTP ECP port directly; RCE devices are reached through
+     * the instance's raw `/ecp1` proxy, which forwards to the emulated device's ECP port and
+     * authenticates via the `access_token` query parameter (the same service-mesh auth carrier the
+     * installer proxy uses).
+     */
+    private async getEcpBaseUrl(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; query: string }> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            let host = this.getHost(deviceConfig);
+            //if the host is a DNS name, look up the IP address
+            try {
+                host = await util.dnsLookup(host);
+            } catch (e) {
+                //try using the host as-is (it'll probably fail...)
+            }
+            return {
+                baseUrl: `http://${host}:${ecpPort}`,
+                query: ''
+            };
+        }
+        if (!deviceConfig.rceToken) {
+            throw new Error('An rceToken is required to reach ECP on an RCE device');
+        }
+        const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+        return {
+            baseUrl: `${instanceUrl}/ecp1`,
+            query: `access_token=${deviceConfig.rceToken}`
+        };
+    }
+
+    /**
+     * Send a raw External Control Protocol (ECP) request to a device and return the response with
+     * its XML body parsed to JSON. This is the single ECP transport: every ECP convenience method
+     * funnels through it, and it is public so any ECP route can be reached even when no dedicated
+     * wrapper exists for it yet.
+     *
+     * Local devices are addressed as `http://<host>:<ecpPort>/<route>`; Cloud Emulator devices go
+     * through their instance's `/ecp1/<route>` proxy (authenticated with the config's api token),
+     * so callers never branch on device kind.
+     * @param device the device to send the request to
+     * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
+     * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
+     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
+     *                chanperf response, for example) come back to the caller instead of throwing.
+     */
+    public async ecp(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
+        options = { ...this.options, ...options } as EcpOptions;
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+
+        const { baseUrl, query } = await this.getEcpBaseUrl(deviceConfig, ecpPort);
+        let url = `${baseUrl}/${route}`;
+        //append the query string (if any) rather than assuming the route has none, since deep-link
+        //launch routes carry their own query params
+        if (query) {
+            url += (url.includes('?') ? '&' : '?') + query;
+        }
+
+        const requestOptions: RequestOptions = { url: url, timeout: timeout };
+        const verify = options.verify ?? false;
+        const response = options.method === 'POST'
+            ? await this.doPostRequest(requestOptions, verify)
+            : await this.doGetRequest(requestOptions, verify);
+
+        return {
+            status: response?.response?.statusCode,
+            body: response?.body,
+            json: await this.parseEcpXml(response?.body, response)
+        };
+    }
+
+    /**
+     * Parse an ECP XML response body into a plain object (xml2js, `explicitArray: false`). An empty
+     * or non-XML body (commands like keypress return none; a proxy error page is not XML) yields
+     * undefined so the caller can inspect the status and raw body instead; a body that looks like
+     * XML but cannot be parsed throws.
+     */
+    private async parseEcpXml(body: string, response?: HttpResponse): Promise<Record<string, any> | undefined> {
+        if (typeof body !== 'string' || !body.trim().startsWith('<')) {
+            return undefined;
+        }
+        try {
+            const parsedContent = await xml2js.parseStringPromise(body, {
+                explicitArray: false
+            });
+            // clone the data onto an object because xml2js somehow makes this object not an object???
+            return { ...parsedContent };
+        } catch (e) {
+            throw new UnparsableDeviceResponseError('Could not parse ECP response', {
+                httpDetails: extractHttpDetails(response?.response, response?.body)
+            }, e instanceof Error ? e : undefined);
+        }
+    }
+
+    /**
      * Get (or create) the `RceDevice` for a given RCE device config. Devices are cached by their
      * identifying fields so repeated calls for the same logical device - even across separately-resolved
      * `DeviceConfig` objects, as happens with registry-name lookups - reuse the same instance and its
@@ -476,24 +574,12 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as SendKeyEventOptions;
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['device', 'key']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE instances take key input over ECP2 rather than the HTTP ECP port
-            await this.getRceDevice(deviceConfig).sendKey(options.action as KeyAction, options.key, { timeout: timeout });
-            return;
-        }
-
-        const host = this.getHost(deviceConfig);
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-        return this.doPostRequest({
-            url: `http://${host}:${ecpPort}/${options.action}/${options.key}`,
-            timeout: timeout
-        }, false);
+        return this.ecp(options.device, `${options.action}/${options.key}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
     }
 
     public async closeChannel(options: CloseChannelOptions) {
@@ -513,25 +599,13 @@ export class RokuDeploy {
     public async launchApp(options: LaunchAppOptions): Promise<void> {
         options = { ...this.options, ...options } as LaunchAppOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE: the ECP2 'launch' verb only accepts the channel id today, so deep-link params
-            //(contentId, mediaType, params) are not yet forwarded to RCE instances.
-            await this.getRceDevice(deviceConfig).launch(options.appId, { timeout: timeout });
-            return;
-        }
-
-        const host = this.getHost(deviceConfig);
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
         const queryString = this.buildLaunchQueryString(options);
-        await this.doPostRequest({
-            url: `http://${host}:${ecpPort}/launch/${options.appId}${queryString}`,
-            timeout: timeout
+        await this.ecp(options.device, `launch/${options.appId}${queryString}`, {
+            method: 'POST',
+            verify: true,
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
         });
     }
 
@@ -562,24 +636,38 @@ export class RokuDeploy {
     public async exitApp(options: ExitAppOptions): Promise<void> {
         options = { ...this.options, ...options } as ExitAppOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+        const forceSegment = options.force ? '/true' : '';
+        const result = await this.ecp(options.device, `exit-app/${options.appId}${forceSegment}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        //devices report exit-app failures through the ECP envelope (a 202 with the error in the
+        //body), so surface that message; fall back to a plain status check when there is no envelope
+        const root = result.json?.['exit-app'];
+        if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
+            throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
+                httpDetails: extractHttpDetails(undefined, result.body)
+            });
+        }
+        if (!root) {
+            this.assertEcpStatusOk(result);
+        }
+    }
 
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE: the ECP2 'exit-app' verb has no force concept, so `force` is ignored for RCE devices.
-            await this.getRceDevice(deviceConfig).exitApp(options.appId, { timeout: timeout });
+    /**
+     * Throw for a non-2xx ECP response, carrying any plain-text device explanation in the message
+     * (for example `ECP command not allowed in Limited mode.`). Used by ECP wrappers whose success
+     * responses have no `<status>` envelope to inspect instead.
+     */
+    private assertEcpStatusOk(result: EcpResult): void {
+        if (result.status >= 200 && result.status < 300) {
             return;
         }
-
-        const host = this.getHost(deviceConfig);
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-        const forceSegment = options.force ? '/true' : '';
-        await this.doPostRequest({
-            url: `http://${host}:${ecpPort}/exit-app/${options.appId}${forceSegment}`,
-            timeout: timeout
+        const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
+        throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status}${bodyText ? `: ${bodyText}` : ''}`, {
+            httpDetails: extractHttpDetails(undefined, result.body)
         });
     }
 
@@ -1067,7 +1155,7 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: RequestOptions) {
+    private async doGetRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling GET request to', this.scrubAccessToken(params.url));
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
@@ -1080,7 +1168,9 @@ export class RokuDeploy {
                 return resolve({ response: resp, body: body });
             });
         });
-        this.checkRequest(results);
+        if (verify) {
+            this.checkRequest(results);
+        }
         return results as HttpResponse;
     }
 
@@ -1645,57 +1735,29 @@ export class RokuDeploy {
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
         this.checkRequiredOptions(options, ['device']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-
-        let response: HttpResponse | undefined;
-        let deviceInfoXml: string;
-
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE instances serve device-info over the ECP2 WebSocket rather than the HTTP ECP port
-            deviceInfoXml = await this.getRceDevice(deviceConfig).getDeviceInfoXml({ timeout: timeout });
-        } else {
-            let host = this.getHost(deviceConfig);
-            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-
-            //if the host is a DNS name, look up the IP address
-            try {
-                host = await util.dnsLookup(host);
-            } catch (e) {
-                //try using the host as-is (it'll probably fail...)
+        let result: EcpResult;
+        try {
+            result = await this.ecp(options.device, 'query/device-info', {
+                verify: true,
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
+            });
+        } catch (e) {
+            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                throw new EcpNetworkAccessModeDisabledError(
+                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
+                    {
+                        httpDetails: (e as any)?.details?.httpDetails
+                    },
+                    e instanceof Error ? e : undefined
+                );
             }
-
-            const url = `http://${host}:${ecpPort}/query/device-info`;
-
-            try {
-                response = await this.doGetRequest({
-                    url: url,
-                    timeout: timeout
-                });
-            } catch (e) {
-                if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
-                    throw new EcpNetworkAccessModeDisabledError(
-                        `Unable to access device-info because ecp-setting-mode is 'disabled'`,
-                        {
-                            httpDetails: (e as any)?.details?.httpDetails
-                        },
-                        e instanceof Error ? e : undefined
-                    );
-                }
-                throw e;
-            }
-            deviceInfoXml = response.body;
+            throw e;
         }
         try {
-            const parsedContent = await xml2js.parseStringPromise(deviceInfoXml, {
-                explicitArray: false
-            });
-            // clone the data onto an object because xml2js somehow makes this object not an object???
             let deviceInfo = {
-                ...parsedContent['device-info']
+                ...result.json['device-info']
             } as Record<string, any>;
 
             if (options.enhance) {
@@ -1706,7 +1768,7 @@ export class RokuDeploy {
         } catch (e) {
             this.logger.warn('Error getting device info:', e);
             throw new UnparsableDeviceResponseError('Could not retrieve device info', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
+                httpDetails: extractHttpDetails(undefined, result.body)
             }, e instanceof Error ? e : undefined);
         }
     }
@@ -1742,53 +1804,36 @@ export class RokuDeploy {
     public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
         options = { ...this.options, ...options } as QueryAppsOptions;
         this.checkRequiredOptions(options, ['device']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-
-        let response: HttpResponse | undefined;
-        let appsXml: string;
-
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE instances serve query-apps over the ECP2 WebSocket rather than the HTTP ECP port
-            appsXml = (await this.getRceDevice(deviceConfig).queryApps({ timeout: timeout })).content;
-        } else {
-            const host = this.getHost(deviceConfig);
-            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-            response = await this.doGetRequest({
-                url: `http://${host}:${ecpPort}/query/apps`,
-                timeout: timeout
-            });
-            appsXml = response.body;
-        }
-
+        let result: EcpResult;
         try {
-            const parsedContent = await xml2js.parseStringPromise(appsXml, {
-                explicitArray: false
-            });
-            const rawAppNodes = parsedContent?.apps?.app;
-            if (!rawAppNodes) {
-                return [];
-            }
-            const appNodes = Array.isArray(rawAppNodes) ? rawAppNodes : [rawAppNodes];
-            return appNodes.map((appNode) => {
-                const parsedApp = this.parseEcpAppElement(appNode);
-                return {
-                    id: parsedApp.id ?? '',
-                    title: parsedApp.title ?? '',
-                    type: parsedApp.type,
-                    subtype: parsedApp.subtype,
-                    version: parsedApp.version
-                };
+            result = await this.ecp(options.device, 'query/apps', {
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
             });
         } catch (e) {
-            this.logger.warn('Error parsing installed app list:', e);
-            throw new UnparsableDeviceResponseError('Could not retrieve installed app list', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
-            }, e instanceof Error ? e : undefined);
+            if (e instanceof UnparsableDeviceResponseError) {
+                this.logger.warn('Error parsing installed app list:', e);
+                throw new UnparsableDeviceResponseError('Could not retrieve installed app list', e.details, e);
+            }
+            throw e;
         }
+        this.assertEcpStatusOk(result);
+        const rawAppNodes = result.json?.apps?.app;
+        if (!rawAppNodes) {
+            return [];
+        }
+        const appNodes = Array.isArray(rawAppNodes) ? rawAppNodes : [rawAppNodes];
+        return appNodes.map((appNode) => {
+            const parsedApp = this.parseEcpAppElement(appNode);
+            return {
+                id: parsedApp.id ?? '',
+                title: parsedApp.title ?? '',
+                type: parsedApp.type,
+                subtype: parsedApp.subtype,
+                version: parsedApp.version
+            };
+        });
     }
 
     /**
@@ -1799,43 +1844,26 @@ export class RokuDeploy {
     public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
         options = { ...this.options, ...options } as QueryActiveAppOptions;
         this.checkRequiredOptions(options, ['device']);
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
-
-        let response: HttpResponse | undefined;
-        let activeAppXml: string;
-
-        if (isRceDeviceConfig(deviceConfig)) {
-            //RCE instances serve query-active-app over the ECP2 WebSocket rather than the HTTP ECP port
-            activeAppXml = (await this.getRceDevice(deviceConfig).queryActiveApp({ timeout: timeout })).content;
-        } else {
-            const host = this.getHost(deviceConfig);
-            const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-            response = await this.doGetRequest({
-                url: `http://${host}:${ecpPort}/query/active-app`,
-                timeout: timeout
-            });
-            activeAppXml = response.body;
-        }
-
+        let result: EcpResult;
         try {
-            const parsedContent = await xml2js.parseStringPromise(activeAppXml, {
-                explicitArray: false
+            result = await this.ecp(options.device, 'query/active-app', {
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
             });
-            const rawActiveAppNode = parsedContent?.['active-app']?.app;
-            if (!rawActiveAppNode) {
-                return {};
-            }
-            return this.parseEcpAppElement(rawActiveAppNode);
         } catch (e) {
-            this.logger.warn('Error parsing active app:', e);
-            throw new UnparsableDeviceResponseError('Could not retrieve active app', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
-            }, e instanceof Error ? e : undefined);
+            if (e instanceof UnparsableDeviceResponseError) {
+                this.logger.warn('Error parsing active app:', e);
+                throw new UnparsableDeviceResponseError('Could not retrieve active app', e.details, e);
+            }
+            throw e;
         }
+        this.assertEcpStatusOk(result);
+        const rawActiveAppNode = result.json?.['active-app']?.app;
+        if (!rawActiveAppNode) {
+            return {};
+        }
+        return this.parseEcpAppElement(rawActiveAppNode);
     }
 
     /**
@@ -1859,6 +1887,153 @@ export class RokuDeploy {
             subtype: attributes.subtype,
             version: attributes.version
         };
+    }
+
+    /**
+     * Query a sideloaded (or installed) app's registry (the ECP `query/registry/{appId}` endpoint).
+     * Throws a FailedDeviceResponseError when the device reports a failure (for example
+     * `Device not keyed`).
+     * @param options
+     */
+    public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
+        options = { ...this.options, ...options } as QueryRegistryOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.ecp(options.device, `query/registry/${options.appId}`, {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
+
+        const registry = root.registry ?? {};
+        const sections: RokuRegistry['sections'] = {};
+        for (const section of this.toArray(registry.sections?.section)) {
+            if (!section || typeof section === 'string') {
+                continue;
+            }
+            const sectionName = section.name;
+            for (const item of this.toArray(section.items?.item)) {
+                if (!item || typeof item === 'string') {
+                    continue;
+                }
+                sections[sectionName] ??= {};
+                sections[sectionName][item.key] = item.value;
+            }
+        }
+        return {
+            devId: registry['dev-id'],
+            plugins: typeof registry.plugins === 'string' ? registry.plugins.split(',') : undefined,
+            spaceAvailable: registry['space-available'],
+            sections: sections
+        };
+    }
+
+    /**
+     * Query the state of an app on the device (the ECP `query/app-state/{appId}` endpoint).
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
+        options = { ...this.options, ...options } as QueryAppStateOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.ecp(options.device, `query/app-state/${options.appId}`, {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
+
+        const knownStates: RokuAppStateValue[] = ['active', 'background', 'inactive'];
+        const state = knownStates.find(knownState => knownState === root.state?.toLowerCase()) ?? 'unknown';
+        return {
+            appId: root['app-id'],
+            appDevId: root['app-dev-id'],
+            appTitle: root['app-title'],
+            appVersion: root['app-version'],
+            state: state
+        };
+    }
+
+    /**
+     * Query SceneGraph rendezvous tracking (the ECP `query/sgrendezvous` endpoint): whether tracking
+     * is enabled, plus any rendezvous events recorded since the last query.
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
+        options = { ...this.options, ...options } as QueryRendezvousOptions;
+        this.checkRequiredOptions(options, ['device']);
+
+        const result = await this.ecp(options.device, 'query/sgrendezvous', {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
+
+        return {
+            trackingEnabled: root.data?.['tracking-enabled'] === 'true',
+            items: this.toArray(root.data?.item).filter(item => item && typeof item !== 'string').map(item => ({
+                id: item.id,
+                startTime: item['start-tm'],
+                endTime: item['end-tm'],
+                lineNumber: item['line-number'],
+                file: item.file
+            }))
+        };
+    }
+
+    /**
+     * Enable or disable SceneGraph rendezvous tracking (the ECP `sgrendezvous/track|untrack`
+     * endpoint) and return the tracking state the device reports afterwards.
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
+        options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
+        this.checkRequiredOptions(options, ['device', 'enabled']);
+
+        const result = await this.ecp(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
+        return root['tracking-enabled'] === 'true';
+    }
+
+    /**
+     * Unwrap a standard ECP response envelope: return the root element of the parsed body, throwing
+     * a FailedDeviceResponseError (with the device's own error message) when the element carries a
+     * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
+     * UnparsableDeviceResponseError when the expected root element is missing entirely.
+     */
+    private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
+        const root = result.json?.[rootKey];
+        if (!root) {
+            //a non-xml ECP response is usually the device explaining itself in plain text (for
+            //example `ECP command not allowed in Limited mode.`), so carry that text in the error
+            const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
+            throw new UnparsableDeviceResponseError(bodyText ? `${failureMessage}: ${bodyText}` : failureMessage, {
+                httpDetails: extractHttpDetails(undefined, result.body)
+            });
+        }
+        if (typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
+            throw new FailedDeviceResponseError(`${failureMessage}: ${root.error ?? 'Unknown error'}`, {
+                httpDetails: extractHttpDetails(undefined, result.body)
+            });
+        }
+        return root;
+    }
+
+    /**
+     * Normalize an xml2js `explicitArray: false` node that may be a single element, an array of
+     * elements, or absent, into an array.
+     */
+    private toArray(node: any): any[] {
+        if (node === undefined || node === null) {
+            return [];
+        }
+        return Array.isArray(node) ? node : [node];
     }
 
     /**
@@ -2233,6 +2408,85 @@ export interface BaseEcpOptions {
     device: DeviceOption;
     ecpPort?: number;
     timeout?: number;
+}
+
+export interface EcpOptions {
+    /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
+    method?: 'GET' | 'POST';
+    /**
+     * Run the standard response verification (throw on non-200 statuses and error bodies).
+     * Defaults to false so raw ECP status bodies (a 202 `FAILED` registry response, for example)
+     * come back to the caller instead of throwing.
+     */
+    verify?: boolean;
+    /** The ECP port for local devices (defaults to 8060); not used for Cloud Emulator devices */
+    ecpPort?: number;
+    timeout?: number;
+}
+
+export interface EcpResult {
+    /** The http status code of the response */
+    status: number;
+    /** The raw response body (usually XML, empty for command routes like keypress) */
+    body: string;
+    /**
+     * The XML response body parsed to a plain object (keyed by the XML root element), or undefined
+     * when the response had no XML body
+     */
+    json: Record<string, any> | undefined;
+}
+
+export interface QueryRegistryOptions extends BaseEcpOptions {
+    /** The app whose registry to query (for example `dev` for the sideloaded app) */
+    appId: string;
+}
+
+export interface RokuRegistry {
+    /** The developer id the device is keyed with */
+    devId?: string;
+    /** The app ids sharing this registry */
+    plugins?: string[];
+    /** Remaining registry space, in bytes (as reported by the device) */
+    spaceAvailable?: string;
+    /** Registry entries, keyed by section name then item key */
+    sections: Record<string, Record<string, string>>;
+}
+
+export interface QueryAppStateOptions extends BaseEcpOptions {
+    /** The app whose state to query (for example `dev` for the sideloaded app) */
+    appId: string;
+}
+
+export type RokuAppStateValue = 'active' | 'background' | 'inactive' | 'unknown';
+
+export interface RokuAppState {
+    appId?: string;
+    appDevId?: string;
+    appTitle?: string;
+    appVersion?: string;
+    state: RokuAppStateValue;
+}
+
+export type QueryRendezvousOptions = BaseEcpOptions;
+
+export interface RokuRendezvous {
+    trackingEnabled: boolean;
+    /** Rendezvous events recorded since the last query */
+    items: RokuRendezvousItem[];
+}
+
+export interface RokuRendezvousItem {
+    id: string;
+    /** Event start time, in seconds (as reported by the device) */
+    startTime: string;
+    /** Event end time, in seconds (as reported by the device) */
+    endTime: string;
+    lineNumber: string;
+    file: string;
+}
+
+export interface SetRendezvousTrackingOptions extends BaseEcpOptions {
+    enabled: boolean;
 }
 
 export type ConvertToSquashfsOptions = BaseRequestOptions;
