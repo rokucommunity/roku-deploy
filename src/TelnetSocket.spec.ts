@@ -82,7 +82,7 @@ class FakeWebSocket extends EventEmitter {
 
 describe('createTelnetSocket', () => {
     it('throws when given a registry name string instead of a device config', () => {
-        expect(() => createTelnetSocket({ device: 'my-device' as any })).to.throw('Device registry names are not supported');
+        expect(() => createTelnetSocket({ device: 'my-device' as any, port: 8085 })).to.throw('Device registry names are not supported');
     });
 
     describe('local device', () => {
@@ -100,28 +100,16 @@ describe('createTelnetSocket', () => {
             } as any);
         }
 
-        it('defaults the brightscript-console channel to port 8085', () => {
+        it('connects to the given port', () => {
             stubRealSocketConnect();
-            createTelnetSocket({ device: { host: '1.2.3.4' } }).connect();
+            createTelnetSocket({ device: { host: '1.2.3.4' }, port: 8085 }).connect();
             expect(connectedArguments).to.eql([{ port: 8085, host: '1.2.3.4' }]);
         });
 
-        it('defaults the debug-server channel to port 8080', () => {
-            stubRealSocketConnect();
-            createTelnetSocket({ device: { host: '1.2.3.4' }, channel: 'debug-server' }).connect();
-            expect(connectedArguments).to.eql([{ port: 8080, host: '1.2.3.4' }]);
-        });
-
-        it('defaults the screensaver channel to port 8087', () => {
-            stubRealSocketConnect();
-            createTelnetSocket({ device: { host: '1.2.3.4' }, channel: 'screensaver' }).connect();
-            expect(connectedArguments).to.eql([{ port: 8087, host: '1.2.3.4' }]);
-        });
-
-        it('lets an explicit port option win over the channel default', () => {
-            stubRealSocketConnect();
-            createTelnetSocket({ device: { host: '1.2.3.4' }, channel: 'debug-server', port: 9999 }).connect();
-            expect(connectedArguments).to.eql([{ port: 9999, host: '1.2.3.4' }]);
+        it('throws when the port is missing or invalid', () => {
+            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' } } as any)).to.throw('requires a valid port number');
+            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' }, port: 0 })).to.throw('requires a valid port number');
+            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' }, port: 8085.5 })).to.throw('requires a valid port number');
         });
 
         describe('against a real tcp server', function performRealTcpServerTests() {
@@ -229,6 +217,7 @@ describe('createTelnetSocket', () => {
             capturedWebSocketOptions = undefined;
             const telnetSocket = createTelnetSocket({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
+                port: 8085,
                 createWebSocket: (url, requestOptions) => {
                     capturedWebSocketUrl = url;
                     capturedWebSocketOptions = requestOptions;
@@ -240,11 +229,11 @@ describe('createTelnetSocket', () => {
             return telnetSocket;
         }
 
-        it('builds the brightscript-console websocket url and carries the Authorization bearer header', async () => {
+        it('builds the ports websocket url and carries the Authorization bearer header', async () => {
             createRceTelnetSocket().connect();
             await flushMicrotasks();
 
-            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/telnet/brightscript-console');
+            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8085');
             expect(capturedWebSocketOptions.headers).to.eql({ Authorization: 'Bearer token-value' });
         });
 
@@ -255,14 +244,14 @@ describe('createTelnetSocket', () => {
             expect(capturedWebSocketOptions.headers).to.be.undefined;
         });
 
-        it('selects the url path by channel', async () => {
-            createRceTelnetSocket({ channel: 'debug-server' }).connect();
+        it('builds the url path from the port number', async () => {
+            createRceTelnetSocket({ port: 8080 }).connect();
             await flushMicrotasks();
-            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/telnet/debug-server');
+            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8080');
 
-            createRceTelnetSocket({ channel: 'screensaver' }).connect();
+            createRceTelnetSocket({ port: 8087 }).connect();
             await flushMicrotasks();
-            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/telnet/screensaver');
+            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8087');
         });
 
         it('emits connect then ready then data, in that order, once the websocket opens', async () => {

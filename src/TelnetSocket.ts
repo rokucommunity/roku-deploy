@@ -6,14 +6,13 @@ import { isLocalDeviceConfig, isRceById, isRceByUrl, isRceDeviceConfig } from '.
 import { RceDevice } from './RceDevice';
 
 /**
- * Creates a transport for one of a Roku device's telnet consoles (the BrightScript console, the
- * SceneGraph debug server, or the screensaver console) that behaves like a `net.Socket` regardless
- * of where the device lives:
+ * Creates a transport for one of a Roku device's telnet consoles (for example the BrightScript
+ * console on port 8085, the SceneGraph debug server on port 8080, or the screensaver console on
+ * port 8087) that behaves like a `net.Socket` regardless of where the device lives:
  *
- *   - a local network device exposes these as plain-tcp telnet ports (8085, 8080, and 8087
- *     respectively)
- *   - a Roku Cloud Emulator (RCE) instance exposes the same consoles as WebSocket endpoints on its
- *     instance api (`<instanceUrl>/api/v0/telnet/<channel>`), authed by an
+ *   - a local network device exposes these as plain-tcp telnet ports
+ *   - a Roku Cloud Emulator (RCE) instance exposes the same ports as WebSocket endpoints on its
+ *     instance api (`<instanceUrl>/api/v0/ports/<port>`), authed by an
  *     `Authorization: Bearer <rceToken>` header on the WebSocket handshake
  *
  * The returned object is meant as a near-transparent replacement for `new net.Socket()`: it exposes
@@ -28,24 +27,20 @@ export function createTelnetSocket(options: TelnetSocketOptions): TelnetSocket {
     if (typeof (options.device as unknown) === 'string') {
         throw new Error('Device registry names are not supported by createTelnetSocket; provide a device config object');
     }
-
-    const channel = options.channel ?? 'brightscript-console';
+    //runtime guard for javascript callers (and for optional ports that were never defaulted
+    //upstream), since the port addresses the device console on both transports
+    if (!Number.isInteger(options.port) || options.port <= 0) {
+        throw new Error(`createTelnetSocket requires a valid port number (received ${String(options.port)})`);
+    }
 
     if (isLocalDeviceConfig(options.device)) {
-        const port = options.port ?? defaultPortByChannel[channel];
-        return new LocalTelnetSocket(options.device.host, port);
+        return new LocalTelnetSocket(options.device.host, options.port);
     }
     if (isRceDeviceConfig(options.device)) {
-        return new RceTelnetSocket(options.device, channel, options);
+        return new RceTelnetSocket(options.device, options.port, options);
     }
     throw new Error('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
 }
-
-const defaultPortByChannel: Record<TelnetChannel, number> = {
-    'brightscript-console': 8085,
-    'debug-server': 8080,
-    'screensaver': 8087
-};
 
 /**
  * A `net.Socket` wired up to connect to a local device's plain-tcp telnet console using the host and
@@ -91,7 +86,7 @@ export class LocalTelnetSocket extends net.Socket {
 
 /**
  * A `stream.Duplex` wired up to connect to a Roku Cloud Emulator (RCE) instance's telnet console
- * over its WebSocket endpoint (`<instanceUrl>/api/v0/telnet/<channel>`), authed by an
+ * over its WebSocket endpoint (`<instanceUrl>/api/v0/ports/<port>`), authed by an
  * `Authorization: Bearer <rceToken>` header on the WebSocket handshake.
  *
  * Extending `stream.Duplex` (rather than a plain `EventEmitter`) matters beyond just matching
@@ -103,7 +98,7 @@ export class LocalTelnetSocket extends net.Socket {
 export class RceTelnetSocket extends stream.Duplex {
     constructor(
         private readonly device: RceDeviceConfig,
-        private readonly channel: TelnetChannel,
+        private readonly port: number,
         options: TelnetSocketOptions
     ) {
         super();
@@ -176,9 +171,9 @@ export class RceTelnetSocket extends stream.Duplex {
     }
 
     /**
-     * Sends a chunk as a binary websocket frame. The RCE telnet endpoints auto-append `\r\n` to TEXT
-     * frames that lack it, which would corrupt exact byte sequences (for example the `\x03;` pause
-     * sequence), so a binary frame is the only way to preserve byte parity with a raw tcp socket.
+     * Sends a chunk as a binary websocket frame. The RCE port endpoints accept binary frames only
+     * (a TEXT frame is rejected with close code 1003), and bytes are forwarded unchanged, which is
+     * exactly the byte parity a raw tcp socket provides.
      */
     public _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
         this.markActivity();
@@ -298,7 +293,7 @@ export class RceTelnetSocket extends stream.Duplex {
     }
 
     private buildWebSocketUrl(instanceUrl: string): string {
-        const url = new URL(`${instanceUrl}/api/v0/telnet/${this.channel}`);
+        const url = new URL(`${instanceUrl}/api/v0/ports/${this.port}`);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         return url.toString();
     }
@@ -310,12 +305,12 @@ export class RceTelnetSocket extends stream.Duplex {
      */
     private describeTarget(): string {
         if (isRceByUrl(this.device)) {
-            return `${this.device.instanceUrl} (${this.channel})`;
+            return `${this.device.instanceUrl} (port ${this.port})`;
         }
         if (isRceById(this.device)) {
-            return `RCE device id '${this.device.id}' (${this.channel})`;
+            return `RCE device id '${this.device.id}' (port ${this.port})`;
         }
-        return `RCE device esn '${this.device.esn}' (${this.channel})`;
+        return `RCE device esn '${this.device.esn}' (port ${this.port})`;
     }
 
     /**
@@ -335,15 +330,16 @@ export class RceTelnetSocket extends stream.Duplex {
     }
 }
 
-export type TelnetChannel = 'brightscript-console' | 'debug-server' | 'screensaver';
-
 export interface TelnetSocketOptions {
     /** the device to connect to. Registry names (strings) are not supported here; pass a resolved device config */
     device: DeviceConfig;
-    /** which device console to connect to. Defaults to 'brightscript-console' */
-    channel?: TelnetChannel;
-    /** local devices only: override the tcp port. Defaults per channel: brightscript-console 8085, debug-server 8080, screensaver 8087 */
-    port?: number;
+    /**
+     * the device port to connect to (for example 8085 for the BrightScript console, 8080 for the
+     * SceneGraph debug server, or 8087 for the screensaver console). A local device connects to this
+     * tcp port directly; an RCE device reaches the same port through the instance api's
+     * `/api/v0/ports/<port>` WebSocket route
+     */
+    port: number;
     /** test injection point for the RCE websocket */
     createWebSocket?: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
 }
