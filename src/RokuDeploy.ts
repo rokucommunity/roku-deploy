@@ -567,13 +567,53 @@ export class RokuDeploy {
     }
 
     /**
-     * Simulate pressing the home button on the remote for this roku.
-     * This makes the roku return to the home screen
+     * Normalize a key name to its canonical `RemoteKey` casing for the RCE instance-api key-input
+     * route, which rejects a wrong-case key with a 422 (the raw ECP proxy and LAN ECP accept any
+     * case). A key that matches a `RemoteKey` value case-insensitively is returned in that canonical
+     * casing; a literal-text key (`lit_<char>`) becomes `Lit_<char>`; anything else is passed
+     * through unchanged (there is no enforced key list, so an unknown key is sent as-is and simply
+     * falls back to the raw proxy if the route rejects it).
+     */
+    private toCanonicalRemoteKey(key: string): string {
+        if (/^lit_/i.test(key)) {
+            return `Lit_${key.slice(4)}`;
+        }
+        return Object.values(RemoteKey).find((candidate) => candidate.toLowerCase() === key.toLowerCase()) ?? key;
+    }
+
+    /**
+     * Send a single key event (keypress/keydown/keyup) to a device.
+     *
+     * For an RCE device the instance-api key-input route (`/api/v0/ecp1/<action>/<key>`) is tried
+     * first: unlike the raw `/ecp1` proxy the generic ecp() transport uses, it keeps working when
+     * the device is in limited ECP mode (which 403s every raw-proxy key press). Any failure - a
+     * non-2xx response (verify throws), or a future rename of that path - falls through to the
+     * normal ecp() transport below, so RCE devices in normal mode and LAN devices are unaffected.
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
-        options = { ...this.options, ...options } as SendKeyEventOptions;
+        options = { ...this.options, ...options };
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['device', 'key']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        if (isRceDeviceConfig(deviceConfig)) {
+            try {
+                if (!deviceConfig.rceToken) {
+                    throw new Error('An rceToken is required to reach ECP on an RCE device');
+                }
+                const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+                const key = this.toCanonicalRemoteKey(options.key);
+                const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}?access_token=${deviceConfig.rceToken}`;
+                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.timeout }, true);
+                return {
+                    status: response?.response?.statusCode,
+                    body: response?.body,
+                    json: undefined
+                } as EcpResult;
+            } catch (e) {
+                this.logger.info('RCE instance-api key route failed; falling back to the ecp1 proxy', this.scrubAccessToken((e as Error)?.message ?? ''));
+            }
+        }
 
         return this.ecp(options.device, `${options.action}/${options.key}`, {
             method: 'POST',
@@ -2296,24 +2336,66 @@ export interface ValidateDeveloperPasswordOptions {
     timeout?: number;
 }
 
-export type RokuKey = 'back' | 'backspace' | 'channeldown' | 'channelup' | 'down' | 'enter' | 'findremote' | 'fwd' | 'guide' | 'home' | 'info' | 'inputav1' | 'inputhdmi1' | 'inputhdmi2' | 'inputhdmi3' | 'inputhdmi4' | 'inputtuner' | 'instantreplay' | 'left' | 'play' | 'poweroff' | 'rev' | 'right' | 'search' | 'select' | 'up' | 'volumedown' | 'volumemute' | 'volumeup';
+/**
+ * The remote-control keys a Roku understands, in the canonical casing the device expects. Exposed
+ * for convenience and discoverability: pass a `RemoteKey` value and you get the casing right without
+ * thinking about it. It is NOT an enforced list - every key option also accepts a raw string, so a
+ * key without a member here (or a `Lit_<char>` literal) can still be sent.
+ */
+export enum RemoteKey {
+    Back = 'Back',
+    Backspace = 'Backspace',
+    ChannelDown = 'ChannelDown',
+    ChannelUp = 'ChannelUp',
+    Down = 'Down',
+    Enter = 'Enter',
+    FindRemote = 'FindRemote',
+    Fwd = 'Fwd',
+    Guide = 'Guide',
+    Home = 'Home',
+    Info = 'Info',
+    InputAV1 = 'InputAV1',
+    InputHDMI1 = 'InputHDMI1',
+    InputHDMI2 = 'InputHDMI2',
+    InputHDMI3 = 'InputHDMI3',
+    InputHDMI4 = 'InputHDMI4',
+    InputTuner = 'InputTuner',
+    InstantReplay = 'InstantReplay',
+    Left = 'Left',
+    Play = 'Play',
+    Power = 'Power',
+    PowerOff = 'PowerOff',
+    PowerOn = 'PowerOn',
+    Rev = 'Rev',
+    Right = 'Right',
+    Search = 'Search',
+    Select = 'Select',
+    Up = 'Up',
+    VolumeDown = 'VolumeDown',
+    VolumeMute = 'VolumeMute',
+    VolumeUp = 'VolumeUp'
+}
 
-export interface SendKeyEventOptions extends BaseEcpOptions {
+export type RemoteKeyText = keyof typeof RemoteKey;
+
+interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
+    //internal transport type: the public key methods enforce RemoteKeyText, but sendText feeds
+    //`lit_<char>` literals through here and callers pass canonical keys, so this stays permissive
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
-    key: RokuKey | string;
+    key: RemoteKeyText | string;
 }
 
 export interface KeyUpOptions extends BaseEcpOptions {
-    key: RokuKey;
+    key: RemoteKeyText;
 }
 
 export interface KeyDownOptions extends BaseEcpOptions {
-    key: RokuKey;
+    key: RemoteKeyText;
 }
 
 export interface KeyPressOptions extends BaseEcpOptions {
-    key: RokuKey;
+    key: RemoteKeyText;
 }
 
 export interface SendTextOptions extends BaseEcpOptions {

@@ -392,7 +392,7 @@ const REQUEST_TIMEOUT = 30_000;
 
     describe('pressHomeButton', () => {
         it('works', async () => {
-            await rd.keyPress({ device: options.device, key: 'home' });
+            await rd.keyPress({ device: options.device, key: 'Home' });
         });
     });
 

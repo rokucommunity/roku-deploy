@@ -1,6 +1,6 @@
 import * as readline from 'readline';
-import type { RokuKey } from '../index';
 import { rokuDeploy } from '../index';
+import type { RemoteKeyText } from '../index';
 
 export class RemoteControlCommand {
     run(args) {
@@ -16,60 +16,60 @@ export class RemoteControlCommand {
 
         process.stdin.on('keypress', (str, key) => {
             const keyName = key.name as unknown;
-            let rokuDeployKeyName: RokuKey | undefined;
+            let rokuDeployKeyName: RemoteKeyText | undefined;
             switch (keyName) {
                 case 'home':
-                    rokuDeployKeyName = keyName;
+                    rokuDeployKeyName = 'Home';
                     break;
                 case 'escape':
-                    rokuDeployKeyName = 'back';
+                    rokuDeployKeyName = 'Back';
                     break;
                 case 'delete':
                     if (key.ctrl || key.meta || key.shift) {
-                        rokuDeployKeyName = 'backspace';
+                        rokuDeployKeyName = 'Backspace';
                     }
-                    rokuDeployKeyName = 'back';
+                    rokuDeployKeyName = 'Back';
                     break;
                 case 'backspace':
                     if (key.ctrl || key.meta || key.shift) {
-                        rokuDeployKeyName = 'backspace';
+                        rokuDeployKeyName = 'Backspace';
                     } else {
-                        rokuDeployKeyName = 'instantreplay';
+                        rokuDeployKeyName = 'InstantReplay';
                     }
                     break;
                 case 'end':
-                    rokuDeployKeyName = 'play';
+                    rokuDeployKeyName = 'Play';
                     break;
                 case 'return':
-                    rokuDeployKeyName = 'select';
+                    rokuDeployKeyName = 'Select';
                     break;
                 case 'up':
-                    rokuDeployKeyName = 'up';
+                    rokuDeployKeyName = 'Up';
                     if (key.shift) {
-                        rokuDeployKeyName = 'volumeup';
+                        rokuDeployKeyName = 'VolumeUp';
                     }
                     break;
                 case 'down':
-                    rokuDeployKeyName = 'down';
+                    rokuDeployKeyName = 'Down';
                     if (key.shift) {
-                        rokuDeployKeyName = 'volumedown';
+                        rokuDeployKeyName = 'VolumeDown';
                     }
                     break;
                 case 'left':
-                    rokuDeployKeyName = 'left';
+                    rokuDeployKeyName = 'Left';
                     if (key.shift) {
-                        rokuDeployKeyName = 'rev';
+                        rokuDeployKeyName = 'Rev';
                     }
                     break;
                 case 'right':
-                    rokuDeployKeyName = 'right';
+                    rokuDeployKeyName = 'Right';
                     if (key.shift) {
-                        rokuDeployKeyName = 'fwd';
+                        rokuDeployKeyName = 'Fwd';
                     }
                     break;
                 default:
                     if (key.sequence === '*') {
-                        rokuDeployKeyName = 'info';
+                        rokuDeployKeyName = 'Info';
                     } else {
                         if (key.ctrl && key.name === 'c') {
                             process.exit(); // We provide a way to exit the program

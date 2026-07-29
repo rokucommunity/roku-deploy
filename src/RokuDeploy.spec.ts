@@ -16,7 +16,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import { httpClient } from './fetch';
 import { RokuDeploy } from './RokuDeploy';
-import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SendKeyEventOptions, SideloadOptions } from './RokuDeploy';
+import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
 
 const sinon = createSandbox();
 
@@ -1408,7 +1408,7 @@ describe('RokuDeploy', () => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
-            return rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' }).then(() => {
+            return rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'Home' }).then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
                 expect(true).to.be.true;
@@ -1418,34 +1418,34 @@ describe('RokuDeploy', () => {
         it('uses default port', async () => {
             const promise = new Promise<void>((resolve) => {
                 sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/home');
+                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'Home' });
             await promise;
         });
 
         it('uses overridden port', async () => {
             const promise = new Promise<void>((resolve) => {
                 sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/home');
+                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'Home' });
             await promise;
         });
 
         it('uses default timeout', async () => {
             const promise = new Promise<void>((resolve) => {
                 sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/home');
+                    expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
                     expect(opts.timeout).to.equal(150000);
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'home' });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, key: 'Home' });
             await promise;
         });
 
@@ -1453,12 +1453,12 @@ describe('RokuDeploy', () => {
             const promise = new Promise<void>((resolve) => {
 
                 sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
-                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/home');
+                    expect(opts.url).to.equal('http://1.2.3.4:987/keypress/Home');
                     expect(opts.timeout).to.equal(1000);
                     resolve();
                 });
             });
-            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'home', timeout: 1000 });
+            await rokuDeploy.keyPress({ ...options, device: { host: '1.2.3.4' }, ecpPort: 987, key: 'Home', timeout: 1000 });
             await promise;
         });
     });
@@ -1468,21 +1468,21 @@ describe('RokuDeploy', () => {
             it('fails when host not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
-                    await rd.keyPress({ key: 'home' } as any);
+                    await rd.keyPress({ key: 'Home' } as any);
                 }, 'Missing required option: device');
             });
 
             it('uses constructor device when not provided in call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyPress({ key: 'home' } as any);
+                await rd.keyPress({ key: 'Home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
             it('call device overrides constructor device', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyPress({ device: { host: 'call-host' }, key: 'home' });
+                await rd.keyPress({ device: { host: 'call-host' }, key: 'Home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1493,21 +1493,21 @@ describe('RokuDeploy', () => {
             it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
-                    await rd.keyUp({ key: 'home' } as any);
+                    await rd.keyUp({ key: 'Home' } as any);
                 }, 'Missing required option: device');
             });
 
             it('uses constructor device when not provided in call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyUp({ key: 'home' } as any);
+                await rd.keyUp({ key: 'Home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
             it('call device overrides constructor device', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyUp({ device: { host: 'call-host' }, key: 'home' });
+                await rd.keyUp({ device: { host: 'call-host' }, key: 'Home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1518,21 +1518,21 @@ describe('RokuDeploy', () => {
             it('fails when device not provided in constructor or call', async () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
-                    await rd.keyDown({ key: 'home' } as any);
+                    await rd.keyDown({ key: 'Home' } as any);
                 }, 'Missing required option: device');
             });
 
             it('uses constructor device when not provided in call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyDown({ key: 'home' } as any);
+                await rd.keyDown({ key: 'Home' } as any);
                 expect(stub.getCall(0).args[0].url).to.include('constructor-host');
             });
 
             it('call device overrides constructor device', async () => {
                 const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                 const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                await rd.keyDown({ device: { host: 'call-host' }, key: 'home' });
+                await rd.keyDown({ device: { host: 'call-host' }, key: 'Home' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
         });
@@ -1560,6 +1560,50 @@ describe('RokuDeploy', () => {
                 await rd.sendText({ device: { host: 'call-host' }, text: 'a' });
                 expect(stub.getCall(0).args[0].url).to.include('call-host');
             });
+        });
+    });
+
+    describe('sendKeyEvent RCE routing', () => {
+        const rceDevice = { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' };
+
+        it('routes an RCE key press through the instance-api key route with a canonical key name', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Home?access_token=secret');
+        });
+
+        it('sends literal text as Lit_<char> through the instance-api route', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: 'a' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a?');
+        });
+
+        it('routes keydown and keyup through the instance-api route', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
+            await rokuDeploy.keyUp({ device: rceDevice, key: 'Down' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keydown/Down?');
+            expect(stub.getCall(1).args[0].url).to.contain('/api/v0/ecp1/keyup/Down?');
+        });
+
+        it('falls back to the raw ecp1 proxy (original-case key) when the instance-api route fails', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
+                if (params.url.includes('/api/v0/')) {
+                    return Promise.reject(new Error('403'));
+                }
+                return Promise.resolve({ response: { statusCode: 200 }, body: '' });
+            });
+            await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
+
+            expect(stub.callCount).to.equal(2);
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Home?');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home?access_token=secret');
+        });
+
+        it('leaves a LAN key event on the direct HTTP ECP path (no instance-api route)', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Home');
         });
     });
 
@@ -5332,7 +5376,7 @@ describe('RokuDeploy', () => {
         }
 
         it('throws error when sendKeyEvent is missing required options', async () => {
-            const requiredOptions: Partial<SendKeyEventOptions> = { device: { host: '1.2.3.4' }, key: 'up' };
+            const requiredOptions = { device: { host: '1.2.3.4' }, key: 'up' };
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'device');
             await testRequiredOptions('sendKeyEvent', requiredOptions, 'key');
         });
@@ -5999,28 +6043,28 @@ describe('RokuDeploy', () => {
                 it('fails when not provided in constructor or call', async () => {
                     const rd = new RokuDeploy();
                     await expectThrowsAsync(async () => {
-                        await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
+                        await rd['sendKeyEvent']({ key: 'Home', action: 'keypress' } as any);
                     }, 'Missing required option: device');
                 });
 
                 it('uses constructor value when not provided in call', async () => {
                     const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ key: 'home', action: 'keypress' } as any);
+                    await rd['sendKeyEvent']({ key: 'Home', action: 'keypress' } as any);
                     expect(stub.getCall(0).args[0].url).to.include('constructor-host');
                 });
 
                 it('uses call value when not provided in constructor', async () => {
                     const rd = new RokuDeploy();
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'Home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include('call-host');
                 });
 
                 it('call value overrides constructor value', async () => {
                     const rd = new RokuDeploy({ device: { host: 'constructor-host' } });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'call-host' }, key: 'Home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include('call-host');
                 });
             });
@@ -6052,21 +6096,21 @@ describe('RokuDeploy', () => {
                 it('uses static default when not provided anywhere', async () => {
                     const rd = new RokuDeploy();
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include(':8060/');
                 });
 
                 it('uses constructor value when not provided in call', async () => {
                     const rd = new RokuDeploy({ ecpPort: 9000 });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
                     expect(stub.getCall(0).args[0].url).to.include(':9000/');
                 });
 
                 it('call value overrides constructor value', async () => {
                     const rd = new RokuDeploy({ ecpPort: 9000 });
                     const stub = sinon.stub(rd as any, 'doPostRequest').resolves({});
-                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress', ecpPort: 9999 });
+                    await rd['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress', ecpPort: 9999 });
                     expect(stub.getCall(0).args[0].url).to.include(':9999/');
                 });
             });
@@ -6227,19 +6271,19 @@ describe('RokuDeploy', () => {
         describe('sendKeyEvent', () => {
             it('uses default ecpPort', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
                 expect(stub.getCall(0).args[0].url).to.include(`:${RokuDeploy['defaults'].ecpPort}/`);
             });
 
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress' });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
                 expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
             });
 
             it('allows overriding ecpPort', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
-                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'home', action: 'keypress', ecpPort: 9000 });
+                await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress', ecpPort: 9000 });
                 expect(stub.getCall(0).args[0].url).to.include(':9000/');
             });
         });
