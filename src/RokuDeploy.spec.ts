@@ -1176,6 +1176,7 @@ describe('RokuDeploy', () => {
 
     describe('defaults', () => {
         it('exposes the common default values', () => {
+            expect(RokuDeploy.defaults.ecpTimeout).to.equal(10000);
             expect(RokuDeploy.defaults.outDir).to.equal('./out');
             expect(RokuDeploy.defaults.outFile).to.equal('roku-deploy.zip');
             expect(RokuDeploy.defaults.stagingDirName).to.equal('.roku-deploy-staging');
@@ -1441,7 +1442,7 @@ describe('RokuDeploy', () => {
             const promise = new Promise<void>((resolve) => {
                 sinon.stub(<any>rokuDeploy, 'doPostRequest').callsFake((opts: any) => {
                     expect(opts.url).to.equal('http://1.2.3.4:8060/keypress/Home');
-                    expect(opts.timeout).to.equal(150000);
+                    expect(opts.timeout).to.equal(RokuDeploy.defaults.ecpTimeout);
                     resolve();
                 });
             });
@@ -6278,7 +6279,7 @@ describe('RokuDeploy', () => {
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
                 await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
             });
 
             it('allows overriding ecpPort', async () => {
@@ -6308,7 +6309,7 @@ describe('RokuDeploy', () => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
             });
         });
 

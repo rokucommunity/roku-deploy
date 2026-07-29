@@ -52,6 +52,11 @@ export class RokuDeploy {
      */
     public static readonly defaults = {
         timeout: 150000,
+        /**
+         * The default timeout for ECP requests, in milliseconds. ECP commands are small and fast,
+         * so this is much lower than `timeout` (which must accommodate large installer uploads).
+         */
+        ecpTimeout: 10000,
         packagePort: 80,
         ecpPort: 8060,
         username: 'rokudev',
@@ -449,7 +454,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.timeout;
+        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         const { baseUrl, query } = await this.getEcpBaseUrl(deviceConfig, ecpPort);
@@ -604,14 +609,14 @@ export class RokuDeploy {
                 const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
                 const key = this.toCanonicalRemoteKey(options.key);
                 const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}?access_token=${deviceConfig.rceToken}`;
-                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.timeout }, true);
+                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout }, true);
                 return {
                     status: response?.response?.statusCode,
                     body: response?.body,
                     json: undefined
                 } as EcpResult;
             } catch (e) {
-                this.logger.info('RCE instance-api key route failed; falling back to the ecp1 proxy', this.scrubAccessToken((e as Error)?.message ?? ''));
+                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', this.scrubAccessToken((e as Error)?.message ?? ''));
             }
         }
 
@@ -702,11 +707,11 @@ export class RokuDeploy {
      * responses have no `<status>` envelope to inspect instead.
      */
     private assertEcpStatusOk(result: EcpResult): void {
-        if (result.status >= 200 && result.status < 300) {
+        if (result.status !== undefined && result.status >= 200 && result.status < 300) {
             return;
         }
         const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
-        throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status}${bodyText ? `: ${bodyText}` : ''}`, {
+        throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status ?? 'unknown'}${bodyText ? `: ${bodyText}` : ''}`, {
             httpDetails: extractHttpDetails(undefined, result.body)
         });
     }
@@ -2489,6 +2494,7 @@ export interface BaseRequestOptions {
 export interface BaseEcpOptions {
     device: DeviceOption;
     ecpPort?: number;
+    /** Request timeout in milliseconds. Defaults to `RokuDeploy.defaults.ecpTimeout` (10 seconds) */
     timeout?: number;
 }
 
@@ -2503,12 +2509,13 @@ export interface EcpOptions {
     verify?: boolean;
     /** The ECP port for local devices (defaults to 8060); not used for Cloud Emulator devices */
     ecpPort?: number;
+    /** Request timeout in milliseconds. Defaults to `RokuDeploy.defaults.ecpTimeout` (10 seconds) */
     timeout?: number;
 }
 
 export interface EcpResult {
-    /** The http status code of the response */
-    status: number;
+    /** The http status code of the response, or undefined when the transport produced no response */
+    status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
     /**
