@@ -323,6 +323,12 @@ export class RceVideoSignalingClient extends EventEmitter {
     private sendRequest(request: Record<string, unknown>): Promise<JanusIncomingMessage> {
         const transaction = this.nextTransactionId();
         return new Promise<JanusIncomingMessage>((resolve, reject) => {
+            //the socket is gone once stop() has run (or before connect()); reject rather than
+            //leaving an orphaned pending request behind a TypeError
+            if (!this.webSocket) {
+                reject(new Error(`Cannot send a Janus request for stream '${this.config.streamId}': the signaling session is not connected`));
+                return;
+            }
             this.pendingRequests.set(transaction, { resolve: resolve, reject: reject });
             this.webSocket.send(JSON.stringify(this.withTransactionAndSecret(request, transaction)));
         });
@@ -349,6 +355,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     }
 
     private startKeepalive(): void {
+        //never stack a second timer on top of an existing one
+        this.stopKeepalive();
         this.keepaliveTimerId = setInterval(() => {
             if (this.sessionId !== undefined) {
                 this.sendFireAndForget({ janus: 'keepalive', session_id: this.sessionId });
