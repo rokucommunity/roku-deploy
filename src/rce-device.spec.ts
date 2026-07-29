@@ -1075,7 +1075,7 @@ const REQUEST_TIMEOUT = 30_000;
  */
 function waitForConsoleOutput(device: DeviceConfig, marker: string, timeout: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-        const socket = createTelnetSocket({ device: device, channel: 'brightscript-console' });
+        const socket = createTelnetSocket({ device: device, port: 8085 });
         let buffer = '';
         const timer = setTimeout(() => {
             cleanup();
