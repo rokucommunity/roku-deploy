@@ -1758,7 +1758,11 @@ export class RokuDeploy {
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new DeviceUnreachableError(`Device ${displayTarget} was unreachable: ${message}`, err);
+            throw new DeviceUnreachableError(
+                `Device ${displayTarget} was unreachable: ${message}`,
+                {},
+                err instanceof Error ? err : undefined
+            );
         }
 
         if (response.status === 200) {
@@ -1793,7 +1797,8 @@ export class RokuDeploy {
                 throw new EcpNetworkAccessModeDisabledError(
                     `Unable to access device-info because ecp-setting-mode is 'disabled'`,
                     {
-                        httpDetails: (e as any)?.details?.httpDetails
+                        // The condition above guarantees details.httpDetails exists
+                        httpDetails: (e as any).details.httpDetails
                     },
                     e instanceof Error ? e : undefined
                 );

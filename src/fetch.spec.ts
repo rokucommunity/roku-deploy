@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { expect } from 'chai';
 import { createSandbox } from 'sinon';
+import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
+
 const sinon = createSandbox();
 
 describe('fetch module', () => {
@@ -37,5 +39,103 @@ describe('fetch module', () => {
             (globalThis as any).fetch = original;
             delete require.cache[require.resolve('./fetch')];
         }
+    });
+
+    describe('buildDigestAuthorization', () => {
+        it('includes opaque parameter when present in challenge', () => {
+            const result = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: {
+                    realm: 'rokudev',
+                    nonce: 'abc123',
+                    qop: 'auth',
+                    opaque: 'xyz789'
+                }
+            });
+
+            expect(result).to.include('opaque="xyz789"');
+            expect(result).to.match(/^Digest /);
+        });
+
+        it('omits opaque parameter when not present in challenge', () => {
+            const result = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: {
+                    realm: 'rokudev',
+                    nonce: 'abc123',
+                    qop: 'auth'
+                }
+            });
+
+            expect(result).to.not.include('opaque');
+        });
+
+        it('handles digest auth edge cases (MD5-SESS, missing qop, default algorithm, empty values)', () => {
+            //MD5-SESS algorithm
+            const md5SessResult = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: { realm: 'rokudev', nonce: 'abc123', qop: 'auth', algorithm: 'MD5-SESS' }
+            });
+            expect(md5SessResult).to.include('algorithm=MD5-SESS');
+            expect(md5SessResult).to.match(/^Digest /);
+
+            //missing qop parameter
+            const noQopResult = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: { realm: 'rokudev', nonce: 'abc123' }
+            });
+            expect(noQopResult).to.not.include('qop=');
+            expect(noQopResult).to.not.include('nc=');
+            expect(noQopResult).to.not.include('cnonce=');
+
+            //defaults to MD5 algorithm when not specified
+            const defaultAlgoResult = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: { realm: 'rokudev', nonce: 'abc123', qop: 'auth' }
+            });
+            expect(defaultAlgoResult).to.include('algorithm=MD5');
+
+            //empty realm and nonce
+            const emptyValuesResult = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'aaaa',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: {}
+            });
+            expect(emptyValuesResult).to.include('realm=""');
+            expect(emptyValuesResult).to.include('nonce=""');
+        });
+    });
+
+    describe('parseDigestChallenge', () => {
+        it('parses quoted values', () => {
+            const result = parseDigestChallenge('Digest realm="rokudev", nonce="abc123"');
+
+            expect(result.realm).to.equal('rokudev');
+            expect(result.nonce).to.equal('abc123');
+        });
+
+        it('parses unquoted values', () => {
+            const result = parseDigestChallenge('Digest realm=rokudev, qop=auth');
+
+            expect(result.realm).to.equal('rokudev');
+            expect(result.qop).to.equal('auth');
+        });
     });
 });
