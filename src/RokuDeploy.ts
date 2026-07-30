@@ -20,6 +20,7 @@ import {
     UnsupportedFirmwareVersionError,
     UpdateCheckRequiredError
 } from './Errors';
+import type { HttpDetails } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
@@ -693,7 +694,7 @@ export class RokuDeploy {
         const root = result.json?.['exit-app'];
         if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
             throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
-                httpDetails: extractHttpDetails(undefined, result.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             });
         }
         if (!root) {
@@ -712,8 +713,22 @@ export class RokuDeploy {
         }
         const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
         throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status ?? 'unknown'}${bodyText ? `: ${bodyText}` : ''}`, {
-            httpDetails: extractHttpDetails(undefined, result.body)
+            httpDetails: this.buildEcpHttpDetails(result)
         });
+    }
+
+    /**
+     * Build the HttpDetails carried by ECP wrapper errors. `ecp()` does not retain the raw
+     * HttpResponse, so this carries what it does keep - the status code and body - which is what a
+     * caller needs to see what the device actually said.
+     */
+    private buildEcpHttpDetails(result: EcpResult): HttpDetails {
+        return {
+            response: {
+                statusCode: result.status,
+                body: result.body
+            }
+        };
     }
 
     /**
@@ -1805,10 +1820,17 @@ export class RokuDeploy {
             }
             throw e;
         }
+        const deviceInfoRoot = result.json?.['device-info'];
+        if (!deviceInfoRoot) {
+            //the response was not device-info XML (an empty body, a proxy error page, ...) - there
+            //is no underlying error to carry as a cause, the body just wasn't what we asked for
+            this.logger.warn('Error getting device info: response had no device-info element');
+            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
+                httpDetails: this.buildEcpHttpDetails(result)
+            });
+        }
         try {
-            let deviceInfo = {
-                ...result.json['device-info']
-            } as Record<string, any>;
+            let deviceInfo = { ...deviceInfoRoot } as Record<string, any>;
 
             if (options.enhance) {
                 deviceInfo = this.enhanceDeviceInfo(deviceInfo as DeviceInfoRaw);
@@ -1818,7 +1840,7 @@ export class RokuDeploy {
         } catch (e) {
             this.logger.warn('Error getting device info:', e);
             throw new UnparsableDeviceResponseError('Could not retrieve device info', {
-                httpDetails: extractHttpDetails(undefined, result.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             }, e instanceof Error ? e : undefined);
         }
     }
@@ -2064,12 +2086,12 @@ export class RokuDeploy {
             //example `ECP command not allowed in Limited mode.`), so carry that text in the error
             const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
             throw new UnparsableDeviceResponseError(bodyText ? `${failureMessage}: ${bodyText}` : failureMessage, {
-                httpDetails: extractHttpDetails(undefined, result.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             });
         }
         if (typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
             throw new FailedDeviceResponseError(`${failureMessage}: ${root.error ?? 'Unknown error'}`, {
-                httpDetails: extractHttpDetails(undefined, result.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             });
         }
         return root;
