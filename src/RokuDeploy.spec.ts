@@ -166,42 +166,6 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('scrubAccessToken', () => {
-        it('redacts the access_token value from a url', () => {
-            const scrubbed = rokuDeploy['scrubAccessToken']('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=super-secret-token');
-            expect(scrubbed).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=<redacted>');
-        });
-
-        it('leaves a url without an access_token unchanged', () => {
-            const url = 'http://1.2.3.4:80/plugin_install';
-            expect(rokuDeploy['scrubAccessToken'](url)).to.equal(url);
-        });
-
-        it('scrubs the url logged for POST requests', async () => {
-            const infoStub = sinon.stub(rokuDeploy.logger, 'info');
-            sinon.stub(request, 'post').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 200 }, '');
-                return {} as any;
-            });
-            await rokuDeploy['doPostRequest']({
-                url: 'https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=super-secret-token'
-            } as any, false);
-            expect(infoStub.getCall(0).args[1]).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=<redacted>');
-        });
-
-        it('scrubs the url logged for GET requests', async () => {
-            const infoStub = sinon.stub(rokuDeploy.logger, 'info');
-            sinon.stub(request, 'get').callsFake((_, callback) => {
-                process.nextTick(callback, undefined, { statusCode: 200 }, '');
-                return {} as any;
-            });
-            await rokuDeploy['doGetRequest']({
-                url: 'https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=super-secret-token'
-            } as any);
-            expect(infoStub.getCall(0).args[1]).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=<redacted>');
-        });
-    });
-
     describe('getRokuMessagesFromResponseBody', () => {
         it('exits on unknown message type', () => {
             const result = rokuDeploy['getRokuMessagesFromResponseBody'](`
@@ -865,7 +829,7 @@ describe('RokuDeploy', () => {
             expect(result.json).to.be.undefined;
         });
 
-        it('routes an RCE device through the instance ecp1 proxy with the access_token query param', async () => {
+        it('routes an RCE device through the instance ecp1 proxy with the X-Authorization bearer header', async () => {
             const stub = mockDoGetRequest('<sgrendezvous><status>OK</status></sgrendezvous>');
 
             const result = await rokuDeploy.ecp(
@@ -873,7 +837,8 @@ describe('RokuDeploy', () => {
                 'query/sgrendezvous'
             );
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
             expect(result.json.sgrendezvous.status).to.equal('OK');
         });
 
@@ -1090,7 +1055,8 @@ describe('RokuDeploy', () => {
             expect(apps).to.eql([
                 { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
             ]);
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/apps?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/apps');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
     });
 
@@ -1134,7 +1100,8 @@ describe('RokuDeploy', () => {
             });
 
             expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/active-app?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/active-app');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
     });
 
@@ -1539,9 +1506,10 @@ describe('RokuDeploy', () => {
             expect(result.url).to.equal('http://1.2.3.4:999/a_b_c');
         });
 
-        it('builds an RCE sideload url with the access_token query param', async () => {
+        it('builds an RCE sideload url with the X-Authorization bearer header', async () => {
             const result = await rokuDeploy['generateBaseRequestOptions']('plugin_install', { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' }, { device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' }, password: 'password' });
-            expect(result.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+            expect(result.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install');
+            expect(result.headers).to.eql({ 'X-Authorization': 'Bearer token-value' });
         });
 
         it('throws a clear error for an RCE device config without an rceToken', async () => {
@@ -1720,21 +1688,22 @@ describe('RokuDeploy', () => {
         it('routes an RCE key press through the instance-api key route with a canonical key name', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Home?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Home');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
         it('sends literal text as Lit_<char> through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.sendText({ device: rceDevice, text: 'a' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a?');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a');
         });
 
         it('routes keydown and keyup through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
             await rokuDeploy.keyUp({ device: rceDevice, key: 'Down' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keydown/Down?');
-            expect(stub.getCall(1).args[0].url).to.contain('/api/v0/ecp1/keyup/Down?');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keydown/Down');
+            expect(stub.getCall(1).args[0].url).to.contain('/api/v0/ecp1/keyup/Down');
         });
 
         it('falls back to the raw ecp1 proxy (original-case key) when the instance-api route fails', async () => {
@@ -1747,8 +1716,9 @@ describe('RokuDeploy', () => {
             await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
 
             expect(stub.callCount).to.equal(2);
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Home?');
-            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Home');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+            expect(stub.getCall(1).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
         it('leaves a LAN key event on the direct HTTP ECP path (no instance-api route)', async () => {
@@ -1820,7 +1790,8 @@ describe('RokuDeploy', () => {
                 contentId: '123'
             });
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/launch/dev?contentId=123&access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/launch/dev?contentId=123');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
     });
 
@@ -1854,7 +1825,8 @@ describe('RokuDeploy', () => {
                 force: true
             });
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/exit-app/dev/true?access_token=secret');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/exit-app/dev/true');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
     });
 
@@ -1883,7 +1855,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(1).args[0].url).to.eql('http://0.0.0.0:80/alt_path');
         });
 
-        it('routes an RCE device through the instance sideload proxy with the access_token query param', async () => {
+        it('routes an RCE device through the instance sideload proxy with the X-Authorization bearer header', async () => {
             const stub = mockDoPostRequest();
             await rokuDeploy.sideload({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
@@ -1892,7 +1864,8 @@ describe('RokuDeploy', () => {
                 close: false
             });
             const requestOptions = stub.getCall(1).args[0];
-            expect(requestOptions.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+            expect(requestOptions.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install');
+            expect(requestOptions.headers).to.eql({ 'X-Authorization': 'Bearer token-value' });
             expect(requestOptions.auth).to.eql({
                 user: 'rokudev',
                 pass: 'devpassword',
@@ -4447,13 +4420,14 @@ describe('RokuDeploy', () => {
             expect(result).not.to.be.undefined;
         });
 
-        it('routes an RCE device through the instance sideload proxy with the access_token query param', async () => {
+        it('routes an RCE device through the instance sideload proxy with the X-Authorization bearer header', async () => {
             const stub = mockDoPostRequest();
             await rokuDeploy.deleteDevChannel({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
                 password: 'password'
             });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install?access_token=token-value');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_install');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer token-value' });
         });
 
         it('throws a clear error when an RCE device config has no rceToken', async () => {
@@ -4655,9 +4629,11 @@ describe('RokuDeploy', () => {
                 password: 'password'
             });
 
-            expect(postStub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_inspect?access_token=token-value');
+            expect(postStub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/sideload/plugin_inspect');
+            expect(postStub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer token-value' });
             const getCallArgs = (request.get as sinon.SinonStub).getCall(0).args[0];
-            expect(getCallArgs.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/pkgs/dev.jpg?time=1649939615&access_token=token-value');
+            expect(getCallArgs.url).to.equal('https://device.rce.roku.com/instance/abc/sideload/pkgs/dev.jpg?time=1649939615');
+            expect(getCallArgs.headers).to.eql({ 'X-Authorization': 'Bearer token-value' });
         });
 
         it('take a screenshot from the device and saves to supplied dir', async () => {

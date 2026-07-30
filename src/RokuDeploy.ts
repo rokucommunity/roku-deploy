@@ -355,16 +355,11 @@ export class RokuDeploy {
         const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
         const username = mergedOptions.username ?? RokuDeploy.defaults.username;
 
-        const { baseUrl, query } = await this.getInstallerBaseUrl(deviceConfig, packagePort);
-        let url = `${baseUrl}/${requestPath}`;
-        //append the query string (if any) rather than assuming the base has none, since `requestPath` can
-        //itself already carry a query string (for example the screenshot image path returned by the device)
-        if (query) {
-            url += (url.includes('?') ? '&' : '?') + query;
-        }
+        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
         let baseRequestOptions = {
-            url: url,
+            url: `${baseUrl}/${requestPath}`,
             timeout: timeout,
+            headers: headers,
             auth: {
                 user: username,
                 pass: mergedOptions.password,
@@ -377,20 +372,20 @@ export class RokuDeploy {
     }
 
     /**
-     * Resolve the installer base url (and any query string that must be appended to every request) for a
-     * device config. Local devices hit the classic port-80 dev installer directly; RCE devices are reached
-     * through the instance api's `/sideload` proxy, which forwards to the emulated device's installer.
+     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
+     * device's installer. Local devices hit the classic port-80 dev installer directly; RCE devices are
+     * reached through the instance api's `/sideload` proxy, which forwards to the emulated device's installer.
      *
-     * The RCE instance api sits behind a service mesh that authenticates via the `access_token` query
-     * parameter (rather than the `Authorization` header, which is reserved for the installer's own HTTP
-     * Digest challenge) - see the RCE sideload recipe notes for the full explanation of why both auth layers
-     * are needed and why they can't share the `Authorization` header.
+     * The RCE instance api sits behind a service mesh that authenticates the bearer token via the
+     * `X-Authorization` header (rather than the standard `Authorization` header, which is reserved for
+     * the installer's own HTTP Digest challenge) - two independent auth layers that can't share the
+     * `Authorization` header.
      */
-    private async getInstallerBaseUrl(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; query: string }> {
+    private async getInstallerRequestBase(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
         if (!isRceDeviceConfig(deviceConfig)) {
             return {
                 baseUrl: `http://${deviceConfig.host}:${packagePort}`,
-                query: ''
+                headers: {}
             };
         }
         if (!deviceConfig.rceToken) {
@@ -399,18 +394,27 @@ export class RokuDeploy {
         const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
         return {
             baseUrl: `${instanceUrl}/sideload`,
-            query: `access_token=${deviceConfig.rceToken}`
+            headers: this.buildRceAuthHeaders(deviceConfig.rceToken)
         };
     }
 
     /**
-     * Resolve the ECP base url (and any query string that must be appended to every request) for a
-     * device config. Local devices hit the HTTP ECP port directly; RCE devices are reached through
+     * Build the headers that authenticate a request to the RCE instance api's service mesh. The bearer
+     * token rides the `X-Authorization` header so the standard `Authorization` header stays free for
+     * whatever the proxied device endpoint itself requires (the installer's HTTP Digest, for example).
+     */
+    private buildRceAuthHeaders(rceToken: string): Record<string, string> {
+        return { 'X-Authorization': `Bearer ${rceToken}` };
+    }
+
+    /**
+     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
+     * device's ECP server. Local devices hit the HTTP ECP port directly; RCE devices are reached through
      * the instance's raw `/ecp1` proxy, which forwards to the emulated device's ECP port and
-     * authenticates via the `access_token` query parameter (the same service-mesh auth carrier the
+     * authenticates via the `X-Authorization` bearer header (the same service-mesh auth carrier the
      * installer proxy uses).
      */
-    private async getEcpBaseUrl(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; query: string }> {
+    private async getEcpRequestBase(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
         if (!isRceDeviceConfig(deviceConfig)) {
             let host = this.getHost(deviceConfig);
             //if the host is a DNS name, look up the IP address
@@ -421,7 +425,7 @@ export class RokuDeploy {
             }
             return {
                 baseUrl: `http://${host}:${ecpPort}`,
-                query: ''
+                headers: {}
             };
         }
         if (!deviceConfig.rceToken) {
@@ -430,7 +434,7 @@ export class RokuDeploy {
         const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
         return {
             baseUrl: `${instanceUrl}/ecp1`,
-            query: `access_token=${deviceConfig.rceToken}`
+            headers: this.buildRceAuthHeaders(deviceConfig.rceToken)
         };
     }
 
@@ -458,15 +462,8 @@ export class RokuDeploy {
         const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
-        const { baseUrl, query } = await this.getEcpBaseUrl(deviceConfig, ecpPort);
-        let url = `${baseUrl}/${route}`;
-        //append the query string (if any) rather than assuming the route has none, since deep-link
-        //launch routes carry their own query params
-        if (query) {
-            url += (url.includes('?') ? '&' : '?') + query;
-        }
-
-        const requestOptions: RequestOptions = { url: url, timeout: timeout };
+        const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
+        const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
         const verify = options.verify ?? false;
         const response = options.method === 'POST'
             ? await this.doPostRequest(requestOptions, verify)
@@ -609,15 +606,15 @@ export class RokuDeploy {
                 }
                 const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
                 const key = this.toCanonicalRemoteKey(options.key);
-                const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}?access_token=${deviceConfig.rceToken}`;
-                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout }, true);
+                const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(deviceConfig.rceToken) }, true);
                 return {
                     status: response?.response?.statusCode,
                     body: response?.body,
                     json: undefined
                 } as EcpResult;
             } catch (e) {
-                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', this.scrubAccessToken((e as Error)?.message ?? ''));
+                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
             }
         }
 
@@ -1193,7 +1190,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doPostRequest(params: RequestOptions, verify = true) {
-        this.logger.info('handling POST request to', this.scrubAccessToken(params.url));
+        this.logger.info('handling POST request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -1216,7 +1213,7 @@ export class RokuDeploy {
      * @param params
      */
     private async doGetRequest(params: RequestOptions, verify = true) {
-        this.logger.info('handling GET request to', this.scrubAccessToken(params.url));
+        this.logger.info('handling GET request to', params.url);
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
 
             this.setUserAgentIfMissing(params);
@@ -1232,15 +1229,6 @@ export class RokuDeploy {
             this.checkRequest(results);
         }
         return results as HttpResponse;
-    }
-
-    /**
-     * Redact the RCE management-api token (the `access_token` query parameter on RCE installer urls) before
-     * logging a url, so it never ends up in logs.
-     */
-    private scrubAccessToken(url: string): string {
-        //some callers exercise these request helpers with incomplete params (no url at all); leave those untouched
-        return url ? url.replace(/access_token=[^&]*/i, 'access_token=<redacted>') : url;
     }
 
     private checkRequest(results: { response?: any; body?: any }) {
@@ -1757,10 +1745,10 @@ export class RokuDeploy {
         const port = options.port ?? 80;
         const timeout = options.timeout ?? 3000;
 
-        const { baseUrl, query } = await this.getInstallerBaseUrl(deviceConfig, port);
-        const url = query ? `${baseUrl}/plugin_install?${query}` : `${baseUrl}/plugin_install`;
+        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
+        const url = `${baseUrl}/plugin_install`;
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
-        //from before), an RCE device by its installer base url (never includes the access_token query param)
+        //from before), an RCE device by its installer base url (never includes credentials)
         const displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
 
         let response: Response;
@@ -1769,7 +1757,8 @@ export class RokuDeploy {
                 method: 'HEAD',
                 username: username,
                 password: options.password,
-                timeout: timeout
+                timeout: timeout,
+                headers: headers
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
