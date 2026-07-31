@@ -1,5 +1,7 @@
 /* eslint-disable camelcase */
 import * as needle from 'needle';
+import type { RceDeviceConfig } from './DeviceConfig';
+import { isRceById, isRceByUrl } from './DeviceConfig';
 
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API. This is the core management
@@ -125,6 +127,27 @@ export class RceManagementClient {
     }
 
     /**
+     * Resolve an RCE device config to its live instance API URL (trailing slashes stripped). An
+     * instanceUrl-addressed config is returned directly; an id- or esn-addressed config is resolved
+     * through the management api and must be running.
+     */
+    public async getInstanceUrl(config: RceDeviceConfig): Promise<string> {
+        let instanceUrl: string;
+        if (isRceByUrl(config)) {
+            instanceUrl = config.instanceUrl;
+        } else if (isRceById(config)) {
+            instanceUrl = await this.getRunningInstanceApiUrl(Number(config.id));
+        } else {
+            const device = await this.findDeviceByEsn(config.esn);
+            if (!device) {
+                throw new Error(`No RCE device found with esn '${config.esn}'`);
+            }
+            instanceUrl = await this.getRunningInstanceApiUrl(device.id);
+        }
+        return instanceUrl.replace(/\/+$/, '');
+    }
+
+    /**
      * Resolve the live instance API URL for a running device, throwing when the device is not running.
      * This is the base URL a caller uses to talk ECP and logs directly to the instance.
      */
@@ -195,7 +218,7 @@ export interface RceManagementClientOptions {
 
 export type HttpMethod = 'get' | 'post' | 'patch' | 'delete';
 
-export type DeviceId = number | string;
+export type DeviceId = number;
 
 export interface ListDevicesOptions {
     items?: number;

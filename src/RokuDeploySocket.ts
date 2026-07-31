@@ -3,7 +3,7 @@ import * as stream from 'stream';
 import * as WebSocket from 'ws';
 import type { DeviceConfig, RceDeviceConfig } from './DeviceConfig';
 import { isLocalDeviceConfig, isRceById, isRceByUrl, isRceDeviceConfig } from './DeviceConfig';
-import { RceDevice } from './RceDevice';
+import { RceManagementClient } from './RceManagementClient';
 
 /**
  * Creates a transport for one of a Roku device's telnet consoles (for example the BrightScript
@@ -21,34 +21,34 @@ import { RceDevice } from './RceDevice';
  * real `net.Socket` and this factory's own RCE implementation. Callers that only care about console
  * bytes never need to know (or change any of their code based on) which transport they got.
  */
-export function createTelnetSocket(options: TelnetSocketOptions): TelnetSocket {
+export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket {
     //runtime guard for javascript callers, since a registry name (string) cannot be resolved to a
     //device config without the registry this function does not have access to
     if (typeof (options.device as unknown) === 'string') {
-        throw new Error('Device registry names are not supported by createTelnetSocket; provide a device config object');
+        throw new Error('Device registry names are not supported by createRokuDeploySocket; provide a device config object');
     }
     //runtime guard for javascript callers (and for optional ports that were never defaulted
     //upstream), since the port addresses the device console on both transports
     if (!Number.isInteger(options.port) || options.port <= 0) {
-        throw new Error(`createTelnetSocket requires a valid port number (received ${String(options.port)})`);
+        throw new Error(`createRokuDeploySocket requires a valid port number (received ${String(options.port)})`);
     }
 
     if (isLocalDeviceConfig(options.device)) {
-        return new LocalTelnetSocket(options.device.host, options.port);
+        return new LocalSocket(options.device.host, options.port);
     }
     if (isRceDeviceConfig(options.device)) {
-        return new RceTelnetSocket(options.device, options.port, options);
+        return new RceSocket(options.device, options.port, options);
     }
     throw new Error('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
 }
 
 /**
  * A `net.Socket` wired up to connect to a local device's plain-tcp telnet console using the host and
- * port resolved by `createTelnetSocket()`. Every behavior other than `connect()` is real
+ * port resolved by `createRokuDeploySocket()`. Every behavior other than `connect()` is real
  * `net.Socket` behavior inherited unchanged; that is the entire point of extending it directly
  * instead of wrapping it in another layer.
  */
-export class LocalTelnetSocket extends net.Socket {
+export class LocalSocket extends net.Socket {
     constructor(
         private readonly host: string,
         private readonly port: number
@@ -62,7 +62,7 @@ export class LocalTelnetSocket extends net.Socket {
      * instance was constructed, so there is nothing left for a caller to specify here. The
      * additional overloads below exist only so this override remains structurally compatible with
      * `net.Socket`'s own `connect()` overloads; nothing in this codebase calls them on a
-     * `LocalTelnetSocket` directly.
+     * `LocalRokuDeploySocket` directly.
      */
     public connect(connectListener?: () => void): this;
     public connect(connectOptions: net.SocketConnectOpts, connectListener?: () => void): this;
@@ -95,11 +95,11 @@ export class LocalTelnetSocket extends net.Socket {
  * `_write`, `_writableState`, `_read`, and `_readableState`, all of which only a real Node stream
  * provides.
  */
-export class RceTelnetSocket extends stream.Duplex {
+export class RceSocket extends stream.Duplex {
     constructor(
         private readonly device: RceDeviceConfig,
         private readonly port: number,
-        options: TelnetSocketOptions
+        options: SocketOptions
     ) {
         super();
         this.createWebSocket = options.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, requestOptions));
@@ -129,10 +129,25 @@ export class RceTelnetSocket extends stream.Duplex {
         return this;
     }
 
+    /**
+     * Resolve the device to its live instance API URL: an instanceUrl-addressed config is used
+     * directly, an id- or esn-addressed config is resolved through the RCE management api (which
+     * requires the config's rceToken).
+     */
+    private async resolveInstanceUrl(): Promise<string> {
+        if (isRceByUrl(this.device)) {
+            return this.device.instanceUrl.replace(/\/+$/, '');
+        }
+        if (!this.device.rceToken) {
+            throw new Error('An rceToken is required to resolve an RCE device by id or esn');
+        }
+        return new RceManagementClient({ token: this.device.rceToken }).getInstanceUrl(this.device);
+    }
+
     private async beginConnecting(): Promise<void> {
         let instanceUrl: string;
         try {
-            instanceUrl = await new RceDevice(this.device).getInstanceUrl();
+            instanceUrl = await this.resolveInstanceUrl();
         } catch (error) {
             this.failConnection(new Error(`Failed to resolve the RCE instance url for ${this.describeTarget()}: ${(error as Error).message}`));
             return;
@@ -157,7 +172,7 @@ export class RceTelnetSocket extends stream.Duplex {
         });
         webSocket.on('message', (data: WebSocket.RawData) => {
             this.markActivity();
-            this.push(RceTelnetSocket.toBuffer(data));
+            this.push(RceSocket.toBuffer(data));
         });
         webSocket.on('error', (error: Error) => {
             this.failConnection(new Error(`RCE telnet websocket error for ${url}: ${error.message}`));
@@ -330,7 +345,7 @@ export class RceTelnetSocket extends stream.Duplex {
     }
 }
 
-export interface TelnetSocketOptions {
+export interface SocketOptions {
     /** the device to connect to. Registry names (strings) are not supported here; pass a resolved device config */
     device: DeviceConfig;
     /**
@@ -346,13 +361,13 @@ export interface TelnetSocketOptions {
 
 /**
  * The socket-shaped surface consumers write against instead of `net.Socket` directly. A real
- * `net.Socket` (and therefore `LocalTelnetSocket`, which extends it) satisfies this interface
- * structurally; `RceTelnetSocket` implements it directly. `remoteAddress`, `remotePort`,
+ * `net.Socket` (and therefore `LocalRokuDeploySocket`, which extends it) satisfies this interface
+ * structurally; `RceRokuDeploySocket` implements it directly. `remoteAddress`, `remotePort`,
  * `localAddress`, `localPort`, `localFamily`, and `timeout` are informational fields carried over
  * from `net.Socket` for logging; an RCE connection has no tcp-level address to report for the first
  * five, so it always reports `undefined` for those.
  */
-export interface TelnetSocket extends NodeJS.ReadWriteStream {
+export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
     connect: (connectListener?: () => void) => this;
     destroy: (error?: Error) => this;
     end: ((callback?: () => void) => this) &

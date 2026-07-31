@@ -65,6 +65,11 @@ export interface RokuDeployConstructorOptions {
      * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
      */
     timeout?: number;
+    /**
+     * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
+     * rceToken of its own. A config-supplied rceToken always wins over this default.
+     */
+    rceToken?: string;
 }
 
 export interface RokuDeployOptions {

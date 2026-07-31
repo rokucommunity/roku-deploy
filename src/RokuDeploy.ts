@@ -27,7 +27,7 @@ import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
-import { RceDevice } from './RceDevice';
+import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
@@ -119,12 +119,12 @@ export class RokuDeploy {
     public readonly logger: typeof logger;
 
     /**
-     * One `RceDevice` per unique RCE device config, cached for the lifetime of this `RokuDeploy` instance.
-     * `RceDevice` itself memoizes the resolved instance url, so reusing the same instance across a
-     * multi-request flow (for example sideload's closeChannel -> deleteDevChannel -> plugin_install) avoids
-     * re-resolving the instance url through the management api on every request.
+     * One resolved instance url per unique RCE device config, cached for the lifetime of this
+     * `RokuDeploy` instance, so a multi-request flow (for example sideload's closeChannel ->
+     * deleteDevChannel -> plugin_install) avoids re-resolving the instance url through the
+     * management api on every request. Failed resolutions are evicted so the next call retries.
      */
-    private readonly rceDevicesByCacheKey = new Map<string, RceDevice>();
+    private readonly rceInstanceUrlsByCacheKey = new Map<string, Promise<string>>();
 
     /**
      * Create a new RokuDeploy instance with optional default options
@@ -388,13 +388,14 @@ export class RokuDeploy {
                 headers: {}
             };
         }
-        if (!deviceConfig.rceToken) {
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
             throw new Error('An rceToken is required to reach the installer on an RCE device');
         }
-        const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
         return {
             baseUrl: `${instanceUrl}/sideload`,
-            headers: this.buildRceAuthHeaders(deviceConfig.rceToken)
+            headers: this.buildRceAuthHeaders(rceToken)
         };
     }
 
@@ -405,6 +406,14 @@ export class RokuDeploy {
      */
     private buildRceAuthHeaders(rceToken: string): Record<string, string> {
         return { 'X-Authorization': `Bearer ${rceToken}` };
+    }
+
+    /**
+     * Resolve the effective RCE token for a device config: the config's own rceToken when present,
+     * otherwise the constructor-supplied default rceToken.
+     */
+    private getRceToken(deviceConfig: RceDeviceConfig): string | undefined {
+        return deviceConfig.rceToken ?? this.options.rceToken;
     }
 
     /**
@@ -428,13 +437,14 @@ export class RokuDeploy {
                 headers: {}
             };
         }
-        if (!deviceConfig.rceToken) {
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
             throw new Error('An rceToken is required to reach ECP on an RCE device');
         }
-        const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
         return {
             baseUrl: `${instanceUrl}/ecp1`,
-            headers: this.buildRceAuthHeaders(deviceConfig.rceToken)
+            headers: this.buildRceAuthHeaders(rceToken)
         };
     }
 
@@ -500,28 +510,54 @@ export class RokuDeploy {
     }
 
     /**
-     * Get (or create) the `RceDevice` for a given RCE device config. Devices are cached by their
-     * identifying fields so repeated calls for the same logical device - even across separately-resolved
-     * `DeviceConfig` objects, as happens with registry-name lookups - reuse the same instance and its
-     * memoized instance url.
+     * Resolve (and memoize) the live instance API URL for an RCE device config. Resolutions are
+     * cached by the device's identifying fields so repeated calls for the same logical device -
+     * even across separately-resolved `DeviceConfig` objects, as happens with registry-name
+     * lookups - reuse the memoized instance url.
      */
-    private getRceDevice(deviceConfig: RceDeviceConfig): RceDevice {
-        const cacheKey = this.getRceDeviceCacheKey(deviceConfig);
-        let rceDevice = this.rceDevicesByCacheKey.get(cacheKey);
-        if (!rceDevice) {
-            rceDevice = new RceDevice(deviceConfig);
-            this.rceDevicesByCacheKey.set(cacheKey, rceDevice);
+    private getRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
+        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
+        let instanceUrlPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
+        if (instanceUrlPromise === undefined) {
+            instanceUrlPromise = this.resolveRceInstanceUrl(deviceConfig);
+            this.rceInstanceUrlsByCacheKey.set(cacheKey, instanceUrlPromise);
+            //only successful resolutions stay cached; a failure must not poison every later request
+            instanceUrlPromise.catch(() => this.rceInstanceUrlsByCacheKey.delete(cacheKey));
         }
-        return rceDevice;
+        return instanceUrlPromise;
+    }
+
+    /**
+     * Resolve the live instance API URL for an RCE device config: an instanceUrl-addressed config is
+     * used directly, an id- or esn-addressed config is resolved through the RCE management api using
+     * the effective token.
+     */
+    private async resolveRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
+        if (isRceByUrl(deviceConfig)) {
+            return deviceConfig.instanceUrl.replace(/\/+$/, '');
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to resolve an RCE device by id or esn');
+        }
+        return this.createRceManagementClient(rceToken).getInstanceUrl(deviceConfig);
+    }
+
+    /**
+     * Create the management client used to resolve an id- or esn-addressed RCE device to its running
+     * instance URL. Split out so tests can supply a fake.
+     */
+    protected createRceManagementClient(rceToken: string): RceManagementClient {
+        return new RceManagementClient({ token: rceToken });
     }
 
     /**
      * Build a stable cache key for an RCE device config from its identifying field (whichever of
-     * `instanceUrl`, `id`, or `esn` is present) plus its token, so a differently-tokened config for the
-     * same identifier does not reuse another config's cached device.
+     * `instanceUrl`, `id`, or `esn` is present) plus its effective token, so a differently-tokened
+     * config for the same identifier does not reuse another config's cached instance url.
      */
-    private getRceDeviceCacheKey(deviceConfig: RceDeviceConfig): string {
-        const token = deviceConfig.rceToken ?? '';
+    private getRceInstanceUrlCacheKey(deviceConfig: RceDeviceConfig): string {
+        const token = this.getRceToken(deviceConfig) ?? '';
         if (isRceByUrl(deviceConfig)) {
             return `instanceUrl:${deviceConfig.instanceUrl}:${token}`;
         }
@@ -570,6 +606,62 @@ export class RokuDeploy {
     }
 
     /**
+     * Press a sequence of remote keys, in order. Each press rides the same transport as `keyPress`
+     * (LAN ECP for local devices; the RCE instance-api key route with the raw ecp1-proxy fallback
+     * for Cloud Emulator devices), waits for the previous press's response plus a small delay
+     * (keyDelayMs) so on-screen navigation keeps up, and the first failed press throws with the
+     * failing key and step.
+     */
+    public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
+        options = { ...this.options, ...options } as SendKeySequenceOptions;
+        this.checkRequiredOptions(options, ['device', 'keys']);
+        const keyDelayMs = options.keyDelayMs ?? 250;
+        for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
+            if (stepIndex > 0 && keyDelayMs > 0) {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, keyDelayMs);
+                });
+            }
+            const key = options.keys[stepIndex];
+            let result: EcpResult;
+            try {
+                result = await this.keyPress({ device: options.device, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
+            } catch (error) {
+                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
+            }
+            if (result?.status && (result.status < 200 || result.status >= 300)) {
+                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed (status ${result.status})`);
+            }
+        }
+    }
+
+    /**
+     * Enter the developer-settings key combo on a Roku Cloud Emulator device through its instance
+     * api (the same combo a physical remote's key sequence would send). The device then shows the
+     * on-screen developer setup wizard for the user to complete; this call only triggers that
+     * screen, it does not finish the setup itself. Local devices are not supported - the combo
+     * endpoint only exists on the RCE instance api.
+     */
+    public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
+        options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
+        this.checkRequiredOptions(options, ['device']);
+        const deviceConfig = this.resolveDevice(options.device);
+        if (!isRceDeviceConfig(deviceConfig)) {
+            throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to reach the instance api on an RCE device');
+        }
+        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+        await this.doPostRequest({
+            url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
+            timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+            headers: this.buildRceAuthHeaders(rceToken)
+        }, true);
+    }
+
+    /**
      * Normalize a key name to its canonical `RemoteKey` casing for the RCE instance-api key-input
      * route, which rejects a wrong-case key with a 422 (the raw ECP proxy and LAN ECP accept any
      * case). A key that matches a `RemoteKey` value case-insensitively is returned in that canonical
@@ -601,13 +693,14 @@ export class RokuDeploy {
         const deviceConfig = this.resolveDevice(options.device);
         if (isRceDeviceConfig(deviceConfig)) {
             try {
-                if (!deviceConfig.rceToken) {
+                const rceToken = this.getRceToken(deviceConfig);
+                if (!rceToken) {
                     throw new Error('An rceToken is required to reach ECP on an RCE device');
                 }
-                const instanceUrl = await this.getRceDevice(deviceConfig).getInstanceUrl();
+                const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                 const key = this.toCanonicalRemoteKey(options.key);
                 const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
-                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(deviceConfig.rceToken) }, true);
+                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 return {
                     status: response?.response?.statusCode,
                     body: response?.body,
@@ -2422,6 +2515,18 @@ export interface KeyPressOptions extends BaseEcpOptions {
 export interface SendTextOptions extends BaseEcpOptions {
     text: string;
 }
+
+export interface SendKeySequenceOptions extends BaseEcpOptions {
+    /** The remote keys to press, in order. */
+    keys: RemoteKeyText[];
+    /**
+     * The pause between consecutive key presses, in milliseconds, so on-screen navigation keeps up
+     * with the input. Defaults to 250.
+     */
+    keyDelayMs?: number;
+}
+
+export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
 export type CloseChannelOptions = BaseEcpOptions;
 

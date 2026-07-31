@@ -12,7 +12,7 @@ import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, 
 import undent from 'undent';
 import { standardizePath as s } from './util';
 import { RceManagementClient } from './RceManagementClient';
-import { createTelnetSocket } from './TelnetSocket';
+import { createRokuDeploySocket } from './RokuDeploySocket';
 import type { DeviceConfig } from './DeviceConfig';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
@@ -89,7 +89,7 @@ const REQUEST_TIMEOUT = 30_000;
 
         //resolve the device through the management api and fail fast if it isn't already running. This
         //suite talks directly to a running instance and never starts one on the caller's behalf.
-        const device = await managementClient.getDevice(RCE_DEVICE_ID);
+        const device = await managementClient.getDevice(Number(RCE_DEVICE_ID));
         if (device.status !== 'running') {
             throw new Error(
                 `RCE device ${RCE_DEVICE_ID} is not running (status '${device.status}'). Start it from the ` +
@@ -1075,7 +1075,7 @@ const REQUEST_TIMEOUT = 30_000;
  */
 function waitForConsoleOutput(device: DeviceConfig, marker: string, timeout: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-        const socket = createTelnetSocket({ device: device, port: 8085 });
+        const socket = createRokuDeploySocket({ device: device, port: 8085 });
         let buffer = '';
         const timer = setTimeout(() => {
             cleanup();

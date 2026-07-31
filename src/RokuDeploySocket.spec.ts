@@ -3,8 +3,8 @@ import * as sinonImport from 'sinon';
 import * as net from 'net';
 import { EventEmitter } from 'events';
 import type * as WebSocket from 'ws';
-import { createTelnetSocket } from './TelnetSocket';
-import type { TelnetSocket, TelnetSocketOptions } from './TelnetSocket';
+import { createRokuDeploySocket } from './RokuDeploySocket';
+import type { RokuDeploySocket, SocketOptions } from './RokuDeploySocket';
 
 let sinon: sinonImport.SinonSandbox;
 beforeEach(() => {
@@ -80,9 +80,9 @@ class FakeWebSocket extends EventEmitter {
     }
 }
 
-describe('createTelnetSocket', () => {
+describe('createRokuDeploySocket', () => {
     it('throws when given a registry name string instead of a device config', () => {
-        expect(() => createTelnetSocket({ device: 'my-device' as any, port: 8085 })).to.throw('Device registry names are not supported');
+        expect(() => createRokuDeploySocket({ device: 'my-device' as any, port: 8085 })).to.throw('Device registry names are not supported');
     });
 
     describe('local device', () => {
@@ -102,14 +102,14 @@ describe('createTelnetSocket', () => {
 
         it('connects to the given port', () => {
             stubRealSocketConnect();
-            createTelnetSocket({ device: { host: '1.2.3.4' }, port: 8085 }).connect();
+            createRokuDeploySocket({ device: { host: '1.2.3.4' }, port: 8085 }).connect();
             expect(connectedArguments).to.eql([{ port: 8085, host: '1.2.3.4' }]);
         });
 
         it('throws when the port is missing or invalid', () => {
-            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' } } as any)).to.throw('requires a valid port number');
-            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' }, port: 0 })).to.throw('requires a valid port number');
-            expect(() => createTelnetSocket({ device: { host: '1.2.3.4' }, port: 8085.5 })).to.throw('requires a valid port number');
+            expect(() => createRokuDeploySocket({ device: { host: '1.2.3.4' } } as any)).to.throw('requires a valid port number');
+            expect(() => createRokuDeploySocket({ device: { host: '1.2.3.4' }, port: 0 })).to.throw('requires a valid port number');
+            expect(() => createRokuDeploySocket({ device: { host: '1.2.3.4' }, port: 8085.5 })).to.throw('requires a valid port number');
         });
 
         describe('against a real tcp server', function performRealTcpServerTests() {
@@ -119,7 +119,7 @@ describe('createTelnetSocket', () => {
 
             let server: net.Server | undefined;
             let serverSocket: net.Socket | undefined;
-            let telnetSocket: TelnetSocket | undefined;
+            let telnetSocket: RokuDeploySocket | undefined;
 
             afterEach(async () => {
                 telnetSocket?.destroy();
@@ -167,7 +167,7 @@ describe('createTelnetSocket', () => {
 
             it('connects with no arguments to the configured host and port', async () => {
                 const port = await startEphemeralServer();
-                telnetSocket = createTelnetSocket({ device: { host: '127.0.0.1' }, port: port });
+                telnetSocket = createRokuDeploySocket({ device: { host: '127.0.0.1' }, port: port });
 
                 await new Promise<void>((resolve) => {
                     telnetSocket.connect(() => resolve());
@@ -176,7 +176,7 @@ describe('createTelnetSocket', () => {
 
             it('passes data both ways once connected', async () => {
                 const port = await startEphemeralServer();
-                telnetSocket = createTelnetSocket({ device: { host: '127.0.0.1' }, port: port });
+                telnetSocket = createRokuDeploySocket({ device: { host: '127.0.0.1' }, port: port });
 
                 await new Promise<void>((resolve) => {
                     telnetSocket.connect(() => resolve());
@@ -202,7 +202,7 @@ describe('createTelnetSocket', () => {
         let fakeWebSocket: FakeWebSocket;
         let capturedWebSocketUrl: string | undefined;
         let capturedWebSocketOptions: WebSocket.ClientOptions | undefined;
-        let createdTelnetSockets: TelnetSocket[] = [];
+        let createdTelnetSockets: RokuDeploySocket[] = [];
 
         afterEach(() => {
             for (const createdTelnetSocket of createdTelnetSockets) {
@@ -211,11 +211,11 @@ describe('createTelnetSocket', () => {
             createdTelnetSockets = [];
         });
 
-        function createRceTelnetSocket(overrides: Partial<TelnetSocketOptions> = {}): TelnetSocket {
+        function createRceTelnetSocket(overrides: Partial<SocketOptions> = {}): RokuDeploySocket {
             fakeWebSocket = new FakeWebSocket();
             capturedWebSocketUrl = undefined;
             capturedWebSocketOptions = undefined;
-            const telnetSocket = createTelnetSocket({
+            const telnetSocket = createRokuDeploySocket({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
                 port: 8085,
                 createWebSocket: (url, requestOptions) => {

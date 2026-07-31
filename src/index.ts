@@ -5,7 +5,6 @@ export * from './RokuDeployOptions';
 export * from './Errors';
 export * from './DeviceInfo';
 export * from './DeviceConfig';
-export * from './RceDevice';
 export * from './RceManagementClient';
 export * from './RceVideoSignalingClient';
-export * from './TelnetSocket';
+export * from './RokuDeploySocket';
