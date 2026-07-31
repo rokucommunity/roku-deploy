@@ -30,100 +30,100 @@ export class RceManagementClient {
     /**
      * Get the authenticated user and their organisation (device/snapshot limits, current counts).
      */
-    public getUserInfo(): Promise<UserOut> {
-        return this.send('get', '/user/me');
+    public getUserInfo(options: GetUserInfoOptions = {}): Promise<UserOut> {
+        return this.send('get', '/user/me', { token: options.token });
     }
 
     /**
      * List the firmware versions available for creating and starting devices.
      */
-    public listFirmwareVersions(): Promise<FirmwareVersionOut[]> {
-        return this.send('get', '/firmwareVersions');
+    public listFirmwareVersions(options: ListFirmwareVersionsOptions = {}): Promise<FirmwareVersionOut[]> {
+        return this.send('get', '/firmwareVersions', { token: options.token });
     }
 
     /**
      * List the caller's devices.
      */
     public listDevices(options: ListDevicesOptions = {}): Promise<DeviceOut[]> {
-        return this.send('get', '/devices', { query: { items: options.items, page: options.page } });
+        return this.send('get', '/devices', { query: { items: options.items, page: options.page }, token: options.token });
     }
 
     /**
      * Get a single device by id.
      */
-    public getDevice(deviceId: DeviceId): Promise<DeviceOut> {
-        return this.send('get', `/devices/${deviceId}`);
+    public getDevice(options: GetDeviceOptions): Promise<DeviceOut> {
+        return this.send('get', `/devices/${options.deviceId}`, { token: options.token });
     }
 
     /**
      * Create a new device.
      */
-    public createDevice(device: DeviceCreate): Promise<DeviceOut> {
-        return this.send('post', '/devices', { body: device });
+    public createDevice(options: CreateDeviceOptions): Promise<DeviceOut> {
+        return this.send('post', '/devices', { body: options.device, token: options.token });
     }
 
     /**
      * Update a device's mutable fields (name, account name, note, properties).
      */
-    public updateDevice(deviceId: DeviceId, update: DeviceUpdate): Promise<DeviceOut> {
-        return this.send('patch', `/devices/${deviceId}`, { body: update });
+    public updateDevice(options: UpdateDeviceOptions): Promise<DeviceOut> {
+        return this.send('patch', `/devices/${options.deviceId}`, { body: options.update, token: options.token });
     }
 
     /**
      * Boot a device from a snapshot. Resolves with the device, whose running_device block carries
      * the instance API URL and video (Janus) connection details.
      */
-    public startDevice(deviceId: DeviceId, start: DeviceStart): Promise<DeviceOut> {
-        return this.send('post', `/devices/${deviceId}/start`, { body: start });
+    public startDevice(options: StartDeviceOptions): Promise<DeviceOut> {
+        return this.send('post', `/devices/${options.deviceId}/start`, { body: options.start, token: options.token });
     }
 
     /**
      * Shut down a running device.
      */
-    public stopDevice(deviceId: DeviceId): Promise<DeviceOut> {
-        return this.send('post', `/devices/${deviceId}/stop`);
+    public stopDevice(options: StopDeviceOptions): Promise<DeviceOut> {
+        return this.send('post', `/devices/${options.deviceId}/stop`, { token: options.token });
     }
 
     /**
      * Get a device's run history.
      */
-    public getDeviceRuns(deviceId: DeviceId): Promise<DeviceRun[]> {
-        return this.send('get', `/devices/${deviceId}/runs`);
+    public getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]> {
+        return this.send('get', `/devices/${options.deviceId}/runs`, { token: options.token });
     }
 
     /**
      * Read the logs captured for a specific instance run of a device.
      */
-    public readLogs(deviceId: DeviceId, instanceId: number): Promise<string> {
-        return this.send('get', `/devices/${deviceId}/logs/${instanceId}`);
+    public readLogs(options: ReadLogsOptions): Promise<string> {
+        return this.send('get', `/devices/${options.deviceId}/logs/${options.instanceId}`, { token: options.token });
     }
 
-    public listSnapshots(deviceId: DeviceId): Promise<SnapshotOut[]> {
-        return this.send('get', `/devices/${deviceId}/snapshots`);
+    public listSnapshots(options: ListSnapshotsOptions): Promise<SnapshotOut[]> {
+        return this.send('get', `/devices/${options.deviceId}/snapshots`, { token: options.token });
     }
 
-    public createSnapshot(deviceId: DeviceId, snapshot: SnapshotCreate): Promise<SnapshotOut> {
-        return this.send('post', `/devices/${deviceId}/snapshots`, { body: snapshot });
+    public createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotOut> {
+        return this.send('post', `/devices/${options.deviceId}/snapshots`, { body: options.snapshot, token: options.token });
     }
 
-    public getSnapshot(deviceId: DeviceId, snapshotId: number): Promise<SnapshotOut> {
-        return this.send('get', `/devices/${deviceId}/snapshots/${snapshotId}`);
+    public getSnapshot(options: GetSnapshotOptions): Promise<SnapshotOut> {
+        return this.send('get', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { token: options.token });
     }
 
-    public updateSnapshot(deviceId: DeviceId, snapshotId: number, update: SnapshotUpdate): Promise<SnapshotOut> {
-        return this.send('patch', `/devices/${deviceId}/snapshots/${snapshotId}`, { body: update });
+    public updateSnapshot(options: UpdateSnapshotOptions): Promise<SnapshotOut> {
+        return this.send('patch', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { body: options.update, token: options.token });
     }
 
-    public deleteSnapshot(deviceId: DeviceId, snapshotId: number): Promise<void> {
-        return this.send('delete', `/devices/${deviceId}/snapshots/${snapshotId}`);
+    public deleteSnapshot(options: DeleteSnapshotOptions): Promise<void> {
+        return this.send('delete', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { token: options.token });
     }
 
     /**
      * Find a device by its serial number (ESN), or undefined when the caller has no such device.
      */
-    public async findDeviceByEsn(esn: string): Promise<DeviceOut | undefined> {
-        const devices = await this.listDevices();
-        return devices.find((device) => device.serial_number === esn);
+    public async findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<DeviceOut | undefined> {
+        const devices = await this.listDevices({ token: options.token });
+        return devices.find((device) => device.serial_number === options.esn);
     }
 
     /**
@@ -131,18 +131,19 @@ export class RceManagementClient {
      * instanceUrl-addressed config is returned directly; an id- or esn-addressed config is resolved
      * through the management api and must be running.
      */
-    public async getInstanceUrl(config: RceDeviceConfig): Promise<string> {
+    public async getInstanceUrl(options: GetInstanceUrlOptions): Promise<string> {
+        const config = options.device;
         let instanceUrl: string;
         if (isRceByUrl(config)) {
             instanceUrl = config.instanceUrl;
         } else if (isRceById(config)) {
-            instanceUrl = await this.getRunningInstanceApiUrl(Number(config.id));
+            instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: Number(config.id), token: options.token });
         } else {
-            const device = await this.findDeviceByEsn(config.esn);
+            const device = await this.findDeviceByEsn({ esn: config.esn, token: options.token });
             if (!device) {
                 throw new Error(`No RCE device found with esn '${config.esn}'`);
             }
-            instanceUrl = await this.getRunningInstanceApiUrl(device.id);
+            instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: device.id, token: options.token });
         }
         return instanceUrl.replace(/\/+$/, '');
     }
@@ -151,18 +152,18 @@ export class RceManagementClient {
      * Resolve the live instance API URL for a running device, throwing when the device is not running.
      * This is the base URL a caller uses to talk ECP and logs directly to the instance.
      */
-    public async getRunningInstanceApiUrl(deviceId: DeviceId): Promise<string> {
-        const device = await this.getDevice(deviceId);
+    public async getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string> {
+        const device = await this.getDevice({ deviceId: options.deviceId, token: options.token });
         const url = device.running_device?.instance_api_url;
         if (!url) {
-            throw new Error(`Device ${deviceId} is not running (status '${device.status}'); start it before connecting to its instance`);
+            throw new Error(`Device ${options.deviceId} is not running (status '${device.status}'); start it before connecting to its instance`);
         }
         return url;
     }
 
     /**
      * Single choke point for HTTP so auth and error handling stay consistent, and so tests can stub
-     * one method rather than the network.
+     * one method rather than the network. A per-call token wins over the constructor token.
      */
     protected send<TResponse>(method: HttpMethod, path: string, options: SendOptions = {}): Promise<TResponse> {
         const url = this.baseUrl + path + this.buildQueryString(options.query);
@@ -170,7 +171,7 @@ export class RceManagementClient {
             json: true,
             timeout: this.timeout,
             headers: {
-                Authorization: `Bearer ${this.token}`,
+                Authorization: `Bearer ${options.token ?? this.token}`,
                 Accept: 'application/json'
             }
         };
@@ -220,14 +221,100 @@ export type HttpMethod = 'get' | 'post' | 'patch' | 'delete';
 
 export type DeviceId = number;
 
-export interface ListDevicesOptions {
+/**
+ * Options accepted by every RceManagementClient call.
+ */
+export interface RceManagementRequestOptions {
+    /**
+     * RCE bearer token to use for this call, overriding the client's constructor token.
+     */
+    token?: string;
+}
+
+export type GetUserInfoOptions = RceManagementRequestOptions;
+
+export type ListFirmwareVersionsOptions = RceManagementRequestOptions;
+
+export interface ListDevicesOptions extends RceManagementRequestOptions {
     items?: number;
     page?: number;
+}
+
+export interface GetDeviceOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+}
+
+export interface CreateDeviceOptions extends RceManagementRequestOptions {
+    device: DeviceCreate;
+}
+
+export interface UpdateDeviceOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    update: DeviceUpdate;
+}
+
+export interface StartDeviceOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    start: DeviceStart;
+}
+
+export interface StopDeviceOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+}
+
+export interface GetDeviceRunsOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+}
+
+export interface ReadLogsOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    instanceId: number;
+}
+
+export interface ListSnapshotsOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+}
+
+export interface CreateSnapshotOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    snapshot: SnapshotCreate;
+}
+
+export interface GetSnapshotOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    snapshotId: number;
+}
+
+export interface UpdateSnapshotOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    snapshotId: number;
+    update: SnapshotUpdate;
+}
+
+export interface DeleteSnapshotOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
+    snapshotId: number;
+}
+
+export interface FindDeviceByEsnOptions extends RceManagementRequestOptions {
+    esn: string;
+}
+
+export interface GetInstanceUrlOptions extends RceManagementRequestOptions {
+    device: RceDeviceConfig;
+}
+
+export interface GetRunningInstanceApiUrlOptions extends RceManagementRequestOptions {
+    deviceId: DeviceId;
 }
 
 interface SendOptions {
     query?: Record<string, string | number | undefined>;
     body?: unknown;
+    /**
+     * RCE bearer token to use for this request, overriding the client's constructor token.
+     */
+    token?: string;
 }
 
 export type DeviceType = 'tv' | 'stb' | 'streambar';

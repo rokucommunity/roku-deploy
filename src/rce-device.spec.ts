@@ -89,7 +89,7 @@ const REQUEST_TIMEOUT = 30_000;
 
         //resolve the device through the management api and fail fast if it isn't already running. This
         //suite talks directly to a running instance and never starts one on the caller's behalf.
-        const device = await managementClient.getDevice(Number(RCE_DEVICE_ID));
+        const device = await managementClient.getDevice({ deviceId: Number(RCE_DEVICE_ID) });
         if (device.status !== 'running') {
             throw new Error(
                 `RCE device ${RCE_DEVICE_ID} is not running (status '${device.status}'). Start it from the ` +

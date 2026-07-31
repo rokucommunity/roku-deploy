@@ -554,7 +554,7 @@ export class RokuDeploy {
         if (!rceToken) {
             throw new Error('An rceToken is required to resolve an RCE device by id or esn');
         }
-        return this.createRceManagementClient(rceToken).getInstanceUrl(deviceConfig);
+        return this.createRceManagementClient(rceToken).getInstanceUrl({ device: deviceConfig });
     }
 
     /**

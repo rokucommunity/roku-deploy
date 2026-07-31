@@ -141,7 +141,7 @@ export class RceSocket extends stream.Duplex {
         if (!this.device.rceToken) {
             throw new Error('An rceToken is required to resolve an RCE device by id or esn');
         }
-        return new RceManagementClient({ token: this.device.rceToken }).getInstanceUrl(this.device);
+        return new RceManagementClient({ token: this.device.rceToken }).getInstanceUrl({ device: this.device });
     }
 
     private async beginConnecting(): Promise<void> {
