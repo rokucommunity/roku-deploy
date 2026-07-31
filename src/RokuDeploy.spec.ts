@@ -1547,6 +1547,34 @@ describe('RokuDeploy', () => {
 
     });
 
+    describe('resolveDns', () => {
+        it('returns a local device config with the host replaced by its resolved ip', async () => {
+            sinon.stub(util, 'dnsLookup').resolves('192.168.1.20');
+
+            const device = { host: 'my-roku.local' };
+            expect(await rokuDeploy.resolveDns(device)).to.eql({ host: '192.168.1.20' });
+            //the original config is not mutated
+            expect(device.host).to.equal('my-roku.local');
+        });
+
+        it('returns an RCE device config unchanged without a DNS lookup', async () => {
+            const dnsLookupStub = sinon.stub(util, 'dnsLookup');
+
+            const device = { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' };
+            expect(await rokuDeploy.resolveDns(device)).to.equal(device);
+            expect(dnsLookupStub.called).to.be.false;
+        });
+
+        it('lets a failed lookup throw to the caller', async () => {
+            sinon.stub(util, 'dnsLookup').rejects(new Error('getaddrinfo ENOTFOUND my-roku.local'));
+
+            await expectThrowsAsync(
+                rokuDeploy.resolveDns({ host: 'my-roku.local' }),
+                'getaddrinfo ENOTFOUND my-roku.local'
+            );
+        });
+    });
+
     describe('getRceInstanceUrl', () => {
         it('uses an instanceUrl-addressed config directly, stripping trailing slashes', async () => {
             expect(await rokuDeploy['getRceInstanceUrl']({ instanceUrl: 'https://device.rce.roku.com/instance/abc/' }))

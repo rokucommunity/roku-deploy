@@ -25,7 +25,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
@@ -446,6 +446,20 @@ export class RokuDeploy {
             baseUrl: `${instanceUrl}/ecp1`,
             headers: this.buildRceAuthHeaders(rceToken)
         };
+    }
+
+    /**
+     * Resolve a device config's host through DNS, returning a new config with the host replaced by
+     * its ip address (some Rokus reject ECP requests addressed by hostname or mDNS name, so callers
+     * use this to pin a config to an ip up front). Only local devices are addressed by host; any
+     * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
+     * lookup throws so the caller decides how to handle an unreachable host.
+     */
+    public async resolveDns<T extends DeviceConfig>(device: T): Promise<T> {
+        if (device && isLocalDeviceConfig(device)) {
+            return { ...device, host: await util.dnsLookup(device.host) };
+        }
+        return device;
     }
 
     /**
