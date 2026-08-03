@@ -70,16 +70,6 @@
             "uuid": "^11.1.1"
         }
     },
-    "mocha": {
-        "require": [
-            "source-map-support/register",
-            "ts-node/register"
-        ],
-        "fullTrace": true,
-        "watchExtensions": [
-            "ts"
-        ]
-    },
     "typings": "dist/index.d.ts",
     "bin": {
         "roku-deploy": "dist/cli.js"
