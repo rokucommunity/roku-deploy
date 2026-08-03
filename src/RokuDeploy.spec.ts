@@ -5249,6 +5249,125 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('resolveDevice', () => {
+        it('resolves a device from the devices registry by host', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'living-room': { host: '1.2.3.4' }
+                }
+            });
+            sinon.stub(rd as any, 'doGetRequest').callsFake((params) => {
+                let results = { response: { statusCode: 200 }, body: '<device-info></device-info>' };
+                rd['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+            const deviceInfo = await rd.getDeviceInfo({
+                device: 'living-room'
+            });
+            expect(deviceInfo).not.to.be.undefined;
+        });
+
+        it('resolves a device from the devices registry by esn', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'cloud-device': { esn: 'ABC123' }
+                }
+            });
+            let ex;
+            try {
+                await rd.getDeviceInfo({
+                    device: 'cloud-device'
+                });
+            } catch (e) {
+                ex = e;
+            }
+            expect(ex?.message).to.eql('RCE devices are not yet supported');
+        });
+
+        it('resolves a device from the devices registry by id', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'cloud-device': { id: 'device-id-1' }
+                }
+            });
+            let ex;
+            try {
+                await rd.getDeviceInfo({
+                    device: 'cloud-device'
+                });
+            } catch (e) {
+                ex = e;
+            }
+            expect(ex?.message).to.eql('RCE devices are not yet supported');
+        });
+
+        it('resolves a device from the devices registry by instanceUrl', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'cloud-device': { instanceUrl: 'https://example.com' }
+                }
+            });
+            let ex;
+            try {
+                await rd.getDeviceInfo({
+                    device: 'cloud-device'
+                });
+            } catch (e) {
+                ex = e;
+            }
+            expect(ex?.message).to.eql('RCE devices are not yet supported');
+        });
+
+        it('throws when a registry entry has no valid identifier', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'bogus-device': {}
+                }
+            });
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({
+                    device: 'bogus-device'
+                });
+            }, 'Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
+        });
+
+        it('throws when the device name is not found in the registry', async () => {
+            const rd = new RokuDeploy({
+                devices: {}
+            });
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({
+                    device: 'does-not-exist'
+                });
+            }, `Device 'does-not-exist' not found in devices registry`);
+        });
+
+        it('throws when the device name is used but no devices registry was configured', async () => {
+            const rd = new RokuDeploy();
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({
+                    device: 'does-not-exist'
+                });
+            }, `Device 'does-not-exist' not found in devices registry`);
+        });
+
+        it('throws when an inline device config has no identifier', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.getDeviceInfo({
+                    device: {} as any
+                });
+            }, 'Device must specify host, esn, id, or instanceUrl');
+        });
+
+        it('throws when an inline device config has multiple identifiers', async () => {
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.getDeviceInfo({
+                    device: { host: '1.2.3.4', esn: 'ABC123' } as any
+                });
+            }, 'Device cannot specify multiple identifiers (host, esn, id, instanceUrl)');
+        });
+    });
+
     describe('option validation', () => {
         beforeEach(() => {
             //make a dummy output file for tests that need a valid zip
