@@ -82,6 +82,16 @@ describe('RceManagementClient', () => {
             expect(requests[0].options.open_timeout).to.equal(30000);
             expect(requests[0].options.response_timeout).to.equal(30000);
         });
+
+        it('closes the socket after every request instead of pooling it (which would hold the process open)', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await client.getUserInfo();
+
+            expect(requests[0].options.connection).to.equal('close');
+            expect(requests[0].options.agent).to.equal(false);
+        });
     });
 
     describe('pagination', () => {

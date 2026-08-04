@@ -180,6 +180,13 @@ export class RceManagementClient {
             //of needle's read timer)
             open_timeout: this.timeout,
             response_timeout: this.timeout,
+            //needle's default (Node's global pooling agent, no `Connection: close`) leaves a
+            //keep-alive socket open after the response, which keeps the Node event loop alive so a
+            //CLI process that only talked to the management api never exits - see request.ts for
+            //the full story. A fresh un-pooled socket per request costs a TLS handshake, which is
+            //fine for this low-volume api.
+            connection: 'close',
+            agent: false,
             headers: {
                 Authorization: `Bearer ${options.token ?? this.token}`,
                 Accept: 'application/json'
