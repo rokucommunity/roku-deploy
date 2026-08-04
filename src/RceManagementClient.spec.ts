@@ -11,21 +11,21 @@ describe('RceManagementClient', () => {
         sinon.restore();
     });
 
-    describe('token handling', () => {
-        /**
-         * Stub needle to answer every request with an empty 200, capturing the request options so
-         * tests can assert on the Authorization header actually sent.
-         */
-        function stubNeedle() {
-            const requests: Array<{ options: needle.NeedleOptions }> = [];
-            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
-                requests.push({ options: options });
-                callback(null, { statusCode: 200, body: {} });
-                return {} as any;
-            }) as any);
-            return requests;
-        }
+    /**
+     * Stub needle to answer every request with an empty 200, capturing the request options so
+     * tests can assert on what was actually sent (Authorization header, timeout timers, ...).
+     */
+    function stubNeedle() {
+        const requests: Array<{ options: needle.NeedleOptions }> = [];
+        sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+            requests.push({ options: options });
+            callback(null, { statusCode: 200, body: {} });
+            return {} as any;
+        }) as any);
+        return requests;
+    }
 
+    describe('token handling', () => {
         it('sends the constructor token when a call supplies none', async () => {
             const requests = stubNeedle();
             const client = new RceManagementClient({ token: 'constructor-token' });
@@ -58,6 +58,28 @@ describe('RceManagementClient', () => {
             await expectThrowsAsync(client.getInstanceUrl({ device: { esn: 'XY123' }, token: 'override-token' }));
 
             expect(requests[0].options.headers.Authorization).to.equal('Bearer override-token');
+        });
+    });
+
+    describe('request timeout', () => {
+        it('maps the configured timeout to both needle timers (connection and first response byte)', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret', timeout: 12345 });
+
+            await client.getUserInfo();
+
+            expect(requests[0].options.open_timeout).to.equal(12345);
+            expect(requests[0].options.response_timeout).to.equal(12345);
+        });
+
+        it('defaults the timeout to 30 seconds', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await client.getUserInfo();
+
+            expect(requests[0].options.open_timeout).to.equal(30000);
+            expect(requests[0].options.response_timeout).to.equal(30000);
         });
     });
 

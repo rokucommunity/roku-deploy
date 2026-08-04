@@ -169,7 +169,13 @@ export class RceManagementClient {
         const url = this.baseUrl + path + this.buildQueryString(options.query);
         const needleOptions: needle.NeedleOptions = {
             json: true,
-            timeout: this.timeout,
+            //needle's `timeout` alias only bounds connection establishment; a server that accepts
+            //the connection but never responds would hang the request forever. Map the timeout to
+            //both the connection and first-response-byte timers, the same way request.ts does (and
+            //like there, deliberately do NOT set `read_timeout` - see request.ts for the hazards
+            //of needle's read timer)
+            open_timeout: this.timeout,
+            response_timeout: this.timeout,
             headers: {
                 Authorization: `Bearer ${options.token ?? this.token}`,
                 Accept: 'application/json'
