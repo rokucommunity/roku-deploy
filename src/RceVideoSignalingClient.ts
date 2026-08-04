@@ -60,6 +60,14 @@ export class RceVideoSignalingClient extends EventEmitter {
 
     private readonly pendingRequests = new Map<string, PendingJanusRequest>();
 
+    /**
+     * Rejects the websocket-handshake promise inside a negotiate() still waiting on 'open'. Stored
+     * here because stop() strips the socket listeners that promise is built on, so stop() (and the
+     * unexpected-close handler) must be able to settle it directly or a connect() cancelled
+     * mid-handshake would sit unresolved until the negotiation timeout fired.
+     */
+    private rejectConnected: ((error: Error) => void) | undefined;
+
     private transactionCounter = 0;
 
     /**
@@ -100,6 +108,12 @@ export class RceVideoSignalingClient extends EventEmitter {
 
         try {
             return await Promise.race([negotiationPromise, timeoutPromise]);
+        } catch (error) {
+            //a failed negotiation (a connection failure, a Janus or plugin error, a missing offer)
+            //must not leave the keepalive timer running and the socket open behind the rejection;
+            //stop() is idempotent, so the timeout path above having already called it is fine
+            this.stop();
+            throw error;
         } finally {
             negotiationSettled = true;
             clearTimeout(timeoutHandle);
@@ -113,16 +127,28 @@ export class RceVideoSignalingClient extends EventEmitter {
         this.webSocket = webSocket;
 
         const connected = new Promise<void>((resolve, reject) => {
+            this.rejectConnected = reject;
             webSocket.once('open', () => resolve());
             webSocket.once('error', (error: Error) => reject(new Error(`Failed to connect to the Janus WebSocket: ${error.message}`)));
         });
         webSocket.on('message', (data: WebSocket.RawData) => this.handleMessage(data.toString()));
         webSocket.on('close', () => {
             this.stopKeepalive();
+            //the socket is gone: nothing can ever answer the requests still in flight, and nothing
+            //sent from now on would reach the gateway, so fail both loudly (a dead sendAnswer()
+            //must reject, not hang its caller forever)
+            this.webSocket = undefined;
+            this.sessionId = undefined;
+            this.handleId = undefined;
+            const closedError = new Error(`The Janus WebSocket for stream '${this.config.streamId}' closed unexpectedly`);
+            this.rejectConnected?.(closedError);
+            this.rejectConnected = undefined;
+            this.rejectPendingRequests(closedError);
             this.emit('close');
         });
 
         await connected;
+        this.rejectConnected = undefined;
         //from here on, a socket error is a session-lifetime error rather than a failed connection attempt
         webSocket.removeAllListeners('error');
         webSocket.on('error', (error: Error) => {
@@ -206,6 +232,11 @@ export class RceVideoSignalingClient extends EventEmitter {
     public stop(): void {
         this.stopKeepalive();
 
+        //a connect() still waiting on the websocket handshake can only be settled from here:
+        //removeAllListeners() below strips the 'open'/'error' listeners its promise is built on
+        this.rejectConnected?.(new Error(`Janus signaling session for stream '${this.config.streamId}' was stopped`));
+        this.rejectConnected = undefined;
+
         if (this.sessionId !== undefined) {
             this.sendFireAndForget({ janus: 'destroy', session_id: this.sessionId });
         }
@@ -232,13 +263,21 @@ export class RceVideoSignalingClient extends EventEmitter {
             this.webSocket = undefined;
         }
 
-        for (const pendingRequest of this.pendingRequests.values()) {
-            pendingRequest.reject(new Error(`Janus signaling session for stream '${this.config.streamId}' was stopped`));
-        }
-        this.pendingRequests.clear();
+        this.rejectPendingRequests(new Error(`Janus signaling session for stream '${this.config.streamId}' was stopped`));
 
         this.sessionId = undefined;
         this.handleId = undefined;
+    }
+
+    /**
+     * Rejects every request still waiting on a Janus response, because nothing can answer them
+     * anymore (the session was stopped, or the socket closed under it).
+     */
+    private rejectPendingRequests(error: Error): void {
+        for (const pendingRequest of this.pendingRequests.values()) {
+            pendingRequest.reject(error);
+        }
+        this.pendingRequests.clear();
     }
 
     private handleMessage(rawData: string): void {

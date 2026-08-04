@@ -192,7 +192,8 @@ describe('RceVideoSignalingClient', () => {
         it('passes the api token as an Authorization bearer header on the websocket handshake', () => {
             const client = createClient({ apiToken: 'secret-management-token' });
 
-            void client.connect();
+            //never driven to completion; the afterEach stop() rejects it, so absorb that rejection
+            client.connect().catch(() => { });
 
             expect(capturedWebSocketOptions.headers).to.eql({ Authorization: 'Bearer secret-management-token' });
         });
@@ -400,6 +401,70 @@ describe('RceVideoSignalingClient', () => {
 
             expect(closeEmitted).to.be.true;
         });
+
+        it('rejects an in-flight request when the socket closes unexpectedly, instead of hanging its caller', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            const answerPromise = client.sendAnswer({ type: 'answer', sdp: 'v=0\r\no=- answer-sdp\r\n' });
+            fakeWebSocket.emit('close');
+
+            let caughtError: Error;
+            try {
+                await answerPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+            expect(caughtError?.message).to.contain(`The Janus WebSocket for stream '42' closed unexpectedly`);
+        });
+
+        it('rejects a request sent after an unexpected close, instead of silently dropping it', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            fakeWebSocket.emit('close');
+
+            let caughtError: Error;
+            try {
+                await client.sendAnswer({ type: 'answer', sdp: 'v=0\r\no=- answer-sdp\r\n' });
+            } catch (error) {
+                caughtError = error as Error;
+            }
+            expect(caughtError?.message).to.contain('the signaling session is not connected');
+        });
+    });
+
+    describe('connect failure cleanup', () => {
+        it('stops the keepalive and closes the socket when negotiation fails after the session was created', async () => {
+            //short real keepalive interval, so a leaked timer would be caught by the wait below
+            const client = createClient({}, 15);
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('open');
+            await flushMicrotasks();
+            simulateMessage({ janus: 'success', transaction: findSentRequest('create').transaction, data: { id: 111 } });
+            await flushMicrotasks();
+            //the keepalive is running now (it starts once the session is created); fail the attach
+            simulateMessage({
+                janus: 'error',
+                transaction: findSentRequest('attach').transaction,
+                error: { code: 458, reason: 'attach failed' }
+            });
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+            expect(caughtError?.message).to.contain('attach failed');
+            expect(fakeWebSocket.closed).to.be.true;
+
+            const keepaliveCountAtFailure = fakeWebSocket.sentMessages.filter((message) => message.janus === 'keepalive').length;
+            await wait(60);
+            const keepaliveCountAfterWaiting = fakeWebSocket.sentMessages.filter((message) => message.janus === 'keepalive').length;
+            expect(keepaliveCountAfterWaiting).to.equal(keepaliveCountAtFailure);
+        });
     });
 
     describe('negotiation timeout', () => {
@@ -445,11 +510,21 @@ describe('RceVideoSignalingClient', () => {
             expect(fakeWebSocket.closed).to.be.true;
         });
 
-        it('is safe to call before connect() has finished', () => {
+        it('is safe to call before connect() has finished, rejecting that connect() immediately', async () => {
+            //the default 20s negotiation timeout proves connect() settles from stop() itself: if it
+            //waited for the timeout instead, this test would take 20s and fail mocha's time limit
             const client = createClient();
-            void client.connect();
+            const connectPromise = client.connect();
 
             expect(() => client.stop()).not.to.throw();
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+            expect(caughtError?.message).to.contain(`Janus signaling session for stream '42' was stopped`);
         });
 
         it('is safe to call more than once', async () => {
