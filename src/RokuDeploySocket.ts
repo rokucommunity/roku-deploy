@@ -113,13 +113,46 @@ export class RceSocket extends stream.Duplex {
 
     private idleTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
+    private connectCalled = false;
+
+    /**
+     * Whether the websocket ever reached OPEN, so teardown paths can distinguish "closed after a
+     * live session" (the remote-close path finishes the job) from "never opened" (nothing will).
+     */
+    private hasConnected = false;
+
+    /**
+     * Whether this socket was destroyed by (or after) an error, reported as the `hadError` argument
+     * on the `'close'` event exactly like `net.Socket` reports it.
+     */
+    private hadError = false;
+
+    /**
+     * A write issued before the websocket opened, held (chunk and stream callback both) until the
+     * `'open'` event flushes it. Holding the callback parks the writable machinery, so at most one
+     * write ever sits here - the rest queue inside the stream itself.
+     */
+    private pendingWrite: PendingWrite | undefined;
+
     /**
      * Fire-and-forget, exactly like `net.Socket#connect()`: resolves the RCE instance url, opens the
      * websocket, and emits `'connect'` then `'ready'` once the handshake completes (the same order
      * `net.Socket` uses). `connectListener` is registered the same way `net.Socket` registers its
      * own connect callback: as a one-time `'connect'` listener.
+     *
+     * Unlike `net.Socket` (which allows reconnecting a closed socket), calling this a second time
+     * throws: a second websocket would orphan the first one with its listeners still feeding this
+     * stream, and a destroyed Duplex cannot be revived, so both misuses fail loudly instead of
+     * leaking or silently never calling back.
      */
     public connect(connectListener?: () => void): this {
+        if (this.destroyed) {
+            throw new Error(`Cannot connect to ${this.describeTarget()}: the socket was destroyed (create a new socket instead)`);
+        }
+        if (this.connectCalled) {
+            throw new Error(`Cannot connect to ${this.describeTarget()}: the socket is already connecting or connected`);
+        }
+        this.connectCalled = true;
         if (connectListener) {
             this.once('connect', connectListener);
         }
@@ -167,21 +200,32 @@ export class RceSocket extends stream.Duplex {
         this.webSocket = webSocket;
 
         webSocket.once('open', () => {
+            this.hasConnected = true;
             this.emit('connect');
             this.emit('ready');
+            this.flushPendingWrite();
         });
         webSocket.on('message', (data: WebSocket.RawData) => {
             this.markActivity();
-            this.push(RceSocket.toBuffer(data));
+            if (!this.push(RceSocket.toBuffer(data))) {
+                //the readable buffer hit its high-water mark: stop pulling frames off the wire
+                //until _read() reports the consumer has caught up (the same backpressure a
+                //net.Socket applies to its tcp stream)
+                webSocket.pause();
+            }
         });
         webSocket.on('error', (error: Error) => {
             this.failConnection(new Error(`RCE telnet websocket error for ${url}: ${error.message}`));
         });
         webSocket.once('close', () => {
-            //a graceful remote close: end the readable side, then fall through the normal destroy
-            //path below so a single 'close' event is still guaranteed
+            //the connection is gone in both directions, so end both sides of the stream and let it
+            //destroy itself (autoDestroy) once 'end' has been delivered - 'end' before 'close', the
+            //same order net.Socket guarantees on a remote FIN. read(0) nudges the readable machinery
+            //to process the EOF even when no consumer is attached yet.
+            this.failPendingWrite(new Error(`Cannot write to ${this.describeTarget()}: the connection closed before it opened`));
             this.push(null);
-            this.destroy();
+            this.read(0);
+            this.end();
         });
     }
 
@@ -189,24 +233,34 @@ export class RceSocket extends stream.Duplex {
      * Sends a chunk as a binary websocket frame. The RCE port endpoints accept binary frames only
      * (a TEXT frame is rejected with close code 1003), and bytes are forwarded unchanged, which is
      * exactly the byte parity a raw tcp socket provides.
+     *
+     * A write issued before the websocket has opened is held and flushed on `'open'`, the same
+     * buffering `net.Socket` applies to writes issued while connecting, so the idiomatic
+     * `socket.connect(); socket.write(...)` pattern works on both transports.
      */
     public _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-        this.markActivity();
-        if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
+        const bufferedChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding);
+        if (this.webSocket?.readyState === WebSocket.OPEN) {
+            this.markActivity();
+            this.webSocket.send(bufferedChunk, { binary: true }, (error) => {
+                callback(error);
+            });
+            return;
+        }
+        if (this.webSocket && this.webSocket.readyState !== WebSocket.CONNECTING) {
+            //CLOSING or CLOSED: this connection will never carry another byte
             callback(new Error(`Cannot write to ${this.describeTarget()}: the connection is not open`));
             return;
         }
-        const bufferedChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding);
-        this.webSocket.send(bufferedChunk, { binary: true }, (error) => {
-            callback(error);
-        });
+        //still connecting (or connect() not called yet): hold the write until 'open' flushes it
+        this.pendingWrite = { chunk: bufferedChunk, callback: callback };
     }
 
     /**
      * Implements the writable half of `end()`. `net.Socket` sends a FIN here; a websocket has no
      * half-close, so the closest equivalent is starting the close handshake. The websocket's own
-     * `'close'` event (see `beginConnecting()`) then ends the readable side and destroys the
-     * stream, so `end()` still arrives at exactly one `'close'` event, just like a `net.Socket`.
+     * `'close'` event (see `beginConnecting()`) then ends the readable side and the stream destroys
+     * itself, so `end()` still arrives at exactly one `'close'` event, just like a `net.Socket`.
      */
     public _final(callback: (error?: Error | null) => void): void {
         if (this.webSocket?.readyState === WebSocket.OPEN) {
@@ -214,20 +268,26 @@ export class RceSocket extends stream.Duplex {
             callback();
             return;
         }
-        //there is no open connection to run a close handshake on (never connected, still
-        //connecting, or already closed), so nothing will ever fire the websocket 'close' event
-        //that normally finishes teardown; destroy directly so end() cannot leave the stream (or a
-        //mid-handshake websocket) dangling
         callback();
-        this.destroy();
+        if (!this.hasConnected) {
+            //there was never an open connection, so nothing will ever fire the websocket 'close'
+            //event that normally finishes teardown; destroy directly so end() cannot leave the
+            //stream (or a mid-handshake websocket) dangling
+            this.destroy();
+        }
+        //otherwise the websocket already closed: its 'close' handler has ended the readable side
+        //too, and the stream destroys itself once 'end' has been delivered
     }
 
     /**
      * Data arrives asynchronously from the websocket's `'message'` event and is pushed as it comes
-     * in (see `beginConnecting()`), so there is nothing to pull on demand here.
+     * in (see `beginConnecting()`); the only on-demand work is releasing backpressure, since a full
+     * readable buffer pauses the websocket until the consumer catches up.
      */
     public _read(size: number): void {
-        //intentionally empty
+        if (this.webSocket?.isPaused) {
+            this.webSocket.resume();
+        }
     }
 
     /**
@@ -237,6 +297,10 @@ export class RceSocket extends stream.Duplex {
      */
     public _destroy(error: Error | undefined, callback: (error?: Error | null) => void): void {
         this.clearIdleTimer();
+        if (error) {
+            this.hadError = true;
+        }
+        this.failPendingWrite(error ?? new Error(`Cannot write to ${this.describeTarget()}: the socket was destroyed`));
         if (this.webSocket) {
             const webSocket = this.webSocket;
             //closing (or terminating) a socket that is still CONNECTING makes ws abort the
@@ -302,6 +366,46 @@ export class RceSocket extends stream.Duplex {
         return undefined;
     }
 
+    /**
+     * `net.Socket`'s `'close'` event carries a `hadError` boolean; the stream machinery emits the
+     * event with no arguments, so decorate it on the way out.
+     */
+    public emit(event: string | symbol, ...args: any[]): boolean {
+        if (event === 'close' && args.length === 0) {
+            return super.emit(event, this.hadError);
+        }
+        return super.emit(event, ...args);
+    }
+
+    /**
+     * Sends the write held from before the websocket opened (if there is one) and releases its
+     * stream callback, which un-parks the writable machinery so any writes queued behind it flow.
+     */
+    private flushPendingWrite(): void {
+        if (!this.pendingWrite) {
+            return;
+        }
+        const pendingWrite = this.pendingWrite;
+        this.pendingWrite = undefined;
+        this.markActivity();
+        this.webSocket.send(pendingWrite.chunk, { binary: true }, (error) => {
+            pendingWrite.callback(error);
+        });
+    }
+
+    /**
+     * Fails the write held from before the websocket opened (if there is one), because the
+     * connection it was waiting on will never open.
+     */
+    private failPendingWrite(error: Error): void {
+        if (!this.pendingWrite) {
+            return;
+        }
+        const pendingWrite = this.pendingWrite;
+        this.pendingWrite = undefined;
+        pendingWrite.callback(error);
+    }
+
     private markActivity(): void {
         if (this.idleTimeoutMilliseconds > 0) {
             this.rearmIdleTimer();
@@ -310,9 +414,13 @@ export class RceSocket extends stream.Duplex {
 
     private rearmIdleTimer(): void {
         clearTimeout(this.idleTimeoutHandle);
-        this.idleTimeoutHandle = this.idleTimeoutMilliseconds > 0
-            ? setTimeout(() => this.emit('timeout'), this.idleTimeoutMilliseconds)
-            : undefined;
+        if (this.idleTimeoutMilliseconds > 0) {
+            this.idleTimeoutHandle = setTimeout(() => this.emit('timeout'), this.idleTimeoutMilliseconds);
+            //net.Socket's timeout timer is unref'd: an idle timer alone must not hold the process open
+            this.idleTimeoutHandle.unref?.();
+        } else {
+            this.idleTimeoutHandle = undefined;
+        }
     }
 
     private clearIdleTimer(): void {
@@ -329,7 +437,14 @@ export class RceSocket extends stream.Duplex {
 
     private buildWebSocketUrl(instanceUrl: string): string {
         const url = new URL(`${instanceUrl}/api/v0/ports/${this.port}`);
-        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        //map only the http schemes; an instanceUrl already given as ws:/wss: passes through
+        //unchanged (in particular, an explicit wss: must never be downgraded to ws:, which would
+        //send the bearer token over an unencrypted handshake)
+        if (url.protocol === 'https:') {
+            url.protocol = 'wss:';
+        } else if (url.protocol === 'http:') {
+            url.protocol = 'ws:';
+        }
         return url.toString();
     }
 
@@ -363,6 +478,11 @@ export class RceSocket extends stream.Duplex {
         }
         return Buffer.from(data);
     }
+}
+
+interface PendingWrite {
+    chunk: Buffer;
+    callback: (error?: Error | null) => void;
 }
 
 export interface SocketOptions {

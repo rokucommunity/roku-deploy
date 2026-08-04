@@ -121,7 +121,10 @@ describe('RceVideoSignalingClient', () => {
         fakeWebSocket = new FakeWebSocket();
         capturedWebSocketOptions = undefined;
         const client = new RceVideoSignalingClient(createConfig(configOverrides), {
+            //a fresh fake per websocket, so a reconnect (a second createWebSocket call) gets its own
+            //socket exactly like the real factory would; `fakeWebSocket` always points at the latest
             createWebSocket: (url, requestOptions) => {
+                fakeWebSocket = new FakeWebSocket();
                 capturedWebSocketOptions = requestOptions;
                 return fakeWebSocket as unknown as WebSocket;
             },
@@ -229,6 +232,34 @@ describe('RceVideoSignalingClient', () => {
             for (const sentMessage of fakeWebSocket.sentMessages) {
                 expect(sentMessage.apisecret).to.be.undefined;
             }
+        });
+    });
+
+    describe('connect() reuse guards', () => {
+        it('rejects a second connect() while a session is already active', async () => {
+            const client = createClient();
+            //never driven to completion; the afterEach stop() rejects it, so absorb that rejection
+            client.connect().catch(() => { });
+
+            let caughtError: Error;
+            try {
+                await client.connect();
+            } catch (error) {
+                caughtError = error as Error;
+            }
+            expect(caughtError?.message).to.contain('already connected or connecting; call stop() before reconnecting');
+        });
+
+        it('allows connect() again after stop()', () => {
+            const client = createClient();
+            client.connect().catch(() => { });
+            const firstFakeWebSocket = fakeWebSocket;
+
+            client.stop();
+            client.connect().catch(() => { });
+
+            //the second connect() got past the guard and opened a fresh websocket
+            expect(fakeWebSocket).to.not.equal(firstFakeWebSocket);
         });
     });
 

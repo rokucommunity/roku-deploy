@@ -84,8 +84,15 @@ export class RceVideoSignalingClient extends EventEmitter {
      * one. Rejects (and tears the session down via stop()) if negotiation has not reached that point
      * within `negotiationTimeoutMs`, so a silently unresponsive gateway (a WAF sinkhole, a dropped
      * session) fails loudly instead of leaving the caller waiting forever.
+     *
+     * One session at a time: a second connect() while one is active rejects (it would orphan the
+     * first websocket with its listeners still driving this client). Call stop() first; after
+     * stop() (or an unexpected close), connect() may be called again.
      */
     public async connect(): Promise<RceVideoSignalingOffer> {
+        if (this.webSocket) {
+            throw new Error(`Janus signaling session for stream '${this.config.streamId}' is already connected or connecting; call stop() before reconnecting`);
+        }
         let negotiationSettled = false;
         let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 

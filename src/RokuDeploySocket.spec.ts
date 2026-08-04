@@ -55,6 +55,21 @@ class FakeWebSocket extends EventEmitter {
 
     public readyState: number = FakeWebSocket.CONNECTING;
 
+    public paused = false;
+
+    //mirrors ws's isPaused getter, which RceSocket's _read checks before resuming
+    public get isPaused(): boolean {
+        return this.paused;
+    }
+
+    public pause(): void {
+        this.paused = true;
+    }
+
+    public resume(): void {
+        this.paused = false;
+    }
+
     public send(data: any, options: any, callback?: (error?: Error) => void): void {
         this.sentFrames.push({ data: data, options: options });
         callback?.();
@@ -441,6 +456,163 @@ describe('createRokuDeploySocket', () => {
             expect(fakeWebSocket.closed).to.be.true;
         });
 
+        it('preserves an explicit wss or ws instanceUrl scheme instead of downgrading it', async () => {
+            createRceTelnetSocket({ device: { instanceUrl: 'wss://device.rce.roku.com/instance/abc', rceToken: 'token-value' } }).connect();
+            await flushMicrotasks();
+            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8085');
+
+            createRceTelnetSocket({ device: { instanceUrl: 'ws://device.local/instance/abc', rceToken: 'token-value' } }).connect();
+            await flushMicrotasks();
+            expect(capturedWebSocketUrl).to.equal('ws://device.local/instance/abc/api/v0/ports/8085');
+        });
+
+        it('maps a plain http instanceUrl to ws', async () => {
+            createRceTelnetSocket({ device: { instanceUrl: 'http://device.local/instance/abc', rceToken: 'token-value' } }).connect();
+            await flushMicrotasks();
+            expect(capturedWebSocketUrl).to.equal('ws://device.local/instance/abc/api/v0/ports/8085');
+        });
+
+        describe('pre-open writes', () => {
+            it('buffers writes issued while connecting and flushes them in order once open', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                //issued before the instance url has even resolved
+                telnetSocket.write('one');
+                telnetSocket.write('two');
+                await flushMicrotasks();
+                expect(fakeWebSocket.sentFrames).to.be.empty;
+
+                fakeWebSocket.emit('open');
+                await flushMicrotasks();
+                telnetSocket.write('three');
+                await flushMicrotasks();
+
+                expect(fakeWebSocket.sentFrames.map((frame) => (frame.data as Buffer).toString('utf8'))).to.eql(['one', 'two', 'three']);
+            });
+
+            it('fails the held write via its callback when the socket is destroyed before opening', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+
+                let writeError: Error | undefined;
+                telnetSocket.write('never sent', (error) => {
+                    writeError = error;
+                });
+                //an errored write also errors the stream; listen so that does not crash the test
+                telnetSocket.on('error', () => { });
+
+                await flushMicrotasks();
+                telnetSocket.destroy();
+                await flushMicrotasks();
+
+                expect(writeError?.message).to.contain('destroyed');
+            });
+        });
+
+        describe('remote close', () => {
+            it(`emits 'end' then 'close' on a server-initiated close, like a remote FIN`, async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                const emittedEventNames: string[] = [];
+                telnetSocket.on('end', () => emittedEventNames.push('end'));
+                telnetSocket.on('close', () => emittedEventNames.push('close'));
+
+                fakeWebSocket.emit('close');
+                await flushMicrotasks();
+
+                expect(emittedEventNames).to.eql(['end', 'close']);
+                expect(telnetSocket.destroyed).to.be.true;
+            });
+
+            it(`delivers data received before a server-initiated close, then 'end'`, async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                const emittedEventNames: string[] = [];
+                telnetSocket.on('data', (data: Buffer) => emittedEventNames.push(`data:${data.toString('utf8')}`));
+                telnetSocket.on('end', () => emittedEventNames.push('end'));
+                telnetSocket.on('close', () => emittedEventNames.push('close'));
+                //let the 'data' listener's flowing-mode switch take effect before pushing data
+                await flushMicrotasks();
+
+                fakeWebSocket.emit('message', Buffer.from('last words'), true);
+                fakeWebSocket.emit('close');
+                await flushMicrotasks();
+
+                expect(emittedEventNames).to.eql(['data:last words', 'end', 'close']);
+            });
+        });
+
+        describe('backpressure', () => {
+            it('pauses the websocket when the readable buffer fills and resumes once the consumer drains it', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                //a frame larger than the stream's high-water mark with no consumer attached: push()
+                //reports the buffer is full, so the socket should stop reading frames off the wire
+                fakeWebSocket.emit('message', Buffer.alloc(20_000), true);
+                expect(fakeWebSocket.paused).to.be.true;
+
+                //attaching a data listener switches the stream to flowing mode, which drains the
+                //buffer and calls _read, which should resume the websocket
+                telnetSocket.on('data', () => { });
+                await flushMicrotasks();
+                expect(fakeWebSocket.paused).to.be.false;
+            });
+        });
+
+        describe('connect() reuse guards', () => {
+            it('throws when connect() is called while already connecting or connected', () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+
+                expect(() => telnetSocket.connect()).to.throw('already connecting or connected');
+            });
+
+            it('throws when connect() is called on a destroyed socket', () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                telnetSocket.destroy();
+
+                expect(() => telnetSocket.connect()).to.throw('was destroyed');
+            });
+        });
+
+        describe(`'close' hadError argument`, () => {
+            it('reports hadError=true after an error and false after a clean close', async () => {
+                const erroredSocket = createRceTelnetSocket();
+                erroredSocket.on('error', () => { });
+                let erroredHadError: boolean | undefined;
+                erroredSocket.on('close', (hadError: boolean) => {
+                    erroredHadError = hadError;
+                });
+                erroredSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('error', new Error('handshake failed'));
+                await flushMicrotasks();
+                expect(erroredHadError).to.be.true;
+
+                const cleanSocket = createRceTelnetSocket();
+                let cleanHadError: boolean | undefined;
+                cleanSocket.on('close', (hadError: boolean) => {
+                    cleanHadError = hadError;
+                });
+                cleanSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+                cleanSocket.destroy();
+                await flushMicrotasks();
+                expect(cleanHadError).to.be.false;
+            });
+        });
+
         describe('end()', () => {
             it('starts the websocket close handshake and reaches exactly one close event once the server completes it', async () => {
                 const telnetSocket = createRceTelnetSocket();
@@ -450,6 +622,7 @@ describe('createRokuDeploySocket', () => {
 
                 const emittedEventNames: string[] = [];
                 telnetSocket.on('finish', () => emittedEventNames.push('finish'));
+                telnetSocket.on('end', () => emittedEventNames.push('end'));
                 telnetSocket.on('close', () => emittedEventNames.push('close'));
 
                 telnetSocket.end();
@@ -464,7 +637,7 @@ describe('createRokuDeploySocket', () => {
                 fakeWebSocket.emit('close');
                 await flushMicrotasks();
 
-                expect(emittedEventNames).to.eql(['finish', 'close']);
+                expect(emittedEventNames).to.eql(['finish', 'end', 'close']);
                 expect(telnetSocket.destroyed).to.be.true;
             });
 
