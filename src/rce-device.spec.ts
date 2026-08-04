@@ -68,7 +68,7 @@ const REQUEST_TIMEOUT = 30_000;
     //device/password are required by every v4 device method; the `before` hook guarantees they're set,
     //so narrow the type here (they're optional on the base RokuDeployOptions) to avoid
     //spreading an optional device/password into methods that require them.
-    let options: rokuDeploy.RokuDeployOptions & { device: { id: string; rceToken: string }; password: string };
+    let options: rokuDeploy.RokuDeployOptions & { device: { id: number; rceToken: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
     //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
@@ -106,7 +106,7 @@ const REQUEST_TIMEOUT = 30_000;
         process.chdir(rootDir);
         rd = new RokuDeploy();
         options = {
-            device: { id: RCE_DEVICE_ID, rceToken: RCE_TOKEN },
+            device: { id: Number(RCE_DEVICE_ID), rceToken: RCE_TOKEN },
             password: RCE_PASSWORD,
             devId: 'c6fdc2019903ac3332f624b0b2c2fe2c733c3e74',
             signingPassword: 'drRCEVWP/++K5TYnTtuAfQ=='

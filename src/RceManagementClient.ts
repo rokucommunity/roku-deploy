@@ -141,7 +141,7 @@ export class RceManagementClient {
         if (isRceByUrl(config)) {
             instanceUrl = config.instanceUrl;
         } else if (isRceById(config)) {
-            instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: Number(config.id), token: options.token });
+            instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: this.parseDeviceId(config.id), token: options.token });
         } else {
             const device = await this.findDeviceByEsn({ esn: config.esn, token: options.token });
             if (!device) {
@@ -150,6 +150,22 @@ export class RceManagementClient {
             instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: device.id, token: options.token });
         }
         return instanceUrl.replace(/\/+$/, '');
+    }
+
+    /**
+     * Normalize a device config's id to the numeric device id the management api uses. The type
+     * says number, but device configs also arrive from untyped sources (a json launch config, a
+     * javascript caller), so a numeric string is coerced and anything else throws a clear error
+     * instead of turning into a request to `/devices/NaN` and a baffling server-side error.
+     */
+    private parseDeviceId(id: number | string): number {
+        if (typeof id === 'number' && Number.isInteger(id)) {
+            return id;
+        }
+        if (typeof id === 'string' && /^\d+$/.test(id)) {
+            return Number(id);
+        }
+        throw new Error(`Invalid RCE device id '${id}': expected a numeric id`);
     }
 
     /**

@@ -9,7 +9,8 @@ export interface DeviceRegistryEntry {
     // One of these identifies the device
     host?: string;
     esn?: string;
-    id?: string;
+    /** The RCE device's numeric management-api id */
+    id?: number;
     instanceUrl?: string;
 
     // Optional RCE token (can be injected at runtime)

@@ -1773,7 +1773,8 @@ export class RokuDeploy {
         if (entry.esn) {
             return { esn: entry.esn, rceToken: entry.rceToken };
         }
-        if (entry.id) {
+        //an explicit !== undefined check (unlike the truthy string checks above): 0 is a valid number
+        if (entry.id !== undefined) {
             return { id: entry.id, rceToken: entry.rceToken };
         }
         if (entry.instanceUrl) {

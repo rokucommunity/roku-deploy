@@ -18,10 +18,11 @@ export interface RceDeviceConfigByEsn {
 }
 
 /**
- * Configuration for an RCE device addressed by device ID
+ * Configuration for an RCE device addressed by device ID (the numeric id the management api
+ * assigns, as seen in `DeviceOut.id`)
  */
 export interface RceDeviceConfigById {
-    id: string;
+    id: number;
     rceToken?: string;
 }
 

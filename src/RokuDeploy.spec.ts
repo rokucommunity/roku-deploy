@@ -1594,7 +1594,7 @@ describe('RokuDeploy', () => {
                 getInstanceUrl: () => Promise.resolve('https://device.rce.roku.com/instance/abc')
             });
 
-            const instanceUrl = await rd['getRceInstanceUrl']({ id: '123' });
+            const instanceUrl = await rd['getRceInstanceUrl']({ id: 123 });
 
             expect(createClientStub.getCall(0).args[0]).to.equal('default-token');
             expect(instanceUrl).to.equal('https://device.rce.roku.com/instance/abc');
@@ -1602,7 +1602,7 @@ describe('RokuDeploy', () => {
 
         it('throws for an id- or esn-addressed device without any rceToken', async () => {
             await expectThrowsAsync(
-                rokuDeploy['getRceInstanceUrl']({ id: '123' }),
+                rokuDeploy['getRceInstanceUrl']({ id: 123 }),
                 'An rceToken is required to resolve an RCE device by id or esn'
             );
         });
@@ -1612,8 +1612,8 @@ describe('RokuDeploy', () => {
             const getInstanceUrlStub = sinon.stub().resolves('https://device.rce.roku.com/instance/abc');
             sinon.stub(rd as any, 'createRceManagementClient').returns({ getInstanceUrl: getInstanceUrlStub });
 
-            await rd['getRceInstanceUrl']({ id: '123' });
-            await rd['getRceInstanceUrl']({ id: '123' });
+            await rd['getRceInstanceUrl']({ id: 123 });
+            await rd['getRceInstanceUrl']({ id: 123 });
 
             expect(getInstanceUrlStub.callCount).to.equal(1);
         });
@@ -1625,8 +1625,8 @@ describe('RokuDeploy', () => {
             getInstanceUrlStub.onSecondCall().resolves('https://device.rce.roku.com/instance/abc');
             sinon.stub(rd as any, 'createRceManagementClient').returns({ getInstanceUrl: getInstanceUrlStub });
 
-            await expectThrowsAsync(rd['getRceInstanceUrl']({ id: '123' }), `Device 123 is not running (status 'shutdown')`);
-            expect(await rd['getRceInstanceUrl']({ id: '123' })).to.equal('https://device.rce.roku.com/instance/abc');
+            await expectThrowsAsync(rd['getRceInstanceUrl']({ id: 123 }), `Device 123 is not running (status 'shutdown')`);
+            expect(await rd['getRceInstanceUrl']({ id: 123 })).to.equal('https://device.rce.roku.com/instance/abc');
         });
     });
 

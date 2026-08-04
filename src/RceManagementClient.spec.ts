@@ -165,7 +165,7 @@ describe('RceManagementClient', () => {
                 running_device: { instance_api_url: 'https://device.rce.roku.com/instance/abc/' }
             });
 
-            const instanceUrl = await client.getInstanceUrl({ device: { id: '123' } });
+            const instanceUrl = await client.getInstanceUrl({ device: { id: 123 } });
 
             expect(instanceUrl).to.equal('https://device.rce.roku.com/instance/abc');
             expect(sendStub.getCall(0).args[1]).to.equal('/devices/123');
@@ -191,6 +191,36 @@ describe('RceManagementClient', () => {
             expect(sendStub.getCall(1).args[1]).to.equal('/devices/42');
         });
 
+        it('coerces a numeric string id from an untyped (json) config', async () => {
+            const client = new RceManagementClient({ token: 'secret' });
+            const sendStub = sinon.stub(client as any, 'send').resolves({
+                id: 123,
+                status: 'running',
+                running_device: { instance_api_url: 'https://device.rce.roku.com/instance/abc' }
+            });
+
+            await client.getInstanceUrl({ device: { id: '123' } as any });
+
+            expect(sendStub.getCall(0).args[1]).to.equal('/devices/123');
+        });
+
+        it('throws a clear error for a non-numeric device id instead of requesting /devices/NaN', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret' });
+
+            //the id type is number, but device configs also arrive from untyped json, hence the casts
+            await expectThrowsAsync(
+                client.getInstanceUrl({ device: { id: '12a' } as any }),
+                `Invalid RCE device id '12a': expected a numeric id`
+            );
+            //an empty id would otherwise coerce to 0 and query /devices/0
+            await expectThrowsAsync(
+                client.getInstanceUrl({ device: { id: '' } as any }),
+                `Invalid RCE device id '': expected a numeric id`
+            );
+            expect(requests).to.be.empty;
+        });
+
         it('throws when no device matches the esn', async () => {
             const client = new RceManagementClient({ token: 'secret' });
             sinon.stub(client as any, 'send').resolves([]);
@@ -206,7 +236,7 @@ describe('RceManagementClient', () => {
             sinon.stub(client as any, 'send').resolves({ id: 123, status: 'shutdown' });
 
             await expectThrowsAsync(
-                client.getInstanceUrl({ device: { id: '123' } }),
+                client.getInstanceUrl({ device: { id: 123 } }),
                 `Device 123 is not running (status 'shutdown'); start it before connecting to its instance`
             );
         });

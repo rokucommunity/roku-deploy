@@ -407,7 +407,7 @@ describe('createRokuDeploySocket', () => {
         });
 
         it('emits error then close when the instance url fails to resolve', async () => {
-            const telnetSocket = createRceTelnetSocket({ device: { id: 'device-id-without-a-token' } });
+            const telnetSocket = createRceTelnetSocket({ device: { id: 123 } });
             const emittedEventNames: string[] = [];
             let emittedError: Error | undefined;
             telnetSocket.on('error', (error: Error) => {
