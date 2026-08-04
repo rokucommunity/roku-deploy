@@ -38,7 +38,7 @@ export class RceManagementClient {
      * List the firmware versions available for creating and starting devices.
      */
     public listFirmwareVersions(options: ListFirmwareVersionsOptions = {}): Promise<FirmwareVersionOut[]> {
-        return this.send('get', '/firmwareVersions', { token: options.token });
+        return this.send('get', '/firmwareVersions', { query: { items: options.items, page: options.page }, token: options.token });
     }
 
     /**
@@ -99,7 +99,7 @@ export class RceManagementClient {
     }
 
     public listSnapshots(options: ListSnapshotsOptions): Promise<SnapshotOut[]> {
-        return this.send('get', `/devices/${options.deviceId}/snapshots`, { token: options.token });
+        return this.send('get', `/devices/${options.deviceId}/snapshots`, { query: { items: options.items, page: options.page }, token: options.token });
     }
 
     public createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotOut> {
@@ -122,7 +122,11 @@ export class RceManagementClient {
      * Find a device by its serial number (ESN), or undefined when the caller has no such device.
      */
     public async findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<DeviceOut | undefined> {
-        const devices = await this.listDevices({ token: options.token });
+        //the devices endpoint is paginated and defaults to 100 items per page, which would silently
+        //hide a device past the first page; `items: 0` is the api's documented "no limit" value, and
+        //the response is a plain array (no total-count envelope), so this is also the only way to
+        //know the whole inventory was searched
+        const devices = await this.listDevices({ items: 0, token: options.token });
         return devices.find((device) => device.serial_number === options.esn);
     }
 
@@ -237,14 +241,26 @@ export interface RceManagementRequestOptions {
     token?: string;
 }
 
-export type GetUserInfoOptions = RceManagementRequestOptions;
-
-export type ListFirmwareVersionsOptions = RceManagementRequestOptions;
-
-export interface ListDevicesOptions extends RceManagementRequestOptions {
+/**
+ * Paging options accepted by the paginated list endpoints (devices, firmware versions, snapshots).
+ */
+export interface RceManagementPagingOptions {
+    /**
+     * The number of items per page. The api defaults to 100 when omitted; `0` means no limit
+     * (return everything in one response).
+     */
     items?: number;
+    /**
+     * The zero-based page number. Defaults to `0` (the first page).
+     */
     page?: number;
 }
+
+export type GetUserInfoOptions = RceManagementRequestOptions;
+
+export type ListFirmwareVersionsOptions = RceManagementRequestOptions & RceManagementPagingOptions;
+
+export type ListDevicesOptions = RceManagementRequestOptions & RceManagementPagingOptions;
 
 export interface GetDeviceOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
@@ -277,7 +293,7 @@ export interface ReadLogsOptions extends RceManagementRequestOptions {
     instanceId: number;
 }
 
-export interface ListSnapshotsOptions extends RceManagementRequestOptions {
+export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceManagementPagingOptions {
     deviceId: DeviceId;
 }
 

@@ -12,14 +12,15 @@ describe('RceManagementClient', () => {
     });
 
     /**
-     * Stub needle to answer every request with an empty 200, capturing the request options so
-     * tests can assert on what was actually sent (Authorization header, timeout timers, ...).
+     * Stub needle to answer every request with a 200 carrying `body` (an empty object by default),
+     * capturing each request's url and options so tests can assert on what was actually sent (url
+     * and query string, Authorization header, timeout timers, ...).
      */
-    function stubNeedle() {
-        const requests: Array<{ options: needle.NeedleOptions }> = [];
+    function stubNeedle(body: unknown = {}) {
+        const requests: Array<{ url: string; options: needle.NeedleOptions }> = [];
         sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
-            requests.push({ options: options });
-            callback(null, { statusCode: 200, body: {} });
+            requests.push({ url: url, options: options });
+            callback(null, { statusCode: 200, body: body });
             return {} as any;
         }) as any);
         return requests;
@@ -80,6 +81,42 @@ describe('RceManagementClient', () => {
 
             expect(requests[0].options.open_timeout).to.equal(30000);
             expect(requests[0].options.response_timeout).to.equal(30000);
+        });
+    });
+
+    describe('pagination', () => {
+        it('forwards items and page to the paginated list endpoints', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await client.listDevices({ items: 25, page: 3 });
+            await client.listFirmwareVersions({ items: 25, page: 3 });
+            await client.listSnapshots({ deviceId: 42, items: 25, page: 3 });
+
+            expect(requests.map((request) => request.url)).to.eql([
+                'https://api.rce.roku.com/api/v1/devices?items=25&page=3',
+                'https://api.rce.roku.com/api/v1/firmwareVersions?items=25&page=3',
+                'https://api.rce.roku.com/api/v1/devices/42/snapshots?items=25&page=3'
+            ]);
+        });
+
+        it('omits paging params entirely when none are given, deferring to the api defaults', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await client.listDevices();
+
+            expect(requests[0].url).to.equal('https://api.rce.roku.com/api/v1/devices');
+        });
+
+        it('findDeviceByEsn searches the whole device inventory (items=0, the api\'s no-limit value)', async () => {
+            const requests = stubNeedle([]);
+            const client = new RceManagementClient({ token: 'secret' });
+
+            const device = await client.findDeviceByEsn({ esn: 'XY123' });
+
+            expect(device).to.be.undefined;
+            expect(requests[0].url).to.equal('https://api.rce.roku.com/api/v1/devices?items=0');
         });
     });
 
