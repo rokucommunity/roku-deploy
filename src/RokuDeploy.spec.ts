@@ -926,6 +926,13 @@ describe('RokuDeploy', () => {
             });
         });
 
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoGetRequest('<plugin-registry><registry></registry><status>OK</status></plugin-registry>');
+            await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/registry/dev%20channel%2F1');
+        });
+
         it('throws a FailedDeviceResponseError carrying the device error message', async () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
                 response: { statusCode: 202 },
@@ -1952,6 +1959,13 @@ describe('RokuDeploy', () => {
             await rokuDeploy.launchApp({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev');
+        });
+
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoPostRequest();
+            await rokuDeploy.launchApp({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev%20channel%2F1');
         });
 
         it('appends contentId and mediaType to the query string', async () => {

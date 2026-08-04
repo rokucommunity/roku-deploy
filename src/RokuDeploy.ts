@@ -751,7 +751,7 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const queryString = this.buildLaunchQueryString(options);
-        await this.ecp(options.device, `launch/${options.appId}${queryString}`, {
+        await this.ecp(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
             method: 'POST',
             verify: true,
             ecpPort: options.ecpPort,
@@ -788,7 +788,7 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const forceSegment = options.force ? '/true' : '';
-        const result = await this.ecp(options.device, `exit-app/${options.appId}${forceSegment}`, {
+        const result = await this.ecp(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -2067,7 +2067,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as QueryRegistryOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.ecp(options.device, `query/registry/${options.appId}`, {
+        const result = await this.ecp(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2105,7 +2105,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as QueryAppStateOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.ecp(options.device, `query/app-state/${options.appId}`, {
+        const result = await this.ecp(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
