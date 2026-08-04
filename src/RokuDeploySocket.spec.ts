@@ -441,6 +441,67 @@ describe('createRokuDeploySocket', () => {
             expect(fakeWebSocket.closed).to.be.true;
         });
 
+        describe('end()', () => {
+            it('starts the websocket close handshake and reaches exactly one close event once the server completes it', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                const emittedEventNames: string[] = [];
+                telnetSocket.on('finish', () => emittedEventNames.push('finish'));
+                telnetSocket.on('close', () => emittedEventNames.push('close'));
+
+                telnetSocket.end();
+                await flushMicrotasks();
+                //the writable side finished and the close handshake started, but the stream stays
+                //alive until the server completes the handshake (the same way a net.Socket stays
+                //alive between sending FIN and receiving the remote FIN)
+                expect(fakeWebSocket.closed).to.be.true;
+                expect(emittedEventNames).to.eql(['finish']);
+
+                //the server completes the websocket close handshake
+                fakeWebSocket.emit('close');
+                await flushMicrotasks();
+
+                expect(emittedEventNames).to.eql(['finish', 'close']);
+                expect(telnetSocket.destroyed).to.be.true;
+            });
+
+            it('flushes a final chunk before starting the close handshake', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                telnetSocket.end('quit\r\n');
+                await flushMicrotasks();
+
+                expect(fakeWebSocket.sentFrames).to.have.lengthOf(1);
+                expect((fakeWebSocket.sentFrames[0].data as Buffer).toString('utf8')).to.equal('quit\r\n');
+                expect(fakeWebSocket.closed).to.be.true;
+            });
+
+            it('tears the stream down when called before the websocket has opened', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                //let the connect sequence create the websocket, which then sits in CONNECTING
+                await flushMicrotasks();
+
+                let closeEventCount = 0;
+                telnetSocket.on('close', () => closeEventCount++);
+
+                telnetSocket.end();
+                await flushMicrotasks();
+
+                //there is no open connection to close-handshake with, so the mid-handshake
+                //websocket is terminated and the stream destroyed instead of dangling forever
+                expect(fakeWebSocket.terminated).to.be.true;
+                expect(telnetSocket.destroyed).to.be.true;
+                expect(closeEventCount).to.equal(1);
+            });
+        });
+
         describe('setTimeout idle semantics', () => {
             it('emits timeout after the configured idle period with no activity, without destroying the connection', async () => {
                 const telnetSocket = createRceTelnetSocket();

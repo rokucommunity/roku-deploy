@@ -203,6 +203,26 @@ export class RceSocket extends stream.Duplex {
     }
 
     /**
+     * Implements the writable half of `end()`. `net.Socket` sends a FIN here; a websocket has no
+     * half-close, so the closest equivalent is starting the close handshake. The websocket's own
+     * `'close'` event (see `beginConnecting()`) then ends the readable side and destroys the
+     * stream, so `end()` still arrives at exactly one `'close'` event, just like a `net.Socket`.
+     */
+    public _final(callback: (error?: Error | null) => void): void {
+        if (this.webSocket?.readyState === WebSocket.OPEN) {
+            this.webSocket.close();
+            callback();
+            return;
+        }
+        //there is no open connection to run a close handshake on (never connected, still
+        //connecting, or already closed), so nothing will ever fire the websocket 'close' event
+        //that normally finishes teardown; destroy directly so end() cannot leave the stream (or a
+        //mid-handshake websocket) dangling
+        callback();
+        this.destroy();
+    }
+
+    /**
      * Data arrives asynchronously from the websocket's `'message'` event and is pushed as it comes
      * in (see `beginConnecting()`), so there is nothing to pull on demand here.
      */
