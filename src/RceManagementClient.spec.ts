@@ -12,13 +12,15 @@ describe('RceManagementClient', () => {
     });
 
     /**
-     * Stub needle to answer every request with a 200 carrying `body` (an empty object by default),
-     * capturing each request's url and options so tests can assert on what was actually sent (url
-     * and query string, Authorization header, timeout timers, ...).
+     * Stub needle to answer each request with a 200 carrying the next body from `bodies` (requests
+     * beyond the list reuse the last body; an empty object when none are given), capturing each
+     * request's url and options so tests can assert on what was actually sent (url and query
+     * string, Authorization header, timeout timers, ...).
      */
-    function stubNeedle(body: unknown = {}) {
+    function stubNeedle(...bodies: unknown[]) {
         const requests: Array<{ url: string; options: needle.NeedleOptions }> = [];
         sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+            const body = bodies.length > 0 ? bodies[Math.min(requests.length, bodies.length - 1)] : {};
             requests.push({ url: url, options: options });
             callback(null, { statusCode: 200, body: body });
             return {} as any;
@@ -51,14 +53,28 @@ describe('RceManagementClient', () => {
             ]);
         });
 
-        it('threads a per-call token through the nested calls of an esn resolution', async () => {
-            const requests = stubNeedle();
+        it('threads a per-call token through both nested calls of an esn resolution', async () => {
+            const requests = stubNeedle(
+                //the listDevices response: the device inventory containing the esn being resolved
+                [{ id: 42, serial_number: 'XY123' }],
+                //the getDevice response: that device, running
+                { id: 42, status: 'running', running_device: { instance_api_url: 'https://device.rce.roku.com/instance/xyz' } }
+            );
             const client = new RceManagementClient({ token: 'constructor-token' });
 
-            //listDevices returns nothing, so the esn lookup fails - but both requests carry the override
-            await expectThrowsAsync(client.getInstanceUrl({ device: { esn: 'XY123' }, token: 'override-token' }));
+            const instanceUrl = await client.getInstanceUrl({ device: { esn: 'XY123' }, token: 'override-token' });
 
-            expect(requests[0].options.headers.Authorization).to.equal('Bearer override-token');
+            expect(instanceUrl).to.equal('https://device.rce.roku.com/instance/xyz');
+            //the full esn resolution ran: the inventory list, then the device lookup by the id it found
+            expect(requests.map((request) => request.url)).to.eql([
+                'https://api.rce.roku.com/api/v1/devices?items=0',
+                'https://api.rce.roku.com/api/v1/devices/42'
+            ]);
+            //and the per-call override rode both requests, not just the first
+            expect(requests.map((request) => request.options.headers.Authorization)).to.eql([
+                'Bearer override-token',
+                'Bearer override-token'
+            ]);
         });
     });
 
