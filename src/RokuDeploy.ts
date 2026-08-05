@@ -119,57 +119,6 @@ export class RokuDeploy {
         this.logger = this.options.logger ?? logger;
     }
 
-    /**
-     * Copies all of the referenced files to the staging folder
-     * @param options
-     */
-    /**
-     * Resolve the path to the staging folder the same way `stage` does: `out` wins when provided,
-     * otherwise the default staging folder inside `outDir`.
-     */
-    public getStagingDir(options?: GetStagingDirOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        return options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, RokuDeploy.defaults.stagingDirName);
-    }
-
-    /**
-     * Resolve the path to the output zip file the same way `zip` does: `out` wins when provided,
-     * otherwise `outFile` inside `outDir`. Always ends with `.zip`.
-     */
-    public getOutputZipPath(options?: GetOutputPathOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        let out = options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
-
-        // Ensure .zip extension
-        if (!out.toLowerCase().endsWith('.zip')) {
-            out += '.zip';
-        }
-        return out;
-    }
-
-    /**
-     * Resolve the path to the output pkg file the same way `createSignedPackage` does: `out` wins when
-     * provided, otherwise `outFile` inside `outDir`. Always ends with `.pkg` (a `.zip` extension is swapped).
-     */
-    public getOutputPkgPath(options?: GetOutputPathOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        let out = options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
-
-        // Ensure .pkg extension
-        if (out.toLowerCase().endsWith('.zip')) {
-            out = out.replace(/\.zip$/i, '.pkg');
-        } else if (!out.toLowerCase().endsWith('.pkg')) {
-            out += '.pkg';
-        }
-        return out;
-    }
-
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
