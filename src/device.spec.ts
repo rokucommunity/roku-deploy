@@ -55,6 +55,11 @@ describe('device', function device() {
     //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
     const rekeySignedPackage = `${cwd}/testSignedPackage.pkg`;
 
+    //tripped by the mid-suite reboot check if the device fails to come back; once true, every remaining
+    //test in this suite is skipped immediately instead of running (and likely failing/timing out) against
+    //a device we already know is unhealthy
+    let deviceIsHealthy = true;
+
     before(async function beforeAll() {
         //fail fast with a clear message rather than letting every test time out against an empty host
         if (!HOST || !PASSWORD) {
@@ -66,24 +71,34 @@ describe('device', function device() {
 
         //a reboot can take a couple minutes to fully come back; allow generous time here
         this.timeout(180_000);
+        console.log('[device-health] rebooting device before the suite starts...');
         await rebootDeviceOrThrow(
             'Could not reboot the device before the device test suite started. The device is likely in a bad ' +
             'state (unresponsive, stuck, or otherwise unhealthy), so the entire suite is likely to fail or hang. ' +
             'Check the device manually before re-running the tests.'
         );
+        console.log('[device-health] device is back online; starting tests.');
     });
 
     after(async function afterAll() {
         //same generous timeout as the initial reboot; the device needs time to come back before mocha exits
         this.timeout(180_000);
+        console.log('[device-health] rebooting device after the suite finishes...');
         await rebootDeviceOrThrow(
             'Could not reboot the device after the device test suite finished. The device is likely in a bad ' +
             'state (unresponsive, stuck, or otherwise unhealthy) after running the suite. Check the device ' +
             'manually before relying on it for the next test run.'
         );
+        console.log('[device-health] device is back online after the suite.');
     });
 
-    beforeEach(() => {
+    beforeEach(function beforeEachTest() {
+        //the device already failed to come back from the mid-suite reboot; skip immediately instead of
+        //burning time on more tests that are almost certainly going to fail/timeout against it anyway
+        if (!deviceIsHealthy) {
+            this.skip();
+        }
+
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
         process.chdir(rootDir);
@@ -499,11 +514,20 @@ describe('device', function device() {
         it('reboots the device to confirm it is still keeping up', async function midSuiteReboot() {
             //same generous timeout as the suite-level reboots; the device needs time to come back
             this.timeout(180_000);
-            await rebootDeviceOrThrow(
-                'Could not reboot the device midway through the device test suite. The device is likely ' +
-                'struggling to keep up with the tests run so far, so the remaining tests are likely to fail. ' +
-                'Check the device manually before re-running the tests.'
-            );
+            console.log('[device-health] rebooting device midway through the suite...');
+            try {
+                await rebootDeviceOrThrow(
+                    'Could not reboot the device midway through the device test suite. The device is likely ' +
+                    'struggling to keep up with the tests run so far, so the remaining tests are likely to fail. ' +
+                    'Check the device manually before re-running the tests.'
+                );
+            } catch (e) {
+                //the device is unhealthy; skip every remaining test in the suite instead of letting each
+                //one individually run and time out against it
+                deviceIsHealthy = false;
+                throw e;
+            }
+            console.log('[device-health] device is still keeping up; continuing with the remaining tests.');
         });
     });
 
