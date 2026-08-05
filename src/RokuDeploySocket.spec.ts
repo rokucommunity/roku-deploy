@@ -233,12 +233,12 @@ describe('createRokuDeploySocket', () => {
             const telnetSocket = createRokuDeploySocket({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'token-value' },
                 port: 8085,
-                createWebSocket: (url, requestOptions) => {
-                    capturedWebSocketUrl = url;
-                    capturedWebSocketOptions = requestOptions;
-                    return fakeWebSocket as unknown as WebSocket;
-                },
                 ...overrides
+            });
+            sinon.stub(telnetSocket as any, 'createWebSocket').callsFake((url, requestOptions) => {
+                capturedWebSocketUrl = url as string;
+                capturedWebSocketOptions = requestOptions as WebSocket.ClientOptions;
+                return fakeWebSocket as unknown as WebSocket;
             });
             createdTelnetSockets.push(telnetSocket);
             return telnetSocket;

@@ -39,12 +39,9 @@ export class RceVideoSignalingClient extends EventEmitter {
         options?: RceVideoSignalingClientOptions
     ) {
         super();
-        this.createWebSocket = options?.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, 'janus-protocol', requestOptions));
         this.keepaliveIntervalMs = options?.keepaliveIntervalMs ?? 25000;
         this.negotiationTimeoutMs = options?.negotiationTimeoutMs ?? 20000;
     }
-
-    private readonly createWebSocket: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
 
     private readonly keepaliveIntervalMs: number;
 
@@ -125,6 +122,14 @@ export class RceVideoSignalingClient extends EventEmitter {
             negotiationSettled = true;
             clearTimeout(timeoutHandle);
         }
+    }
+
+    /**
+     * Creates the websocket that carries the Janus signaling traffic. A dedicated method (rather
+     * than an inline `new WebSocket(...)` in `negotiate()`) so tests can stub it with a fake.
+     */
+    private createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket {
+        return new WebSocket(url, 'janus-protocol', requestOptions);
     }
 
     private async negotiate(): Promise<RceVideoSignalingOffer> {
@@ -444,7 +449,6 @@ export interface RceVideoSignalingConfig {
 }
 
 export interface RceVideoSignalingClientOptions {
-    createWebSocket?: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
     /**
      * How often to send a Janus keepalive. Defaults to 25000ms (Janus sessions time out at 60s).
      */

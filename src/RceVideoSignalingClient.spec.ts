@@ -121,15 +121,15 @@ describe('RceVideoSignalingClient', () => {
         fakeWebSocket = new FakeWebSocket();
         capturedWebSocketOptions = undefined;
         const client = new RceVideoSignalingClient(createConfig(configOverrides), {
-            //a fresh fake per websocket, so a reconnect (a second createWebSocket call) gets its own
-            //socket exactly like the real factory would; `fakeWebSocket` always points at the latest
-            createWebSocket: (url, requestOptions) => {
-                fakeWebSocket = new FakeWebSocket();
-                capturedWebSocketOptions = requestOptions;
-                return fakeWebSocket as unknown as WebSocket;
-            },
             keepaliveIntervalMs: keepaliveIntervalMs,
             negotiationTimeoutMs: negotiationTimeoutMs
+        });
+        //a fresh fake per websocket, so a reconnect (a second createWebSocket call) gets its own
+        //socket exactly like the real method would; `fakeWebSocket` always points at the latest
+        sinon.stub(client as any, 'createWebSocket').callsFake((url, requestOptions) => {
+            fakeWebSocket = new FakeWebSocket();
+            capturedWebSocketOptions = requestOptions as WebSocket.ClientOptions;
+            return fakeWebSocket as unknown as WebSocket;
         });
         createdClients.push(client);
         return client;

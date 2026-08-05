@@ -1,7 +1,7 @@
 import * as net from 'net';
 import * as stream from 'stream';
 import * as WebSocket from 'ws';
-import type { DeviceConfig, RceDeviceConfig } from './DeviceConfig';
+import type { DeviceConfig, LocalDeviceConfig, RceDeviceConfig } from './DeviceConfig';
 import { isLocalDeviceConfig, isRceById, isRceByUrl, isRceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 
@@ -34,10 +34,10 @@ export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket
     }
 
     if (isLocalDeviceConfig(options.device)) {
-        return new LocalSocket(options.device.host, options.port);
+        return new LocalSocket({ ...options, device: options.device });
     }
     if (isRceDeviceConfig(options.device)) {
-        return new RceSocket(options.device, options.port, options);
+        return new RceSocket({ ...options, device: options.device });
     }
     throw new Error('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
 }
@@ -49,12 +49,15 @@ export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket
  * instead of wrapping it in another layer.
  */
 export class LocalSocket extends net.Socket {
-    constructor(
-        private readonly host: string,
-        private readonly port: number
-    ) {
+    constructor(options: LocalSocketOptions) {
         super({ allowHalfOpen: false });
+        this.host = options.device.host;
+        this.port = options.port;
     }
+
+    private readonly host: string;
+
+    private readonly port: number;
 
     /**
      * Connects to the host and port resolved by the factory that created this socket, matching
@@ -96,16 +99,15 @@ export class LocalSocket extends net.Socket {
  * provides.
  */
 export class RceSocket extends stream.Duplex {
-    constructor(
-        private readonly device: RceDeviceConfig,
-        private readonly port: number,
-        options: SocketOptions
-    ) {
+    constructor(options: RceSocketOptions) {
         super();
-        this.createWebSocket = options.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, requestOptions));
+        this.device = options.device;
+        this.port = options.port;
     }
 
-    private readonly createWebSocket: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
+    private readonly device: RceDeviceConfig;
+
+    private readonly port: number;
 
     private webSocket: WebSocket | undefined;
 
@@ -227,6 +229,14 @@ export class RceSocket extends stream.Duplex {
             this.read(0);
             this.end();
         });
+    }
+
+    /**
+     * Creates the websocket that carries the console bytes. A dedicated method (rather than an
+     * inline `new WebSocket(...)` in `beginConnecting()`) so tests can stub it with a fake.
+     */
+    private createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket {
+        return new WebSocket(url, requestOptions);
     }
 
     /**
@@ -495,8 +505,20 @@ export interface SocketOptions {
      * `/api/v0/ports/<port>` WebSocket route
      */
     port: number;
-    /** test injection point for the RCE websocket */
-    createWebSocket?: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
+}
+
+/**
+ * `SocketOptions` narrowed to a local network device, the flavor `LocalSocket` requires
+ */
+export interface LocalSocketOptions extends SocketOptions {
+    device: LocalDeviceConfig;
+}
+
+/**
+ * `SocketOptions` narrowed to an RCE device, the flavor `RceSocket` requires
+ */
+export interface RceSocketOptions extends SocketOptions {
+    device: RceDeviceConfig;
 }
 
 /**
