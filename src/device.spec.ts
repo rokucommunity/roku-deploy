@@ -115,7 +115,9 @@ describe('device', function device() {
         fsExtra.emptyDirSync(tempDir);
 
         //add 1 second of breathing room between tests so the device doesn't get overwhelmed by back-to-back requests.
-        await new Promise<void>(resolve => { setTimeout(resolve, 1000); });
+        await new Promise<void>(resolve => {
+            setTimeout(resolve, 1000);
+        });
     });
 
     function countByType(packages: Array<{ appType: string }>) {
