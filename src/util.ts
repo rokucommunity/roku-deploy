@@ -364,14 +364,8 @@ export class Util {
         const entries = util.normalizeFilesArray(files);
 
         function makeGlobAbsolute(pattern: string) {
-            return path.resolve(
-                path.posix.join(
-                    rootDir,
-                    //remove leading exclamation point if pattern is negated
-                    pattern
-                    //coerce all slashes to forward
-                )
-            ).replace(/\\/g, '/');
+            //resolve the pattern relative to rootDir (absolute patterns stand on their own), and coerce all slashes to forward
+            return path.resolve(rootDir, pattern).replace(/\\/g, '/');
         }
 
         let result: string;
