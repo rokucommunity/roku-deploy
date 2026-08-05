@@ -92,12 +92,18 @@ describe('device', function device() {
         console.log('[device-health] device is back online after the suite.');
     });
 
-    beforeEach(function beforeEachTest() {
+    beforeEach(async function beforeEachTest() {
         //the device already failed to come back from the mid-suite reboot; skip immediately instead of
         //burning time on more tests that are almost certainly going to fail/timeout against it anyway
         if (!deviceIsHealthy) {
             this.skip();
         }
+
+        //make sure the device is actually reachable before running the next test; catches the case where
+        //the previous test (or a reboot) left the device still coming back online, so we don't immediately
+        //trample a device that isn't ready yet
+        this.timeout(60_000);
+        await waitForDeviceOnline(HOST, 30_000, 2000, 0);
 
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
