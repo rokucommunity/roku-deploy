@@ -43,7 +43,12 @@ describe('device', function device() {
 
     let options: rokuDeploy.RokuDeployOptions;
 
-    before(() => {
+    //tripped by the mid-suite reboot check if the device fails to come back; once true, every remaining
+    //test in this suite is skipped immediately instead of running (and likely failing/timing out) against
+    //a device we already know is unhealthy
+    let deviceIsHealthy = true;
+
+    before(async function beforeAll() {
         //fail fast with a clear message rather than letting every test time out against an empty host
         if (!HOST || !PASSWORD) {
             throw new Error(
@@ -51,9 +56,43 @@ describe('device', function device() {
                 `(see .env.example) or as environment variables before running "npm run test:device".`
             );
         }
+
+        //a reboot can take a couple minutes to fully come back; allow generous time here
+        this.timeout(180_000);
+        console.log('[device-health] rebooting device before the suite starts...');
+        await rebootDeviceOrThrow(
+            'Could not reboot the device before the device test suite started. The device is likely in a bad ' +
+            'state (unresponsive, stuck, or otherwise unhealthy), so the entire suite is likely to fail or hang. ' +
+            'Check the device manually before re-running the tests.'
+        );
+        console.log('[device-health] device is back online; starting tests.');
     });
 
-    beforeEach(() => {
+    after(async function afterAll() {
+        //same generous timeout as the initial reboot; the device needs time to come back before mocha exits
+        this.timeout(180_000);
+        console.log('[device-health] rebooting device after the suite finishes...');
+        await rebootDeviceOrThrow(
+            'Could not reboot the device after the device test suite finished. The device is likely in a bad ' +
+            'state (unresponsive, stuck, or otherwise unhealthy) after running the suite. Check the device ' +
+            'manually before relying on it for the next test run.'
+        );
+        console.log('[device-health] device is back online after the suite.');
+    });
+
+    beforeEach(async function beforeEachTest() {
+        //the device already failed to come back from the mid-suite reboot; skip immediately instead of
+        //burning time on more tests that are almost certainly going to fail/timeout against it anyway
+        if (!deviceIsHealthy) {
+            this.skip();
+        }
+
+        //make sure the device is actually reachable before running the next test; catches the case where
+        //the previous test (or a reboot) left the device still coming back online, so we don't immediately
+        //trample a device that isn't ready yet
+        this.timeout(60_000);
+        await waitForDeviceOnline(HOST, 30_000, 2000, 0);
+
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
         process.chdir(rootDir);
@@ -115,9 +154,7 @@ describe('device', function device() {
         fsExtra.emptyDirSync(tempDir);
 
         //add 1 second of breathing room between tests so the device doesn't get overwhelmed by back-to-back requests.
-        await new Promise<void>(resolve => {
-            setTimeout(resolve, 1000);
-        });
+        await sleep(1000);
     });
 
     function countByType(packages: Array<{ appType: string }>) {
@@ -706,6 +743,27 @@ describe('device', function device() {
         });
     });
 
+    describe('mid-suite reboot', () => {
+        it('reboots the device to confirm it is still keeping up', async function midSuiteReboot() {
+            //same generous timeout as the suite-level reboots; the device needs time to come back
+            this.timeout(180_000);
+            console.log('[device-health] rebooting device midway through the suite...');
+            try {
+                await rebootDeviceOrThrow(
+                    'Could not reboot the device midway through the device test suite. The device is likely ' +
+                    'struggling to keep up with the tests run so far, so the remaining tests are likely to fail. ' +
+                    'Check the device manually before re-running the tests.'
+                );
+            } catch (e) {
+                //the device is unhealthy; skip every remaining test in the suite instead of letting each
+                //one individually run and time out against it
+                deviceIsHealthy = false;
+                throw e;
+            }
+            console.log('[device-health] device is still keeping up; continuing with the remaining tests.');
+        });
+    });
+
     //these tests are slow (and can reboot the device), so they run last so as many other tests as
     //possible finish and report before we hit them.
     describe('rebootDevice', () => {
@@ -832,6 +890,21 @@ function getActiveApp(host: string): Promise<string> {
             req.destroy(new Error(`Timed out querying active-app on ${host}:8060`));
         });
     });
+}
+
+/**
+ * Reboot the device and wait for it to come back online. Rethrows with `helpText` prepended if the
+ * reboot itself fails, or if the device never comes back online afterward, so a broken device is
+ * reported clearly instead of surfacing as a generic timeout.
+ */
+async function rebootDeviceOrThrow(helpText: string): Promise<void> {
+    try {
+        await rokuDeploy.rokuDeploy.rebootDevice({ host: HOST, password: PASSWORD, timeout: REQUEST_TIMEOUT });
+        await waitForDeviceOnline(HOST);
+    } catch (e) {
+        const cause = e as Error;
+        throw new Error(`${helpText}\n\nUnderlying error: ${cause?.message}`);
+    }
 }
 
 /**
