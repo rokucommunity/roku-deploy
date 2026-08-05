@@ -34,24 +34,11 @@ import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
-export const DefaultFiles = [
-    'source/**/*.*',
-    'components/**/*.*',
-    'images/**/*.*',
-    'locale/**/*',
-    'fonts/**/*',
-    'manifest',
-    '!node_modules',
-    '!**/*.{md,DS_Store,db}'
-];
-
 export class RokuDeploy {
     /**
-     * Default values for common options used across multiple functions.
-     * Public so consumers can resolve the same defaults roku-deploy uses internally
-     * instead of hardcoding them (see also `getStagingDir`, `getOutputZipPath` and `getOutputPkgPath`).
+     * Default values for common options used across multiple functions
      */
-    public static readonly defaults = {
+    private static readonly defaults = {
         timeout: 150000,
         /**
          * The default timeout for ECP requests, in milliseconds. ECP commands are small and fast,
@@ -60,14 +47,8 @@ export class RokuDeploy {
         ecpTimeout: 10000,
         packagePort: 80,
         ecpPort: 8060,
-        username: 'rokudev',
         outDir: './out',
-        outFile: 'roku-deploy.zip',
-        /**
-         * The name of the staging folder that gets created inside `outDir`
-         */
-        stagingDirName: '.roku-deploy-staging',
-        files: DefaultFiles
+        outFile: 'roku-deploy.zip'
     };
 
     /**
@@ -140,53 +121,6 @@ export class RokuDeploy {
      * Copies all of the referenced files to the staging folder
      * @param options
      */
-    /**
-     * Resolve the path to the staging folder the same way `stage` does: `out` wins when provided,
-     * otherwise the default staging folder inside `outDir`.
-     */
-    public getStagingDir(options?: GetStagingDirOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        return options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, RokuDeploy.defaults.stagingDirName);
-    }
-
-    /**
-     * Resolve the path to the output zip file the same way `zip` does: `out` wins when provided,
-     * otherwise `outFile` inside `outDir`. Always ends with `.zip`.
-     */
-    public getOutputZipPath(options?: GetOutputPathOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        let out = options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
-
-        // Ensure .zip extension
-        if (!out.toLowerCase().endsWith('.zip')) {
-            out += '.zip';
-        }
-        return out;
-    }
-
-    /**
-     * Resolve the path to the output pkg file the same way `createSignedPackage` does: `out` wins when
-     * provided, otherwise `outFile` inside `outDir`. Always ends with `.pkg` (a `.zip` extension is swapped).
-     */
-    public getOutputPkgPath(options?: GetOutputPathOptions): string {
-        const cwd = options?.cwd ?? process.cwd();
-        let out = options?.out
-            ? path.resolve(cwd, options.out)
-            : path.resolve(cwd, options?.outDir ?? RokuDeploy.defaults.outDir, options?.outFile ?? RokuDeploy.defaults.outFile);
-
-        // Ensure .pkg extension
-        if (out.toLowerCase().endsWith('.zip')) {
-            out = out.replace(/\.zip$/i, '.pkg');
-        } else if (!out.toLowerCase().endsWith('.pkg')) {
-            out += '.pkg';
-        }
-        return out;
-    }
-
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
@@ -197,7 +131,9 @@ export class RokuDeploy {
         const files = options.files ?? [...DefaultFiles];
 
         // Resolve output directory - use 'out' if provided, otherwise default to staging dir
-        const out = this.getStagingDir({ out: options.out, cwd: cwd });
+        const out = options.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
 
         //clean the staging directory
         await fsExtra.remove(out);
@@ -247,7 +183,14 @@ export class RokuDeploy {
         const dir = path.resolve(cwd, options.dir);
 
         // Resolve output zip path - use 'out' if provided, otherwise default
-        const out = this.getOutputZipPath({ out: options.out, cwd: cwd });
+        let out = options.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
+
+        // Ensure .zip extension
+        if (!out.toLowerCase().endsWith('.zip')) {
+            out += '.zip';
+        }
 
         // Get files to include - use provided files array or default to everything
         const files = options.files ?? ['**/*'];
@@ -353,7 +296,7 @@ export class RokuDeploy {
         // Set defaults for request options
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
         const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
-        const username = mergedOptions.username ?? RokuDeploy.defaults.username;
+        const username = mergedOptions.username ?? 'rokudev';
 
         const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
         let baseRequestOptions = {
@@ -868,7 +811,7 @@ export class RokuDeploy {
             zipFilePath = path.resolve(cwd, options.zip);
         } else if ('dir' in options && options.dir) {
             // Generate zip from directory to a temp location
-            zipFilePath = this.getOutputZipPath({ cwd: cwd });
+            zipFilePath = path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
         } else {
@@ -1188,7 +1131,16 @@ export class RokuDeploy {
         const cwd = options.cwd ?? process.cwd();
 
         // Resolve output pkg path - use 'out' if provided, otherwise derive from default
-        const out = this.getOutputPkgPath({ out: options.out, cwd: cwd });
+        let out = options.out
+            ? path.resolve(cwd, options.out)
+            : path.resolve(cwd, RokuDeploy.defaults.outDir, 'roku-deploy.pkg');
+
+        // Ensure .pkg extension
+        if (out.toLowerCase().endsWith('.zip')) {
+            out = out.replace(/\.zip$/i, '.pkg');
+        } else if (!out.toLowerCase().endsWith('.pkg')) {
+            out += '.pkg';
+        }
 
         // Process options for app title and app version
         if (options.appTitle || options.appVersion) {
@@ -1849,7 +1801,7 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        const username = options.username ?? RokuDeploy.defaults.username;
+        const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
         const timeout = options.timeout ?? 3000;
 
@@ -2390,6 +2342,17 @@ enum RokuMessageType {
     error = 'error'
 }
 
+export const DefaultFiles = [
+    'source/**/*.*',
+    'components/**/*.*',
+    'images/**/*.*',
+    'locale/**/*',
+    'fonts/**/*',
+    'manifest',
+    '!node_modules',
+    '!**/*.{md,DS_Store,db}'
+];
+
 export interface HttpResponse {
     response: any;
     body: any;
@@ -2630,7 +2593,7 @@ export interface BaseRequestOptions {
 export interface BaseEcpOptions {
     device: DeviceOption;
     ecpPort?: number;
-    /** Request timeout in milliseconds. Defaults to `RokuDeploy.defaults.ecpTimeout` (10 seconds) */
+    /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
     timeout?: number;
 }
 
@@ -2645,7 +2608,7 @@ export interface EcpOptions {
     verify?: boolean;
     /** The ECP port for local devices (defaults to 8060); not used for Cloud Emulator devices */
     ecpPort?: number;
-    /** Request timeout in milliseconds. Defaults to `RokuDeploy.defaults.ecpTimeout` (10 seconds) */
+    /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
     timeout?: number;
 }
 
@@ -2748,37 +2711,8 @@ export type RebootDeviceOptions = BaseRequestOptions;
 
 export type CheckForUpdateOptions = BaseRequestOptions;
 
-export interface GetStagingDirOptions {
-    /**
-     * The staging folder path. When provided, this wins over `outDir`.
-     */
+export interface GetOutputZipFilePathOptions {
     out?: string;
-    /**
-     * The output directory that contains the default staging folder. Defaults to `'./out'`.
-     */
-    outDir?: string;
-    /**
-     * The current working directory to use for relative paths
-     */
-    cwd?: string;
-}
-
-export interface GetOutputPathOptions {
-    /**
-     * The output file path. When provided, this wins over `outDir`/`outFile`.
-     */
-    out?: string;
-    /**
-     * The output directory. Defaults to `'./out'`.
-     */
-    outDir?: string;
-    /**
-     * The output file name. Defaults to `'roku-deploy.zip'`.
-     */
-    outFile?: string;
-    /**
-     * The current working directory to use for relative paths
-     */
     cwd?: string;
 }
 
