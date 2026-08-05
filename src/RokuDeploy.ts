@@ -398,7 +398,7 @@ export class RokuDeploy {
      * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
      * lookup throws so the caller decides how to handle an unreachable host.
      */
-    public async resolveDns<T extends DeviceConfig>(device: T): Promise<T> {
+    public async withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T> {
         if (device && isLocalDeviceConfig(device)) {
             return { ...device, host: await util.dnsLookup(device.host) };
         }
