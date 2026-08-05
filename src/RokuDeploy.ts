@@ -420,7 +420,7 @@ export class RokuDeploy {
      *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
      *                chanperf response, for example) come back to the caller instead of throwing.
      */
-    public async ecp(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
+    public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
         options = { ...this.options, ...options } as EcpOptions;
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
@@ -504,7 +504,7 @@ export class RokuDeploy {
      * Create the management client used to resolve an id- or esn-addressed RCE device to its running
      * instance URL. Split out so tests can supply a fake.
      */
-    protected createRceManagementClient(rceToken: string): RceManagementClient {
+    private createRceManagementClient(rceToken: string): RceManagementClient {
         return new RceManagementClient({ token: rceToken });
     }
 
@@ -635,10 +635,10 @@ export class RokuDeploy {
      * Send a single key event (keypress/keydown/keyup) to a device.
      *
      * For an RCE device the instance-api key-input route (`/api/v0/ecp1/<action>/<key>`) is tried
-     * first: unlike the raw `/ecp1` proxy the generic ecp() transport uses, it keeps working when
+     * first: unlike the raw `/ecp1` proxy the generic sendEcpRequest() transport uses, it keeps working when
      * the device is in limited ECP mode (which 403s every raw-proxy key press). Any failure - a
      * non-2xx response (verify throws), or a future rename of that path - falls through to the
-     * normal ecp() transport below, so RCE devices in normal mode and LAN devices are unaffected.
+     * normal sendEcpRequest() transport below, so RCE devices in normal mode and LAN devices are unaffected.
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
         options = { ...this.options, ...options };
@@ -666,7 +666,7 @@ export class RokuDeploy {
             }
         }
 
-        return this.ecp(options.device, `${options.action}/${options.key}`, {
+        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -692,7 +692,7 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const queryString = this.buildLaunchQueryString(options);
-        await this.ecp(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
+        await this.sendEcpRequest(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
             method: 'POST',
             verify: true,
             ecpPort: options.ecpPort,
@@ -729,7 +729,7 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const forceSegment = options.force ? '/true' : '';
-        const result = await this.ecp(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
+        const result = await this.sendEcpRequest(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -763,7 +763,7 @@ export class RokuDeploy {
     }
 
     /**
-     * Build the HttpDetails carried by ECP wrapper errors. `ecp()` does not retain the raw
+     * Build the HttpDetails carried by ECP wrapper errors. `sendEcpRequest()` does not retain the raw
      * HttpResponse, so this carries what it does keep - the status code and body - which is what a
      * caller needs to see what the device actually said.
      */
@@ -1848,7 +1848,7 @@ export class RokuDeploy {
 
         let result: EcpResult;
         try {
-            result = await this.ecp(options.device, 'query/device-info', {
+            result = await this.sendEcpRequest(options.device, 'query/device-info', {
                 verify: true,
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -1925,7 +1925,7 @@ export class RokuDeploy {
 
         let result: EcpResult;
         try {
-            result = await this.ecp(options.device, 'query/apps', {
+            result = await this.sendEcpRequest(options.device, 'query/apps', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -1965,7 +1965,7 @@ export class RokuDeploy {
 
         let result: EcpResult;
         try {
-            result = await this.ecp(options.device, 'query/active-app', {
+            result = await this.sendEcpRequest(options.device, 'query/active-app', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -2017,7 +2017,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as QueryRegistryOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.ecp(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
+        const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2055,7 +2055,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as QueryAppStateOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.ecp(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
+        const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2082,7 +2082,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as QueryRendezvousOptions;
         this.checkRequiredOptions(options, ['device']);
 
-        const result = await this.ecp(options.device, 'query/sgrendezvous', {
+        const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2110,7 +2110,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
         this.checkRequiredOptions(options, ['device', 'enabled']);
 
-        const result = await this.ecp(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
+        const result = await this.sendEcpRequest(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
