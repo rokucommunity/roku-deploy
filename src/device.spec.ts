@@ -103,7 +103,7 @@ describe('device', function device() {
         ]);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         //tear down any sockets/connections opened during the test so the suite doesn't hang open
         while (cleanups.length > 0) {
             try {
@@ -113,6 +113,9 @@ describe('device', function device() {
         //restore the original working directory
         process.chdir(cwd);
         fsExtra.emptyDirSync(tempDir);
+
+        //add 1 second of breathing room between tests so the device doesn't get overwhelmed by back-to-back requests.
+        await new Promise<void>(resolve => { setTimeout(resolve, 1000); });
     });
 
     function countByType(packages: Array<{ appType: string }>) {
