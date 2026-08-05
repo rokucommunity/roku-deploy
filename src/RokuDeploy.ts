@@ -25,7 +25,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isLocalDeviceConfig, isRceDeviceConfig, isRceById, isRceByUrl } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfig, isRceByEsn, isRceById, isRceByUrl } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
@@ -575,9 +575,7 @@ export class RokuDeploy {
         const keyDelayMs = options.keyDelayMs ?? 250;
         for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
             if (stepIndex > 0 && keyDelayMs > 0) {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, keyDelayMs);
-                });
+                await util.sleep(keyDelayMs);
             }
             const key = options.keys[stepIndex];
             let result: EcpResult;
@@ -1695,10 +1693,10 @@ export class RokuDeploy {
      */
     private validateDeviceConfig(config: DeviceConfig): void {
         const identifiers = [
-            (config as any).host,
-            (config as any).esn,
-            (config as any).id,
-            (config as any).instanceUrl
+            isLocalDeviceConfig(config),
+            isRceByEsn(config),
+            isRceById(config),
+            isRceByUrl(config)
         ].filter(Boolean);
 
         if (identifiers.length === 0) {
@@ -1719,17 +1717,16 @@ export class RokuDeploy {
      * Extract a DeviceConfig from a DeviceRegistryEntry.
      */
     private extractDeviceConfig(entry: DeviceRegistryEntry): DeviceConfig {
-        if (entry.host) {
+        if (isLocalDeviceConfig(entry)) {
             return { host: entry.host };
         }
-        if (entry.esn) {
+        if (isRceByEsn(entry)) {
             return { esn: entry.esn, rceToken: entry.rceToken };
         }
-        //an explicit !== undefined check (unlike the truthy string checks above): 0 is a valid number
-        if (entry.id !== undefined) {
+        if (isRceById(entry)) {
             return { id: entry.id, rceToken: entry.rceToken };
         }
-        if (entry.instanceUrl) {
+        if (isRceByUrl(entry)) {
             return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
         }
         throw new Error('Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
@@ -2470,7 +2467,7 @@ export enum RemoteKey {
 
 export type RemoteKeyText = keyof typeof RemoteKey;
 
-interface SendKeyEventOptions extends BaseEcpOptions {
+export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     //internal transport type: the public key methods enforce RemoteKeyText, but sendText feeds
     //`lit_<char>` literals through here and callers pass canonical keys, so this stays permissive
