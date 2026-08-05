@@ -30,22 +30,22 @@ export class RceManagementClient {
     /**
      * Get the authenticated user and their organisation (device/snapshot limits, current counts).
      */
-    public getUserInfo(options: GetUserInfoOptions = {}): Promise<UserOut> {
-        return this.send('get', '/user/me', { token: options.token });
+    public getUserInfo(options?: GetUserInfoOptions): Promise<UserOut> {
+        return this.send('get', '/user/me', { token: options?.token });
     }
 
     /**
      * List the firmware versions available for creating and starting devices.
      */
-    public listFirmwareVersions(options: ListFirmwareVersionsOptions = {}): Promise<FirmwareVersionOut[]> {
-        return this.send('get', '/firmwareVersions', { query: { items: options.items, page: options.page }, token: options.token });
+    public listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersionOut[]> {
+        return this.send('get', '/firmwareVersions', { query: { items: options?.items, page: options?.page }, token: options?.token });
     }
 
     /**
      * List the caller's devices.
      */
-    public listDevices(options: ListDevicesOptions = {}): Promise<DeviceOut[]> {
-        return this.send('get', '/devices', { query: { items: options.items, page: options.page }, token: options.token });
+    public listDevices(options?: ListDevicesOptions): Promise<DeviceOut[]> {
+        return this.send('get', '/devices', { query: { items: options?.items, page: options?.page }, token: options?.token });
     }
 
     /**
@@ -185,8 +185,8 @@ export class RceManagementClient {
      * Single choke point for HTTP so auth and error handling stay consistent, and so tests can stub
      * one method rather than the network. A per-call token wins over the constructor token.
      */
-    protected send<TResponse>(method: HttpMethod, path: string, options: SendOptions = {}): Promise<TResponse> {
-        const url = this.baseUrl + path + this.buildQueryString(options.query);
+    protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse> {
+        const url = this.baseUrl + path + this.buildQueryString(options?.query);
         const needleOptions: needle.NeedleOptions = {
             json: true,
             //needle's `timeout` alias only bounds connection establishment; a server that accepts
@@ -204,12 +204,12 @@ export class RceManagementClient {
             connection: 'close',
             agent: false,
             headers: {
-                Authorization: `Bearer ${options.token ?? this.token}`,
+                Authorization: `Bearer ${options?.token ?? this.token}`,
                 Accept: 'application/json'
             }
         };
         return new Promise<TResponse>((resolve, reject) => {
-            needle.request(method, url, options.body ?? null, needleOptions, (error, response) => {
+            needle.request(method, url, options?.body ?? null, needleOptions, (error, response) => {
                 if (error) {
                     reject(error);
                     return;

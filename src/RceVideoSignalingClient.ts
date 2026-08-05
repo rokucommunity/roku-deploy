@@ -36,12 +36,12 @@ import type { IceServer } from './RceManagementClient';
 export class RceVideoSignalingClient extends EventEmitter {
     constructor(
         private readonly config: RceVideoSignalingConfig,
-        options: RceVideoSignalingClientOptions = {}
+        options?: RceVideoSignalingClientOptions
     ) {
         super();
-        this.createWebSocket = options.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, 'janus-protocol', requestOptions));
-        this.keepaliveIntervalMs = options.keepaliveIntervalMs ?? 25000;
-        this.negotiationTimeoutMs = options.negotiationTimeoutMs ?? 20000;
+        this.createWebSocket = options?.createWebSocket ?? ((url, requestOptions) => new WebSocket(url, 'janus-protocol', requestOptions));
+        this.keepaliveIntervalMs = options?.keepaliveIntervalMs ?? 25000;
+        this.negotiationTimeoutMs = options?.negotiationTimeoutMs ?? 20000;
     }
 
     private readonly createWebSocket: (url: string, requestOptions: WebSocket.ClientOptions) => WebSocket;
