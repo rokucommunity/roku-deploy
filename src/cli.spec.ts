@@ -103,6 +103,27 @@ describe('cli', function cli() {
         });
     });
 
+    it('Rekeys a device using the provided cwd', async () => {
+        const stub = sinon.stub(rokuDeploy, 'rekeyDevice').callsFake(async () => {
+            return Promise.resolve();
+        });
+
+        const command = new RekeyDeviceCommand();
+        await command.run({
+            cwd: cwd,
+            host: '1.2.3.4',
+            password: '5536'
+        });
+
+        expect(
+            stub.getCall(0).args[0]
+        ).to.eql({
+            cwd: cwd,
+            host: '1.2.3.4',
+            password: '5536'
+        });
+    });
+
     it('Signs an existing package', async () => {
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve({ pkgPath: '' });
@@ -124,6 +145,27 @@ describe('cli', function cli() {
             password: '5536',
             signingPassword: undefined,
             stagingDir: stagingDir
+        });
+    });
+
+    it('Signs an existing package using the provided cwd', async () => {
+        const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
+            return Promise.resolve({ pkgPath: '' });
+        });
+
+        const command = new CreateSignedPackageCommand();
+        await command.run({
+            cwd: cwd,
+            host: '1.2.3.4',
+            password: '5536'
+        });
+
+        expect(
+            stub.getCall(0).args[0]
+        ).to.eql({
+            cwd: cwd,
+            host: '1.2.3.4',
+            password: '5536'
         });
     });
 
@@ -153,6 +195,27 @@ describe('cli', function cli() {
 
         const command = new CaptureScreenshotCommand();
         await command.run({
+            host: '1.2.3.4',
+            password: '5536'
+        });
+
+        expect(
+            stub.getCall(0).args[0]
+        ).to.eql({
+            cwd: cwd,
+            host: '1.2.3.4',
+            password: '5536'
+        });
+    });
+
+    it('Takes a screenshot using the provided cwd', async () => {
+        const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
+            return Promise.resolve({ buffer: Buffer.from(''), filePath: '' });
+        });
+
+        const command = new CaptureScreenshotCommand();
+        await command.run({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
