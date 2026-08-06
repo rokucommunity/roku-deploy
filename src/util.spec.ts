@@ -640,6 +640,19 @@ describe('util', () => {
                 )
             ).to.be.undefined;
         });
+
+        it('finds dest path for an absolute src entry outside the root dir', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../externalDir/main.brs`,
+                    [{
+                        src: s`${rootDir}/../externalDir/main.brs`,
+                        dest: 'source/standalone.brs'
+                    }],
+                    rootDir
+                )
+            ).to.equal(s`source/standalone.brs`);
+        });
     });
 
     describe('computeFileDestPath', () => {
