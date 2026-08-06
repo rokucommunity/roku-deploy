@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import * as needle from 'needle';
 import type { RceDeviceConfig } from './DeviceConfig';
-import { isRceById, isRceByUrl } from './DeviceConfig';
+import { isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
 
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API. This is the core management
@@ -30,42 +30,42 @@ export class RceManagementClient {
     /**
      * Get the authenticated user and their organisation (device/snapshot limits, current counts).
      */
-    public getUserInfo(options?: GetUserInfoOptions): Promise<UserOut> {
+    public getUserInfo(options?: GetUserInfoOptions): Promise<User> {
         return this.send('get', '/user/me', { token: options?.token });
     }
 
     /**
      * List the firmware versions available for creating and starting devices.
      */
-    public listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersionOut[]> {
+    public listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]> {
         return this.send('get', '/firmwareVersions', { query: { items: options?.items, page: options?.page }, token: options?.token });
     }
 
     /**
      * List the caller's devices.
      */
-    public listDevices(options?: ListDevicesOptions): Promise<DeviceOut[]> {
+    public listDevices(options?: ListDevicesOptions): Promise<RceDevice[]> {
         return this.send('get', '/devices', { query: { items: options?.items, page: options?.page }, token: options?.token });
     }
 
     /**
      * Get a single device by id.
      */
-    public getDevice(options: GetDeviceOptions): Promise<DeviceOut> {
+    public getDevice(options: GetDeviceOptions): Promise<RceDevice> {
         return this.send('get', `/devices/${options.deviceId}`, { token: options.token });
     }
 
     /**
      * Create a new device.
      */
-    public createDevice(options: CreateDeviceOptions): Promise<DeviceOut> {
+    public createDevice(options: CreateDeviceOptions): Promise<RceDevice> {
         return this.send('post', '/devices', { body: options.device, token: options.token });
     }
 
     /**
      * Update a device's mutable fields (name, account name, note, properties).
      */
-    public updateDevice(options: UpdateDeviceOptions): Promise<DeviceOut> {
+    public updateDevice(options: UpdateDeviceOptions): Promise<RceDevice> {
         return this.send('patch', `/devices/${options.deviceId}`, { body: options.update, token: options.token });
     }
 
@@ -73,14 +73,14 @@ export class RceManagementClient {
      * Boot a device from a snapshot. Resolves with the device, whose running_device block carries
      * the instance API URL and video (Janus) connection details.
      */
-    public startDevice(options: StartDeviceOptions): Promise<DeviceOut> {
+    public startDevice(options: StartDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/start`, { body: options.start, token: options.token });
     }
 
     /**
      * Shut down a running device.
      */
-    public stopDevice(options: StopDeviceOptions): Promise<DeviceOut> {
+    public stopDevice(options: StopDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/stop`, { token: options.token });
     }
 
@@ -98,19 +98,19 @@ export class RceManagementClient {
         return this.send('get', `/devices/${options.deviceId}/logs/${options.instanceId}`, { token: options.token });
     }
 
-    public listSnapshots(options: ListSnapshotsOptions): Promise<SnapshotOut[]> {
+    public listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]> {
         return this.send('get', `/devices/${options.deviceId}/snapshots`, { query: { items: options.items, page: options.page }, token: options.token });
     }
 
-    public createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotOut> {
+    public createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot> {
         return this.send('post', `/devices/${options.deviceId}/snapshots`, { body: options.snapshot, token: options.token });
     }
 
-    public getSnapshot(options: GetSnapshotOptions): Promise<SnapshotOut> {
+    public getSnapshot(options: GetSnapshotOptions): Promise<Snapshot> {
         return this.send('get', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { token: options.token });
     }
 
-    public updateSnapshot(options: UpdateSnapshotOptions): Promise<SnapshotOut> {
+    public updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot> {
         return this.send('patch', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { body: options.update, token: options.token });
     }
 
@@ -121,7 +121,7 @@ export class RceManagementClient {
     /**
      * Find a device by its serial number (ESN), or undefined when the caller has no such device.
      */
-    public async findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<DeviceOut | undefined> {
+    public async findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined> {
         //the devices endpoint is paginated and defaults to 100 items per page, which would silently
         //hide a device past the first page; `items: 0` is the api's documented "no limit" value, and
         //the response is a plain array (no total-count envelope), so this is also the only way to
@@ -138,9 +138,9 @@ export class RceManagementClient {
     public async getInstanceUrl(options: GetInstanceUrlOptions): Promise<string> {
         const config = options.device;
         let instanceUrl: string;
-        if (isRceByUrl(config)) {
+        if (isRceDeviceConfigByUrl(config)) {
             instanceUrl = config.instanceUrl;
-        } else if (isRceById(config)) {
+        } else if (isRceDeviceConfigById(config)) {
             instanceUrl = await this.getRunningInstanceApiUrl({ deviceId: this.parseDeviceId(config.id), token: options.token });
         } else {
             const device = await this.findDeviceByEsn({ esn: config.esn, token: options.token });
@@ -376,7 +376,7 @@ export interface IceServer {
     credential?: string | null;
 }
 
-export interface DeviceInstanceInfo {
+export interface RceDeviceInstance {
     id: number;
     creator_id: string;
     created_at: string;
@@ -394,7 +394,7 @@ export interface DeviceInstanceInfo {
     max_runtime: number;
 }
 
-export interface DeviceOut {
+export interface RceDevice {
     id: number;
     device_type: DeviceType;
     name: string;
@@ -408,7 +408,7 @@ export interface DeviceOut {
     properties?: Record<string, any> | null;
     last_snapshot_id?: number | null;
     firmware_version_id?: string | null;
-    running_device?: DeviceInstanceInfo | null;
+    running_device?: RceDeviceInstance | null;
 }
 
 export interface DeviceCreate {
@@ -464,7 +464,7 @@ export interface DeviceRun {
     [key: string]: unknown;
 }
 
-export interface SnapshotOut {
+export interface Snapshot {
     id: number;
     created_at: string;
     parent_id?: number | null;
@@ -493,13 +493,13 @@ export interface SnapshotUpdate {
     properties?: Record<string, any> | null;
 }
 
-export interface FirmwareVersionOut {
+export interface FirmwareVersion {
     firmware_version_id: string;
     device_type: DeviceType;
     display_name?: string | null;
 }
 
-export interface UserOrganisationOut {
+export interface UserOrganisation {
     id: number;
     idp_id: string;
     name: string;
@@ -509,10 +509,10 @@ export interface UserOrganisationOut {
     current_devices: Record<string, number>;
 }
 
-export interface UserOut {
+export interface User {
     id: string;
     username: string;
     full_name?: string | null;
     email?: string | null;
-    organisation: UserOrganisationOut;
+    organisation: UserOrganisation;
 }

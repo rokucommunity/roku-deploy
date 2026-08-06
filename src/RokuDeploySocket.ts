@@ -2,7 +2,7 @@ import * as net from 'net';
 import * as stream from 'stream';
 import * as WebSocket from 'ws';
 import type { DeviceConfig, LocalDeviceConfig, RceDeviceConfig } from './DeviceConfig';
-import { isLocalDeviceConfig, isRceById, isRceByUrl, isRceDeviceConfig } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfigById, isRceDeviceConfigByUrl, isRceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 
 /**
@@ -170,7 +170,7 @@ export class RceSocket extends stream.Duplex {
      * requires the config's rceToken).
      */
     private async resolveInstanceUrl(): Promise<string> {
-        if (isRceByUrl(this.device)) {
+        if (isRceDeviceConfigByUrl(this.device)) {
             return this.device.instanceUrl.replace(/\/+$/, '');
         }
         if (!this.device.rceToken) {
@@ -464,10 +464,10 @@ export class RceSocket extends stream.Duplex {
      * finishes resolving, so this falls back to the identifying field instead).
      */
     private describeTarget(): string {
-        if (isRceByUrl(this.device)) {
+        if (isRceDeviceConfigByUrl(this.device)) {
             return `${this.device.instanceUrl} (port ${this.port})`;
         }
-        if (isRceById(this.device)) {
+        if (isRceDeviceConfigById(this.device)) {
             return `RCE device id '${this.device.id}' (port ${this.port})`;
         }
         return `RCE device esn '${this.device.esn}' (port ${this.port})`;

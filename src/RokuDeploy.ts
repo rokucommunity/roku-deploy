@@ -26,7 +26,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isLocalDeviceConfig, isRceDeviceConfig, isRceByEsn, isRceById, isRceByUrl } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
@@ -603,7 +603,7 @@ export class RokuDeploy {
      * the effective token.
      */
     private async resolveRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
-        if (isRceByUrl(deviceConfig)) {
+        if (isRceDeviceConfigByUrl(deviceConfig)) {
             return deviceConfig.instanceUrl.replace(/\/+$/, '');
         }
         const rceToken = this.getRceToken(deviceConfig);
@@ -628,10 +628,10 @@ export class RokuDeploy {
      */
     private getRceInstanceUrlCacheKey(deviceConfig: RceDeviceConfig): string {
         const token = this.getRceToken(deviceConfig) ?? '';
-        if (isRceByUrl(deviceConfig)) {
+        if (isRceDeviceConfigByUrl(deviceConfig)) {
             return `instanceUrl:${deviceConfig.instanceUrl}:${token}`;
         }
-        if (isRceById(deviceConfig)) {
+        if (isRceDeviceConfigById(deviceConfig)) {
             return `id:${deviceConfig.id}:${token}`;
         }
         return `esn:${deviceConfig.esn}:${token}`;
@@ -1840,9 +1840,9 @@ export class RokuDeploy {
     private validateDeviceConfig(config: DeviceConfig): void {
         const identifiers = [
             isLocalDeviceConfig(config),
-            isRceByEsn(config),
-            isRceById(config),
-            isRceByUrl(config)
+            isRceDeviceConfigByEsn(config),
+            isRceDeviceConfigById(config),
+            isRceDeviceConfigByUrl(config)
         ].filter(Boolean);
 
         if (identifiers.length === 0) {
@@ -1866,13 +1866,13 @@ export class RokuDeploy {
         if (isLocalDeviceConfig(entry)) {
             return { host: entry.host };
         }
-        if (isRceByEsn(entry)) {
+        if (isRceDeviceConfigByEsn(entry)) {
             return { esn: entry.esn, rceToken: entry.rceToken };
         }
-        if (isRceById(entry)) {
+        if (isRceDeviceConfigById(entry)) {
             return { id: entry.id, rceToken: entry.rceToken };
         }
-        if (isRceByUrl(entry)) {
+        if (isRceDeviceConfigByUrl(entry)) {
             return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
         }
         throw new Error('Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');

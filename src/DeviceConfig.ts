@@ -73,27 +73,30 @@ export function isLocalDeviceConfig(config: DeviceConfigLike): config is LocalDe
  * Check if a device config is for an RCE device
  */
 export function isRceDeviceConfig(config: DeviceConfigLike): config is RceDeviceConfig {
-    return isRceByEsn(config) || isRceById(config) || isRceByUrl(config);
+    return isRceDeviceConfigByEsn(config) || isRceDeviceConfigById(config) || isRceDeviceConfigByUrl(config);
 }
 
 /**
  * Check if an RCE config is addressed by ESN (has a non-empty esn)
+ * @internal
  */
-export function isRceByEsn(config: DeviceConfigLike): config is RceDeviceConfigByEsn {
+export function isRceDeviceConfigByEsn(config: DeviceConfigLike): config is RceDeviceConfigByEsn {
     return !!config.esn;
 }
 
 /**
  * Check if an RCE config is addressed by device ID.
  * An explicit !== undefined check (unlike the truthy string checks): 0 is a valid id
- */
-export function isRceById(config: DeviceConfigLike): config is RceDeviceConfigById {
+ * @internal
+*/
+export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDeviceConfigById {
     return config.id !== undefined;
 }
 
 /**
  * Check if an RCE config is addressed by instance URL (has a non-empty instanceUrl)
+ * @internal
  */
-export function isRceByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl {
+export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl {
     return !!config.instanceUrl;
 }
