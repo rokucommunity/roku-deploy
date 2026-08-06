@@ -12,6 +12,7 @@ import { expect } from 'chai';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
 import { standardizePath as s } from './util';
+import { powerCycleRokuDevice } from './smartSwitchManagement.spec';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
 //pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
@@ -59,8 +60,7 @@ describe('device', function device() {
 
         //a reboot can take a couple minutes to fully come back; allow generous time here
         this.timeout(180_000);
-        console.log('[device-health] rebooting device before the suite starts...');
-        await rebootDeviceOrThrow(
+        await hardRebootDeviceOrThrow(
             'Could not reboot the device before the device test suite started. The device is likely in a bad ' +
             'state (unresponsive, stuck, or otherwise unhealthy), so the entire suite is likely to fail or hang. ' +
             'Check the device manually before re-running the tests.'
@@ -71,8 +71,7 @@ describe('device', function device() {
     after(async function afterAll() {
         //same generous timeout as the initial reboot; the device needs time to come back before mocha exits
         this.timeout(180_000);
-        console.log('[device-health] rebooting device after the suite finishes...');
-        await rebootDeviceOrThrow(
+        await hardRebootDeviceOrThrow(
             'Could not reboot the device after the device test suite finished. The device is likely in a bad ' +
             'state (unresponsive, stuck, or otherwise unhealthy) after running the suite. Check the device ' +
             'manually before relying on it for the next test run.'
@@ -900,6 +899,32 @@ function getActiveApp(host: string): Promise<string> {
 async function rebootDeviceOrThrow(helpText: string): Promise<void> {
     try {
         await rokuDeploy.rokuDeploy.rebootDevice({ host: HOST, password: PASSWORD, timeout: REQUEST_TIMEOUT });
+        await waitForDeviceOnline(HOST);
+    } catch (e) {
+        const cause = e as Error;
+        throw new Error(`${helpText}\n\nUnderlying error: ${cause?.message}`);
+    }
+}
+
+/**
+ * Hard-reboot the device for the suite-level (before/after) health checks. Prefers physically
+ * power-cycling it via a Tuya/SmartLife smart plug (see smartSwitchManagement.spec.ts) when TUYA_DEVICE_ID,
+ * TUYA_LOCAL_KEY, and TUYA_DEVICE_IP are configured - that's a true hard reset, which is what we
+ * actually want when the device might be wedged. Not everyone running this suite has the same smart
+ * plug wired up, though, so when those aren't configured this falls back to the normal software
+ * `rebootDevice` ECP call instead.
+ */
+async function hardRebootDeviceOrThrow(helpText: string): Promise<void> {
+    const tuyaConfigured = !!(process.env.TUYA_DEVICE_ID && process.env.TUYA_LOCAL_KEY && process.env.TUYA_DEVICE_IP);
+    if (!tuyaConfigured) {
+        console.log('[device-health] Tuya smart plug not configured (TUYA_DEVICE_ID/TUYA_LOCAL_KEY/TUYA_DEVICE_IP); falling back to a software reboot.');
+        await rebootDeviceOrThrow(helpText);
+        return;
+    }
+
+    try {
+        console.log('[device-health] power-cycling device via Tuya smart plug...');
+        await powerCycleRokuDevice();
         await waitForDeviceOnline(HOST);
     } catch (e) {
         const cause = e as Error;
