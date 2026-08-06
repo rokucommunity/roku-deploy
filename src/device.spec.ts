@@ -44,9 +44,9 @@ describe('device', function device() {
 
     let options: rokuDeploy.RokuDeployOptions;
 
-    //tripped by the mid-suite reboot check if the device fails to come back; once true, every remaining
-    //test in this suite is skipped immediately instead of running (and likely failing/timing out) against
-    //a device we already know is unhealthy
+    //tripped by the rebootDevice test (which runs mid-suite) if the device fails to come back; once
+    //true, every remaining test in this suite is skipped immediately instead of running (and likely
+    //failing/timing out) against a device we already know is unhealthy
     let deviceIsHealthy = true;
 
     before(async function beforeAll() {
@@ -80,7 +80,7 @@ describe('device', function device() {
     });
 
     beforeEach(async function beforeEachTest() {
-        //the device already failed to come back from the mid-suite reboot; skip immediately instead of
+        //the device already failed to come back from the rebootDevice test; skip immediately instead of
         //burning time on more tests that are almost certainly going to fail/timeout against it anyway
         if (!deviceIsHealthy) {
             this.skip();
@@ -541,6 +541,29 @@ describe('device', function device() {
         });
     });
 
+    //placed at roughly the suite's midpoint (rather than at the end) so a device that can't keep up
+    //under sustained load is caught here, instead of only ever being exercised once, right before mocha exits
+    describe('rebootDevice', () => {
+        it('works, and confirms the device is still keeping up midway through the suite', async function rebootDevice() {
+            //a reboot takes the device offline for a while; the ceiling is driven by
+            //waitForDeviceOnline (up to ~120s) plus the reboot POST, not the observed happy-path time.
+            this.timeout(180_000);
+            try {
+                //use a short per-request timeout so the reboot POST can't hang open past the device going
+                //down; without this it would inherit the 150s default and could orphan a socket if mocha's
+                //test-timeout fired first.
+                await rokuDeploy.rokuDeploy.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
+                //wait until the device is reachable again so the next test doesn't run mid-reboot
+                await waitForDeviceOnline(options.host);
+            } catch (e) {
+                //the device is unhealthy; skip every remaining test in the suite instead of letting each
+                //one individually run and time out against it
+                deviceIsHealthy = false;
+                throw e;
+            }
+        });
+    });
+
     describe('install size boundary', function installSizeBoundary() {
         //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
         //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
@@ -739,43 +762,6 @@ describe('device', function device() {
 
             //clean up
             await rokuDeploy.rokuDeploy.deleteAllSideloadedPlugins(options);
-        });
-    });
-
-    describe('mid-suite reboot', () => {
-        it('reboots the device to confirm it is still keeping up', async function midSuiteReboot() {
-            //same generous timeout as the suite-level reboots; the device needs time to come back
-            this.timeout(180_000);
-            console.log('[device-health] rebooting device midway through the suite...');
-            try {
-                await rebootDeviceOrThrow(
-                    'Could not reboot the device midway through the device test suite. The device is likely ' +
-                    'struggling to keep up with the tests run so far, so the remaining tests are likely to fail. ' +
-                    'Check the device manually before re-running the tests.'
-                );
-            } catch (e) {
-                //the device is unhealthy; skip every remaining test in the suite instead of letting each
-                //one individually run and time out against it
-                deviceIsHealthy = false;
-                throw e;
-            }
-            console.log('[device-health] device is still keeping up; continuing with the remaining tests.');
-        });
-    });
-
-    //these tests are slow (and can reboot the device), so they run last so as many other tests as
-    //possible finish and report before we hit them.
-    describe('rebootDevice', () => {
-        it('works', async function rebootDevice() {
-            //a reboot takes the device offline for a while; the ceiling is driven by
-            //waitForDeviceOnline (up to ~120s) plus the reboot POST, not the observed happy-path time.
-            this.timeout(150_000);
-            //use a short per-request timeout so the reboot POST can't hang open past the device going
-            //down; without this it would inherit the 150s default and could orphan a socket if mocha's
-            //test-timeout fired first.
-            await rokuDeploy.rokuDeploy.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
-            //wait until the device is reachable again so the next test doesn't run mid-reboot
-            await waitForDeviceOnline(options.host);
         });
     });
 
