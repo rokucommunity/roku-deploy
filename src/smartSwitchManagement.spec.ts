@@ -2,8 +2,7 @@ import * as TuyaDeviceModule from 'tuyapi';
 const TuyaDevice = TuyaDeviceModule as unknown as typeof TuyaDeviceModule.default;
 
 /**
- * Power-cycles the Roku via a smart plug it's plugged into, for a hard reboot when the Roku's own
- * software reboot isn't enough.
+ * Power-cycles the Roku. Uses a smart plug when available, and falls back to a reboot request through the plugin_install api.
  */
 export async function powerCycleRokuDevice(offMs = 5000): Promise<void> {
     const deviceId = process.env.SMART_SWITCH_DEVICE_ID;
