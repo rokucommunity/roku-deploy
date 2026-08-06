@@ -21,7 +21,7 @@ import {
     UnsupportedFirmwareVersionError,
     UpdateCheckRequiredError
 } from './Errors';
-import type { HttpDetails } from './Errors';
+import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
@@ -508,7 +508,23 @@ export class RokuDeploy {
      * Network error codes that mean the request never reached a live endpoint (host gone,
      * connection refused/reset, timed out).
      */
-    private static readonly rceInstanceGoneNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
+    private static readonly rceInstanceUnreachableNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
+
+    /**
+     * Whether an error says the request never reached a live endpoint at all (either the raw
+     * network error, or one of roku-deploy's wrapper errors carrying it as its cause). These bust
+     * the cached instance url so the next call re-resolves, but do not prove the instance moved,
+     * so they never trigger an in-call retry.
+     */
+    private isRceInstanceUnreachableError(error: unknown): boolean {
+        for (const candidate of [error, (error as RokuDeployError)?.cause]) {
+            const networkErrorCode = (candidate as NodeJS.ErrnoException)?.code;
+            if (typeof networkErrorCode === 'string' && RokuDeploy.rceInstanceUnreachableNetworkErrorCodes.has(networkErrorCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Whether a response from an instance url says the instance itself is not there. The mesh
@@ -527,10 +543,6 @@ export class RokuDeploy {
      * rejected route) that a live instance produced.
      */
     private isRceInstanceGoneError(error: unknown): boolean {
-        const networkErrorCode = (error as NodeJS.ErrnoException)?.code;
-        if (typeof networkErrorCode === 'string' && RokuDeploy.rceInstanceGoneNetworkErrorCodes.has(networkErrorCode)) {
-            return true;
-        }
         if (error instanceof DeviceError) {
             const response = error.details?.httpDetails?.response;
             return this.isRceInstanceGoneResponse(response?.statusCode, response?.headers);
@@ -541,10 +553,12 @@ export class RokuDeploy {
     /**
      * Run an operation that reaches a device through its (possibly cached) RCE instance url,
      * retrying once when the cache turns out to be stale. The retry only triggers when the url the
-     * operation used came from the cache AND the failure explicitly says the instance is not there
-     * (see isRceInstanceGoneError); then the cache entry is evicted and re-resolved through the
+     * operation used came from the cache AND the failure is a mesh-generated 404 (see
+     * isRceInstanceGoneError); then the cache entry is evicted and re-resolved through the
      * management api, and the operation is rerun only when that fresh url is actually different
-     * (the instance moved). Everything else - application-level failures, a failure against a
+     * (the instance moved). A network-level failure (see isRceInstanceUnreachableError) busts the
+     * cached url so the next call re-resolves, but is rethrown without a retry - it does not prove
+     * the instance moved. Everything else - application-level failures, a failure against a
      * freshly-resolved url, a local device - is rethrown unchanged, so a request is never
      * double-sent to a live instance.
      */
@@ -557,16 +571,22 @@ export class RokuDeploy {
         try {
             return await run();
         } catch (error) {
-            //only an instance-not-there failure against a cached url is worth a retry; a cache miss
-            //means run() already used a freshly-resolved url
-            if (cachedPromise === undefined || !this.isRceInstanceGoneError(error)) {
+            const instanceGone = this.isRceInstanceGoneError(error);
+            //only an instance-not-there failure against a cached url touches the cache; a cache
+            //miss means run() already used a freshly-resolved url
+            if (cachedPromise === undefined || (!instanceGone && !this.isRceInstanceUnreachableError(error))) {
                 throw error;
             }
-            const staleUrl = await cachedPromise.catch(() => undefined);
-            //evict only if our entry is still the current one (a concurrent caller may have refreshed it already)
+            //bust the cached url, but only if our entry is still the current one (a concurrent
+            //caller may have refreshed it already)
             if (this.rceInstanceUrlsByCacheKey.get(cacheKey) === cachedPromise) {
                 this.rceInstanceUrlsByCacheKey.delete(cacheKey);
             }
+            //a network-level failure busts the cache for the next call but is not retried here
+            if (!instanceGone) {
+                throw error;
+            }
+            const staleUrl = await cachedPromise.catch(() => undefined);
             const freshUrl = await this.getRceInstanceUrl(deviceConfig);
             //the instance did not move, so the original failure stands
             if (freshUrl === staleUrl) {
@@ -701,12 +721,14 @@ export class RokuDeploy {
         if (!rceToken) {
             throw new Error('An rceToken is required to reach the instance api on an RCE device');
         }
-        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-        await this.doPostRequest({
-            url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-            timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
-            headers: this.buildRceAuthHeaders(rceToken)
-        }, true);
+        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+            return this.doPostRequest({
+                url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
+                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+                headers: this.buildRceAuthHeaders(rceToken)
+            }, true);
+        });
     }
 
     /**
@@ -745,10 +767,12 @@ export class RokuDeploy {
                 if (!rceToken) {
                     throw new Error('An rceToken is required to reach ECP on an RCE device');
                 }
-                const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                 const key = this.toCanonicalRemoteKey(options.key);
-                const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
-                const response = await this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                    const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                });
                 return {
                     status: response?.response?.statusCode,
                     body: response?.body,
@@ -925,60 +949,67 @@ export class RokuDeploy {
             if ((await fsExtra.pathExists(zipFilePath)) === false) {
                 throw new Error(`Cannot sideload because file does not exist at '${zipFilePath}'`);
             }
-            readStream = fsExtra.createReadStream(zipFilePath);
-            //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
-            await new Promise((resolve) => {
-                readStream.on('open', resolve);
-            });
 
-            const route = options.packageUploadOverrides?.route ?? 'plugin_install';
-            let requestOptions = await this.generateBaseRequestOptions(route, deviceConfig, options, {
-                mysubmit: 'Replace',
-                archive: readStream,
-                ...(options.appType ? { 'app_type': options.appType } : {})
-            });
-
-            //attach the remotedebug flag if configured
-            if (options.remoteDebug) {
-                requestOptions.formData.remotedebug = '1';
-            }
-
-            //attach the remotedebug_connect_early if present
-            if (options.remoteDebugConnectEarly) {
-                // eslint-disable-next-line camelcase
-                requestOptions.formData.remotedebug_connect_early = '1';
-            }
-
-            //apply any supplied formData overrides
-            for (const key in options.packageUploadOverrides?.formData ?? {}) {
-                const value = options.packageUploadOverrides.formData[key];
-                if (value === undefined || value === null) {
-                    delete requestOptions.formData[key];
-                } else {
-                    requestOptions.formData[key] = value;
-                }
-            }
-
-            //try to "replace" the channel first since that usually works.
             let response: HttpResponse;
             try {
-                try {
-                    response = await this.doPostRequest(requestOptions);
-                } catch (replaceError: any) {
-                    //fail if this is a compile error
-                    if (this.isCompileError(replaceError.message) && failOnCompileError) {
-                        const rokuMessages = this.getRokuMessagesFromResponseBody(replaceError.results?.body ?? '');
-                        throw new CompileError('Compile error', {
-                            httpDetails: extractHttpDetails(replaceError.results?.response, replaceError.results?.body),
-                            rokuMessages: rokuMessages
-                        }, replaceError);
-                    } else if (this.isUpdateRequiredError(replaceError)) {
-                        throw replaceError;
-                    } else {
-                        requestOptions.formData.mysubmit = 'Install';
-                        response = await this.doPostRequest(requestOptions);
+                response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                    //a rerun needs its own stream: the previous attempt already consumed the last one
+                    try {
+                        readStream?.close();
+                    } catch { }
+                    readStream = fsExtra.createReadStream(zipFilePath);
+                    //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
+                    await new Promise((resolve) => {
+                        readStream.on('open', resolve);
+                    });
+
+                    const route = options.packageUploadOverrides?.route ?? 'plugin_install';
+                    let requestOptions = await this.generateBaseRequestOptions(route, deviceConfig, options, {
+                        mysubmit: 'Replace',
+                        archive: readStream,
+                        ...(options.appType ? { 'app_type': options.appType } : {})
+                    });
+
+                    //attach the remotedebug flag if configured
+                    if (options.remoteDebug) {
+                        requestOptions.formData.remotedebug = '1';
                     }
-                }
+
+                    //attach the remotedebug_connect_early if present
+                    if (options.remoteDebugConnectEarly) {
+                        // eslint-disable-next-line camelcase
+                        requestOptions.formData.remotedebug_connect_early = '1';
+                    }
+
+                    //apply any supplied formData overrides
+                    for (const key in options.packageUploadOverrides?.formData ?? {}) {
+                        const value = options.packageUploadOverrides.formData[key];
+                        if (value === undefined || value === null) {
+                            delete requestOptions.formData[key];
+                        } else {
+                            requestOptions.formData[key] = value;
+                        }
+                    }
+
+                    //try to "replace" the channel first since that usually works.
+                    try {
+                        return await this.doPostRequest(requestOptions);
+                    } catch (replaceError: any) {
+                        //fail if this is a compile error
+                        if (this.isCompileError(replaceError.message) && failOnCompileError) {
+                            const rokuMessages = this.getRokuMessagesFromResponseBody(replaceError.results?.body ?? '');
+                            throw new CompileError('Compile error', {
+                                httpDetails: extractHttpDetails(replaceError.results?.response, replaceError.results?.body),
+                                rokuMessages: rokuMessages
+                            }, replaceError);
+                        } else if (this.isUpdateRequiredError(replaceError)) {
+                            throw replaceError;
+                        } else {
+                            requestOptions.formData.mysubmit = 'Install';
+                            return await this.doPostRequest(requestOptions);
+                        }
+                    }
+                });
             } catch (e: any) {
                 //if this is a 577 error, we have high confidence that the device needs to do an update check
                 if (this.isUpdateRequiredError(e)) {
@@ -1108,31 +1139,36 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        let requestOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options, {
-            archive: '',
-            mysubmit: 'Convert to squashfs'
-        });
-        let results;
-        try {
-            results = await this.doPostRequest(requestOptions);
-        } catch (error) {
-            //Occasionally this error is seen if the zip size and file name length at the
-            //wrong combination. The device fails to respond to our request with a valid response.
-            //The device successfully converted the zip, so ping the device and and check the response
-            //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
-            if ((error as any).code === 'HPE_INVALID_CONSTANT') {
-                try {
-                    results = await this.doPostRequest(requestOptions, false);
-                    if (/"fileType"\s*:\s*"squashfs"/.test(results.body)) {
-                        return results;
+        let squashfsConfirmedAfterInvalidResponse = false;
+        const results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            squashfsConfirmedAfterInvalidResponse = false;
+            let requestOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options, {
+                archive: '',
+                mysubmit: 'Convert to squashfs'
+            });
+            try {
+                return await this.doPostRequest(requestOptions);
+            } catch (error) {
+                //Occasionally this error is seen if the zip size and file name length at the
+                //wrong combination. The device fails to respond to our request with a valid response.
+                //The device successfully converted the zip, so ping the device and and check the response
+                //for "fileType": "squashfs" then return a happy response, otherwise throw the original error
+                if ((error as any).code === 'HPE_INVALID_CONSTANT') {
+                    let pingResults;
+                    try {
+                        pingResults = await this.doPostRequest(requestOptions, false);
+                    } catch (e) {
+                        this.logger.warn('Error converting to squashfs:', error);
+                        throw error;
                     }
-                } catch (e) {
-                    this.logger.warn('Error converting to squashfs:', error);
-                    throw error;
+                    squashfsConfirmedAfterInvalidResponse = /"fileType"\s*:\s*"squashfs"/.test(pingResults.body);
+                    return pingResults;
                 }
-            } else {
                 throw error;
             }
+        });
+        if (squashfsConfirmedAfterInvalidResponse) {
+            return results;
         }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new ConvertError('Squashfs conversion failed', {
@@ -1160,20 +1196,26 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.pkg)) {
             pkgPath = path.resolve(cwd, options.pkg);
         }
-        let requestOptions = await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options as any, {
-            mysubmit: 'Rekey',
-            passwd: options.signingPassword,
-            archive: null as ReadStream
-        });
-
+        let archiveStream: ReadStream;
         let results: HttpResponse;
         try {
-            requestOptions.formData.archive = fsExtra.createReadStream(pkgPath);
-            results = await this.doPostRequest(requestOptions);
+            results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                //a rerun needs its own stream: the previous attempt already consumed the last one
+                try {
+                    archiveStream?.close();
+                } catch { }
+                archiveStream = fsExtra.createReadStream(pkgPath);
+                let requestOptions = await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options as any, {
+                    mysubmit: 'Rekey',
+                    passwd: options.signingPassword,
+                    archive: archiveStream
+                });
+                return this.doPostRequest(requestOptions);
+            });
         } finally {
             //ensure the stream is closed
             try {
-                requestOptions.formData.archive?.close();
+                archiveStream?.close();
             } catch { }
         }
 
@@ -1263,14 +1305,15 @@ export class RokuDeploy {
             }
         }
 
-        let requestOptions = await this.generateBaseRequestOptions('plugin_package', deviceConfig, options, {
-            mysubmit: 'Package',
-            pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
-            passwd: options.signingPassword,
-            app_name: appName //eslint-disable-line camelcase
+        let results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let requestOptions = await this.generateBaseRequestOptions('plugin_package', deviceConfig, options, {
+                mysubmit: 'Package',
+                pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
+                passwd: options.signingPassword,
+                app_name: appName //eslint-disable-line camelcase
+            });
+            return this.doPostRequest(requestOptions);
         });
-
-        let results = await this.doPostRequest(requestOptions);
 
         let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
         if (failedSearchMatches) {
@@ -1542,12 +1585,14 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-        deleteOptions.formData = {
-            mysubmit: 'Delete',
-            archive: ''
-        };
-        return this.doPostRequest(deleteOptions);
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'Delete',
+                archive: ''
+            };
+            return this.doPostRequest(deleteOptions);
+        });
     }
 
     /**
@@ -1560,12 +1605,14 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-        deleteOptions.formData = {
-            mysubmit: 'DeleteAll',
-            archive: ''
-        };
-        return this.doPostRequest(deleteOptions);
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'DeleteAll',
+                archive: ''
+            };
+            return this.doPostRequest(deleteOptions);
+        });
     }
 
     /**
@@ -1577,16 +1624,18 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-        deleteOptions.formData = {
-            mysubmit: 'Delete',
-            'app_type': 'dcl',
-            fileName: options.fileName
-        };
-        deleteOptions.qs ??= {};
-        // eslint-disable-next-line camelcase
-        deleteOptions.qs.dcl_enabled = '1';
-        await this.doPostRequest(deleteOptions);
+        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'Delete',
+                'app_type': 'dcl',
+                fileName: options.fileName
+            };
+            deleteOptions.qs ??= {};
+            // eslint-disable-next-line camelcase
+            deleteOptions.qs.dcl_enabled = '1';
+            return this.doPostRequest(deleteOptions);
+        });
     }
 
     /**
@@ -1615,11 +1664,13 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device);
 
-        let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-        deleteOptions.qs ??= {};
-        // eslint-disable-next-line camelcase
-        deleteOptions.qs.dcl_enabled = '1';
-        const result = await this.doGetRequest(deleteOptions);
+        const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.qs ??= {};
+            // eslint-disable-next-line camelcase
+            deleteOptions.qs.dcl_enabled = '1';
+            return this.doGetRequest(deleteOptions);
+        });
         const packages = this.getPackagesFromResponseBody(result.body);
         return packages;
     }
@@ -1638,12 +1689,14 @@ export class RokuDeploy {
         const deviceConfig = this.resolveDevice(options.device);
 
         // Ask for the device to make an image
-        let createScreenshotResult = await this.doPostRequest({
-            ...(await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options)),
-            formData: {
-                mysubmit: 'Screenshot',
-                archive: ''
-            }
+        let createScreenshotResult = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'Screenshot',
+                    archive: ''
+                }
+            });
         });
 
         // Pull the image url out of the response body
@@ -1895,29 +1948,49 @@ export class RokuDeploy {
         const port = options.port ?? 80;
         const timeout = options.timeout ?? 3000;
 
-        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
-        const url = `${baseUrl}/plugin_install`;
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
         //from before), an RCE device by its installer base url (never includes credentials)
-        const displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
+        let displayTarget = '';
 
-        let response: Response;
-        try {
-            response = await fetchWithDigest(url, {
-                method: 'HEAD',
-                username: username,
-                password: options.password,
-                timeout: timeout,
-                headers: headers
-            });
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : String(err);
-            throw new DeviceUnreachableError(
-                `Device ${displayTarget} was unreachable: ${message}`,
-                {},
-                err instanceof Error ? err : undefined
-            );
-        }
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
+            const url = `${baseUrl}/plugin_install`;
+            displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
+
+            let fetchResponse: Response;
+            try {
+                fetchResponse = await fetchWithDigest(url, {
+                    method: 'HEAD',
+                    username: username,
+                    password: options.password,
+                    timeout: timeout,
+                    headers: headers
+                });
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                throw new DeviceUnreachableError(
+                    `Device ${displayTarget} was unreachable: ${message}`,
+                    {},
+                    err instanceof Error ? err : undefined
+                );
+            }
+            //fetch does not throw on a status code, so surface a mesh-generated 404 (a stale
+            //instance url) to the retry wrapper as the error verification would have produced
+            const responseHeaders: Record<string, string> = {};
+            if (typeof fetchResponse.headers?.forEach === 'function') {
+                fetchResponse.headers.forEach((value, key) => {
+                    responseHeaders[key] = value;
+                });
+            } else {
+                Object.assign(responseHeaders, fetchResponse.headers ?? {});
+            }
+            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(fetchResponse.status, responseHeaders)) {
+                throw new InvalidDeviceResponseCodeError(`Unexpected status ${fetchResponse.status} from device at ${displayTarget}`, {
+                    httpDetails: { response: { statusCode: fetchResponse.status, headers: responseHeaders } }
+                });
+            }
+            return fetchResponse;
+        });
 
         if (response.status === 200) {
             return true;
@@ -2348,12 +2421,14 @@ export class RokuDeploy {
             );
         }
 
-        return this.doPostRequest({
-            ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
-            formData: {
-                mysubmit: 'Reboot',
-                archive: ''
-            }
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'Reboot',
+                    archive: ''
+                }
+            });
         });
     }
 
@@ -2379,12 +2454,14 @@ export class RokuDeploy {
             );
         }
 
-        return this.doPostRequest({
-            ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
-            formData: {
-                mysubmit: 'CheckUpdate',
-                archive: ''
-            }
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'CheckUpdate',
+                    archive: ''
+                }
+            });
         });
     }
 }

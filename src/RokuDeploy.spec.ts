@@ -1616,20 +1616,26 @@ describe('RokuDeploy', () => {
             return getInstanceUrlStub;
         }
 
-        function createInstanceGoneError() {
+        function createMeshNotFoundError() {
+            return new errors.InvalidDeviceResponseCodeError('Invalid response code: 404', {
+                httpDetails: { response: { statusCode: 404, headers: {} } }
+            });
+        }
+
+        function createConnectionError() {
             const error = new Error('connect ECONNREFUSED') as NodeJS.ErrnoException;
             error.code = 'ECONNREFUSED';
             return error;
         }
 
-        it('reruns the operation once when the cached instance url turns out to be stale', async () => {
+        it('reruns the operation once when a mesh-generated 404 (no envoy upstream header) says the cached url is stale', async () => {
             const rd = new RokuDeploy({ rceToken: 'default-token' });
             stubInstanceUrls(rd, 'https://device.rce.roku.com/instance/old', 'https://device.rce.roku.com/instance/new');
             //prime the cache with the soon-to-be-stale url
             await rd['getRceInstanceUrl']({ id: 123 });
 
             const run = sinon.stub();
-            run.onFirstCall().rejects(createInstanceGoneError());
+            run.onFirstCall().rejects(createMeshNotFoundError());
             run.onSecondCall().resolves('success');
 
             expect(await rd['withRceInstanceUrlRetry']({ id: 123 }, run)).to.equal('success');
@@ -1638,19 +1644,34 @@ describe('RokuDeploy', () => {
             expect(await rd['getRceInstanceUrl']({ id: 123 })).to.equal('https://device.rce.roku.com/instance/new');
         });
 
-        it('treats a mesh-generated 404 (no envoy upstream header) as instance-gone', async () => {
+        it('busts the cached url on a network-level failure without retrying', async () => {
+            const rd = new RokuDeploy({ rceToken: 'default-token' });
+            const getInstanceUrlStub = stubInstanceUrls(rd, 'https://device.rce.roku.com/instance/old', 'https://device.rce.roku.com/instance/new');
+            await rd['getRceInstanceUrl']({ id: 123 });
+
+            const run = sinon.stub().rejects(createConnectionError());
+
+            await expectThrowsAsync(rd['withRceInstanceUrlRetry']({ id: 123 }, run), 'connect ECONNREFUSED');
+            expect(run.callCount).to.equal(1);
+            //the wrapper itself never re-resolved...
+            expect(getInstanceUrlStub.callCount).to.equal(1);
+            //...but the cache was busted, so the next resolution goes back to the management api
+            expect(await rd['getRceInstanceUrl']({ id: 123 })).to.equal('https://device.rce.roku.com/instance/new');
+        });
+
+        it('busts the cached url when the network failure arrives wrapped in a roku-deploy error', async () => {
             const rd = new RokuDeploy({ rceToken: 'default-token' });
             stubInstanceUrls(rd, 'https://device.rce.roku.com/instance/old', 'https://device.rce.roku.com/instance/new');
             await rd['getRceInstanceUrl']({ id: 123 });
 
-            const run = sinon.stub();
-            run.onFirstCall().rejects(new errors.InvalidDeviceResponseCodeError('Invalid response code: 404', {
-                httpDetails: { response: { statusCode: 404, headers: {} } }
-            }));
-            run.onSecondCall().resolves('success');
+            const run = sinon.stub().rejects(new errors.ConnectionResetError({}, createConnectionError()));
 
-            expect(await rd['withRceInstanceUrlRetry']({ id: 123 }, run)).to.equal('success');
-            expect(run.callCount).to.equal(2);
+            await expectThrowsAsync(async () => {
+                await rd['withRceInstanceUrlRetry']({ id: 123 }, run);
+            });
+            expect(run.callCount).to.equal(1);
+            //the cause's network code busted the cache
+            expect(await rd['getRceInstanceUrl']({ id: 123 })).to.equal('https://device.rce.roku.com/instance/new');
         });
 
         it('treats a 404 a live instance answered (envoy upstream header present) as application-level', async () => {
@@ -1688,9 +1709,9 @@ describe('RokuDeploy', () => {
             stubInstanceUrls(rd, 'https://device.rce.roku.com/instance/abc', 'https://device.rce.roku.com/instance/abc');
             await rd['getRceInstanceUrl']({ id: 123 });
 
-            const run = sinon.stub().rejects(createInstanceGoneError());
+            const run = sinon.stub().rejects(createMeshNotFoundError());
 
-            await expectThrowsAsync(rd['withRceInstanceUrlRetry']({ id: 123 }, run), 'connect ECONNREFUSED');
+            await expectThrowsAsync(rd['withRceInstanceUrlRetry']({ id: 123 }, run), 'Invalid response code: 404');
             expect(run.callCount).to.equal(1);
         });
 
@@ -1701,17 +1722,17 @@ describe('RokuDeploy', () => {
             const run = sinon.stub().callsFake(async () => {
                 //resolve through the cache exactly like the real call sites do
                 await rd['getRceInstanceUrl']({ id: 123 });
-                throw createInstanceGoneError();
+                throw createMeshNotFoundError();
             });
 
-            await expectThrowsAsync(rd['withRceInstanceUrlRetry']({ id: 123 }, run), 'connect ECONNREFUSED');
+            await expectThrowsAsync(rd['withRceInstanceUrlRetry']({ id: 123 }, run), 'Invalid response code: 404');
             expect(run.callCount).to.equal(1);
             //only run()'s own resolution happened; the failure never triggered a re-resolution
             expect(getInstanceUrlStub.callCount).to.equal(1);
         });
 
         it('passes local devices through without any retry handling', async () => {
-            const run = sinon.stub().rejects(createInstanceGoneError());
+            const run = sinon.stub().rejects(createConnectionError());
 
             await expectThrowsAsync(rokuDeploy['withRceInstanceUrlRetry']({ host: '1.2.3.4' }, run), 'connect ECONNREFUSED');
             expect(run.callCount).to.equal(1);

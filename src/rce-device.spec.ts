@@ -380,6 +380,58 @@ const REQUEST_TIMEOUT = 30_000;
         });
     });
 
+    describe('stale instance url recovery', () => {
+        //an instance id that has never existed, on the real mesh host: the mesh answers it with the
+        //same bare 404 a genuinely stale (restarted-instance) url produces
+        function buildDeadInstanceUrl() {
+            return `https://${resolvedInstanceHost}/instance/00000000-0000-0000-0000-000000000000`;
+        }
+
+        /**
+         * Prime the RokuDeploy instance's rce instance url cache with a specific url, simulating a
+         * process that resolved the device before its instance was restarted or moved.
+         */
+        function primeInstanceUrlCache(instanceUrl: string) {
+            const cacheKey = rd['getRceInstanceUrlCacheKey'](options.device);
+            rd['rceInstanceUrlsByCacheKey'].set(cacheKey, Promise.resolve(instanceUrl));
+            return cacheKey;
+        }
+
+        it('self-heals an ECP request when the cached instance url is stale', async () => {
+            const cacheKey = primeInstanceUrlCache(buildDeadInstanceUrl());
+
+            const deviceInfo = await rd.getDeviceInfo({ device: options.device });
+
+            assert.ok(deviceInfo['software-version']);
+            //the cache was refreshed to the live instance url
+            expect(await rd['rceInstanceUrlsByCacheKey'].get(cacheKey)).to.not.equal(buildDeadInstanceUrl());
+        });
+
+        it('self-heals an installer request when the cached instance url is stale', async () => {
+            const cacheKey = primeInstanceUrlCache(buildDeadInstanceUrl());
+
+            const packages = await rd.listSideloadedPlugins({ device: options.device, password: options.password });
+
+            expect(packages).to.be.an('array');
+            expect(await rd['rceInstanceUrlsByCacheKey'].get(cacheKey)).to.not.equal(buildDeadInstanceUrl());
+        });
+
+        it('busts the cache without an in-call retry when the cached instance url is unreachable at the network level', async () => {
+            const unreachableUrl = 'https://nonexistent-00000000.rce.roku.com/instance/00000000-0000-0000-0000-000000000000';
+            const cacheKey = primeInstanceUrlCache(unreachableUrl);
+
+            //the call itself fails: a network error does not prove the instance moved, so it is not retried...
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({ device: options.device });
+            });
+            //...but the poisoned entry was busted...
+            expect(rd['rceInstanceUrlsByCacheKey'].has(cacheKey)).to.be.false;
+            //...so the next call re-resolves and succeeds
+            const deviceInfo = await rd.getDeviceInfo({ device: options.device });
+            assert.ok(deviceInfo['software-version']);
+        });
+    });
+
     describe('getEcpNetworkAccessMode', () => {
         //RCE: the instance's plain HTTP ECP query routes (which this call falls back to detect a
         //disabled setting) are not exposed on the instance api and 404; this needs a dedicated ECP2
