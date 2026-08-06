@@ -11,7 +11,7 @@ import * as errors from './Errors';
 import { expect } from 'chai';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
-import { standardizePath as s } from './util';
+import { standardizePath as s, util } from './util';
 import { powerCycleRokuDevice } from './smartSwitchManagement.spec';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
@@ -908,22 +908,42 @@ async function hardRebootDeviceOrThrow(helpText: string): Promise<void> {
 }
 
 /**
- * Wait for a device to be reachable again by polling its device-info over ECP until it responds.
- * Used after operations that reboot the device (rebootDevice, and sometimes checkForUpdate) so the
- * next test doesn't run against a device that's still rebooting.
+ * Wait for a device to be reachable again by polling both ECP (device-info) and the installer web
+ * server (the same `plugin_install` endpoint sideload/publish/delete use) until both respond. Used
+ * after operations that reboot the device (rebootDevice, and sometimes checkForUpdate) so the next
+ * test doesn't run against a device that's still rebooting.
+ *
+ * ECP alone isn't enough: it can come back before the installer server has finished settling, which
+ * showed up as flaky complib install/delete failures even though a `beforeEach` ECP check had just
+ * reported the device as online.
  *
  * @param graceMs how long to wait before the first poll, giving the device time to actually go down
  *   after the reboot was issued (so we don't immediately see the still-alive pre-reboot device)
  */
 async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs = 3000, graceMs = 5000): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
+    const startTime = Date.now();
+    const deadline = startTime + timeoutMs;
     //give the device a moment to actually start going down before we begin polling
     await sleep(graceMs);
     let lastError: Error;
+    let count = 0;
     while (Date.now() < deadline) {
+        if (count++ > 0) {
+            console.log(`Waiting for device to come back online (${Date.now() - startTime}ms elapsed)`);
+        }
         try {
+            //ensure the ECP webserver is responsive
             await rokuDeploy.rokuDeploy.getDeviceInfo({ host: host, timeout: intervalMs });
-            //a successful device-info query means ECP is up and the device is responsive again
+            //ensure the plugin_install webserver is responsive
+            await rokuDeploy.listSideloadedPlugins({ host: host, password: PASSWORD, timeout: intervalMs });
+            //ECP responded and the installer server is accepting connections
+
+            //some devices are still NOT FULLY ready to speak yet, so if this was the result of a long wait,
+            //wait just a little bit longer
+            if (count > 1) {
+                console.log('Device is online, but waiting a few more seconds to ensure it is fully ready...');
+                await util.sleep(5_000);
+            }
             return;
         } catch (e) {
             lastError = e as Error;
