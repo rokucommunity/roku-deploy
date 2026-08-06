@@ -68,17 +68,6 @@ describe('device', function device() {
         console.log('[device-health] device is back online; starting tests.');
     });
 
-    after(async function afterAll() {
-        //same generous timeout as the initial reboot; the device needs time to come back before mocha exits
-        this.timeout(180_000);
-        await hardRebootDeviceOrThrow(
-            'Could not reboot the device after the device test suite finished. The device is likely in a bad ' +
-            'state (unresponsive, stuck, or otherwise unhealthy) after running the suite. Check the device ' +
-            'manually before relying on it for the next test run.'
-        );
-        console.log('[device-health] device is back online after the suite.');
-    });
-
     beforeEach(async function beforeEachTest() {
         //the device already failed to come back from the rebootDevice test; skip immediately instead of
         //burning time on more tests that are almost certainly going to fail/timeout against it anyway
@@ -893,7 +882,7 @@ async function rebootDeviceOrThrow(helpText: string): Promise<void> {
 }
 
 /**
- * Hard-reboot the device for the suite-level (before/after) health checks. Prefers physically
+ * Hard-reboot the device for the suite-level (before-all) health check. Prefers physically
  * power-cycling it via a smart plug (see smartSwitchManagement.spec.ts) when SMART_SWITCH_DEVICE_ID,
  * SMART_SWITCH_LOCAL_KEY, and SMART_SWITCH_IP are configured - that's a true hard reset, which is what
  * we actually want when the device might be wedged. Not everyone running this suite has the same smart
