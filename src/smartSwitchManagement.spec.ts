@@ -2,18 +2,19 @@ import * as TuyaDeviceModule from 'tuyapi';
 const TuyaDevice = TuyaDeviceModule as unknown as typeof TuyaDeviceModule.default;
 
 /**
- * Power-cycles the Roku via a Tuya/SmartLife smart plug it's plugged into, for a hard reboot when the
- * Roku's own software reboot isn't enough.
+ * Power-cycles the Roku via a smart plug it's plugged into, for a hard reboot when the Roku's own
+ * software reboot isn't enough.
  */
 export async function powerCycleRokuDevice(offMs = 5000): Promise<void> {
-    const deviceId = process.env.TUYA_DEVICE_ID;
-    const localKey = process.env.TUYA_LOCAL_KEY;
-    const ip = process.env.TUYA_DEVICE_IP;
+    const deviceId = process.env.SMART_SWITCH_DEVICE_ID;
+    const localKey = process.env.SMART_SWITCH_LOCAL_KEY;
+    const ip = process.env.SMART_SWITCH_IP;
 
     if (!deviceId || !localKey || !ip) {
         throw new Error(
-            'Missing Tuya smart plug connection info. Set TUYA_DEVICE_ID, TUYA_LOCAL_KEY, and TUYA_DEVICE_IP ' +
-            'in your .env file (see .env.example) or as environment variables before running the device tests.'
+            'Missing smart switch connection info. Set SMART_SWITCH_DEVICE_ID, SMART_SWITCH_LOCAL_KEY, and ' +
+            'SMART_SWITCH_IP in your .env file (see .env.example) or as environment variables before running ' +
+            'the device tests.'
         );
     }
 

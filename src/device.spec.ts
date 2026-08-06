@@ -908,22 +908,22 @@ async function rebootDeviceOrThrow(helpText: string): Promise<void> {
 
 /**
  * Hard-reboot the device for the suite-level (before/after) health checks. Prefers physically
- * power-cycling it via a Tuya/SmartLife smart plug (see smartSwitchManagement.spec.ts) when TUYA_DEVICE_ID,
- * TUYA_LOCAL_KEY, and TUYA_DEVICE_IP are configured - that's a true hard reset, which is what we
- * actually want when the device might be wedged. Not everyone running this suite has the same smart
+ * power-cycling it via a smart plug (see smartSwitchManagement.spec.ts) when SMART_SWITCH_DEVICE_ID,
+ * SMART_SWITCH_LOCAL_KEY, and SMART_SWITCH_IP are configured - that's a true hard reset, which is what
+ * we actually want when the device might be wedged. Not everyone running this suite has the same smart
  * plug wired up, though, so when those aren't configured this falls back to the normal software
  * `rebootDevice` ECP call instead.
  */
 async function hardRebootDeviceOrThrow(helpText: string): Promise<void> {
-    const tuyaConfigured = !!(process.env.TUYA_DEVICE_ID && process.env.TUYA_LOCAL_KEY && process.env.TUYA_DEVICE_IP);
-    if (!tuyaConfigured) {
-        console.log('[device-health] Tuya smart plug not configured (TUYA_DEVICE_ID/TUYA_LOCAL_KEY/TUYA_DEVICE_IP); falling back to a software reboot.');
+    const smartSwitchConfigured = !!(process.env.SMART_SWITCH_DEVICE_ID && process.env.SMART_SWITCH_LOCAL_KEY && process.env.SMART_SWITCH_IP);
+    if (!smartSwitchConfigured) {
+        console.log('[device-health] smart switch not configured (SMART_SWITCH_DEVICE_ID/SMART_SWITCH_LOCAL_KEY/SMART_SWITCH_IP); falling back to a software reboot.');
         await rebootDeviceOrThrow(helpText);
         return;
     }
 
     try {
-        console.log('[device-health] power-cycling device via Tuya smart plug...');
+        console.log('[device-health] power-cycling device via smart switch...');
         await powerCycleRokuDevice();
         await waitForDeviceOnline(HOST);
     } catch (e) {
