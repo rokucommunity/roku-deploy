@@ -651,7 +651,7 @@ describe('util', () => {
                     }],
                     rootDir
                 )
-            ).to.equal('source/standalone.brs');
+            ).to.equal(s`source/standalone.brs`);
         });
     });
 
