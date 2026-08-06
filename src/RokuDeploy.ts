@@ -8,6 +8,7 @@ import {
     CompileError,
     ConnectionResetError,
     ConvertError,
+    DeviceError,
     DeviceUnreachableError,
     EcpNetworkAccessModeDisabledError,
     extractHttpDetails,
@@ -429,12 +430,31 @@ export class RokuDeploy {
         const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
-        const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
-        const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
         const verify = options.verify ?? false;
-        const response = options.method === 'POST'
-            ? await this.doPostRequest(requestOptions, verify)
-            : await this.doGetRequest(requestOptions, verify);
+        //with verify off, an instance-gone 404 comes back as a normal response rather than a throw;
+        //it is surfaced to the retry wrapper as an error, and held here so the caller still receives
+        //the raw response when the retry does not apply
+        let instanceGoneResponse: HttpResponse | undefined;
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            instanceGoneResponse = undefined;
+            const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
+            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
+            const result = options.method === 'POST'
+                ? await this.doPostRequest(requestOptions, verify)
+                : await this.doGetRequest(requestOptions, verify);
+            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.response?.statusCode, result?.response?.headers)) {
+                instanceGoneResponse = result;
+                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.response.statusCode}`, {
+                    httpDetails: extractHttpDetails(result.response, result.body)
+                });
+            }
+            return result;
+        }).catch((error) => {
+            if (instanceGoneResponse) {
+                return instanceGoneResponse;
+            }
+            throw error;
+        });
 
         return {
             status: response?.response?.statusCode,
@@ -482,6 +502,79 @@ export class RokuDeploy {
             instanceUrlPromise.catch(() => this.rceInstanceUrlsByCacheKey.delete(cacheKey));
         }
         return instanceUrlPromise;
+    }
+
+    /**
+     * Network error codes that mean the request never reached a live endpoint (host gone,
+     * connection refused/reset, timed out).
+     */
+    private static readonly rceInstanceGoneNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
+
+    /**
+     * Whether a response from an instance url says the instance itself is not there. The mesh
+     * answers a dead instance path with a bare 404 it generated itself, distinguishable from a 404
+     * a live instance produced (an unknown ECP route, for example) by the absence of the
+     * `x-envoy-upstream-service-time` header the mesh stamps on every response it actually
+     * forwarded to an instance.
+     */
+    private isRceInstanceGoneResponse(statusCode: number | undefined, headers: Record<string, unknown> | undefined): boolean {
+        return statusCode === 404 && headers?.['x-envoy-upstream-service-time'] === undefined;
+    }
+
+    /**
+     * Whether an error thrown while talking to an RCE instance url explicitly indicates the
+     * instance itself is not there, as opposed to an application-level failure (bad credentials, a
+     * rejected route) that a live instance produced.
+     */
+    private isRceInstanceGoneError(error: unknown): boolean {
+        const networkErrorCode = (error as NodeJS.ErrnoException)?.code;
+        if (typeof networkErrorCode === 'string' && RokuDeploy.rceInstanceGoneNetworkErrorCodes.has(networkErrorCode)) {
+            return true;
+        }
+        if (error instanceof DeviceError) {
+            const response = error.details?.httpDetails?.response;
+            return this.isRceInstanceGoneResponse(response?.statusCode, response?.headers);
+        }
+        return false;
+    }
+
+    /**
+     * Run an operation that reaches a device through its (possibly cached) RCE instance url,
+     * retrying once when the cache turns out to be stale. The retry only triggers when the url the
+     * operation used came from the cache AND the failure explicitly says the instance is not there
+     * (see isRceInstanceGoneError); then the cache entry is evicted and re-resolved through the
+     * management api, and the operation is rerun only when that fresh url is actually different
+     * (the instance moved). Everything else - application-level failures, a failure against a
+     * freshly-resolved url, a local device - is rethrown unchanged, so a request is never
+     * double-sent to a live instance.
+     */
+    private async withRceInstanceUrlRetry<T>(deviceConfig: DeviceConfig, run: () => Promise<T>): Promise<T> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            return run();
+        }
+        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
+        const cachedPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
+        try {
+            return await run();
+        } catch (error) {
+            //only an instance-not-there failure against a cached url is worth a retry; a cache miss
+            //means run() already used a freshly-resolved url
+            if (cachedPromise === undefined || !this.isRceInstanceGoneError(error)) {
+                throw error;
+            }
+            const staleUrl = await cachedPromise.catch(() => undefined);
+            //evict only if our entry is still the current one (a concurrent caller may have refreshed it already)
+            if (this.rceInstanceUrlsByCacheKey.get(cacheKey) === cachedPromise) {
+                this.rceInstanceUrlsByCacheKey.delete(cacheKey);
+            }
+            const freshUrl = await this.getRceInstanceUrl(deviceConfig);
+            //the instance did not move, so the original failure stands
+            if (freshUrl === staleUrl) {
+                throw error;
+            }
+            //run() re-reads through getRceInstanceUrl, so it picks up the fresh url
+            return run();
+        }
     }
 
     /**
