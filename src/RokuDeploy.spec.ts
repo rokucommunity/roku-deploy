@@ -33,6 +33,12 @@ describe('RokuDeploy', () => {
     beforeEach(() => {
         rokuDeploy = new RokuDeploy();
 
+        //pre-resolve the fake hostnames the specs use, so tests that reach the ECP url builder never
+        //do a real DNS lookup for them (resolving a nonexistent name on windows walks the LLMNR/NetBIOS
+        //fallbacks and takes several seconds, blowing mocha's timeout)
+        util['dnsCache'].set('constructor-host', 'constructor-host');
+        util['dnsCache'].set('call-host', 'call-host');
+
         options = {
             rootDir: rootDir,
             stagingDir: stagingDir,
