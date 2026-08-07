@@ -1644,6 +1644,11 @@ export interface ListSideloadedPluginsOptions {
      * The username for logging in to the developer portal on the target Roku device. Defaults to `'rokudev'`
      */
     username?: string;
+
+    /**
+     * The number of milliseconds at which point this request should timeout and return a rejected promise
+     */
+    timeout?: number;
 }
 
 enum RokuMessageType {
