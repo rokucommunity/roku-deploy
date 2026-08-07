@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import * as sinonImport from 'sinon';
 import { EventEmitter } from 'events';
 import type * as WebSocket from 'ws';
+import * as ws from 'ws';
 import { RceVideoSignalingClient } from './RceVideoSignalingClient';
 import type { RceVideoSignalingConfig } from './RceVideoSignalingClient';
 
@@ -527,6 +528,31 @@ describe('RceVideoSignalingClient', () => {
 
             expect(fakeWebSocket.closed).to.be.false;
         });
+
+        it('a timeout that fires after negotiation already settled does nothing', async () => {
+            //capture the negotiation timer's callback so the timer-fired-late race (normally
+            //prevented by clearTimeout) can be forced deterministically
+            let timeoutCallback: (() => void) | undefined;
+            const setTimeoutStub = sinon.stub(global, 'setTimeout').callsFake(((callback: () => void) => {
+                timeoutCallback = callback;
+                return {} as any;
+            }) as any);
+            try {
+                const client = createClient();
+                await connectToOfferState(client);
+
+                let emittedError: Error | undefined;
+                client.on('error', (error) => {
+                    emittedError = error;
+                });
+                timeoutCallback();
+
+                expect(emittedError).to.be.undefined;
+                expect(fakeWebSocket.closed).to.be.false;
+            } finally {
+                setTimeoutStub.restore();
+            }
+        });
     });
 
     describe('stop', () => {
@@ -567,13 +593,228 @@ describe('RceVideoSignalingClient', () => {
             expect(() => client.stop()).not.to.throw();
         });
 
+        it('fire-and-forget sends after stop() are dropped instead of throwing', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+            client.stop();
+
+            expect(() => client.sendCandidatesComplete()).not.to.throw();
+        });
+
+        it('applies the default keepalive and negotiation timings when constructed without options', () => {
+            const client = new RceVideoSignalingClient(createConfig());
+            createdClients.push(client);
+
+            expect((client as any).keepaliveIntervalMs).to.equal(25000);
+            expect((client as any).negotiationTimeoutMs).to.equal(20000);
+        });
+
+        it('creates a real ws websocket speaking the janus protocol outside of tests (every other test stubs the factory)', () => {
+            const client = new RceVideoSignalingClient(createConfig());
+            createdClients.push(client);
+            const webSocket = (client as any).createWebSocket('ws://127.0.0.1:1', {}) as ws.WebSocket;
+
+            expect(webSocket).to.be.instanceOf(ws.WebSocket);
+
+            //the connection attempt targets a closed port; silence and abort it
+            webSocket.on('error', () => { });
+            webSocket.terminate();
+        });
+
+        it('rejects connect() when the websocket handshake fails', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('error', new Error('handshake refused'));
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+
+            expect(caughtError?.message).to.equal('Failed to connect to the Janus WebSocket: handshake refused');
+        });
+
+        it('rejects connect() when the websocket closes before it ever opens', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('close');
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+
+            expect(caughtError?.message).to.equal(`The Janus WebSocket for stream '42' closed unexpectedly`);
+        });
+
+        it('emits an error event for a websocket error after the session is established', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            let emittedError: Error | undefined;
+            client.on('error', (error) => {
+                emittedError = error;
+            });
+            fakeWebSocket.emit('error', new Error('mid-session failure'));
+
+            expect(emittedError?.message).to.equal('Janus WebSocket error: mid-session failure');
+        });
+
+        it('rejects connect() when the watch response carries no SDP offer, tolerating create/attach responses with no data', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('open');
+            await flushMicrotasks();
+            //create and attach answered without a data block: the session/handle ids are simply undefined
+            simulateMessage({ janus: 'success', transaction: findSentRequest('create').transaction });
+            await flushMicrotasks();
+            simulateMessage({ janus: 'success', transaction: findSentRequest('attach').transaction });
+            await flushMicrotasks();
+            //watch answered without a jsep offer
+            simulateMessage({ janus: 'event', transaction: findSentRequest('message', 0).transaction });
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+
+            expect(caughtError?.message).to.equal(`Janus did not return an SDP offer for stream '42'`);
+        });
+
+        it('defaults to no ice servers when the config carries none', async () => {
+            const client = createClient({ iceServers: undefined });
+
+            const { offer } = await connectToOfferState(client);
+
+            expect(offer.iceServers).to.eql([]);
+        });
+
+        it('ignores a message that is not valid json', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            let emittedError: Error | undefined;
+            client.on('error', (error) => {
+                emittedError = error;
+            });
+            fakeWebSocket.emit('message', Buffer.from('this is not json'));
+
+            expect(emittedError).to.be.undefined;
+        });
+
+        it('ignores the ack that precedes an asynchronous response, settling on the real response', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('open');
+            await flushMicrotasks();
+            const createTransaction = findSentRequest('create').transaction;
+            //janus acknowledges the request first, then answers it for real
+            simulateMessage({ janus: 'ack', transaction: createTransaction });
+            await flushMicrotasks();
+            simulateMessage({ janus: 'success', transaction: createTransaction, data: { id: 111 } });
+            await flushMicrotasks();
+
+            simulateMessage({ janus: 'success', transaction: findSentRequest('attach').transaction, data: { id: 222 } });
+            await flushMicrotasks();
+            simulateMessage({
+                janus: 'event',
+                transaction: findSentRequest('message', 0).transaction,
+                jsep: { type: 'offer', sdp: 'v=0\r\n' }
+            });
+
+            const offer = await connectPromise;
+            expect(offer.offer.sdp).to.equal('v=0\r\n');
+        });
+
+        it('emits an error event for a janus error whose transaction matches no pending request', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            let emittedError: Error | undefined;
+            client.on('error', (error) => {
+                emittedError = error;
+            });
+            simulateMessage({ janus: 'error', transaction: 'no-such-transaction', error: { code: 458, reason: 'Session not found' } });
+
+            expect(emittedError?.message).to.equal(`Janus error for stream '42' (code 458): Session not found`);
+        });
+
+        it('describes a janus error that carries no error details as an unknown error', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('open');
+            await flushMicrotasks();
+            simulateMessage({ janus: 'error', transaction: findSentRequest('create').transaction });
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+
+            expect(caughtError?.message).to.equal(`Janus error for stream '42': unknown error`);
+        });
+
+        it('describes a plugin error that carries no error code without a code suffix', async () => {
+            const client = createClient();
+            const connectPromise = client.connect();
+
+            fakeWebSocket.emit('open');
+            await flushMicrotasks();
+            simulateMessage({ janus: 'success', transaction: findSentRequest('create').transaction, data: { id: 111 } });
+            await flushMicrotasks();
+            simulateMessage({ janus: 'success', transaction: findSentRequest('attach').transaction, data: { id: 222 } });
+            await flushMicrotasks();
+            simulateMessage({
+                janus: 'event',
+                transaction: findSentRequest('message', 0).transaction,
+                plugindata: { data: { error: 'Wrong pin' } }
+            });
+
+            let caughtError: Error;
+            try {
+                await connectPromise;
+            } catch (error) {
+                caughtError = error as Error;
+            }
+
+            expect(caughtError?.message).to.equal(`Janus plugin error for stream '42': Wrong pin`);
+        });
+
+        it('describes a hangup that carries no reason without a reason suffix', async () => {
+            const client = createClient();
+            await connectToOfferState(client);
+
+            let emittedError: Error | undefined;
+            client.on('error', (error) => {
+                emittedError = error;
+            });
+            simulateMessage({ janus: 'hangup' });
+
+            expect(emittedError?.message).to.equal(`Janus hung up on stream '42'`);
+        });
+
         it('swallows the "closed before connection established" error when stopping a still-CONNECTING socket, without emitting it', () => {
             const client = createClient({}, undefined, 15);
-            fakeWebSocket.emitErrorOnCloseWhileConnecting = true;
             //never resolves/rejects in a way this test cares about; caught so the eventual
             //negotiation-timeout rejection (the socket never gets a chance to open) is not an
             //unhandled rejection
             client.connect().catch(() => { });
+            //the flag must be set on the socket connect() actually created (createWebSocket makes a
+            //fresh fake per call), otherwise the close-while-connecting error is never simulated
+            fakeWebSocket.emitErrorOnCloseWhileConnecting = true;
 
             let emittedError: Error | undefined;
             let emittedClose = false;

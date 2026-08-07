@@ -3,8 +3,10 @@ import * as sinonImport from 'sinon';
 import * as net from 'net';
 import { EventEmitter } from 'events';
 import type * as WebSocket from 'ws';
+import * as ws from 'ws';
 import { createRokuDeploySocket } from './RokuDeploySocket';
 import type { RokuDeploySocket, SocketOptions } from './RokuDeploySocket';
+import { RceManagementClient } from './RceManagementClient';
 
 let sinon: sinonImport.SinonSandbox;
 beforeEach(() => {
@@ -100,6 +102,10 @@ describe('createRokuDeploySocket', () => {
         expect(() => createRokuDeploySocket({ device: 'my-device' as any, port: 8085 })).to.throw('Device registry names are not supported');
     });
 
+    it('throws when given a device config with no recognized identifier', () => {
+        expect(() => createRokuDeploySocket({ device: {} as any, port: 8085 })).to.throw('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
+    });
+
     describe('local device', () => {
         let connectedArguments: Array<{ port: number; host: string }>;
 
@@ -119,6 +125,12 @@ describe('createRokuDeploySocket', () => {
             stubRealSocketConnect();
             createRokuDeploySocket({ device: { host: '1.2.3.4' }, port: 8085 }).connect();
             expect(connectedArguments).to.eql([{ port: 8085, host: '1.2.3.4' }]);
+        });
+
+        it('delegates an explicit-address connect() call to net.Socket unchanged', () => {
+            stubRealSocketConnect();
+            (createRokuDeploySocket({ device: { host: '1.2.3.4' }, port: 8085 }) as unknown as net.Socket).connect(9000, '5.6.7.8');
+            expect(connectedArguments).to.eql([{ port: 9000, host: '5.6.7.8' }]);
         });
 
         it('throws when the port is missing or invalid', () => {
@@ -753,6 +765,170 @@ describe('createRokuDeploySocket', () => {
 
                 expect(timeoutEmitted).to.be.false;
             });
+
+            it('setTimeout accepts a one-shot listener and reports the armed value through the timeout getter', async () => {
+                const telnetSocket = createRceTelnetSocket();
+                telnetSocket.connect();
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+
+                expect(telnetSocket.timeout).to.be.undefined;
+
+                let listenerFired = false;
+                telnetSocket.setTimeout(30, () => {
+                    listenerFired = true;
+                });
+
+                expect(telnetSocket.timeout).to.equal(30);
+
+                await wait(60);
+
+                expect(listenerFired).to.be.true;
+            });
+        });
+
+        it('resolves an id-addressed device through the management api and connects to the resolved instance url', async () => {
+            sinon.stub(RceManagementClient.prototype, 'getInstanceUrl').resolves('https://device.rce.roku.com/instance/resolved');
+            const telnetSocket = createRceTelnetSocket({ device: { id: 42, rceToken: 'token-value' } });
+
+            telnetSocket.connect();
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            expect(capturedWebSocketUrl).to.equal('wss://device.rce.roku.com/instance/resolved/api/v0/ports/8085');
+        });
+
+        it('swallows a resolution failure that lands after destroy()', async () => {
+            const telnetSocket = createRceTelnetSocket({ device: { id: 42, rceToken: 'token-value' } });
+            let rejectResolution: (error: Error) => void;
+            sinon.stub(telnetSocket as any, 'resolveInstanceUrl').returns(new Promise((resolve, reject) => {
+                rejectResolution = reject;
+            }));
+            const emittedErrors: Error[] = [];
+            telnetSocket.on('error', (error: Error) => emittedErrors.push(error));
+
+            telnetSocket.connect();
+            telnetSocket.destroy();
+            rejectResolution(new Error('resolution failed'));
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            expect(emittedErrors).to.eql([]);
+            expect(capturedWebSocketUrl).to.be.undefined;
+        });
+
+        it('connect() never throws, even when the connection sequence itself crashes', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            sinon.stub(telnetSocket as any, 'beginConnecting').rejects(new Error('unexpected crash'));
+
+            expect(() => telnetSocket.connect()).not.to.throw();
+            await flushMicrotasks();
+        });
+
+        it('creates a real ws websocket outside of tests (every other test stubs the factory)', () => {
+            const telnetSocket = createRokuDeploySocket({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' }, port: 8085 });
+            const webSocket = (telnetSocket as any).createWebSocket('ws://127.0.0.1:1', {}) as WebSocket;
+
+            expect(webSocket).to.be.instanceOf(ws.WebSocket);
+
+            //the connection attempt targets a closed port; silence and abort it
+            webSocket.on('error', () => { });
+            webSocket.terminate();
+            telnetSocket.destroy();
+        });
+
+        it('fails a write issued after the connection closed, naming the esn-addressed target', async () => {
+            sinon.stub(RceManagementClient.prototype, 'getInstanceUrl').resolves('https://device.rce.roku.com/instance/abc');
+            const telnetSocket = createRceTelnetSocket({ device: { esn: 'XY123', rceToken: 'token-value' } });
+            telnetSocket.connect();
+            await flushMicrotasks();
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            //the connection dropped but the stream has not observed the close yet
+            fakeWebSocket.readyState = FakeWebSocket.CLOSED;
+
+            //the failed write also surfaces through the stream's 'error' event; observe it so it
+            //does not become an uncaught exception
+            telnetSocket.on('error', () => { });
+            let writeError: Error | undefined;
+            telnetSocket.write('too late', (error: Error) => {
+                writeError = error;
+            });
+            await flushMicrotasks();
+
+            expect(writeError?.message).to.equal(`Cannot write to RCE device esn 'XY123' (port 8085): the connection is not open`);
+        });
+
+        it('ignores a websocket error that fires after destroy()', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+
+            const emittedErrors: Error[] = [];
+            telnetSocket.on('error', (error: Error) => emittedErrors.push(error));
+            telnetSocket.destroy();
+            fakeWebSocket.emit('error', new Error('late error'));
+            await flushMicrotasks();
+
+            expect(emittedErrors).to.eql([]);
+        });
+
+        it('_write converts a string chunk itself when invoked directly (the stream normally decodes first)', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+
+            let writeError: Error | null | undefined;
+            (telnetSocket as any)._write('raw string', 'utf8', (error?: Error | null) => {
+                writeError = error;
+            });
+
+            expect(writeError).to.be.undefined;
+            expect((fakeWebSocket.sentFrames[0].data as Buffer).toString('utf8')).to.equal('raw string');
+        });
+
+        it('end() before connect() destroys the stream cleanly (there is no websocket to close)', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            let closed = false;
+            telnetSocket.on('close', () => {
+                closed = true;
+            });
+
+            telnetSocket.end();
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            expect(closed).to.be.true;
+            expect(telnetSocket.destroyed).to.be.true;
+        });
+
+        it('tolerates a timer implementation whose handle has no unref (non-Node runtimes)', () => {
+            const telnetSocket = createRceTelnetSocket();
+            const fakeTimerHandle = {};
+            const setTimeoutStub = sinon.stub(global, 'setTimeout').returns(fakeTimerHandle as any);
+            try {
+                telnetSocket.setTimeout(30);
+            } finally {
+                setTimeoutStub.restore();
+            }
+
+            expect(setTimeoutStub.calledOnce).to.be.true;
+            expect(telnetSocket.timeout).to.equal(30);
+
+            //disarm so the fake handle is cleared and cannot fire
+            telnetSocket.setTimeout(0);
+        });
+
+        it('reports no addresses (there is no underlying tcp connection)', () => {
+            const telnetSocket = createRceTelnetSocket() as any;
+
+            expect(telnetSocket.remoteAddress).to.be.undefined;
+            expect(telnetSocket.remotePort).to.be.undefined;
+            expect(telnetSocket.localAddress).to.be.undefined;
+            expect(telnetSocket.localPort).to.be.undefined;
+            expect(telnetSocket.localFamily).to.be.undefined;
         });
     });
 });

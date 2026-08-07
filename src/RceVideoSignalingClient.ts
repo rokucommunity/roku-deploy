@@ -367,7 +367,7 @@ export class RceVideoSignalingClient extends EventEmitter {
         if (pluginErrorText === undefined) {
             return undefined;
         }
-        const errorCode = message.plugindata?.data?.error_code;
+        const errorCode = message.plugindata.data.error_code;
         return `Janus plugin error for stream '${this.config.streamId}'${errorCode !== undefined ? ` (code ${errorCode})` : ''}: ${pluginErrorText}`;
     }
 
