@@ -1,5 +1,11 @@
 import { expect } from 'chai';
-import { isLocalDeviceConfig, isRceDeviceConfig, isRceByEsn, isRceById, isRceByUrl } from './DeviceConfig';
+import {
+    isLocalDeviceConfig,
+    isRceDeviceConfig,
+    isRceDeviceConfigByEsn,
+    isRceDeviceConfigById,
+    isRceDeviceConfigByUrl
+} from './DeviceConfig';
 
 describe('DeviceConfig', () => {
     describe('isLocalDeviceConfig', () => {
@@ -30,33 +36,33 @@ describe('DeviceConfig', () => {
         });
     });
 
-    describe('isRceByEsn', () => {
+    describe('isRceDeviceConfigByEsn', () => {
         it('returns true when config has an esn', () => {
-            expect(isRceByEsn({ esn: 'ABC123' })).to.be.true;
+            expect(isRceDeviceConfigByEsn({ esn: 'ABC123' })).to.be.true;
         });
 
         it('returns false when config does not have an esn', () => {
-            expect(isRceByEsn({ id: 'device-1' } as any)).to.be.false;
+            expect(isRceDeviceConfigByEsn({ id: 'device-1' } as any)).to.be.false;
         });
     });
 
-    describe('isRceById', () => {
+    describe('isRceDeviceConfigById', () => {
         it('returns true when config has an id', () => {
-            expect(isRceById({ id: 'device-1' })).to.be.true;
+            expect(isRceDeviceConfigById({ id: 1 })).to.be.true;
         });
 
         it('returns false when config does not have an id', () => {
-            expect(isRceById({ esn: 'ABC123' } as any)).to.be.false;
+            expect(isRceDeviceConfigById({ esn: 'ABC123' } as any)).to.be.false;
         });
     });
 
-    describe('isRceByUrl', () => {
+    describe('isRceDeviceConfigByUrl', () => {
         it('returns true when config has an instanceUrl', () => {
-            expect(isRceByUrl({ instanceUrl: 'https://example.com' })).to.be.true;
+            expect(isRceDeviceConfigByUrl({ instanceUrl: 'https://example.com' })).to.be.true;
         });
 
         it('returns false when config does not have an instanceUrl', () => {
-            expect(isRceByUrl({ esn: 'ABC123' } as any)).to.be.false;
+            expect(isRceDeviceConfigByUrl({ esn: 'ABC123' } as any)).to.be.false;
         });
     });
 });

@@ -11,9 +11,10 @@
         "watch": "npm run clean && tsc --watch",
         "lint": "eslint \"./src/**/*.ts\"",
         "audit": "npm audit || audit-ci --config ./audit-ci.jsonc",
-        "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
-        "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\"",
+        "test": "nyc mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\" --exclude \"src/rce-device.spec.ts\"",
+        "test:nocover": "mocha \"src/**/*.spec.ts\" --exclude \"src/device.spec.ts\" --exclude \"src/rce-device.spec.ts\"",
         "test:device": "mocha src/device.spec.ts",
+        "test:device:rce": "mocha src/rce-device.spec.ts",
         "test:all": "nyc mocha \"src/**/*.spec.ts\"",
         "test-without-sourcemaps": "npm run build && nyc mocha dist/**/*.spec.js",
         "package": "npm run build && npm pack"
@@ -30,6 +31,7 @@
         "needle": "^3.5.0",
         "picomatch": "^2.3.2",
         "semver": "^7.7.3",
+        "ws": "^8.21.1",
         "xml2js": "^0.5.0",
         "yargs": "^17.7.2"
     },
@@ -44,6 +46,7 @@
         "@types/picomatch": "^2.3.4",
         "@types/semver": "^7.7.1",
         "@types/sinon": "^10.0.4",
+        "@types/ws": "^8.18.1",
         "@types/xml2js": "^0.4.5",
         "@types/yargs": "^17.0.32",
         "@typescript-eslint/eslint-plugin": "^5.62.0",

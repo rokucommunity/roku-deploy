@@ -4,3 +4,7 @@ export * from './util';
 export * from './RokuDeployOptions';
 export * from './Errors';
 export * from './DeviceInfo';
+export * from './DeviceConfig';
+export * from './RceManagementClient';
+export * from './RceVideoSignalingClient';
+export * from './RokuDeploySocket';
