@@ -6198,7 +6198,7 @@ describe('RokuDeploy', () => {
         it('resolves a device from the devices registry by id', async () => {
             const rd = new RokuDeploy({
                 devices: {
-                    'cloud-device': { id: 'device-id-1' }
+                    'cloud-device': { id: 1 }
                 }
             });
             let ex;
