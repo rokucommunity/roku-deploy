@@ -1,7 +1,177 @@
 #!/usr/bin/env node
-import { deploy } from './index';
-deploy().then((...args) => {
-    console.log(...args);
-}, (...args) => {
-    console.error(...args);
-});
+import * as yargs from 'yargs';
+import { SendTextCommand } from './commands/SendTextCommand';
+import { StageCommand } from './commands/StageCommand';
+import { SideloadCommand } from './commands/SideloadCommand';
+import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
+import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
+import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
+import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
+import { CaptureScreenshotCommand } from './commands/CaptureScreenshotCommand';
+import { GetDeviceInfoCommand } from './commands/GetDeviceInfoCommand';
+import { GetDevIdCommand } from './commands/GetDevIdCommand';
+import { ZipCommand } from './commands/ZipCommand';
+import { KeyPressCommand } from './commands/KeyPressCommand';
+import { KeyUpCommand } from './commands/KeyUpCommand';
+import { KeyDownCommand } from './commands/KeyDownCommand';
+import { RemoteControlCommand } from './commands/RemoteControlCommand';
+
+void yargs
+
+    .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
+        return builder
+            .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
+            .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
+            .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
+            .option('remoteDebugConnectEarly', { type: 'boolean', description: 'Should the command connect to the debugger early', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+    }, (args: any) => {
+        return new SideloadCommand().run(args);
+    })
+
+    .command('package', 'Create a signed package from an existing sideloaded dev channel', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
+            .option('appTitle', { type: 'string', description: 'The title of the app to be signed', demandOption: false })
+            .option('appVersion', { type: 'string', description: 'The version of the app to be signed', demandOption: false })
+            .option('manifestPath', { type: 'string', description: 'The path to the manifest file, relative to cwd', demandOption: false })
+            .option('out', { type: 'string', description: 'The location where the signed package will be saved, relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
+            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+    }, (args: any) => {
+        return new CreateSignedPackageCommand().run(args);
+    })
+
+    .command('keyPress', 'send keypress command', (builder) => {
+        return builder
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
+    }, (args: any) => {
+        return new KeyPressCommand().run(args);
+    })
+
+    .command('keyUp', 'send keyup command', (builder) => {
+        return builder
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
+    }, (args: any) => {
+        return new KeyUpCommand().run(args);
+    })
+
+    .command('keyDown', 'send keydown command', (builder) => {
+        return builder
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
+    }, (args: any) => {
+        return new KeyDownCommand().run(args);
+    })
+
+    .command('sendText', 'Send text command', (builder) => {
+        return builder
+            .option('text', { type: 'string', description: 'The text to send', demandOption: true })
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
+    }, (args: any) => {
+        return new SendTextCommand().run(args);
+    })
+
+    .command('remote-control', 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false });
+    }, (args: any) => {
+        return new RemoteControlCommand().run(args);
+    })
+
+    .command('stage', 'Copies all of the referenced files to the staging folder', (builder) => {
+        return builder
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
+            .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
+            .option('files', { type: 'array', description: 'An array of source file paths indicating where the source files are', demandOption: false })
+            .option('out', { type: 'string', description: 'The selected staging folder where all files will be copied to', demandOption: false });
+    }, (args: any) => {
+        return new StageCommand().run(args);
+    })
+
+    .command('squash', 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false });
+    }, (args: any) => {
+        return new ConvertToSquashfsCommand().run(args);
+    })
+
+    .command('rekey', 'Rekey a device', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('pkg', { type: 'string', description: 'The path to the signed package to be used for rekeying, relative to cwd', demandOption: false })
+            .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
+            .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+    }, (args: any) => {
+        return new RekeyDeviceCommand().run(args);
+    })
+
+    .command('deleteDevChannel', 'Delete an installed channel', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false });
+    }, (args: any) => {
+        return new DeleteDevChannelCommand().run(args);
+    })
+
+    .command('screenshot', 'Take a screenshot', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
+            .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
+            .option('out', { type: 'string', description: 'The location where the screenshot will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.jpg' })
+            .option('autoExtension', { type: 'boolean', description: 'Automatically handle file extension based on device response. When false (default), filename is used exactly as provided.', demandOption: false, default: false })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+    }, (args: any) => {
+        return new CaptureScreenshotCommand().run(args);
+    })
+
+    .command('getDeviceInfo', 'Get the `device-info` response from a Roku device', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false });
+    }, (args: any) => {
+        return new GetDeviceInfoCommand().run(args);
+    })
+
+    .command('getDevId', 'Get Dev ID', (builder) => {
+        return builder
+            .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false });
+    }, (args: any) => {
+        return new GetDevIdCommand().run(args);
+    })
+
+    .command('zip', 'Zip a folder into a package', (builder) => {
+        return builder
+            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: true })
+            .option('files', { type: 'array', description: 'Optional file patterns to filter which files are included (defaults to all files)', demandOption: false })
+            .option('out', { type: 'string', description: 'The path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+    }, (args: any) => {
+        return new ZipCommand().run(args);
+    })
+
+    .argv;

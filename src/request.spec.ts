@@ -459,6 +459,23 @@ describe('request (needle shim)', () => {
             expect(response.statusCode).to.equal(401);
         });
 
+        it('sends the real request unchanged when the probe yields no response at all', async () => {
+            //needle can invoke its callback with neither an error nor a response; the preflight must not
+            //blow up dereferencing it, and should fall back to needle's own 401 dance
+            const calls = stubPostSequence([
+                { response: undefined, body: undefined },
+                { response: { statusCode: 200, headers: {} }, body: 'ok' }
+            ]);
+            const { response } = await callPost({
+                url: 'http://1.2.3.4:80/plugin_install',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                formData: { mysubmit: 'Replace' }
+            });
+            expect(calls).to.have.lengthOf(2);
+            expect(calls[1].options.headers?.authorization).to.be.undefined;
+            expect(response.statusCode).to.equal(200);
+        });
+
         it('propagates a probe failure without sending the real request', async () => {
             const networkError = new Error('ECONNREFUSED');
             const calls = stubPostSequence([{ error: networkError }]);
