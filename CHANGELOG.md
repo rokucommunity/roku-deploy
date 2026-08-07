@@ -6,6 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.3](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.2...v4.0.0-alpha.3) - 2026-08-07
+### Added
+ - Add 1s breathing room between device tests ([#348](https://github.com/rokucommunity/roku-deploy/pull/348))
+ - Add cause to all thrown errors ([#329](https://github.com/rokucommunity/roku-deploy/pull/329))
+ - Add named options for all functions ([#314](https://github.com/rokucommunity/roku-deploy/pull/314))
+ - Add validation helper functions and validate all parameters for commands ([#320](https://github.com/rokucommunity/roku-deploy/pull/320))
+ - Add option to get screenshot as a buffer ([#304](https://github.com/rokucommunity/roku-deploy/pull/304))
+ - Add a files option to the zip command ([#290](https://github.com/rokucommunity/roku-deploy/pull/290))
+ - New args for commands ([#202](https://github.com/rokucommunity/roku-deploy/pull/202))
+### Changed
+ - Merge master into v4 ([#355](https://github.com/rokucommunity/roku-deploy/pull/355))
+ - Roku Cloud Emulator support ([#331](https://github.com/rokucommunity/roku-deploy/pull/331))
+ - Close code coverage gaps to hit 100% ([#343](https://github.com/rokucommunity/roku-deploy/pull/343))
+ - Full test coverage ([#325](https://github.com/rokucommunity/roku-deploy/pull/325))
+ - Unified device option ([#323](https://github.com/rokucommunity/roku-deploy/pull/323))
+ - Security enhancements ([#322](https://github.com/rokucommunity/roku-deploy/pull/322))
+ - Merge master into v4 (2026-07-16) ([#321](https://github.com/rokucommunity/roku-deploy/pull/321))
+ - Error handling rewrite ([#302](https://github.com/rokucommunity/roku-deploy/pull/302))
+ - Ensure all functions return objects ([#316](https://github.com/rokucommunity/roku-deploy/pull/316))
+ - Merge master into v4 ([#317](https://github.com/rokucommunity/roku-deploy/pull/317))
+ - Allow setting options when creating the Roku-Deploy object ([#291](https://github.com/rokucommunity/roku-deploy/pull/291))
+ - Return the out path when zipping ([#296](https://github.com/rokucommunity/roku-deploy/pull/296))
+ - Standardize Parameter Names Between Node API and CLI ([#233](https://github.com/rokucommunity/roku-deploy/pull/233))
+ - Merge master into v4 ([#283](https://github.com/rokucommunity/roku-deploy/pull/283))
+ - Download actual signed package from device on newer firmware ([#244](https://github.com/rokucommunity/roku-deploy/pull/244))
+ - Merge master 2 ([#231](https://github.com/rokucommunity/roku-deploy/pull/231))
+ - V4 merge master ([#228](https://github.com/rokucommunity/roku-deploy/pull/228))
+ - master into v4 - merge 3 ([#199](https://github.com/rokucommunity/roku-deploy/pull/199))
+ - upgrade to [@rokucommunity/logger@0.4.1](https://github.com/rokucommunity/logger/blob/master/CHANGELOG.md#041---2026-07-10). Notable changes since 0.3.10:
+     - Serialize Error.cause (recursively) when logging ([#33](https://github.com/rokucommunity/logger/pull/33))
+     - chore: Update create-vsix to support multi-vsix and shared bot logic ([#32](https://github.com/rokucommunity/logger/pull/32))
+     - Reduce public API surface and implement API Extractor ([#30](https://github.com/rokucommunity/logger/pull/30))
+     - chore: Reduce prod deps 6 → 1 (inline single-use helpers) + consolidate source-map-support ([#29](https://github.com/rokucommunity/logger/pull/29))
+     - chore: Support dispatch workflows ([#15](https://github.com/rokucommunity/logger/pull/15))
+     - chore: Shared CI - remove merged check on publish releases ([#14](https://github.com/rokucommunity/logger/pull/14))
+     - Update minimum audit threshold ([#27](https://github.com/rokucommunity/logger/pull/27))
+     - Accept GHSA-w5hq-g745-h8pq (uuid <11.1.1) advisory ([#26](https://github.com/rokucommunity/logger/pull/26))
+     - Slim security-audit-required to a single conditional check ([#24](https://github.com/rokucommunity/logger/pull/24))
+     - Only block release-branch PRs on Security Audit failures ([#21](https://github.com/rokucommunity/logger/pull/21))
+     - Security Audit workflow ([#19](https://github.com/rokucommunity/logger/pull/19))
+     - Security enhancements ([#17](https://github.com/rokucommunity/logger/pull/17))
+     - chore: support OIDC ([#16](https://github.com/rokucommunity/logger/pull/16))
+     - Merge pull request #12 from rokucommunity/migrate-to-shared-ci ([f43e5a4](https://github.com/rokucommunity/logger/commit/f43e5a4))
+### Fixed
+ - Fix getDestPath dropping absolute src entries ([#347](https://github.com/rokucommunity/roku-deploy/pull/347))
+ - Fix mocha/ts-node breaking on Node 22+ ([#341](https://github.com/rokucommunity/roku-deploy/pull/341))
+ - Fix sercurity audit issues ([#289](https://github.com/rokucommunity/roku-deploy/pull/289))
+### Removed
+ - Remove getOptions ([#284](https://github.com/rokucommunity/roku-deploy/pull/284))
+
+
+
 ## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
 ### Added
  - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
