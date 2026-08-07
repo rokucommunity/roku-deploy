@@ -530,7 +530,7 @@ describe('device', function device() {
         });
     });
 
-    //placed at roughly the suite's midpoint (rather than at the end) so a device that can't keep up
+    //placed at roughly the suite's midpoint (rather than at the end) so a device that isn't able to keep up
     //under sustained load is caught here, instead of only ever being exercised once, right before mocha exits
     describe('rebootDevice', () => {
         it('works, and confirms the device is still keeping up midway through the suite', async function rebootDevice() {
