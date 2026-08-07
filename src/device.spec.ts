@@ -12,7 +12,8 @@ import * as errors from './Errors';
 import { expect } from 'chai';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
-import { standardizePath as s } from './util';
+import { standardizePath as s, util } from './util';
+import { powerCycleRokuDevice } from './smartSwitchManagement.spec';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
 //pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
@@ -55,9 +56,9 @@ describe('device', function device() {
     //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
     const rekeySignedPackage = `${cwd}/testSignedPackage.pkg`;
 
-    //tripped by the mid-suite reboot check if the device fails to come back; once true, every remaining
-    //test in this suite is skipped immediately instead of running (and likely failing/timing out) against
-    //a device we already know is unhealthy
+    //tripped by the rebootDevice test (which runs mid-suite) if the device fails to come back; once
+    //true, every remaining test in this suite is skipped immediately instead of running (and likely
+    //failing/timing out) against a device we already know is unhealthy
     let deviceIsHealthy = true;
 
     before(async function beforeAll() {
@@ -72,7 +73,7 @@ describe('device', function device() {
         //a reboot can take a couple minutes to fully come back; allow generous time here
         this.timeout(180_000);
         console.log('[device-health] rebooting device before the suite starts...');
-        await rebootDeviceOrThrow(
+        await hardRebootDeviceOrThrow(
             'Could not reboot the device before the device test suite started. The device is likely in a bad ' +
             'state (unresponsive, stuck, or otherwise unhealthy), so the entire suite is likely to fail or hang. ' +
             'Check the device manually before re-running the tests.'
@@ -80,20 +81,8 @@ describe('device', function device() {
         console.log('[device-health] device is back online; starting tests.');
     });
 
-    after(async function afterAll() {
-        //same generous timeout as the initial reboot; the device needs time to come back before mocha exits
-        this.timeout(180_000);
-        console.log('[device-health] rebooting device after the suite finishes...');
-        await rebootDeviceOrThrow(
-            'Could not reboot the device after the device test suite finished. The device is likely in a bad ' +
-            'state (unresponsive, stuck, or otherwise unhealthy) after running the suite. Check the device ' +
-            'manually before relying on it for the next test run.'
-        );
-        console.log('[device-health] device is back online after the suite.');
-    });
-
     beforeEach(async function beforeEachTest() {
-        //the device already failed to come back from the mid-suite reboot; skip immediately instead of
+        //the device already failed to come back from the rebootDevice test; skip immediately instead of
         //burning time on more tests that are almost certainly going to fail/timeout against it anyway
         if (!deviceIsHealthy) {
             this.skip();
@@ -301,6 +290,71 @@ describe('device', function device() {
         });
     });
 
+    describe('large zip uploads', function largeZipUploads() {
+        //a large upload takes several seconds per digest-auth leg on wifi, and publish() may attempt
+        //Replace + Install; keep this generous
+        this.timeout(120_000);
+
+        //Large enough that the multipart body cannot fit in the OS socket buffers, so the upload is
+        //still mid-write when the device responds to the request. Random bytes are incompressible, so
+        //the zip stays this size instead of deflating away.
+        const LARGE_FILE_SIZE = 10 * 1024 * 1024;
+
+        it('sideloads a large channel zip', async () => {
+            //bulk the standard test channel up with a large incompressible asset
+            fsExtra.outputFileSync(s`${rootDir}/assets/noise.bin`, crypto.randomBytes(LARGE_FILE_SIZE));
+
+            const files = ['manifest', 'source/**/*', 'components/**/*', 'assets/**/*'];
+            const { stagingDir: staged } = await rd.stage({ rootDir: rootDir, files: files, out: stagingDir });
+            const zipPath = `${outDir}/roku-deploy.zip`;
+            await rd.zip({ dir: staged, out: zipPath, files: files });
+            expect(fsExtra.statSync(zipPath).size).to.be.greaterThan(LARGE_FILE_SIZE);
+
+            const response = await rd.sideload({ ...options, zip: zipPath });
+            assert.equal(response.message, 'Successful sideload');
+        });
+
+        //Mirrors roku-debug's component-library launch flow: delete every sideloaded plugin, then
+        //install a complib whose zip is several megabytes (like a real-world complib)
+        it('installs a large component library after deleting all sideloaded plugins', async () => {
+            //start clean, like roku-debug does at launch
+            await rd.deleteAllSideloadedPlugins(options);
+
+            const libName = 'largecomplib';
+            const libRootDir = `${tempDir}/${libName}`;
+            writeFiles(libRootDir, [
+                ['manifest', undent`
+                    title=${libName}
+                    sg_component_libs_provided=${libName}
+                `],
+                [`components/${libName}.xml`, undent`
+                    <component name="${libName}">
+                        <!-- ${COMPLIB_PADDING} -->
+                    </component>
+                `]
+            ]);
+            //bulk the complib up with a large incompressible asset
+            fsExtra.outputFileSync(s`${libRootDir}/assets/noise.bin`, crypto.randomBytes(LARGE_FILE_SIZE));
+
+            const files = ['manifest', 'components/**/*', 'assets/**/*'];
+            const { stagingDir: staged } = await rd.stage({ rootDir: libRootDir, files: files, out: `${stagingDir}-${libName}` });
+            const zipPath = `${outDir}/${libName}.zip`;
+            await rd.zip({ dir: staged, out: zipPath, files: files });
+            const response = await rd.sideload({
+                ...options,
+                zip: zipPath,
+                appType: 'dcl'
+            });
+            assert.equal(response.message, 'Successful sideload');
+
+            //the complib should now be installed on the device
+            expect(await getInstalledComponentLibraryFileNames()).to.have.lengthOf(1);
+
+            //clean up
+            await rd.deleteAllSideloadedPlugins(options);
+        });
+    });
+
     describe('deployAndSignPackage', () => {
         //TODO(v4-merge): verify against hardware — v4 split the old `deployAndSignPackage` into
         //stage+zip+sideload followed by `createSignedPackage`; confirm the device is left rekeyed and
@@ -460,27 +514,15 @@ describe('device', function device() {
         });
     });
 
-    describe('rebootDevice', () => {
-        it('works', async function rebootDevice() {
-            //a reboot takes the device offline for a while; allow time for it to come back
-            this.timeout(180_000);
-            //use a short per-request timeout so the reboot POST can't hang open past the device going
-            //down; without this it would inherit the 150s default and could orphan a socket if mocha's
-            //test-timeout fired first.
-            await rd.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
-            //wait until the device is reachable again so the next test doesn't run mid-reboot
-            await waitForDeviceOnline(options.device.host);
-        });
-    });
-
     describe('checkForUpdate', () => {
         //checkForUpdate requires firmware >= this version; below it, it throws UnsupportedFirmwareVersionError
         const MIN_FIRMWARE = '15.0.4';
 
         it('works', async function checkForUpdate() {
             //triggers a real update check against Roku's servers, which can be slow and can sometimes
-            //trigger a reboot, so allow generous time for the device to come back afterward
-            this.timeout(240_000);
+            //trigger a reboot; the ceiling is the update check plus a possible reboot + waitForDeviceOnline
+            //(up to ~120s), so keep it generous rather than sizing to the observed happy-path time.
+            this.timeout(180_000);
 
             //Every device call below uses an explicit short `timeout` so no underlying needle request can
             //hang open indefinitely (the default is 150s). This guarantees each request either resolves or
@@ -513,27 +555,6 @@ describe('device', function device() {
                     `expected UnsupportedFirmwareVersionError, got ${thrown?.constructor?.name}: ${thrown?.message}`
                 );
             }
-        });
-    });
-
-    describe('mid-suite reboot', () => {
-        it('reboots the device to confirm it is still keeping up', async function midSuiteReboot() {
-            //same generous timeout as the suite-level reboots; the device needs time to come back
-            this.timeout(180_000);
-            console.log('[device-health] rebooting device midway through the suite...');
-            try {
-                await rebootDeviceOrThrow(
-                    'Could not reboot the device midway through the device test suite. The device is likely ' +
-                    'struggling to keep up with the tests run so far, so the remaining tests are likely to fail. ' +
-                    'Check the device manually before re-running the tests.'
-                );
-            } catch (e) {
-                //the device is unhealthy; skip every remaining test in the suite instead of letting each
-                //one individually run and time out against it
-                deviceIsHealthy = false;
-                throw e;
-            }
-            console.log('[device-health] device is still keeping up; continuing with the remaining tests.');
         });
     });
 
@@ -615,6 +636,29 @@ describe('device', function device() {
 
             //nothing should be installed anymore
             expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
+        });
+    });
+
+    //placed at roughly the suite's midpoint (rather than at the end) so a device that isn't able to keep up
+    //under sustained load is caught here, instead of only ever being exercised once, right before mocha exits
+    describe('rebootDevice', () => {
+        it('works, and confirms the device is still keeping up midway through the suite', async function rebootDevice() {
+            //a reboot takes the device offline for a while; the ceiling is driven by
+            //waitForDeviceOnline (up to ~120s) plus the reboot POST, not the observed happy-path time.
+            this.timeout(180_000);
+            try {
+                //use a short per-request timeout so the reboot POST can't hang open past the device going
+                //down; without this it would inherit the 150s default and could orphan a socket if mocha's
+                //test-timeout fired first.
+                await rd.rebootDevice({ ...options, timeout: REQUEST_TIMEOUT });
+                //wait until the device is reachable again so the next test doesn't run mid-reboot
+                await waitForDeviceOnline(options.device.host);
+            } catch (e) {
+                //the device is unhealthy; skip every remaining test in the suite instead of letting each
+                //one individually run and time out against it
+                deviceIsHealthy = false;
+                throw e;
+            }
         });
     });
 
@@ -1142,7 +1186,7 @@ function getActiveApp(host: string): Promise<string> {
 
 /**
  * Reboot the device and wait for it to come back online, using a module-level RokuDeploy instance so
- * it can be called from suite-level `before`/`after` hooks where the describe-scoped `rd` isn't set up.
+ * it can be called from the suite-level `before` hook where the describe-scoped `rd` isn't set up.
  * Rethrows with `helpText` prepended if the reboot itself fails, or if the device never comes back
  * online afterward, so a broken device is reported clearly instead of surfacing as a generic timeout.
  */
@@ -1157,22 +1201,68 @@ async function rebootDeviceOrThrow(helpText: string): Promise<void> {
 }
 
 /**
- * Wait for a device to be reachable again by polling its device-info over ECP until it responds.
- * Used after operations that reboot the device (rebootDevice, and sometimes checkForUpdate) so the
- * next test doesn't run against a device that's still rebooting.
+ * Hard-reboot the device for the suite-level (before-all) health check. Prefers physically
+ * power-cycling it via a smart plug (see smartSwitchManagement.spec.ts) when SMART_SWITCH_DEVICE_ID,
+ * SMART_SWITCH_LOCAL_KEY, and SMART_SWITCH_IP are configured - that's a true hard reset, which is what
+ * we actually want when the device might be wedged. Not everyone running this suite has the same smart
+ * plug wired up, though, so when those aren't configured this falls back to the normal software
+ * `rebootDevice` ECP call instead.
+ */
+async function hardRebootDeviceOrThrow(helpText: string): Promise<void> {
+    const smartSwitchConfigured = !!(process.env.SMART_SWITCH_DEVICE_ID && process.env.SMART_SWITCH_LOCAL_KEY && process.env.SMART_SWITCH_IP);
+    if (!smartSwitchConfigured) {
+        console.log('[device-health] smart switch not configured (SMART_SWITCH_DEVICE_ID/SMART_SWITCH_LOCAL_KEY/SMART_SWITCH_IP); falling back to a software reboot.');
+        await rebootDeviceOrThrow(helpText);
+        return;
+    }
+
+    try {
+        console.log('[device-health] power-cycling device via smart switch...');
+        await powerCycleRokuDevice();
+        await waitForDeviceOnline(HOST);
+    } catch (e) {
+        const cause = e as Error;
+        throw new Error(`${helpText}\n\nUnderlying error: ${cause?.message}`);
+    }
+}
+
+/**
+ * Wait for a device to be reachable again by polling both ECP (device-info) and the installer web
+ * server (the same `plugin_install` endpoint sideload/publish/delete use) until both respond. Used
+ * after operations that reboot the device (rebootDevice, and sometimes checkForUpdate) so the next
+ * test doesn't run against a device that's still rebooting.
+ *
+ * ECP alone isn't enough: it can come back before the installer server has finished settling, which
+ * showed up as flaky complib install/delete failures even though a `beforeEach` ECP check had just
+ * reported the device as online.
  *
  * @param graceMs how long to wait before the first poll, giving the device time to actually go down
  *   after the reboot was issued (so we don't immediately see the still-alive pre-reboot device)
  */
 async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs = 3000, graceMs = 5000): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
+    const startTime = Date.now();
+    const deadline = startTime + timeoutMs;
     //give the device a moment to actually start going down before we begin polling
     await sleep(graceMs);
     let lastError: Error;
+    let count = 0;
     while (Date.now() < deadline) {
+        if (count++ > 0) {
+            console.log(`Waiting for device to come back online (${Date.now() - startTime}ms elapsed)`);
+        }
         try {
+            //ensure the ECP webserver is responsive
             await helperRd.getDeviceInfo({ device: { host: host }, timeout: intervalMs });
-            //a successful device-info query means ECP is up and the device is responsive again
+            //ensure the plugin_install webserver is responsive
+            await helperRd.listSideloadedPlugins({ device: { host: host }, password: PASSWORD, timeout: intervalMs });
+            //ECP responded and the installer server is accepting connections
+
+            //some devices are still NOT FULLY ready to speak yet, so if this was the result of a long wait,
+            //wait just a little bit longer
+            if (count > 1) {
+                console.log('Device is online, but waiting a few more seconds to ensure it is fully ready...');
+                await util.sleep(5_000);
+            }
             return;
         } catch (e) {
             lastError = e as Error;
