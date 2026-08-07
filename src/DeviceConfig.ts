@@ -57,7 +57,7 @@ export type DeviceOption = string | DeviceConfig;
 // === Type Guards ===
 
 /**
- * Any object that may carry device identifier keys (a DeviceConfig, a registry entry, etc.).
+ * Any object that may carry device identifier keys (a DeviceConfig, a registry entry, etc.)
  * Lets the guards below work on partially-populated shapes, not just the strict union.
  */
 type DeviceConfigLike = Partial<LocalDeviceConfig & RceDeviceConfigByEsn & RceDeviceConfigById & RceDeviceConfigByUrl>;
