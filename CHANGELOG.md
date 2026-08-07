@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.3](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.2...v4.0.0-alpha.3) - 2026-08-07
+### Added
+ - Add cause to all thrown errors ([#329](https://github.com/rokucommunity/roku-deploy/pull/329))
+ - Add named options for all functions ([#314](https://github.com/rokucommunity/roku-deploy/pull/314))
+ - Add validation helper functions and validate all parameters for commands ([#320](https://github.com/rokucommunity/roku-deploy/pull/320))
+ - Add option to get screenshot as a buffer ([#304](https://github.com/rokucommunity/roku-deploy/pull/304))
+ - Add a files option to the zip command ([#290](https://github.com/rokucommunity/roku-deploy/pull/290))
+ - New args for commands ([#202](https://github.com/rokucommunity/roku-deploy/pull/202))
+ - Add Roku Cloud Emulator (RCE) support ([#331](https://github.com/rokucommunity/roku-deploy/pull/331))
+### Changed
+ - Unified device option ([#323](https://github.com/rokucommunity/roku-deploy/pull/323))
+ - Error handling rewrite ([#302](https://github.com/rokucommunity/roku-deploy/pull/302))
+ - Ensure all functions return objects ([#316](https://github.com/rokucommunity/roku-deploy/pull/316))
+ - Allow setting options when creating the Roku-Deploy object ([#291](https://github.com/rokucommunity/roku-deploy/pull/291))
+ - Return the out path when zipping ([#296](https://github.com/rokucommunity/roku-deploy/pull/296))
+ - Standardize Parameter Names Between Node API and CLI ([#233](https://github.com/rokucommunity/roku-deploy/pull/233))
+ - Download actual signed package from device on newer firmware ([#244](https://github.com/rokucommunity/roku-deploy/pull/244))
+ - upgrade to [@rokucommunity/logger@0.4.1](https://github.com/rokucommunity/logger/blob/master/CHANGELOG.md#041---2026-07-10). Notable changes since 0.3.10:
+### Fixed
+ - Security enhancements ([#322](https://github.com/rokucommunity/roku-deploy/pull/322))
+ - Fix getDestPath dropping absolute src entries ([#347](https://github.com/rokucommunity/roku-deploy/pull/347))
+ - Fix mocha/ts-node breaking on Node 22+ ([#341](https://github.com/rokucommunity/roku-deploy/pull/341))
+ - Fix security audit issues ([#289](https://github.com/rokucommunity/roku-deploy/pull/289))
+ - chore: Full test coverage ([#325](https://github.com/rokucommunity/roku-deploy/pull/325))
+ - chore: Add 1s breathing room between device tests ([#348](https://github.com/rokucommunity/roku-deploy/pull/348))
+ - chore: Close code coverage gaps to hit 100% ([#343](https://github.com/rokucommunity/roku-deploy/pull/343))
+### Removed
+ - Remove `getOptions` ([#284](https://github.com/rokucommunity/roku-deploy/pull/284))
+
+
+
 ## [4.0.0-alpha.2](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.1...v4.0.0-alpha.2) - 2025-06-02
 ### Added
  - Add interactive remote mode ([#169](https://github.com/rokucommunity/roku-deploy/pull/169))
