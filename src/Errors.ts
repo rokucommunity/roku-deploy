@@ -103,6 +103,15 @@ export interface UnsupportedFirmwareDetails {
  * Provides consistent error handling with typed details and serialization support.
  */
 export abstract class RokuDeployError<T = unknown> extends Error {
+    constructor(message: string, details?: T, cause?: Error) {
+        super(message);
+        this.name = this.constructor.name;
+        this.details = details ?? {} as T;
+        this.cause = cause;
+        // Restore prototype chain for proper instanceof checks
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+
     /**
      * Error code for programmatic identification
      */
@@ -117,15 +126,6 @@ export abstract class RokuDeployError<T = unknown> extends Error {
      * Original error if this error wraps another
      */
     public readonly cause?: Error;
-
-    constructor(message: string, details?: T, cause?: Error) {
-        super(message);
-        this.name = this.constructor.name;
-        this.details = details ?? {} as T;
-        this.cause = cause;
-        // Restore prototype chain for proper instanceof checks
-        Object.setPrototypeOf(this, new.target.prototype);
-    }
 
     /**
      * Serialize the error for logging/transmission
@@ -229,13 +229,13 @@ export class EcpNetworkAccessModeDisabledError extends DeviceError {
  * the user to check for updates (even if no updates are actually available).
  */
 export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDetails> {
-    public readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
-
-    static MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
-
     constructor(details?: ConnectionErrorDetails, cause?: Error) {
         super(UpdateCheckRequiredError.MESSAGE, details, cause);
     }
+
+    public readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
+
+    static MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 }
 
 /**
@@ -244,14 +244,14 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
  * but it can also happen for other reasons.
  */
 export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails> {
-    public readonly code = RokuDeployErrorCode.CONNECTION_RESET;
-
-    static MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
-
     // eslint-disable-next-line @typescript-eslint/no-useless-constructor
     constructor(details?: ConnectionErrorDetails, cause?: Error) {
         super(ConnectionResetError.MESSAGE, details, cause);
     }
+
+    public readonly code = RokuDeployErrorCode.CONNECTION_RESET;
+
+    static MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 }
 
 /**
