@@ -3322,12 +3322,12 @@ describe('RokuDeploy', () => {
         });
 
         class ErrorWithConnectionResetCode extends Error {
-            code;
-
             constructor(code = 'ECONNRESET') {
                 super();
                 this.code = code;
             }
+
+            code;
         }
 
         it('Should throw an exception', async () => {
@@ -3831,12 +3831,12 @@ describe('RokuDeploy', () => {
     });
 
     class ErrorWithCode extends Error {
-        code;
-
         constructor(code = 'HPE_INVALID_CONSTANT') {
             super();
             this.code = code;
         }
+
+        code;
     }
 
     describe('rekey', () => {
