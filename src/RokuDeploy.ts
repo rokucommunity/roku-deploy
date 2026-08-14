@@ -46,6 +46,18 @@ export class RokuDeploy {
         // Use custom logger if provided, otherwise use global logger
         this.logger = this.options.logger ?? logger;
     }
+
+    /**
+     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
+     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
+     * both channels and component libraries).
+     */
+    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
+
+    /**
+     * The logger instance for this RokuDeploy instance
+     */
+    public readonly logger: typeof logger;
     /**
      * Default values for common options used across multiple functions
      */
@@ -63,13 +75,6 @@ export class RokuDeploy {
     };
 
     /**
-     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
-     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
-     * both channels and component libraries).
-     */
-    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
-
-    /**
      * Network error codes that mean the request never reached a live endpoint (host gone,
      * connection refused/reset, timed out).
      */
@@ -79,11 +84,6 @@ export class RokuDeploy {
      * Instance-level default options merged into every method call
      */
     private readonly options: RokuDeployConstructorOptions;
-
-    /**
-     * The logger instance for this RokuDeploy instance
-     */
-    public readonly logger: typeof logger;
 
     /**
      * One resolved instance url per unique RCE device config, cached for the lifetime of this
@@ -184,51 +184,6 @@ export class RokuDeploy {
         await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
         return { zipPath: out };
-    }
-
-    /**
-    * Get all file paths for the specified options
-    */
-    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
-        options = { ...this.options, ...options } as GetFilePathsOptions;
-        let rootDir = options.rootDir;
-        const files = options.files;
-
-        //if the rootDir isn't absolute, convert it to absolute
-        if (path.isAbsolute(rootDir) === false) {
-            rootDir = path.resolve(process.cwd(), rootDir);
-        }
-        const entries = util.normalizeFilesArray(files);
-        const srcPathsByIndex = await util.globAllByIndex(
-            entries.map(x => {
-                return typeof x === 'string' ? x : x.src;
-            }),
-            rootDir
-        );
-
-        /**
-         * Result indexed by the dest path
-         */
-        let result = new Map<string, StandardizedFileEntry>();
-
-        //compute `dest` path for every file
-        for (let i = 0; i < srcPathsByIndex.length; i++) {
-            const srcPaths = srcPathsByIndex[i];
-            const entry = entries[i];
-            if (srcPaths) {
-                for (let srcPath of srcPaths) {
-                    srcPath = util.standardizePath(srcPath);
-
-                    const dest = util.computeFileDestPath(srcPath, entry, rootDir);
-                    //the last file with this `dest` will win, so just replace any existing entry with this one.
-                    result.set(dest, {
-                        src: srcPath,
-                        dest: dest
-                    });
-                }
-            }
-        }
-        return [...result.values()];
     }
 
     /**
@@ -1452,6 +1407,51 @@ export class RokuDeploy {
             return fileOptions;
         }
         return {};
+    }
+
+    /**
+    * Get all file paths for the specified options
+    */
+    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
+        options = { ...this.options, ...options } as GetFilePathsOptions;
+        let rootDir = options.rootDir;
+        const files = options.files;
+
+        //if the rootDir isn't absolute, convert it to absolute
+        if (path.isAbsolute(rootDir) === false) {
+            rootDir = path.resolve(process.cwd(), rootDir);
+        }
+        const entries = util.normalizeFilesArray(files);
+        const srcPathsByIndex = await util.globAllByIndex(
+            entries.map(x => {
+                return typeof x === 'string' ? x : x.src;
+            }),
+            rootDir
+        );
+
+        /**
+         * Result indexed by the dest path
+         */
+        let result = new Map<string, StandardizedFileEntry>();
+
+        //compute `dest` path for every file
+        for (let i = 0; i < srcPathsByIndex.length; i++) {
+            const srcPaths = srcPathsByIndex[i];
+            const entry = entries[i];
+            if (srcPaths) {
+                for (let srcPath of srcPaths) {
+                    srcPath = util.standardizePath(srcPath);
+
+                    const dest = util.computeFileDestPath(srcPath, entry, rootDir);
+                    //the last file with this `dest` will win, so just replace any existing entry with this one.
+                    result.set(dest, {
+                        src: srcPath,
+                        dest: dest
+                    });
+                }
+            }
+        }
+        return [...result.values()];
     }
 
     /**
