@@ -58,6 +58,7 @@ export class RokuDeploy {
      * The logger instance for this RokuDeploy instance
      */
     public readonly logger: typeof logger;
+
     /**
      * Default values for common options used across multiple functions
      */
