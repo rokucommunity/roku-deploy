@@ -36,6 +36,29 @@ import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
 export class RokuDeploy {
+
+    /**
+     * Create a new RokuDeploy instance with optional default options
+     */
+    constructor(options?: RokuDeployConstructorOptions) {
+        this.options = options ?? {};
+
+        // Use custom logger if provided, otherwise use global logger
+        this.logger = this.options.logger ?? logger;
+    }
+
+    /**
+     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
+     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
+     * both channels and component libraries).
+     */
+    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
+
+    /**
+     * The logger instance for this RokuDeploy instance
+     */
+    public readonly logger: typeof logger;
+
     /**
      * Default values for common options used across multiple functions
      */
@@ -53,52 +76,15 @@ export class RokuDeploy {
     };
 
     /**
-     * The minimum zip size (in bytes) the Roku firmware will sideload. A zip smaller than this is rejected
-     * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
-     * both channels and component libraries).
+     * Network error codes that mean the request never reached a live endpoint (host gone,
+     * connection refused/reset, timed out).
      */
-    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
-
-    /**
-     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
-     */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
-        const cwd = options?.cwd ?? process.cwd();
-        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
-
-        if (fsExtra.existsSync(configPath)) {
-            const configFileText = fsExtra.readFileSync(configPath).toString();
-            const parseErrors: ParseError[] = [];
-            const fileOptions = parseJsonc(configFileText, parseErrors, {
-                allowEmptyContent: true,
-                allowTrailingComma: true,
-                disallowComments: false
-            });
-            if (parseErrors.length > 0) {
-                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
-                    parseErrors.map(x => {
-                        return {
-                            message: printParseErrorCode(x.error),
-                            offset: x.offset,
-                            length: x.length
-                        };
-                    })
-                ));
-            }
-            return fileOptions;
-        }
-        return {};
-    }
+    private static readonly rceInstanceUnreachableNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
 
     /**
      * Instance-level default options merged into every method call
      */
     private readonly options: RokuDeployConstructorOptions;
-
-    /**
-     * The logger instance for this RokuDeploy instance
-     */
-    public readonly logger: typeof logger;
 
     /**
      * One resolved instance url per unique RCE device config, cached for the lifetime of this
@@ -108,15 +94,7 @@ export class RokuDeploy {
      */
     private readonly rceInstanceUrlsByCacheKey = new Map<string, Promise<string>>();
 
-    /**
-     * Create a new RokuDeploy instance with optional default options
-     */
-    constructor(options?: RokuDeployConstructorOptions) {
-        this.options = options ?? {};
-
-        // Use custom logger if provided, otherwise use global logger
-        this.logger = this.options.logger ?? logger;
-    }
+    private _packageVersion: string;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -207,690 +185,6 @@ export class RokuDeploy {
         await this.makeZip(dir, out, files);
         this.logger.info('Zip created at:', out);
         return { zipPath: out };
-    }
-
-    /**
-     * Given a path to a folder, zip up that folder and all of its contents
-     * @param srcFolder the folder that should be zipped
-     * @param zipFilePath the path to the zip that will be created
-     * @param files a files array used to filter the files from `srcFolder`
-     */
-    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
-        const filePaths = await this.getFilePaths({ files: files, rootDir: srcFolder });
-
-        const zip = new JSZip();
-        // Allows us to wait until all are done before we build the zip
-        const promises = [];
-        for (const file of filePaths) {
-            const promise = fsExtra.readFile(file.src).then((data) => {
-                const ext = path.extname(file.dest).toLowerCase();
-                let compression: 'DEFLATE' | 'STORE' = 'DEFLATE';
-
-                if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
-                    compression = 'STORE';
-                }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data as Uint8Array, {
-                    compression: compression
-                });
-            });
-            promises.push(promise);
-        }
-        await Promise.all(promises);
-
-        //ensure the output directory exists
-        await fsExtra.ensureDir(
-            path.dirname(zipFilePath)
-        );
-        // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
-        const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
-        return fsExtra.writeFile(zipFilePath, content);
-    }
-
-    /**
-    * Get all file paths for the specified options
-    */
-    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
-        options = { ...this.options, ...options } as GetFilePathsOptions;
-        let rootDir = options.rootDir;
-        const files = options.files;
-
-        //if the rootDir isn't absolute, convert it to absolute
-        if (path.isAbsolute(rootDir) === false) {
-            rootDir = path.resolve(process.cwd(), rootDir);
-        }
-        const entries = util.normalizeFilesArray(files);
-        const srcPathsByIndex = await util.globAllByIndex(
-            entries.map(x => {
-                return typeof x === 'string' ? x : x.src;
-            }),
-            rootDir
-        );
-
-        /**
-         * Result indexed by the dest path
-         */
-        let result = new Map<string, StandardizedFileEntry>();
-
-        //compute `dest` path for every file
-        for (let i = 0; i < srcPathsByIndex.length; i++) {
-            const srcPaths = srcPathsByIndex[i];
-            const entry = entries[i];
-            if (srcPaths) {
-                for (let srcPath of srcPaths) {
-                    srcPath = util.standardizePath(srcPath);
-
-                    const dest = util.computeFileDestPath(srcPath, entry, rootDir);
-                    //the last file with this `dest` will win, so just replace any existing entry with this one.
-                    result.set(dest, {
-                        src: srcPath,
-                        dest: dest
-                    });
-                }
-            }
-        }
-        return [...result.values()];
-    }
-
-    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T): Promise<RequestOptions> {
-        // Merge constructor options with call options
-        const mergedOptions = { ...this.options, ...options };
-        // Set defaults for request options
-        const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
-        const username = mergedOptions.username ?? 'rokudev';
-
-        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
-        let baseRequestOptions = {
-            url: `${baseUrl}/${requestPath}`,
-            timeout: timeout,
-            headers: headers,
-            auth: {
-                user: username,
-                pass: mergedOptions.password,
-                sendImmediately: false
-            },
-            formData: formData,
-            agentOptions: { 'keepAlive': false }
-        };
-        return baseRequestOptions;
-    }
-
-    /**
-     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
-     * device's installer. Local devices hit the classic port-80 dev installer directly; RCE devices are
-     * reached through the instance api's `/sideload` proxy, which forwards to the emulated device's installer.
-     *
-     * The RCE instance api sits behind a service mesh that authenticates the bearer token via the
-     * `X-Authorization` header (rather than the standard `Authorization` header, which is reserved for
-     * the installer's own HTTP Digest challenge) - two independent auth layers that can't share the
-     * `Authorization` header.
-     */
-    private async getInstallerRequestBase(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
-        if (!isRceDeviceConfig(deviceConfig)) {
-            return {
-                baseUrl: `http://${deviceConfig.host}:${packagePort}`,
-                headers: {}
-            };
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to reach the installer on an RCE device');
-        }
-        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-        return {
-            baseUrl: `${instanceUrl}/sideload`,
-            headers: this.buildRceAuthHeaders(rceToken)
-        };
-    }
-
-    /**
-     * Build the headers that authenticate a request to the RCE instance api's service mesh. The bearer
-     * token rides the `X-Authorization` header so the standard `Authorization` header stays free for
-     * whatever the proxied device endpoint itself requires (the installer's HTTP Digest, for example).
-     */
-    private buildRceAuthHeaders(rceToken: string): Record<string, string> {
-        return { 'X-Authorization': `Bearer ${rceToken}` };
-    }
-
-    /**
-     * Resolve the effective RCE token for a device config: the config's own rceToken when present,
-     * otherwise the constructor-supplied default rceToken.
-     */
-    private getRceToken(deviceConfig: RceDeviceConfig): string | undefined {
-        return deviceConfig.rceToken ?? this.options.rceToken;
-    }
-
-    /**
-     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
-     * device's ECP server. Local devices hit the HTTP ECP port directly; RCE devices are reached through
-     * the instance's raw `/ecp1` proxy, which forwards to the emulated device's ECP port and
-     * authenticates via the `X-Authorization` bearer header (the same service-mesh auth carrier the
-     * installer proxy uses).
-     */
-    private async getEcpRequestBase(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
-        if (!isRceDeviceConfig(deviceConfig)) {
-            let host = this.getHost(deviceConfig);
-            //if the host is a DNS name, look up the IP address
-            try {
-                host = await util.dnsLookup(host);
-            } catch (e) {
-                //try using the host as-is (it'll probably fail...)
-            }
-            return {
-                baseUrl: `http://${host}:${ecpPort}`,
-                headers: {}
-            };
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to reach ECP on an RCE device');
-        }
-        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-        return {
-            baseUrl: `${instanceUrl}/ecp1`,
-            headers: this.buildRceAuthHeaders(rceToken)
-        };
-    }
-
-    /**
-     * Resolve a device config's host through DNS, returning a new config with the host replaced by
-     * its ip address (some Rokus reject ECP requests addressed by hostname or mDNS name, so callers
-     * use this to pin a config to an ip up front). Only local devices are addressed by host; any
-     * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
-     * lookup throws so the caller decides how to handle an unreachable host.
-     */
-    public async withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T> {
-        if (device && isLocalDeviceConfig(device)) {
-            return { ...device, host: await util.dnsLookup(device.host) };
-        }
-        return device;
-    }
-
-    /**
-     * Send a raw External Control Protocol (ECP) request to a device and return the response with
-     * its XML body parsed to JSON. This is the single ECP transport: every ECP convenience method
-     * funnels through it, and it is public so any ECP route can be reached even when no dedicated
-     * wrapper exists for it yet.
-     *
-     * Local devices are addressed as `http://<host>:<ecpPort>/<route>`; Cloud Emulator devices go
-     * through their instance's `/ecp1/<route>` proxy (authenticated with the config's api token),
-     * so callers never branch on device kind.
-     * @param device the device to send the request to
-     * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
-     * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
-     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
-     *                chanperf response, for example) come back to the caller instead of throwing.
-     */
-    public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
-        options = { ...this.options, ...options } as EcpOptions;
-        this.validatePort(options.ecpPort, 'ecpPort');
-        this.validateTimeout(options.timeout);
-
-        const deviceConfig = this.resolveDevice(device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
-        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
-
-        const verify = options.verify ?? false;
-        //with verify off, an instance-gone 404 comes back as a normal response rather than a throw;
-        //it is surfaced to the retry wrapper as an error, and held here so the caller still receives
-        //the raw response when the retry does not apply
-        let instanceGoneResponse: HttpResponse | undefined;
-        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            instanceGoneResponse = undefined;
-            const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
-            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
-            const result = options.method === 'POST'
-                ? await this.doPostRequest(requestOptions, verify)
-                : await this.doGetRequest(requestOptions, verify);
-            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.response?.statusCode, result?.response?.headers)) {
-                instanceGoneResponse = result;
-                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.response.statusCode}`, {
-                    httpDetails: extractHttpDetails(result.response, result.body)
-                });
-            }
-            return result;
-        }).catch((error) => {
-            if (instanceGoneResponse) {
-                return instanceGoneResponse;
-            }
-            throw error;
-        });
-
-        return {
-            status: response?.response?.statusCode,
-            body: response?.body,
-            json: await this.parseEcpXml(response?.body, response)
-        };
-    }
-
-    /**
-     * Parse an ECP XML response body into a plain object (xml2js, `explicitArray: false`). An empty
-     * or non-XML body (commands like keypress return none; a proxy error page is not XML) yields
-     * undefined so the caller can inspect the status and raw body instead; a body that looks like
-     * XML but cannot be parsed throws.
-     */
-    private async parseEcpXml(body: string, response?: HttpResponse): Promise<Record<string, any> | undefined> {
-        if (typeof body !== 'string' || !body.trim().startsWith('<')) {
-            return undefined;
-        }
-        try {
-            const parsedContent = await xml2js.parseStringPromise(body, {
-                explicitArray: false
-            });
-            // clone the data onto an object because xml2js somehow makes this object not an object???
-            return { ...parsedContent };
-        } catch (e) {
-            throw new UnparsableDeviceResponseError('Could not parse ECP response', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
-            }, e instanceof Error ? e : undefined);
-        }
-    }
-
-    /**
-     * Resolve (and memoize) the live instance API URL for an RCE device config. Resolutions are
-     * cached by the device's identifying fields so repeated calls for the same logical device -
-     * even across separately-resolved `DeviceConfig` objects, as happens with registry-name
-     * lookups - reuse the memoized instance url.
-     */
-    private getRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
-        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
-        let instanceUrlPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
-        if (instanceUrlPromise === undefined) {
-            instanceUrlPromise = this.resolveRceInstanceUrl(deviceConfig);
-            this.rceInstanceUrlsByCacheKey.set(cacheKey, instanceUrlPromise);
-            //only successful resolutions stay cached; a failure must not poison every later request
-            instanceUrlPromise.catch(() => this.rceInstanceUrlsByCacheKey.delete(cacheKey));
-        }
-        return instanceUrlPromise;
-    }
-
-    /**
-     * Network error codes that mean the request never reached a live endpoint (host gone,
-     * connection refused/reset, timed out).
-     */
-    private static readonly rceInstanceUnreachableNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
-
-    /**
-     * Whether an error says the request never reached a live endpoint at all (either the raw
-     * network error, or one of roku-deploy's wrapper errors carrying it as its cause). These bust
-     * the cached instance url so the next call re-resolves, but do not prove the instance moved,
-     * so they never trigger an in-call retry.
-     */
-    private isRceInstanceUnreachableError(error: unknown): boolean {
-        for (const candidate of [error, (error as RokuDeployError)?.cause]) {
-            const networkErrorCode = (candidate as NodeJS.ErrnoException)?.code;
-            if (typeof networkErrorCode === 'string' && RokuDeploy.rceInstanceUnreachableNetworkErrorCodes.has(networkErrorCode)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Whether a response from an instance url says the instance itself is not there. The mesh
-     * answers a dead instance path with a bare 404 it generated itself, distinguishable from a 404
-     * a live instance produced (an unknown ECP route, for example) by the absence of the
-     * `x-envoy-upstream-service-time` header the mesh stamps on every response it actually
-     * forwarded to an instance.
-     */
-    private isRceInstanceGoneResponse(statusCode: number | undefined, headers: Record<string, unknown> | undefined): boolean {
-        return statusCode === 404 && headers?.['x-envoy-upstream-service-time'] === undefined;
-    }
-
-    /**
-     * Whether an error thrown while talking to an RCE instance url explicitly indicates the
-     * instance itself is not there, as opposed to an application-level failure (bad credentials, a
-     * rejected route) that a live instance produced.
-     */
-    private isRceInstanceGoneError(error: unknown): boolean {
-        if (error instanceof DeviceError) {
-            const response = error.details?.httpDetails?.response;
-            return this.isRceInstanceGoneResponse(response?.statusCode, response?.headers);
-        }
-        return false;
-    }
-
-    /**
-     * Run an operation that reaches a device through its (possibly cached) RCE instance url,
-     * retrying once when the cache turns out to be stale. The retry only triggers when the url the
-     * operation used came from the cache AND the failure is a mesh-generated 404 (see
-     * isRceInstanceGoneError); then the cache entry is evicted and re-resolved through the
-     * management api, and the operation is rerun only when that fresh url is actually different
-     * (the instance moved). A network-level failure (see isRceInstanceUnreachableError) busts the
-     * cached url so the next call re-resolves, but is rethrown without a retry - it does not prove
-     * the instance moved. Everything else - application-level failures, a failure against a
-     * freshly-resolved url, a local device - is rethrown unchanged, so a request is never
-     * double-sent to a live instance.
-     */
-    private async withRceInstanceUrlRetry<T>(deviceConfig: DeviceConfig, run: () => Promise<T>): Promise<T> {
-        if (!isRceDeviceConfig(deviceConfig)) {
-            return run();
-        }
-        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
-        const cachedPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
-        try {
-            return await run();
-        } catch (error) {
-            const instanceGone = this.isRceInstanceGoneError(error);
-            //only an instance-not-there failure against a cached url touches the cache; a cache
-            //miss means run() already used a freshly-resolved url
-            if (cachedPromise === undefined || (!instanceGone && !this.isRceInstanceUnreachableError(error))) {
-                throw error;
-            }
-            //bust the cached url, but only if our entry is still the current one (a concurrent
-            //caller may have refreshed it already)
-            if (this.rceInstanceUrlsByCacheKey.get(cacheKey) === cachedPromise) {
-                this.rceInstanceUrlsByCacheKey.delete(cacheKey);
-            }
-            //a network-level failure busts the cache for the next call but is not retried here
-            if (!instanceGone) {
-                throw error;
-            }
-            const staleUrl = await cachedPromise.catch(() => undefined);
-            const freshUrl = await this.getRceInstanceUrl(deviceConfig);
-            //the instance did not move, so the original failure stands
-            if (freshUrl === staleUrl) {
-                throw error;
-            }
-            //run() re-reads through getRceInstanceUrl, so it picks up the fresh url
-            return run();
-        }
-    }
-
-    /**
-     * Resolve the live instance API URL for an RCE device config: an instanceUrl-addressed config is
-     * used directly, an id- or esn-addressed config is resolved through the RCE management api using
-     * the effective token.
-     */
-    private async resolveRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
-        if (isRceDeviceConfigByUrl(deviceConfig)) {
-            return deviceConfig.instanceUrl.replace(/\/+$/, '');
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to resolve an RCE device by id or esn');
-        }
-        return this.createRceManagementClient(rceToken).getInstanceUrl({ device: deviceConfig });
-    }
-
-    /**
-     * Create the management client used to resolve an id- or esn-addressed RCE device to its running
-     * instance URL. Split out so tests can supply a fake.
-     */
-    private createRceManagementClient(rceToken: string): RceManagementClient {
-        return new RceManagementClient({ token: rceToken });
-    }
-
-    /**
-     * Build a stable cache key for an RCE device config from its identifying field (whichever of
-     * `instanceUrl`, `id`, or `esn` is present) plus its effective token, so a differently-tokened
-     * config for the same identifier does not reuse another config's cached instance url.
-     */
-    private getRceInstanceUrlCacheKey(deviceConfig: RceDeviceConfig): string {
-        const token = this.getRceToken(deviceConfig) ?? '';
-        if (isRceDeviceConfigByUrl(deviceConfig)) {
-            return `instanceUrl:${deviceConfig.instanceUrl}:${token}`;
-        }
-        if (isRceDeviceConfigById(deviceConfig)) {
-            return `id:${deviceConfig.id}:${token}`;
-        }
-        return `esn:${deviceConfig.esn}:${token}`;
-    }
-
-    public async keyPress(options: KeyPressOptions) {
-        options = { ...this.options, ...options } as KeyPressOptions;
-        return this.sendKeyEvent({
-            ...options,
-            key: options.key,
-            action: 'keypress'
-        });
-    }
-
-    public async keyUp(options: KeyUpOptions) {
-        options = { ...this.options, ...options } as KeyUpOptions;
-        return this.sendKeyEvent({
-            ...options,
-            action: 'keyup'
-        });
-    }
-
-    public async keyDown(options: KeyDownOptions) {
-        options = { ...this.options, ...options } as KeyDownOptions;
-        return this.sendKeyEvent({
-            ...options,
-            action: 'keydown'
-        });
-    }
-
-    public async sendText(options: SendTextOptions) {
-        options = { ...this.options, ...options } as SendTextOptions;
-        this.checkRequiredOptions(options, ['device', 'text']);
-        const chars = options.text.split('');
-        for (const char of chars) {
-            await this.sendKeyEvent({
-                ...options,
-                key: `lit_${encodeURIComponent(char)}`,
-                action: 'keypress'
-            });
-        }
-    }
-
-    /**
-     * Press a sequence of remote keys, in order. Each press rides the same transport as `keyPress`
-     * (LAN ECP for local devices; the RCE instance-api key route with the raw ecp1-proxy fallback
-     * for Cloud Emulator devices), waits for the previous press's response plus a small delay
-     * (keyDelayMs) so on-screen navigation keeps up, and the first failed press throws with the
-     * failing key and step.
-     */
-    public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
-        options = { ...this.options, ...options } as SendKeySequenceOptions;
-        this.checkRequiredOptions(options, ['device', 'keys']);
-        const keyDelayMs = options.keyDelayMs ?? 250;
-        for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
-            if (stepIndex > 0 && keyDelayMs > 0) {
-                await util.sleep(keyDelayMs);
-            }
-            const key = options.keys[stepIndex];
-            let result: EcpResult;
-            try {
-                result = await this.keyPress({ device: options.device, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
-            } catch (error) {
-                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
-            }
-            if (result?.status && (result.status < 200 || result.status >= 300)) {
-                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed (status ${result.status})`);
-            }
-        }
-    }
-
-    /**
-     * Enter the developer-settings key combo on a Roku Cloud Emulator device through its instance
-     * api (the same combo a physical remote's key sequence would send). The device then shows the
-     * on-screen developer setup wizard for the user to complete; this call only triggers that
-     * screen, it does not finish the setup itself. Local devices are not supported - the combo
-     * endpoint only exists on the RCE instance api.
-     */
-    public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
-        options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
-        this.checkRequiredOptions(options, ['device']);
-        const deviceConfig = this.resolveDevice(options.device);
-        if (!isRceDeviceConfig(deviceConfig)) {
-            throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to reach the instance api on an RCE device');
-        }
-        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-            return this.doPostRequest({
-                url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
-                headers: this.buildRceAuthHeaders(rceToken)
-            }, true);
-        });
-    }
-
-    /**
-     * Normalize a key name to its canonical `RemoteKey` casing for the RCE instance-api key-input
-     * route, which rejects a wrong-case key with a 422 (the raw ECP proxy and LAN ECP accept any
-     * case). A key that matches a `RemoteKey` value case-insensitively is returned in that canonical
-     * casing; a literal-text key (`lit_<char>`) becomes `Lit_<char>`; anything else is passed
-     * through unchanged (there is no enforced key list, so an unknown key is sent as-is and simply
-     * falls back to the raw proxy if the route rejects it).
-     */
-    private toCanonicalRemoteKey(key: string): string {
-        if (/^lit_/i.test(key)) {
-            return `Lit_${key.slice(4)}`;
-        }
-        return Object.values(RemoteKey).find((candidate) => candidate.toLowerCase() === key.toLowerCase()) ?? key;
-    }
-
-    /**
-     * Send a single key event (keypress/keydown/keyup) to a device.
-     *
-     * For an RCE device the instance-api key-input route (`/api/v0/ecp1/<action>/<key>`) is tried
-     * first: unlike the raw `/ecp1` proxy the generic sendEcpRequest() transport uses, it keeps working when
-     * the device is in limited ECP mode (which 403s every raw-proxy key press). Any failure - a
-     * non-2xx response (verify throws), or a future rename of that path - falls through to the
-     * normal sendEcpRequest() transport below, so RCE devices in normal mode and LAN devices are unaffected.
-     */
-    private async sendKeyEvent(options: SendKeyEventOptions) {
-        options = { ...this.options, ...options };
-        this.logger.info('Sending key event:', options.key);
-        this.checkRequiredOptions(options, ['device', 'key']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-        if (isRceDeviceConfig(deviceConfig)) {
-            try {
-                const rceToken = this.getRceToken(deviceConfig);
-                if (!rceToken) {
-                    throw new Error('An rceToken is required to reach ECP on an RCE device');
-                }
-                const key = this.toCanonicalRemoteKey(options.key);
-                const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-                    const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
-                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
-                });
-                return {
-                    status: response?.response?.statusCode,
-                    body: response?.body,
-                    json: undefined
-                } as EcpResult;
-            } catch (e) {
-                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
-            }
-        }
-
-        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
-            method: 'POST',
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-    }
-
-    public async closeChannel(options: CloseChannelOptions) {
-        options = { ...this.options, ...options } as CloseChannelOptions;
-        // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
-        await this.sendKeyEvent({
-            ...options,
-            action: 'keypress',
-            key: 'home'
-        });
-    }
-
-    /**
-     * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
-     * @param options
-     */
-    public async launchApp(options: LaunchAppOptions): Promise<void> {
-        options = { ...this.options, ...options } as LaunchAppOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
-
-        const queryString = this.buildLaunchQueryString(options);
-        await this.sendEcpRequest(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
-            method: 'POST',
-            verify: true,
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-    }
-
-    /**
-     * Build the deep-link query string (contentId, mediaType, and any additional params) for a local `launch/{appId}` request.
-     * @param options
-     */
-    private buildLaunchQueryString(options: LaunchAppOptions): string {
-        const queryParams: Record<string, string> = { ...options.params };
-        if (options.contentId !== undefined) {
-            queryParams.contentId = options.contentId;
-        }
-        if (options.mediaType !== undefined) {
-            queryParams.mediaType = options.mediaType;
-        }
-        const queryEntries = Object.entries(queryParams);
-        if (queryEntries.length === 0) {
-            return '';
-        }
-        const serializedParams = queryEntries.map(([paramName, paramValue]) => `${encodeURIComponent(paramName)}=${encodeURIComponent(paramValue)}`).join('&');
-        return `?${serializedParams}`;
-    }
-
-    /**
-     * Exit a running channel on the device (the ECP `exit-app/{appId}` endpoint).
-     * @param options
-     */
-    public async exitApp(options: ExitAppOptions): Promise<void> {
-        options = { ...this.options, ...options } as ExitAppOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
-
-        const forceSegment = options.force ? '/true' : '';
-        const result = await this.sendEcpRequest(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
-            method: 'POST',
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-        //devices report exit-app failures through the ECP envelope (a 202 with the error in the
-        //body), so surface that message; fall back to a plain status check when there is no envelope
-        const root = result.json?.['exit-app'];
-        if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
-            throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
-                httpDetails: this.buildEcpHttpDetails(result)
-            });
-        }
-        if (!root) {
-            this.assertEcpStatusOk(result);
-        }
-    }
-
-    /**
-     * Throw for a non-2xx ECP response, carrying any plain-text device explanation in the message
-     * (for example `ECP command not allowed in Limited mode.`). Used by ECP wrappers whose success
-     * responses have no `<status>` envelope to inspect instead.
-     */
-    private assertEcpStatusOk(result: EcpResult): void {
-        if (result.status !== undefined && result.status >= 200 && result.status < 300) {
-            return;
-        }
-        const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
-        throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status ?? 'unknown'}${bodyText ? `: ${bodyText}` : ''}`, {
-            httpDetails: this.buildEcpHttpDetails(result)
-        });
-    }
-
-    /**
-     * Build the HttpDetails carried by ECP wrapper errors. `sendEcpRequest()` does not retain the raw
-     * HttpResponse, so this carries what it does keep - the status code and body - which is what a
-     * caller needs to see what the device actually said.
-     */
-    private buildEcpHttpDetails(result: EcpResult): HttpDetails {
-        return {
-            response: {
-                statusCode: result.status,
-                body: result.body
-            }
-        };
     }
 
     /**
@@ -1077,57 +371,6 @@ export class RokuDeploy {
     }
 
     /**
-     * Does the response look like a compile error
-     */
-    private isCompileError(responseHtml: string) {
-        return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
-    }
-
-    /**
-     * Does the text look like the device's "corrupt/invalid zip" install failure? The Roku firmware
-     * returns this when a sideloaded zip can't be unzipped - most commonly because the zip is below the
-     * minimum installable size (see MINIMUM_INSTALLABLE_ZIP_SIZE).
-     */
-    private isCorruptZipError(text: string) {
-        //device text (firmware 15.x): "Install Failure: Unzip failed. Invalid or corrupt zip archive.  Unloading."
-        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text);
-    }
-
-    /**
-     * When a sideload fails with a "corrupt zip" error, check whether the zip is simply too small for the
-     * firmware to accept. If so, return a helpful hint to append to the error; otherwise return ''.
-     */
-    private getUndersizedZipHint(zipFilePath: string) {
-        let size: number;
-        try {
-            size = fsExtra.statSync(zipFilePath).size;
-        } catch {
-            return '';
-        }
-        if (size < RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE) {
-            return ` The supplied zip is ${size} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`;
-        }
-        return '';
-    }
-
-    /**
-     * Does the response look like a compile error
-     */
-    private isUpdateCheckRequiredResponse(responseHtml: string) {
-        return !!/["']\s*Failed\s*to\s*check\s*for\s*software\s*update\s*["']/i.exec(responseHtml);
-    }
-
-    /**
-     * Checks to see if the exception is due to the device needing to check for updates
-     */
-    private isUpdateRequiredError(e: any): boolean {
-        // Check for 577 status code in the new error format (details.httpDetails.response.statusCode)
-        const statusCode = e.details?.httpDetails?.response?.statusCode;
-        const body = e.details?.httpDetails?.response?.body;
-        return statusCode === 577 || (typeof body === 'string' && this.isUpdateCheckRequiredResponse(body));
-    }
-
-    /**
      * Converts the currently sideloaded dev app to squashfs for faster loading packages
      * @param options
      */
@@ -1175,76 +418,6 @@ export class RokuDeploy {
                 httpDetails: extractHttpDetails(results.response, results.body),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
-        }
-    }
-
-    /**
-     * resign Roku Device with a supplied signed pkg and
-     * @param options
-     */
-    public async rekeyDevice(options: RekeyDeviceOptions) {
-        options = { ...this.options, ...options } as RekeyDeviceOptions;
-        this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
-        this.validatePort(options.packagePort, 'packagePort');
-        this.validateTimeout(options.timeout);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
-
-        let pkgPath = options.pkg;
-        if (!path.isAbsolute(options.pkg)) {
-            pkgPath = path.resolve(cwd, options.pkg);
-        }
-        let archiveStream: ReadStream;
-        let results: HttpResponse;
-        try {
-            results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-                //a rerun needs its own stream: the previous attempt already consumed the last one
-                try {
-                    archiveStream?.close();
-                } catch { }
-                archiveStream = fsExtra.createReadStream(pkgPath);
-                let requestOptions = await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options as any, {
-                    mysubmit: 'Rekey',
-                    passwd: options.signingPassword,
-                    archive: archiveStream
-                });
-                return this.doPostRequest(requestOptions);
-            });
-        } finally {
-            //ensure the stream is closed
-            try {
-                archiveStream?.close();
-            } catch { }
-        }
-
-        let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
-        if (!resultTextSearch) {
-            throw new UnparsableDeviceResponseError('Unknown Rekey Failure', {
-                httpDetails: extractHttpDetails(results.response, results.body),
-                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
-            });
-        }
-
-        if (resultTextSearch[1] !== 'Success.') {
-            throw new FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1], {
-                httpDetails: extractHttpDetails(results.response, results.body),
-                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
-            });
-        }
-
-        if (options.devId) {
-            const { devId } = await this.getDevId(options);
-
-            if (devId !== options.devId) {
-                throw new UnknownDeviceResponseError(
-                    'Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"',
-                    {
-                        httpDetails: extractHttpDetails(results.response, results.body)
-                    }
-                );
-            }
         }
     }
 
@@ -1344,39 +517,1103 @@ export class RokuDeploy {
     }
 
     /**
-     * Set the `User-Agent` header if missing from the request params, ensuring it's included in all requests made by roku-deploy
-     * @param params
-     * @returns
+     * resign Roku Device with a supplied signed pkg and
+     * @param options
      */
-    private setUserAgentIfMissing(params: RequestOptions) {
-        if (!params) {
-            params = {} as RequestOptions;
+    public async rekeyDevice(options: RekeyDeviceOptions) {
+        options = { ...this.options, ...options } as RekeyDeviceOptions;
+        this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
+
+        let pkgPath = options.pkg;
+        if (!path.isAbsolute(options.pkg)) {
+            pkgPath = path.resolve(cwd, options.pkg);
         }
-        if (!params.headers) {
-            params.headers = {};
+        let archiveStream: ReadStream;
+        let results: HttpResponse;
+        try {
+            results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                //a rerun needs its own stream: the previous attempt already consumed the last one
+                try {
+                    archiveStream?.close();
+                } catch { }
+                archiveStream = fsExtra.createReadStream(pkgPath);
+                let requestOptions = await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options as any, {
+                    mysubmit: 'Rekey',
+                    passwd: options.signingPassword,
+                    archive: archiveStream
+                });
+                return this.doPostRequest(requestOptions);
+            });
+        } finally {
+            //ensure the stream is closed
+            try {
+                archiveStream?.close();
+            } catch { }
         }
-        if (!params.headers['User-Agent']) {
-            params.headers['User-Agent'] = this.getUserAgent();
+
+        let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
+        if (!resultTextSearch) {
+            throw new UnparsableDeviceResponseError('Unknown Rekey Failure', {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
         }
-        return params;
+
+        if (resultTextSearch[1] !== 'Success.') {
+            throw new FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1], {
+                httpDetails: extractHttpDetails(results.response, results.body),
+                rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
+            });
+        }
+
+        if (options.devId) {
+            const { devId } = await this.getDevId(options);
+
+            if (devId !== options.devId) {
+                throw new UnknownDeviceResponseError(
+                    'Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"',
+                    {
+                        httpDetails: extractHttpDetails(results.response, results.body)
+                    }
+                );
+            }
+        }
     }
 
     /**
-     * Get the user-agent string used for HTTP requests sent by this package
-     * @returns
+     * Get the `device-info` response from a Roku device
+     * @param host the host or IP address of the Roku
+     * @param port the port to use for the ECP request (defaults to 8060)
      */
-    private getUserAgent() {
+    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
+    public async getDeviceInfo(options: GetDeviceInfoOptions) {
+        options = { ...this.options, ...options } as GetDeviceInfoOptions;
+        this.checkRequiredOptions(options, ['device']);
+
+        let result: EcpResult;
         try {
-            if (this._packageVersion === undefined) {
-                this._packageVersion = fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
-            }
+            result = await this.sendEcpRequest(options.device, 'query/device-info', {
+                verify: true,
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
+            });
         } catch (e) {
-            this._packageVersion = null;
+            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                throw new EcpNetworkAccessModeDisabledError(
+                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
+                    {
+                        // The condition above guarantees details.httpDetails exists
+                        httpDetails: (e as any).details.httpDetails
+                    },
+                    e instanceof Error ? e : undefined
+                );
+            }
+            throw e;
         }
-        return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
+        const deviceInfoRoot = result.json?.['device-info'];
+        if (!deviceInfoRoot) {
+            //the response was not device-info XML (an empty body, a proxy error page, ...) - there
+            //is no underlying error to carry as a cause, the body just wasn't what we asked for
+            this.logger.warn('Error getting device info: response had no device-info element');
+            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
+                httpDetails: this.buildEcpHttpDetails(result)
+            });
+        }
+        try {
+            let deviceInfo = { ...deviceInfoRoot } as Record<string, any>;
+
+            if (options.enhance) {
+                deviceInfo = this.enhanceDeviceInfo(deviceInfo as DeviceInfoRaw);
+            }
+            this.logger.debug('Device info:', deviceInfo);
+            return deviceInfo;
+        } catch (e) {
+            this.logger.warn('Error getting device info:', e);
+            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
+                httpDetails: this.buildEcpHttpDetails(result)
+            }, e instanceof Error ? e : undefined);
+        }
     }
 
-    private _packageVersion: string;
+    /**
+     * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
+     * the device accepts remote control commands via the ECP API.
+     *
+     * @param options - Configuration options including host, ecpPort, timeout, etc.
+     * @returns The ECP setting mode:
+     *   - 'enabled': fully enabled and accepting commands
+     *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
+     *   - 'limited': Restricted functionality, text and movement commands only
+     *   - 'permissive': Full access for internal networks
+     */
+    public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
+        options = { ...this.options, ...options } as GetDeviceInfoOptions;
+        try {
+            const deviceInfo = await this.getDeviceInfo(options);
+            return deviceInfo['ecp-setting-mode'];
+        } catch (e) {
+            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
+                return 'disabled';
+            }
+            throw new UnknownDeviceResponseError('Could not retrieve device ECP setting', {}, e instanceof Error ? e : undefined);
+        }
+    }
+
+    /**
+     * Get the developer ID from the device-info response
+     * @param options
+     * @returns
+     */
+    public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
+        options = { ...this.options, ...options } as GetDevIdOptions;
+        this.checkRequiredOptions(options, ['device']);
+        const deviceInfo = await this.getDeviceInfo(options);
+        this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
+        return { devId: deviceInfo['keyed-developer-id'] };
+    }
+
+    /**
+     * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
+     * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
+     */
+
+    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
+        options = { ...this.options, ...options } as CaptureScreenshotOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        // Ask for the device to make an image
+        let createScreenshotResult = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'Screenshot',
+                    archive: ''
+                }
+            });
+        });
+
+        // Pull the image url out of the response body
+        const [_, imageUrlOnDevice, deviceExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
+
+        if (!imageUrlOnDevice) {
+            throw new Error('No screenshot url returned from device');
+        }
+
+        const requestParams = await this.generateBaseRequestOptions(imageUrlOnDevice, deviceConfig, options);
+
+        // Always download to buffer
+        const buffer = await this.downloadToBuffer(requestParams);
+
+        const result: CaptureScreenshotResult = { buffer: buffer };
+
+        // If out is provided, also save to disk
+        if (options.out) {
+            const cwd = options.cwd ?? process.cwd();
+            const screenshotDir = options.screenshotDir
+                ? path.resolve(cwd, options.screenshotDir)
+                : path.join(util.tempDir, '/roku-deploy/screenshots/');
+
+            let filePath: string;
+            if (options.out === true) {
+                // Use default directory with generated filename
+                const defaultFilename = `screenshot-${formatTimestampForScreenshot()}${deviceExt}`;
+                filePath = path.resolve(cwd, screenshotDir, defaultFilename);
+            } else {
+                // User provided a path
+                filePath = path.resolve(cwd, options.out);
+                const userExt = path.extname(filePath).toLowerCase();
+                const deviceExtLower = deviceExt.toLowerCase();
+
+                if (options.autoExtension) {
+                    if (userExt === deviceExtLower) {
+                        // User extension matches device extension - use as-is
+                    } else if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
+                        // User provided an image extension that doesn't match - swap it
+                        filePath = filePath.slice(0, -userExt.length) + deviceExt;
+                    } else {
+                        // No recognized image extension - append device extension
+                        filePath += deviceExt;
+                    }
+                }
+            }
+
+            await fsExtra.ensureFile(filePath);
+            await fsExtra.writeFile(filePath, buffer);
+            result.filePath = filePath;
+        }
+
+        return result;
+    }
+
+    public async rebootDevice(options: RebootDeviceOptions) {
+        options = { ...this.options, ...options } as RebootDeviceOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new UnsupportedFirmwareVersionError(
+                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`,
+                {
+                    currentVersion: softwareVersion,
+                    minimumVersion: '15.0.4',
+                    operation: 'reboot'
+                }
+            );
+        }
+
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'Reboot',
+                    archive: ''
+                }
+            });
+        });
+    }
+
+    public async checkForUpdate(options: CheckForUpdateOptions) {
+        options = { ...this.options, ...options } as CheckForUpdateOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        // Get device info to check software version
+        const deviceInfo = await this.getDeviceInfo(options);
+        const softwareVersion = deviceInfo['software-version'];
+
+        // Check if device version is at least 15.0.4
+        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
+            throw new UnsupportedFirmwareVersionError(
+                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`,
+                {
+                    currentVersion: softwareVersion,
+                    minimumVersion: '15.0.4',
+                    operation: 'checkForUpdate'
+                }
+            );
+        }
+
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            return this.doPostRequest({
+                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
+                formData: {
+                    mysubmit: 'CheckUpdate',
+                    archive: ''
+                }
+            });
+        });
+    }
+
+    /**
+     * Check whether the given developer password is accepted by a Roku device.
+     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
+     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     */
+    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
+        options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        const username = options.username ?? 'rokudev';
+        const port = options.port ?? 80;
+        const timeout = options.timeout ?? 3000;
+
+        //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
+        //from before), an RCE device by its installer base url (never includes credentials)
+        let displayTarget = '';
+
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
+            const url = `${baseUrl}/plugin_install`;
+            displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
+
+            let fetchResponse: Response;
+            try {
+                fetchResponse = await fetchWithDigest(url, {
+                    method: 'HEAD',
+                    username: username,
+                    password: options.password,
+                    timeout: timeout,
+                    headers: headers
+                });
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : String(err);
+                throw new DeviceUnreachableError(
+                    `Device ${displayTarget} was unreachable: ${message}`,
+                    {},
+                    err instanceof Error ? err : undefined
+                );
+            }
+            //fetch does not throw on a status code, so surface a mesh-generated 404 (a stale
+            //instance url) to the retry wrapper as the error verification would have produced
+            const responseHeaders: Record<string, string> = {};
+            if (typeof fetchResponse.headers?.forEach === 'function') {
+                fetchResponse.headers.forEach((value, key) => {
+                    responseHeaders[key] = value;
+                });
+            } else {
+                Object.assign(responseHeaders, fetchResponse.headers ?? {});
+            }
+            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(fetchResponse.status, responseHeaders)) {
+                throw new InvalidDeviceResponseCodeError(`Unexpected status ${fetchResponse.status} from device at ${displayTarget}`, {
+                    httpDetails: { response: { statusCode: fetchResponse.status, headers: responseHeaders } }
+                });
+            }
+            return fetchResponse;
+        });
+
+        if (response.status === 200) {
+            return true;
+        }
+        if (response.status === 401) {
+            return false;
+        }
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${displayTarget}`, response as any);
+    }
+
+    /**
+     * Send a raw External Control Protocol (ECP) request to a device and return the response with
+     * its XML body parsed to JSON. This is the single ECP transport: every ECP convenience method
+     * funnels through it, and it is public so any ECP route can be reached even when no dedicated
+     * wrapper exists for it yet.
+     *
+     * Local devices are addressed as `http://<host>:<ecpPort>/<route>`; Cloud Emulator devices go
+     * through their instance's `/ecp1/<route>` proxy (authenticated with the config's api token),
+     * so callers never branch on device kind.
+     * @param device the device to send the request to
+     * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
+     * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
+     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
+     *                chanperf response, for example) come back to the caller instead of throwing.
+     */
+    public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
+        options = { ...this.options, ...options } as EcpOptions;
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+
+        const verify = options.verify ?? false;
+        //with verify off, an instance-gone 404 comes back as a normal response rather than a throw;
+        //it is surfaced to the retry wrapper as an error, and held here so the caller still receives
+        //the raw response when the retry does not apply
+        let instanceGoneResponse: HttpResponse | undefined;
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            instanceGoneResponse = undefined;
+            const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
+            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
+            const result = options.method === 'POST'
+                ? await this.doPostRequest(requestOptions, verify)
+                : await this.doGetRequest(requestOptions, verify);
+            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.response?.statusCode, result?.response?.headers)) {
+                instanceGoneResponse = result;
+                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.response.statusCode}`, {
+                    httpDetails: extractHttpDetails(result.response, result.body)
+                });
+            }
+            return result;
+        }).catch((error) => {
+            if (instanceGoneResponse) {
+                return instanceGoneResponse;
+            }
+            throw error;
+        });
+
+        return {
+            status: response?.response?.statusCode,
+            body: response?.body,
+            json: await this.parseEcpXml(response?.body, response)
+        };
+    }
+
+    public async keyPress(options: KeyPressOptions) {
+        options = { ...this.options, ...options } as KeyPressOptions;
+        return this.sendKeyEvent({
+            ...options,
+            key: options.key,
+            action: 'keypress'
+        });
+    }
+
+    public async keyDown(options: KeyDownOptions) {
+        options = { ...this.options, ...options } as KeyDownOptions;
+        return this.sendKeyEvent({
+            ...options,
+            action: 'keydown'
+        });
+    }
+
+    public async keyUp(options: KeyUpOptions) {
+        options = { ...this.options, ...options } as KeyUpOptions;
+        return this.sendKeyEvent({
+            ...options,
+            action: 'keyup'
+        });
+    }
+
+    public async sendText(options: SendTextOptions) {
+        options = { ...this.options, ...options } as SendTextOptions;
+        this.checkRequiredOptions(options, ['device', 'text']);
+        const chars = options.text.split('');
+        for (const char of chars) {
+            await this.sendKeyEvent({
+                ...options,
+                key: `lit_${encodeURIComponent(char)}`,
+                action: 'keypress'
+            });
+        }
+    }
+
+    /**
+     * Press a sequence of remote keys, in order. Each press rides the same transport as `keyPress`
+     * (LAN ECP for local devices; the RCE instance-api key route with the raw ecp1-proxy fallback
+     * for Cloud Emulator devices), waits for the previous press's response plus a small delay
+     * (keyDelayMs) so on-screen navigation keeps up, and the first failed press throws with the
+     * failing key and step.
+     */
+    public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
+        options = { ...this.options, ...options } as SendKeySequenceOptions;
+        this.checkRequiredOptions(options, ['device', 'keys']);
+        const keyDelayMs = options.keyDelayMs ?? 250;
+        for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
+            if (stepIndex > 0 && keyDelayMs > 0) {
+                await util.sleep(keyDelayMs);
+            }
+            const key = options.keys[stepIndex];
+            let result: EcpResult;
+            try {
+                result = await this.keyPress({ device: options.device, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
+            } catch (error) {
+                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
+            }
+            if (result?.status && (result.status < 200 || result.status >= 300)) {
+                throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed (status ${result.status})`);
+            }
+        }
+    }
+
+    /**
+     * Enter the developer-settings key combo on a Roku Cloud Emulator device through its instance
+     * api (the same combo a physical remote's key sequence would send). The device then shows the
+     * on-screen developer setup wizard for the user to complete; this call only triggers that
+     * screen, it does not finish the setup itself. Local devices are not supported - the combo
+     * endpoint only exists on the RCE instance api.
+     */
+    public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
+        options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
+        this.checkRequiredOptions(options, ['device']);
+        const deviceConfig = this.resolveDevice(options.device);
+        if (!isRceDeviceConfig(deviceConfig)) {
+            throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to reach the instance api on an RCE device');
+        }
+        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+            return this.doPostRequest({
+                url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
+                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+                headers: this.buildRceAuthHeaders(rceToken)
+            }, true);
+        });
+    }
+
+    /**
+     * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
+     * @param options
+     */
+    public async launchApp(options: LaunchAppOptions): Promise<void> {
+        options = { ...this.options, ...options } as LaunchAppOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const queryString = this.buildLaunchQueryString(options);
+        await this.sendEcpRequest(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
+            method: 'POST',
+            verify: true,
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+    }
+
+    /**
+     * Exit a running channel on the device (the ECP `exit-app/{appId}` endpoint).
+     * @param options
+     */
+    public async exitApp(options: ExitAppOptions): Promise<void> {
+        options = { ...this.options, ...options } as ExitAppOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const forceSegment = options.force ? '/true' : '';
+        const result = await this.sendEcpRequest(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        //devices report exit-app failures through the ECP envelope (a 202 with the error in the
+        //body), so surface that message; fall back to a plain status check when there is no envelope
+        const root = result.json?.['exit-app'];
+        if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
+            throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
+                httpDetails: this.buildEcpHttpDetails(result)
+            });
+        }
+        if (!root) {
+            this.assertEcpStatusOk(result);
+        }
+    }
+
+    public async closeChannel(options: CloseChannelOptions) {
+        options = { ...this.options, ...options } as CloseChannelOptions;
+        // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
+        await this.sendKeyEvent({
+            ...options,
+            action: 'keypress',
+            key: 'home'
+        });
+    }
+
+    /**
+     * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
+     * @param options
+     */
+    public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
+        options = { ...this.options, ...options } as QueryAppsOptions;
+        this.checkRequiredOptions(options, ['device']);
+
+        let result: EcpResult;
+        try {
+            result = await this.sendEcpRequest(options.device, 'query/apps', {
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
+            });
+        } catch (e) {
+            if (e instanceof UnparsableDeviceResponseError) {
+                this.logger.warn('Error parsing installed app list:', e);
+                throw new UnparsableDeviceResponseError('Could not retrieve installed app list', e.details, e);
+            }
+            throw e;
+        }
+        this.assertEcpStatusOk(result);
+        const rawAppNodes = result.json?.apps?.app;
+        if (!rawAppNodes) {
+            return [];
+        }
+        const appNodes = Array.isArray(rawAppNodes) ? rawAppNodes : [rawAppNodes];
+        return appNodes.map((appNode) => {
+            const parsedApp = this.parseEcpAppElement(appNode);
+            return {
+                id: parsedApp.id ?? '',
+                title: parsedApp.title ?? '',
+                type: parsedApp.type,
+                subtype: parsedApp.subtype,
+                version: parsedApp.version
+            };
+        });
+    }
+
+    /**
+     * Query the currently active app on the device (the ECP `query/active-app` endpoint). The active
+     * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
+     * @param options
+     */
+    public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
+        options = { ...this.options, ...options } as QueryActiveAppOptions;
+        this.checkRequiredOptions(options, ['device']);
+
+        let result: EcpResult;
+        try {
+            result = await this.sendEcpRequest(options.device, 'query/active-app', {
+                ecpPort: options.ecpPort,
+                timeout: options.timeout
+            });
+        } catch (e) {
+            if (e instanceof UnparsableDeviceResponseError) {
+                this.logger.warn('Error parsing active app:', e);
+                throw new UnparsableDeviceResponseError('Could not retrieve active app', e.details, e);
+            }
+            throw e;
+        }
+        this.assertEcpStatusOk(result);
+        const rawActiveAppNode = result.json?.['active-app']?.app;
+        if (!rawActiveAppNode) {
+            return {};
+        }
+        return this.parseEcpAppElement(rawActiveAppNode);
+    }
+
+    /**
+     * Query a sideloaded (or installed) app's registry (the ECP `query/registry/{appId}` endpoint).
+     * Throws a FailedDeviceResponseError when the device reports a failure (for example
+     * `Device not keyed`).
+     * @param options
+     */
+    public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
+        options = { ...this.options, ...options } as QueryRegistryOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
+
+        const registry = root.registry ?? {};
+        const sections: RokuRegistry['sections'] = {};
+        for (const section of this.toArray(registry.sections?.section)) {
+            if (!section || typeof section === 'string') {
+                continue;
+            }
+            const sectionName = section.name;
+            for (const item of this.toArray(section.items?.item)) {
+                if (!item || typeof item === 'string') {
+                    continue;
+                }
+                sections[sectionName] ??= {};
+                sections[sectionName][item.key] = item.value;
+            }
+        }
+        return {
+            devId: registry['dev-id'],
+            plugins: typeof registry.plugins === 'string' ? registry.plugins.split(',') : undefined,
+            spaceAvailable: registry['space-available'],
+            sections: sections
+        };
+    }
+
+    /**
+     * Query the state of an app on the device (the ECP `query/app-state/{appId}` endpoint).
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
+        options = { ...this.options, ...options } as QueryAppStateOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
+
+        const knownStates: RokuAppStateValue[] = ['active', 'background', 'inactive'];
+        const state = knownStates.find(knownState => knownState === root.state?.toLowerCase()) ?? 'unknown';
+        return {
+            appId: root['app-id'],
+            appDevId: root['app-dev-id'],
+            appTitle: root['app-title'],
+            appVersion: root['app-version'],
+            state: state
+        };
+    }
+
+    /**
+     * Query SceneGraph rendezvous tracking (the ECP `query/sgrendezvous` endpoint): whether tracking
+     * is enabled, plus any rendezvous events recorded since the last query.
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
+        options = { ...this.options, ...options } as QueryRendezvousOptions;
+        this.checkRequiredOptions(options, ['device']);
+
+        const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
+
+        return {
+            trackingEnabled: root.data?.['tracking-enabled'] === 'true',
+            items: this.toArray(root.data?.item).filter(item => item && typeof item !== 'string').map(item => ({
+                id: item.id,
+                startTime: item['start-tm'],
+                endTime: item['end-tm'],
+                lineNumber: item['line-number'],
+                file: item.file
+            }))
+        };
+    }
+
+    /**
+     * Enable or disable SceneGraph rendezvous tracking (the ECP `sgrendezvous/track|untrack`
+     * endpoint) and return the tracking state the device reports afterwards.
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
+        options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
+        this.checkRequiredOptions(options, ['device', 'enabled']);
+
+        const result = await this.sendEcpRequest(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
+        return root['tracking-enabled'] === 'true';
+    }
+
+    /**
+     * Deletes any installed dev channel on the target Roku device
+     * @param options
+     */
+    public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        this.logger.info('Deleting dev channel...');
+        this.checkRequiredOptions(options, ['device', 'password']);
+        this.validatePort(options.packagePort, 'packagePort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'Delete',
+                archive: ''
+            };
+            return this.doPostRequest(deleteOptions);
+        });
+    }
+
+    /**
+     * Deletes any installed dev channel, and any installed component libraries on the target Roku device
+     * @param options
+     */
+    public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
+        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'DeleteAll',
+                archive: ''
+            };
+            return this.doPostRequest(deleteOptions);
+        });
+    }
+
+    /**
+     * Delete the component library with the specified filename from the device
+     */
+    public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
+        options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
+        this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.formData = {
+                mysubmit: 'Delete',
+                'app_type': 'dcl',
+                fileName: options.fileName
+            };
+            deleteOptions.qs ??= {};
+            // eslint-disable-next-line camelcase
+            deleteOptions.qs.dcl_enabled = '1';
+            return this.doPostRequest(deleteOptions);
+        });
+    }
+
+    /**
+     * Delete all component libraries from the device
+     */
+    public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
+        options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
+        const packages = await this.listSideloadedPlugins(options);
+        for (const pkg of packages) {
+            if (pkg.appType === 'dcl') {
+                await this.deleteComponentLibrary({
+                    ...options,
+                    fileName: pkg.archiveFileName
+                });
+            }
+        }
+    }
+
+    /**
+     * Fetch the full list of installed plugins (side-loaded packages) from the device. Useful for finding the
+     * file names of installed component libraries or the dev channel.
+     */
+    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
+        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
+        this.checkRequiredOptions(options, ['device', 'password']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+
+        const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
+            deleteOptions.qs ??= {};
+            // eslint-disable-next-line camelcase
+            deleteOptions.qs.dcl_enabled = '1';
+            return this.doGetRequest(deleteOptions);
+        });
+        const packages = this.getPackagesFromResponseBody(result.body);
+        return packages;
+    }
+
+    /**
+     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     */
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
+        const cwd = options?.cwd ?? process.cwd();
+        const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
+
+        if (fsExtra.existsSync(configPath)) {
+            const configFileText = fsExtra.readFileSync(configPath).toString();
+            const parseErrors: ParseError[] = [];
+            const fileOptions = parseJsonc(configFileText, parseErrors, {
+                allowEmptyContent: true,
+                allowTrailingComma: true,
+                disallowComments: false
+            });
+            if (parseErrors.length > 0) {
+                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                    parseErrors.map(x => {
+                        return {
+                            message: printParseErrorCode(x.error),
+                            offset: x.offset,
+                            length: x.length
+                        };
+                    })
+                ));
+            }
+            return fileOptions;
+        }
+        return {};
+    }
+
+    /**
+    * Get all file paths for the specified options
+    */
+    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
+        options = { ...this.options, ...options } as GetFilePathsOptions;
+        let rootDir = options.rootDir;
+        const files = options.files;
+
+        //if the rootDir isn't absolute, convert it to absolute
+        if (path.isAbsolute(rootDir) === false) {
+            rootDir = path.resolve(process.cwd(), rootDir);
+        }
+        const entries = util.normalizeFilesArray(files);
+        const srcPathsByIndex = await util.globAllByIndex(
+            entries.map(x => {
+                return typeof x === 'string' ? x : x.src;
+            }),
+            rootDir
+        );
+
+        /**
+         * Result indexed by the dest path
+         */
+        let result = new Map<string, StandardizedFileEntry>();
+
+        //compute `dest` path for every file
+        for (let i = 0; i < srcPathsByIndex.length; i++) {
+            const srcPaths = srcPathsByIndex[i];
+            const entry = entries[i];
+            if (srcPaths) {
+                for (let srcPath of srcPaths) {
+                    srcPath = util.standardizePath(srcPath);
+
+                    const dest = util.computeFileDestPath(srcPath, entry, rootDir);
+                    //the last file with this `dest` will win, so just replace any existing entry with this one.
+                    result.set(dest, {
+                        src: srcPath,
+                        dest: dest
+                    });
+                }
+            }
+        }
+        return [...result.values()];
+    }
+
+    /**
+     * Resolve a device config's host through DNS, returning a new config with the host replaced by
+     * its ip address (some Rokus reject ECP requests addressed by hostname or mDNS name, so callers
+     * use this to pin a config to an ip up front). Only local devices are addressed by host; any
+     * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
+     * lookup throws so the caller decides how to handle an unreachable host.
+     */
+    public async withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T> {
+        if (device && isLocalDeviceConfig(device)) {
+            return { ...device, host: await util.dnsLookup(device.host) };
+        }
+        return device;
+    }
+
+    /**
+     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
+     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
+     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
+     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
+     * enhance it without making another request to the device.
+     * @param deviceInfo the raw device-info object to enhance
+     */
+    public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
+        const result = {} as DeviceInfo;
+        // sanitize/normalize values to their native formats, and also convert property names to camelCase
+        for (let key in deviceInfo) {
+            result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
+        }
+        return result;
+    }
+
+    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
+        for (let opt of requiredOptions as string[]) {
+            if (options[opt] === undefined) {
+                throw new Error('Missing required option: ' + opt);
+            }
+        }
+    }
+
+    /**
+     * Given a path to a folder, zip up that folder and all of its contents
+     * @param srcFolder the folder that should be zipped
+     * @param zipFilePath the path to the zip that will be created
+     * @param files a files array used to filter the files from `srcFolder`
+     */
+    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
+        const filePaths = await this.getFilePaths({ files: files, rootDir: srcFolder });
+
+        const zip = new JSZip();
+        // Allows us to wait until all are done before we build the zip
+        const promises = [];
+        for (const file of filePaths) {
+            const promise = fsExtra.readFile(file.src).then((data) => {
+                const ext = path.extname(file.dest).toLowerCase();
+                let compression: 'DEFLATE' | 'STORE' = 'DEFLATE';
+
+                if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
+                    compression = 'STORE';
+                }
+                zip.file(file.dest.replace(/[\\/]/g, '/'), data as Uint8Array, {
+                    compression: compression
+                });
+            });
+            promises.push(promise);
+        }
+        await Promise.all(promises);
+
+        //ensure the output directory exists
+        await fsExtra.ensureDir(
+            path.dirname(zipFilePath)
+        );
+        // level 2 compression seems to be the best balance between speed and file size. Speed matters more since most will be calling squashfs afterwards.
+        const content = await zip.generateAsync({ type: 'nodebuffer', compressionOptions: { level: 2 } });
+        return fsExtra.writeFile(zipFilePath, content);
+    }
+
+    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T): Promise<RequestOptions> {
+        // Merge constructor options with call options
+        const mergedOptions = { ...this.options, ...options };
+        // Set defaults for request options
+        const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
+        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const username = mergedOptions.username ?? 'rokudev';
+
+        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
+        let baseRequestOptions = {
+            url: `${baseUrl}/${requestPath}`,
+            timeout: timeout,
+            headers: headers,
+            auth: {
+                user: username,
+                pass: mergedOptions.password,
+                sendImmediately: false
+            },
+            formData: formData,
+            agentOptions: { 'keepAlive': false }
+        };
+        return baseRequestOptions;
+    }
+
+    /**
+     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
+     * device's installer. Local devices hit the classic port-80 dev installer directly; RCE devices are
+     * reached through the instance api's `/sideload` proxy, which forwards to the emulated device's installer.
+     *
+     * The RCE instance api sits behind a service mesh that authenticates the bearer token via the
+     * `X-Authorization` header (rather than the standard `Authorization` header, which is reserved for
+     * the installer's own HTTP Digest challenge) - two independent auth layers that can't share the
+     * `Authorization` header.
+     */
+    private async getInstallerRequestBase(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            return {
+                baseUrl: `http://${deviceConfig.host}:${packagePort}`,
+                headers: {}
+            };
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to reach the installer on an RCE device');
+        }
+        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+        return {
+            baseUrl: `${instanceUrl}/sideload`,
+            headers: this.buildRceAuthHeaders(rceToken)
+        };
+    }
+
+    /**
+     * Resolve the request base (base url + headers that must be sent with every request) for reaching a
+     * device's ECP server. Local devices hit the HTTP ECP port directly; RCE devices are reached through
+     * the instance's raw `/ecp1` proxy, which forwards to the emulated device's ECP port and
+     * authenticates via the `X-Authorization` bearer header (the same service-mesh auth carrier the
+     * installer proxy uses).
+     */
+    private async getEcpRequestBase(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            let host = this.getHost(deviceConfig);
+            //if the host is a DNS name, look up the IP address
+            try {
+                host = await util.dnsLookup(host);
+            } catch (e) {
+                //try using the host as-is (it'll probably fail...)
+            }
+            return {
+                baseUrl: `http://${host}:${ecpPort}`,
+                headers: {}
+            };
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to reach ECP on an RCE device');
+        }
+        const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+        return {
+            baseUrl: `${instanceUrl}/ecp1`,
+            headers: this.buildRceAuthHeaders(rceToken)
+        };
+    }
 
     /**
      * Centralized function for handling POST http requests
@@ -1424,6 +1661,39 @@ export class RokuDeploy {
         return results as HttpResponse;
     }
 
+    /**
+     * Set the `User-Agent` header if missing from the request params, ensuring it's included in all requests made by roku-deploy
+     * @param params
+     * @returns
+     */
+    private setUserAgentIfMissing(params: RequestOptions) {
+        if (!params) {
+            params = {} as RequestOptions;
+        }
+        if (!params.headers) {
+            params.headers = {};
+        }
+        if (!params.headers['User-Agent']) {
+            params.headers['User-Agent'] = this.getUserAgent();
+        }
+        return params;
+    }
+
+    /**
+     * Get the user-agent string used for HTTP requests sent by this package
+     * @returns
+     */
+    private getUserAgent() {
+        try {
+            if (this._packageVersion === undefined) {
+                this._packageVersion = fsExtra.readJsonSync(`${__dirname}/../package.json`).version;
+            }
+        } catch (e) {
+            this._packageVersion = null;
+        }
+        return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
+    }
+
     private checkRequest(results: { response?: any; body?: any }) {
         if (!results || !results.response || typeof results.body !== 'string') {
             throw new UnparsableDeviceResponseError('Invalid response', {
@@ -1461,6 +1731,464 @@ export class RokuDeploy {
                 }
             );
         }
+    }
+
+    private async downloadFile(requestParams: any, filePath: string) {
+        let writeStream: WriteStream;
+        await fsExtra.ensureFile(filePath);
+        return new Promise<string>((resolve, reject) => {
+            writeStream = fsExtra.createWriteStream(filePath, {
+                flags: 'w'
+            });
+            if (!writeStream) {
+                reject(new Error(`Unable to create write stream for "${filePath}"`));
+                return;
+            }
+            //when the file has finished writing to disk, we can finally resolve and say we're done
+            writeStream.on('finish', () => {
+                resolve(filePath);
+            });
+            //if anything does wrong with the write stream, reject the promise
+            writeStream.on('error', (error) => {
+                reject(error);
+            });
+
+            request.get(requestParams).on('error', (err) => {
+                reject(err);
+            }).on('response', (response) => {
+                if (response.statusCode !== 200) {
+                    return reject(new Error('Invalid response code: ' + response.statusCode));
+                }
+            }).pipe(writeStream);
+
+        }).finally(() => {
+            try {
+                writeStream.close();
+            } catch { }
+        });
+    }
+
+    private downloadToBuffer(requestParams: any): Promise<Buffer> {
+        return new Promise<Buffer>((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            request.get(requestParams)
+                .on('error', (err) => {
+                    reject(err);
+                })
+                .on('response', (response) => {
+                    if (response.statusCode !== 200) {
+                        return reject(new Error('Invalid response code: ' + response.statusCode));
+                    }
+                })
+                .on('data', (chunk: Buffer) => {
+                    chunks.push(chunk);
+                })
+                .on('end', () => {
+                    resolve(Buffer.concat(chunks));
+                });
+        });
+    }
+
+    /**
+     * Resolve the effective RCE token for a device config: the config's own rceToken when present,
+     * otherwise the constructor-supplied default rceToken.
+     */
+    private getRceToken(deviceConfig: RceDeviceConfig): string | undefined {
+        return deviceConfig.rceToken ?? this.options.rceToken;
+    }
+
+    /**
+     * Build the headers that authenticate a request to the RCE instance api's service mesh. The bearer
+     * token rides the `X-Authorization` header so the standard `Authorization` header stays free for
+     * whatever the proxied device endpoint itself requires (the installer's HTTP Digest, for example).
+     */
+    private buildRceAuthHeaders(rceToken: string): Record<string, string> {
+        return { 'X-Authorization': `Bearer ${rceToken}` };
+    }
+
+    /**
+     * Resolve (and memoize) the live instance API URL for an RCE device config. Resolutions are
+     * cached by the device's identifying fields so repeated calls for the same logical device -
+     * even across separately-resolved `DeviceConfig` objects, as happens with registry-name
+     * lookups - reuse the memoized instance url.
+     */
+    private getRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
+        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
+        let instanceUrlPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
+        if (instanceUrlPromise === undefined) {
+            instanceUrlPromise = this.resolveRceInstanceUrl(deviceConfig);
+            this.rceInstanceUrlsByCacheKey.set(cacheKey, instanceUrlPromise);
+            //only successful resolutions stay cached; a failure must not poison every later request
+            instanceUrlPromise.catch(() => this.rceInstanceUrlsByCacheKey.delete(cacheKey));
+        }
+        return instanceUrlPromise;
+    }
+
+    /**
+     * Resolve the live instance API URL for an RCE device config: an instanceUrl-addressed config is
+     * used directly, an id- or esn-addressed config is resolved through the RCE management api using
+     * the effective token.
+     */
+    private async resolveRceInstanceUrl(deviceConfig: RceDeviceConfig): Promise<string> {
+        if (isRceDeviceConfigByUrl(deviceConfig)) {
+            return deviceConfig.instanceUrl.replace(/\/+$/, '');
+        }
+        const rceToken = this.getRceToken(deviceConfig);
+        if (!rceToken) {
+            throw new Error('An rceToken is required to resolve an RCE device by id or esn');
+        }
+        return this.createRceManagementClient(rceToken).getInstanceUrl({ device: deviceConfig });
+    }
+
+    /**
+     * Create the management client used to resolve an id- or esn-addressed RCE device to its running
+     * instance URL. Split out so tests can supply a fake.
+     */
+    private createRceManagementClient(rceToken: string): RceManagementClient {
+        return new RceManagementClient({ token: rceToken });
+    }
+
+    /**
+     * Build a stable cache key for an RCE device config from its identifying field (whichever of
+     * `instanceUrl`, `id`, or `esn` is present) plus its effective token, so a differently-tokened
+     * config for the same identifier does not reuse another config's cached instance url.
+     */
+    private getRceInstanceUrlCacheKey(deviceConfig: RceDeviceConfig): string {
+        const token = this.getRceToken(deviceConfig) ?? '';
+        if (isRceDeviceConfigByUrl(deviceConfig)) {
+            return `instanceUrl:${deviceConfig.instanceUrl}:${token}`;
+        }
+        if (isRceDeviceConfigById(deviceConfig)) {
+            return `id:${deviceConfig.id}:${token}`;
+        }
+        return `esn:${deviceConfig.esn}:${token}`;
+    }
+
+    /**
+     * Run an operation that reaches a device through its (possibly cached) RCE instance url,
+     * retrying once when the cache turns out to be stale. The retry only triggers when the url the
+     * operation used came from the cache AND the failure is a mesh-generated 404 (see
+     * isRceInstanceGoneError); then the cache entry is evicted and re-resolved through the
+     * management api, and the operation is rerun only when that fresh url is actually different
+     * (the instance moved). A network-level failure (see isRceInstanceUnreachableError) busts the
+     * cached url so the next call re-resolves, but is rethrown without a retry - it does not prove
+     * the instance moved. Everything else - application-level failures, a failure against a
+     * freshly-resolved url, a local device - is rethrown unchanged, so a request is never
+     * double-sent to a live instance.
+     */
+    private async withRceInstanceUrlRetry<T>(deviceConfig: DeviceConfig, run: () => Promise<T>): Promise<T> {
+        if (!isRceDeviceConfig(deviceConfig)) {
+            return run();
+        }
+        const cacheKey = this.getRceInstanceUrlCacheKey(deviceConfig);
+        const cachedPromise = this.rceInstanceUrlsByCacheKey.get(cacheKey);
+        try {
+            return await run();
+        } catch (error) {
+            const instanceGone = this.isRceInstanceGoneError(error);
+            //only an instance-not-there failure against a cached url touches the cache; a cache
+            //miss means run() already used a freshly-resolved url
+            if (cachedPromise === undefined || (!instanceGone && !this.isRceInstanceUnreachableError(error))) {
+                throw error;
+            }
+            //bust the cached url, but only if our entry is still the current one (a concurrent
+            //caller may have refreshed it already)
+            if (this.rceInstanceUrlsByCacheKey.get(cacheKey) === cachedPromise) {
+                this.rceInstanceUrlsByCacheKey.delete(cacheKey);
+            }
+            //a network-level failure busts the cache for the next call but is not retried here
+            if (!instanceGone) {
+                throw error;
+            }
+            const staleUrl = await cachedPromise.catch(() => undefined);
+            const freshUrl = await this.getRceInstanceUrl(deviceConfig);
+            //the instance did not move, so the original failure stands
+            if (freshUrl === staleUrl) {
+                throw error;
+            }
+            //run() re-reads through getRceInstanceUrl, so it picks up the fresh url
+            return run();
+        }
+    }
+
+    /**
+     * Whether an error says the request never reached a live endpoint at all (either the raw
+     * network error, or one of roku-deploy's wrapper errors carrying it as its cause). These bust
+     * the cached instance url so the next call re-resolves, but do not prove the instance moved,
+     * so they never trigger an in-call retry.
+     */
+    private isRceInstanceUnreachableError(error: unknown): boolean {
+        for (const candidate of [error, (error as RokuDeployError)?.cause]) {
+            const networkErrorCode = (candidate as NodeJS.ErrnoException)?.code;
+            if (typeof networkErrorCode === 'string' && RokuDeploy.rceInstanceUnreachableNetworkErrorCodes.has(networkErrorCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a response from an instance url says the instance itself is not there. The mesh
+     * answers a dead instance path with a bare 404 it generated itself, distinguishable from a 404
+     * a live instance produced (an unknown ECP route, for example) by the absence of the
+     * `x-envoy-upstream-service-time` header the mesh stamps on every response it actually
+     * forwarded to an instance.
+     */
+    private isRceInstanceGoneResponse(statusCode: number | undefined, headers: Record<string, unknown> | undefined): boolean {
+        return statusCode === 404 && headers?.['x-envoy-upstream-service-time'] === undefined;
+    }
+
+    /**
+     * Whether an error thrown while talking to an RCE instance url explicitly indicates the
+     * instance itself is not there, as opposed to an application-level failure (bad credentials, a
+     * rejected route) that a live instance produced.
+     */
+    private isRceInstanceGoneError(error: unknown): boolean {
+        if (error instanceof DeviceError) {
+            const response = error.details?.httpDetails?.response;
+            return this.isRceInstanceGoneResponse(response?.statusCode, response?.headers);
+        }
+        return false;
+    }
+
+    /**
+     * Parse an ECP XML response body into a plain object (xml2js, `explicitArray: false`). An empty
+     * or non-XML body (commands like keypress return none; a proxy error page is not XML) yields
+     * undefined so the caller can inspect the status and raw body instead; a body that looks like
+     * XML but cannot be parsed throws.
+     */
+    private async parseEcpXml(body: string, response?: HttpResponse): Promise<Record<string, any> | undefined> {
+        if (typeof body !== 'string' || !body.trim().startsWith('<')) {
+            return undefined;
+        }
+        try {
+            const parsedContent = await xml2js.parseStringPromise(body, {
+                explicitArray: false
+            });
+            // clone the data onto an object because xml2js somehow makes this object not an object???
+            return { ...parsedContent };
+        } catch (e) {
+            throw new UnparsableDeviceResponseError('Could not parse ECP response', {
+                httpDetails: extractHttpDetails(response?.response, response?.body)
+            }, e instanceof Error ? e : undefined);
+        }
+    }
+
+    /**
+     * Send a single key event (keypress/keydown/keyup) to a device.
+     *
+     * For an RCE device the instance-api key-input route (`/api/v0/ecp1/<action>/<key>`) is tried
+     * first: unlike the raw `/ecp1` proxy the generic sendEcpRequest() transport uses, it keeps working when
+     * the device is in limited ECP mode (which 403s every raw-proxy key press). Any failure - a
+     * non-2xx response (verify throws), or a future rename of that path - falls through to the
+     * normal sendEcpRequest() transport below, so RCE devices in normal mode and LAN devices are unaffected.
+     */
+    private async sendKeyEvent(options: SendKeyEventOptions) {
+        options = { ...this.options, ...options };
+        this.logger.info('Sending key event:', options.key);
+        this.checkRequiredOptions(options, ['device', 'key']);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        if (isRceDeviceConfig(deviceConfig)) {
+            try {
+                const rceToken = this.getRceToken(deviceConfig);
+                if (!rceToken) {
+                    throw new Error('An rceToken is required to reach ECP on an RCE device');
+                }
+                const key = this.toCanonicalRemoteKey(options.key);
+                const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                    const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                });
+                return {
+                    status: response?.response?.statusCode,
+                    body: response?.body,
+                    json: undefined
+                } as EcpResult;
+            } catch (e) {
+                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
+            }
+        }
+
+        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+    }
+
+    /**
+     * Normalize a key name to its canonical `RemoteKey` casing for the RCE instance-api key-input
+     * route, which rejects a wrong-case key with a 422 (the raw ECP proxy and LAN ECP accept any
+     * case). A key that matches a `RemoteKey` value case-insensitively is returned in that canonical
+     * casing; a literal-text key (`lit_<char>`) becomes `Lit_<char>`; anything else is passed
+     * through unchanged (there is no enforced key list, so an unknown key is sent as-is and simply
+     * falls back to the raw proxy if the route rejects it).
+     */
+    private toCanonicalRemoteKey(key: string): string {
+        if (/^lit_/i.test(key)) {
+            return `Lit_${key.slice(4)}`;
+        }
+        return Object.values(RemoteKey).find((candidate) => candidate.toLowerCase() === key.toLowerCase()) ?? key;
+    }
+
+    /**
+     * Build the deep-link query string (contentId, mediaType, and any additional params) for a local `launch/{appId}` request.
+     * @param options
+     */
+    private buildLaunchQueryString(options: LaunchAppOptions): string {
+        const queryParams: Record<string, string> = { ...options.params };
+        if (options.contentId !== undefined) {
+            queryParams.contentId = options.contentId;
+        }
+        if (options.mediaType !== undefined) {
+            queryParams.mediaType = options.mediaType;
+        }
+        const queryEntries = Object.entries(queryParams);
+        if (queryEntries.length === 0) {
+            return '';
+        }
+        const serializedParams = queryEntries.map(([paramName, paramValue]) => `${encodeURIComponent(paramName)}=${encodeURIComponent(paramValue)}`).join('&');
+        return `?${serializedParams}`;
+    }
+
+    /**
+     * Throw for a non-2xx ECP response, carrying any plain-text device explanation in the message
+     * (for example `ECP command not allowed in Limited mode.`). Used by ECP wrappers whose success
+     * responses have no `<status>` envelope to inspect instead.
+     */
+    private assertEcpStatusOk(result: EcpResult): void {
+        if (result.status !== undefined && result.status >= 200 && result.status < 300) {
+            return;
+        }
+        const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
+        throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.status ?? 'unknown'}${bodyText ? `: ${bodyText}` : ''}`, {
+            httpDetails: this.buildEcpHttpDetails(result)
+        });
+    }
+
+    /**
+     * Build the HttpDetails carried by ECP wrapper errors. `sendEcpRequest()` does not retain the raw
+     * HttpResponse, so this carries what it does keep - the status code and body - which is what a
+     * caller needs to see what the device actually said.
+     */
+    private buildEcpHttpDetails(result: EcpResult): HttpDetails {
+        return {
+            response: {
+                statusCode: result.status,
+                body: result.body
+            }
+        };
+    }
+
+    /**
+     * Parse a single `<app>` element from a `query/apps` or `query/active-app` response. With
+     * `explicitArray: false`, an app node with attributes and a title is `{ _: 'Title', $: { id, type, subtype, version } }`;
+     * an attribute-less app node (for example the home screen) collapses to a plain string.
+     * @param appElement
+     */
+    private parseEcpAppElement(appElement: any): RokuActiveApp {
+        if (appElement === undefined || appElement === null) {
+            return {};
+        }
+        if (typeof appElement === 'string') {
+            return { title: appElement };
+        }
+        const attributes = appElement.$ ?? {};
+        return {
+            id: attributes.id,
+            title: appElement._,
+            type: attributes.type,
+            subtype: attributes.subtype,
+            version: attributes.version
+        };
+    }
+
+    /**
+     * Unwrap a standard ECP response envelope: return the root element of the parsed body, throwing
+     * a FailedDeviceResponseError (with the device's own error message) when the element carries a
+     * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
+     * UnparsableDeviceResponseError when the expected root element is missing entirely.
+     */
+    private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
+        const root = result.json?.[rootKey];
+        if (!root) {
+            //a non-xml ECP response is usually the device explaining itself in plain text (for
+            //example `ECP command not allowed in Limited mode.`), so carry that text in the error
+            const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
+            throw new UnparsableDeviceResponseError(bodyText ? `${failureMessage}: ${bodyText}` : failureMessage, {
+                httpDetails: this.buildEcpHttpDetails(result)
+            });
+        }
+        if (typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
+            throw new FailedDeviceResponseError(`${failureMessage}: ${root.error ?? 'Unknown error'}`, {
+                httpDetails: this.buildEcpHttpDetails(result)
+            });
+        }
+        return root;
+    }
+
+    /**
+     * Normalize an xml2js `explicitArray: false` node that may be a single element, an array of
+     * elements, or absent, into an array.
+     */
+    private toArray(node: any): any[] {
+        if (node === undefined || node === null) {
+            return [];
+        }
+        return Array.isArray(node) ? node : [node];
+    }
+
+    /**
+     * Does the response look like a compile error
+     */
+    private isCompileError(responseHtml: string) {
+        return !!/install\sfailure:\scompilation\sfailed/i.exec(responseHtml);
+    }
+
+    /**
+     * Does the text look like the device's "corrupt/invalid zip" install failure? The Roku firmware
+     * returns this when a sideloaded zip can't be unzipped - most commonly because the zip is below the
+     * minimum installable size (see MINIMUM_INSTALLABLE_ZIP_SIZE).
+     */
+    private isCorruptZipError(text: string) {
+        //device text (firmware 15.x): "Install Failure: Unzip failed. Invalid or corrupt zip archive.  Unloading."
+        return !!/invalid\s+or\s+corrupt\s+zip/i.exec(text);
+    }
+
+    /**
+     * When a sideload fails with a "corrupt zip" error, check whether the zip is simply too small for the
+     * firmware to accept. If so, return a helpful hint to append to the error; otherwise return ''.
+     */
+    private getUndersizedZipHint(zipFilePath: string) {
+        let size: number;
+        try {
+            size = fsExtra.statSync(zipFilePath).size;
+        } catch {
+            return '';
+        }
+        if (size < RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE) {
+            return ` The supplied zip is ${size} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`;
+        }
+        return '';
+    }
+
+    /**
+     * Does the response look like a compile error
+     */
+    private isUpdateCheckRequiredResponse(responseHtml: string) {
+        return !!/["']\s*Failed\s*to\s*check\s*for\s*software\s*update\s*["']/i.exec(responseHtml);
+    }
+
+    /**
+     * Checks to see if the exception is due to the device needing to check for updates
+     */
+    private isUpdateRequiredError(e: any): boolean {
+        // Check for 577 status code in the new error format (details.httpDetails.response.statusCode)
+        const statusCode = e.details?.httpDetails?.response?.statusCode;
+        const body = e.details?.httpDetails?.response?.body;
+        return statusCode === 577 || (typeof body === 'string' && this.isUpdateCheckRequiredResponse(body));
     }
 
     private getRokuMessagesFromResponseBody(body: string): RokuMessages {
@@ -1570,250 +2298,6 @@ export class RokuDeploy {
             }
         }
         return [];
-    }
-
-    /**
-     * Deletes any installed dev channel on the target Roku device
-     * @param options
-     */
-    public async deleteDevChannel(options?: DeleteDevChannelOptions) {
-        options = { ...this.options, ...options } as DeleteDevChannelOptions;
-        this.logger.info('Deleting dev channel...');
-        this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
-        this.validateTimeout(options.timeout);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.formData = {
-                mysubmit: 'Delete',
-                archive: ''
-            };
-            return this.doPostRequest(deleteOptions);
-        });
-    }
-
-    /**
-     * Deletes any installed dev channel, and any installed component libraries on the target Roku device
-     * @param options
-     */
-    public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
-        options = { ...this.options, ...options } as DeleteDevChannelOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.formData = {
-                mysubmit: 'DeleteAll',
-                archive: ''
-            };
-            return this.doPostRequest(deleteOptions);
-        });
-    }
-
-    /**
-     * Delete the component library with the specified filename from the device
-     */
-    public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
-        options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
-        this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.formData = {
-                mysubmit: 'Delete',
-                'app_type': 'dcl',
-                fileName: options.fileName
-            };
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
-            return this.doPostRequest(deleteOptions);
-        });
-    }
-
-    /**
-     * Delete all component libraries from the device
-     */
-    public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
-        options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
-        const packages = await this.listSideloadedPlugins(options);
-        for (const pkg of packages) {
-            if (pkg.appType === 'dcl') {
-                await this.deleteComponentLibrary({
-                    ...options,
-                    fileName: pkg.archiveFileName
-                });
-            }
-        }
-    }
-
-    /**
-     * Fetch the full list of installed plugins (side-loaded packages) from the device. Useful for finding the
-     * file names of installed component libraries or the dev channel.
-     */
-    public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
-        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
-            return this.doGetRequest(deleteOptions);
-        });
-        const packages = this.getPackagesFromResponseBody(result.body);
-        return packages;
-    }
-
-    /**
-     * Gets a screenshot from the device. A side-loaded channel must be running or an error will be thrown.
-     * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
-     */
-
-    public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
-        options = { ...this.options, ...options } as CaptureScreenshotOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
-        this.validateTimeout(options.timeout);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        // Ask for the device to make an image
-        let createScreenshotResult = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            return this.doPostRequest({
-                ...(await this.generateBaseRequestOptions('plugin_inspect', deviceConfig, options)),
-                formData: {
-                    mysubmit: 'Screenshot',
-                    archive: ''
-                }
-            });
-        });
-
-        // Pull the image url out of the response body
-        const [_, imageUrlOnDevice, deviceExt] = /["'](pkgs\/dev(\.jpg|\.png)\?.+?)['"]/gi.exec(createScreenshotResult.body) ?? [];
-
-        if (!imageUrlOnDevice) {
-            throw new Error('No screenshot url returned from device');
-        }
-
-        const requestParams = await this.generateBaseRequestOptions(imageUrlOnDevice, deviceConfig, options);
-
-        // Always download to buffer
-        const buffer = await this.downloadToBuffer(requestParams);
-
-        const result: CaptureScreenshotResult = { buffer: buffer };
-
-        // If out is provided, also save to disk
-        if (options.out) {
-            const cwd = options.cwd ?? process.cwd();
-            const screenshotDir = options.screenshotDir
-                ? path.resolve(cwd, options.screenshotDir)
-                : path.join(util.tempDir, '/roku-deploy/screenshots/');
-
-            let filePath: string;
-            if (options.out === true) {
-                // Use default directory with generated filename
-                const defaultFilename = `screenshot-${formatTimestampForScreenshot()}${deviceExt}`;
-                filePath = path.resolve(cwd, screenshotDir, defaultFilename);
-            } else {
-                // User provided a path
-                filePath = path.resolve(cwd, options.out);
-                const userExt = path.extname(filePath).toLowerCase();
-                const deviceExtLower = deviceExt.toLowerCase();
-
-                if (options.autoExtension) {
-                    if (userExt === deviceExtLower) {
-                        // User extension matches device extension - use as-is
-                    } else if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
-                        // User provided an image extension that doesn't match - swap it
-                        filePath = filePath.slice(0, -userExt.length) + deviceExt;
-                    } else {
-                        // No recognized image extension - append device extension
-                        filePath += deviceExt;
-                    }
-                }
-            }
-
-            await fsExtra.ensureFile(filePath);
-            await fsExtra.writeFile(filePath, buffer);
-            result.filePath = filePath;
-        }
-
-        return result;
-    }
-
-    private async downloadFile(requestParams: any, filePath: string) {
-        let writeStream: WriteStream;
-        await fsExtra.ensureFile(filePath);
-        return new Promise<string>((resolve, reject) => {
-            writeStream = fsExtra.createWriteStream(filePath, {
-                flags: 'w'
-            });
-            if (!writeStream) {
-                reject(new Error(`Unable to create write stream for "${filePath}"`));
-                return;
-            }
-            //when the file has finished writing to disk, we can finally resolve and say we're done
-            writeStream.on('finish', () => {
-                resolve(filePath);
-            });
-            //if anything does wrong with the write stream, reject the promise
-            writeStream.on('error', (error) => {
-                reject(error);
-            });
-
-            request.get(requestParams).on('error', (err) => {
-                reject(err);
-            }).on('response', (response) => {
-                if (response.statusCode !== 200) {
-                    return reject(new Error('Invalid response code: ' + response.statusCode));
-                }
-            }).pipe(writeStream);
-
-        }).finally(() => {
-            try {
-                writeStream.close();
-            } catch { }
-        });
-    }
-
-    private downloadToBuffer(requestParams: any): Promise<Buffer> {
-        return new Promise<Buffer>((resolve, reject) => {
-            const chunks: Buffer[] = [];
-            request.get(requestParams)
-                .on('error', (err) => {
-                    reject(err);
-                })
-                .on('response', (response) => {
-                    if (response.statusCode !== 200) {
-                        return reject(new Error('Invalid response code: ' + response.statusCode));
-                    }
-                })
-                .on('data', (chunk: Buffer) => {
-                    chunks.push(chunk);
-                })
-                .on('end', () => {
-                    resolve(Buffer.concat(chunks));
-                });
-        });
-    }
-
-    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
-        for (let opt of requiredOptions as string[]) {
-            if (options[opt] === undefined) {
-                throw new Error('Missing required option: ' + opt);
-            }
-        }
     }
 
     /**
@@ -1934,410 +2418,6 @@ export class RokuDeploy {
     }
 
     /**
-     * Check whether the given developer password is accepted by a Roku device.
-     * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
-     * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
-     */
-    public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
-        options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        const username = options.username ?? 'rokudev';
-        const port = options.port ?? 80;
-        const timeout = options.timeout ?? 3000;
-
-        //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
-        //from before), an RCE device by its installer base url (never includes credentials)
-        let displayTarget = '';
-
-        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
-            const url = `${baseUrl}/plugin_install`;
-            displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
-
-            let fetchResponse: Response;
-            try {
-                fetchResponse = await fetchWithDigest(url, {
-                    method: 'HEAD',
-                    username: username,
-                    password: options.password,
-                    timeout: timeout,
-                    headers: headers
-                });
-            } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : String(err);
-                throw new DeviceUnreachableError(
-                    `Device ${displayTarget} was unreachable: ${message}`,
-                    {},
-                    err instanceof Error ? err : undefined
-                );
-            }
-            //fetch does not throw on a status code, so surface a mesh-generated 404 (a stale
-            //instance url) to the retry wrapper as the error verification would have produced
-            const responseHeaders: Record<string, string> = {};
-            if (typeof fetchResponse.headers?.forEach === 'function') {
-                fetchResponse.headers.forEach((value, key) => {
-                    responseHeaders[key] = value;
-                });
-            } else {
-                Object.assign(responseHeaders, fetchResponse.headers ?? {});
-            }
-            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(fetchResponse.status, responseHeaders)) {
-                throw new InvalidDeviceResponseCodeError(`Unexpected status ${fetchResponse.status} from device at ${displayTarget}`, {
-                    httpDetails: { response: { statusCode: fetchResponse.status, headers: responseHeaders } }
-                });
-            }
-            return fetchResponse;
-        });
-
-        if (response.status === 200) {
-            return true;
-        }
-        if (response.status === 401) {
-            return false;
-        }
-        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${displayTarget}`, response as any);
-    }
-
-    /**
-     * Get the `device-info` response from a Roku device
-     * @param host the host or IP address of the Roku
-     * @param port the port to use for the ECP request (defaults to 8060)
-     */
-    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
-    public async getDeviceInfo(options: GetDeviceInfoOptions) {
-        options = { ...this.options, ...options } as GetDeviceInfoOptions;
-        this.checkRequiredOptions(options, ['device']);
-
-        let result: EcpResult;
-        try {
-            result = await this.sendEcpRequest(options.device, 'query/device-info', {
-                verify: true,
-                ecpPort: options.ecpPort,
-                timeout: options.timeout
-            });
-        } catch (e) {
-            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
-                throw new EcpNetworkAccessModeDisabledError(
-                    `Unable to access device-info because ecp-setting-mode is 'disabled'`,
-                    {
-                        // The condition above guarantees details.httpDetails exists
-                        httpDetails: (e as any).details.httpDetails
-                    },
-                    e instanceof Error ? e : undefined
-                );
-            }
-            throw e;
-        }
-        const deviceInfoRoot = result.json?.['device-info'];
-        if (!deviceInfoRoot) {
-            //the response was not device-info XML (an empty body, a proxy error page, ...) - there
-            //is no underlying error to carry as a cause, the body just wasn't what we asked for
-            this.logger.warn('Error getting device info: response had no device-info element');
-            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
-                httpDetails: this.buildEcpHttpDetails(result)
-            });
-        }
-        try {
-            let deviceInfo = { ...deviceInfoRoot } as Record<string, any>;
-
-            if (options.enhance) {
-                deviceInfo = this.enhanceDeviceInfo(deviceInfo as DeviceInfoRaw);
-            }
-            this.logger.debug('Device info:', deviceInfo);
-            return deviceInfo;
-        } catch (e) {
-            this.logger.warn('Error getting device info:', e);
-            throw new UnparsableDeviceResponseError('Could not retrieve device info', {
-                httpDetails: this.buildEcpHttpDetails(result)
-            }, e instanceof Error ? e : undefined);
-        }
-    }
-
-    /**
-     * Get the External Control Protocol (ECP) setting mode of the device. This determines whether
-     * the device accepts remote control commands via the ECP API.
-     *
-     * @param options - Configuration options including host, ecpPort, timeout, etc.
-     * @returns The ECP setting mode:
-     *   - 'enabled': fully enabled and accepting commands
-     *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
-     *   - 'limited': Restricted functionality, text and movement commands only
-     *   - 'permissive': Full access for internal networks
-     */
-    public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
-        options = { ...this.options, ...options } as GetDeviceInfoOptions;
-        try {
-            const deviceInfo = await this.getDeviceInfo(options);
-            return deviceInfo['ecp-setting-mode'];
-        } catch (e) {
-            if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
-                return 'disabled';
-            }
-            throw new UnknownDeviceResponseError('Could not retrieve device ECP setting', {}, e instanceof Error ? e : undefined);
-        }
-    }
-
-    /**
-     * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
-     * @param options
-     */
-    public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
-        options = { ...this.options, ...options } as QueryAppsOptions;
-        this.checkRequiredOptions(options, ['device']);
-
-        let result: EcpResult;
-        try {
-            result = await this.sendEcpRequest(options.device, 'query/apps', {
-                ecpPort: options.ecpPort,
-                timeout: options.timeout
-            });
-        } catch (e) {
-            if (e instanceof UnparsableDeviceResponseError) {
-                this.logger.warn('Error parsing installed app list:', e);
-                throw new UnparsableDeviceResponseError('Could not retrieve installed app list', e.details, e);
-            }
-            throw e;
-        }
-        this.assertEcpStatusOk(result);
-        const rawAppNodes = result.json?.apps?.app;
-        if (!rawAppNodes) {
-            return [];
-        }
-        const appNodes = Array.isArray(rawAppNodes) ? rawAppNodes : [rawAppNodes];
-        return appNodes.map((appNode) => {
-            const parsedApp = this.parseEcpAppElement(appNode);
-            return {
-                id: parsedApp.id ?? '',
-                title: parsedApp.title ?? '',
-                type: parsedApp.type,
-                subtype: parsedApp.subtype,
-                version: parsedApp.version
-            };
-        });
-    }
-
-    /**
-     * Query the currently active app on the device (the ECP `query/active-app` endpoint). The active
-     * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
-     * @param options
-     */
-    public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
-        options = { ...this.options, ...options } as QueryActiveAppOptions;
-        this.checkRequiredOptions(options, ['device']);
-
-        let result: EcpResult;
-        try {
-            result = await this.sendEcpRequest(options.device, 'query/active-app', {
-                ecpPort: options.ecpPort,
-                timeout: options.timeout
-            });
-        } catch (e) {
-            if (e instanceof UnparsableDeviceResponseError) {
-                this.logger.warn('Error parsing active app:', e);
-                throw new UnparsableDeviceResponseError('Could not retrieve active app', e.details, e);
-            }
-            throw e;
-        }
-        this.assertEcpStatusOk(result);
-        const rawActiveAppNode = result.json?.['active-app']?.app;
-        if (!rawActiveAppNode) {
-            return {};
-        }
-        return this.parseEcpAppElement(rawActiveAppNode);
-    }
-
-    /**
-     * Parse a single `<app>` element from a `query/apps` or `query/active-app` response. With
-     * `explicitArray: false`, an app node with attributes and a title is `{ _: 'Title', $: { id, type, subtype, version } }`;
-     * an attribute-less app node (for example the home screen) collapses to a plain string.
-     * @param appElement
-     */
-    private parseEcpAppElement(appElement: any): RokuActiveApp {
-        if (appElement === undefined || appElement === null) {
-            return {};
-        }
-        if (typeof appElement === 'string') {
-            return { title: appElement };
-        }
-        const attributes = appElement.$ ?? {};
-        return {
-            id: attributes.id,
-            title: appElement._,
-            type: attributes.type,
-            subtype: attributes.subtype,
-            version: attributes.version
-        };
-    }
-
-    /**
-     * Query a sideloaded (or installed) app's registry (the ECP `query/registry/{appId}` endpoint).
-     * Throws a FailedDeviceResponseError when the device reports a failure (for example
-     * `Device not keyed`).
-     * @param options
-     */
-    public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
-        options = { ...this.options, ...options } as QueryRegistryOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
-
-        const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-        const root = this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
-
-        const registry = root.registry ?? {};
-        const sections: RokuRegistry['sections'] = {};
-        for (const section of this.toArray(registry.sections?.section)) {
-            if (!section || typeof section === 'string') {
-                continue;
-            }
-            const sectionName = section.name;
-            for (const item of this.toArray(section.items?.item)) {
-                if (!item || typeof item === 'string') {
-                    continue;
-                }
-                sections[sectionName] ??= {};
-                sections[sectionName][item.key] = item.value;
-            }
-        }
-        return {
-            devId: registry['dev-id'],
-            plugins: typeof registry.plugins === 'string' ? registry.plugins.split(',') : undefined,
-            spaceAvailable: registry['space-available'],
-            sections: sections
-        };
-    }
-
-    /**
-     * Query the state of an app on the device (the ECP `query/app-state/{appId}` endpoint).
-     * Throws a FailedDeviceResponseError when the device reports a failure.
-     * @param options
-     */
-    public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
-        options = { ...this.options, ...options } as QueryAppStateOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
-
-        const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-        const root = this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
-
-        const knownStates: RokuAppStateValue[] = ['active', 'background', 'inactive'];
-        const state = knownStates.find(knownState => knownState === root.state?.toLowerCase()) ?? 'unknown';
-        return {
-            appId: root['app-id'],
-            appDevId: root['app-dev-id'],
-            appTitle: root['app-title'],
-            appVersion: root['app-version'],
-            state: state
-        };
-    }
-
-    /**
-     * Query SceneGraph rendezvous tracking (the ECP `query/sgrendezvous` endpoint): whether tracking
-     * is enabled, plus any rendezvous events recorded since the last query.
-     * Throws a FailedDeviceResponseError when the device reports a failure.
-     * @param options
-     */
-    public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
-        options = { ...this.options, ...options } as QueryRendezvousOptions;
-        this.checkRequiredOptions(options, ['device']);
-
-        const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
-
-        return {
-            trackingEnabled: root.data?.['tracking-enabled'] === 'true',
-            items: this.toArray(root.data?.item).filter(item => item && typeof item !== 'string').map(item => ({
-                id: item.id,
-                startTime: item['start-tm'],
-                endTime: item['end-tm'],
-                lineNumber: item['line-number'],
-                file: item.file
-            }))
-        };
-    }
-
-    /**
-     * Enable or disable SceneGraph rendezvous tracking (the ECP `sgrendezvous/track|untrack`
-     * endpoint) and return the tracking state the device reports afterwards.
-     * Throws a FailedDeviceResponseError when the device reports a failure.
-     * @param options
-     */
-    public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
-        options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
-        this.checkRequiredOptions(options, ['device', 'enabled']);
-
-        const result = await this.sendEcpRequest(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
-            method: 'POST',
-            ecpPort: options.ecpPort,
-            timeout: options.timeout
-        });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
-        return root['tracking-enabled'] === 'true';
-    }
-
-    /**
-     * Unwrap a standard ECP response envelope: return the root element of the parsed body, throwing
-     * a FailedDeviceResponseError (with the device's own error message) when the element carries a
-     * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
-     * UnparsableDeviceResponseError when the expected root element is missing entirely.
-     */
-    private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
-        const root = result.json?.[rootKey];
-        if (!root) {
-            //a non-xml ECP response is usually the device explaining itself in plain text (for
-            //example `ECP command not allowed in Limited mode.`), so carry that text in the error
-            const bodyText = typeof result.body === 'string' ? result.body.trim() : '';
-            throw new UnparsableDeviceResponseError(bodyText ? `${failureMessage}: ${bodyText}` : failureMessage, {
-                httpDetails: this.buildEcpHttpDetails(result)
-            });
-        }
-        if (typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
-            throw new FailedDeviceResponseError(`${failureMessage}: ${root.error ?? 'Unknown error'}`, {
-                httpDetails: this.buildEcpHttpDetails(result)
-            });
-        }
-        return root;
-    }
-
-    /**
-     * Normalize an xml2js `explicitArray: false` node that may be a single element, an array of
-     * elements, or absent, into an array.
-     */
-    private toArray(node: any): any[] {
-        if (node === undefined || node === null) {
-            return [];
-        }
-        return Array.isArray(node) ? node : [node];
-    }
-
-    /**
-     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
-     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
-     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
-     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
-     * enhance it without making another request to the device.
-     * @param deviceInfo the raw device-info object to enhance
-     */
-    public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
-        const result = {} as DeviceInfo;
-        // sanitize/normalize values to their native formats, and also convert property names to camelCase
-        for (let key in deviceInfo) {
-            result[util.camelCase(key)] = this.normalizeDeviceInfoFieldValue(deviceInfo[key]);
-        }
-        return result;
-    }
-
-    /**
      * Normalize a deviceInfo field value. This includes things like converting boolean strings to booleans, number strings to numbers,
      * decoding HtmlEntities, etc.
      * @param deviceInfo
@@ -2358,19 +2438,6 @@ export class RokuDeploy {
         } else {
             return util.decodeHtmlEntities(value);
         }
-    }
-
-    /**
-     * Get the developer ID from the device-info response
-     * @param options
-     * @returns
-     */
-    public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
-        options = { ...this.options, ...options } as GetDevIdOptions;
-        this.checkRequiredOptions(options, ['device']);
-        const deviceInfo = await this.getDeviceInfo(options);
-        this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
-        return { devId: deviceInfo['keyed-developer-id'] };
     }
 
     private async parseManifest(manifestPath: string): Promise<ManifestData> {
@@ -2397,72 +2464,6 @@ export class RokuDeploy {
         });
 
         return manifestData;
-    }
-
-    public async rebootDevice(options: RebootDeviceOptions) {
-        options = { ...this.options, ...options } as RebootDeviceOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        // Get device info to check software version
-        const deviceInfo = await this.getDeviceInfo(options);
-        const softwareVersion = deviceInfo['software-version'];
-
-        // Check if device version is at least 15.0.4
-        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new UnsupportedFirmwareVersionError(
-                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for reboot operation`,
-                {
-                    currentVersion: softwareVersion,
-                    minimumVersion: '15.0.4',
-                    operation: 'reboot'
-                }
-            );
-        }
-
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            return this.doPostRequest({
-                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
-                formData: {
-                    mysubmit: 'Reboot',
-                    archive: ''
-                }
-            });
-        });
-    }
-
-    public async checkForUpdate(options: CheckForUpdateOptions) {
-        options = { ...this.options, ...options } as CheckForUpdateOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
-
-        const deviceConfig = this.resolveDevice(options.device);
-
-        // Get device info to check software version
-        const deviceInfo = await this.getDeviceInfo(options);
-        const softwareVersion = deviceInfo['software-version'];
-
-        // Check if device version is at least 15.0.4
-        if (!softwareVersion || semver.lt(semver.coerce(softwareVersion), '15.0.4')) {
-            throw new UnsupportedFirmwareVersionError(
-                `Device software version ${softwareVersion} is below the minimum required version 15.0.4 for check update operation`,
-                {
-                    currentVersion: softwareVersion,
-                    minimumVersion: '15.0.4',
-                    operation: 'checkForUpdate'
-                }
-            );
-        }
-
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            return this.doPostRequest({
-                ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
-                formData: {
-                    mysubmit: 'CheckUpdate',
-                    archive: ''
-                }
-            });
-        });
     }
 }
 
