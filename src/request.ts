@@ -135,6 +135,10 @@ export class Request {
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
             parse_response: false,
+            //Rokus label binary downloads (.pkg, screenshots) `text/plain`, so needle would decode them as
+            //utf8 and replace every invalid byte with U+FFFD. `request` never decoded; keep bytes exact.
+            decode_response: false,
+
             //`request` had a single `timeout` that governed how long to wait to establish the connection and
             //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
             //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
