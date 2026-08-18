@@ -1489,6 +1489,7 @@ export class RokuDeploy {
         return result;
     }
 
+    /** @internal */
     public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
         for (let opt of requiredOptions as string[]) {
             if (options[opt] === undefined) {
