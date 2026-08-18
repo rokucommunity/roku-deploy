@@ -606,6 +606,7 @@ export interface Deferred<T> {
 
 /**
  * A tagged template literal function for standardizing the path.
+ * @public
  */
 export function standardizePath(stringParts, ...expressions: any[]) {
     let result = [];
@@ -619,6 +620,7 @@ export function standardizePath(stringParts, ...expressions: any[]) {
 
 /**
  * A tagged template literal function for standardizing the path and making all path separators forward slashes
+ * @public
  */
 export function standardizePathPosix(stringParts, ...expressions: any[]) {
     let result = [];

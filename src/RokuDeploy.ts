@@ -35,6 +35,9 @@ import * as semver from 'semver';
 import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
+/**
+ * @public
+ */
 export class RokuDeploy {
 
     /**
@@ -2467,12 +2470,18 @@ export class RokuDeploy {
     }
 }
 
+/**
+ * @public
+ */
 export interface ManifestData {
     [key: string]: any;
     keyIndexes?: Record<string, number>;
     lineCount?: number;
 }
 
+/**
+ * @public
+ */
 export interface StandardizedFileEntry {
     /**
      * The full path to the source file
@@ -2484,12 +2493,18 @@ export interface StandardizedFileEntry {
     dest: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuMessages {
     errors: string[];
     infos: string[];
     successes: string[];
 }
 
+/**
+ * @public
+ */
 export interface RokuPlugin {
     appType: 'channel' | 'dcl';
     archiveFileName: string;
@@ -2500,8 +2515,14 @@ export interface RokuPlugin {
     pkgPath: string;
     size: string;
 }
+/**
+ * @public
+ */
 export type RokuPackage = RokuPlugin;
 
+/**
+ * @public
+ */
 export type ListSideloadedPluginsOptions = BaseRequestOptions;
 
 enum RokuMessageType {
@@ -2510,6 +2531,9 @@ enum RokuMessageType {
     error = 'error'
 }
 
+/**
+ * @public
+ */
 export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
@@ -2521,11 +2545,17 @@ export const DefaultFiles = [
     '!**/*.{md,DS_Store,db}'
 ];
 
+/**
+ * @public
+ */
 export interface HttpResponse {
     response: any;
     body: any;
 }
 
+/**
+ * @public
+ */
 export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
      * When provided, saves the screenshot to disk in addition to returning the buffer.
@@ -2556,6 +2586,9 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
     autoExtension?: boolean;
 }
 
+/**
+ * @public
+ */
 export interface CaptureScreenshotResult {
     /**
      * The screenshot image data
@@ -2567,6 +2600,9 @@ export interface CaptureScreenshotResult {
     filePath?: string;
 }
 
+/**
+ * @public
+ */
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
@@ -2575,10 +2611,19 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
 
+/**
+ * @public
+ */
 export type QueryAppsOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export type QueryActiveAppOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
     device: DeviceOption;
@@ -2601,6 +2646,7 @@ export interface ValidateDeveloperPasswordOptions {
  * for convenience and discoverability: pass a `RemoteKey` value and you get the casing right without
  * thinking about it. It is NOT an enforced list - every key option also accepts a raw string, so a
  * key without a member here (or a `Lit_<char>` literal) can still be sent.
+ * @public
  */
 export enum RemoteKey {
     Back = 'Back',
@@ -2636,8 +2682,14 @@ export enum RemoteKey {
     VolumeUp = 'VolumeUp'
 }
 
+/**
+ * @public
+ */
 export type RemoteKeyText = keyof typeof RemoteKey;
 
+/**
+ * @public
+ */
 export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     //internal transport type: the public key methods enforce RemoteKeyText, but sendText feeds
@@ -2646,22 +2698,37 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
     key: RemoteKeyText | string;
 }
 
+/**
+ * @public
+ */
 export interface KeyUpOptions extends BaseEcpOptions {
     key: RemoteKeyText;
 }
 
+/**
+ * @public
+ */
 export interface KeyDownOptions extends BaseEcpOptions {
     key: RemoteKeyText;
 }
 
+/**
+ * @public
+ */
 export interface KeyPressOptions extends BaseEcpOptions {
     key: RemoteKeyText;
 }
 
+/**
+ * @public
+ */
 export interface SendTextOptions extends BaseEcpOptions {
     text: string;
 }
 
+/**
+ * @public
+ */
 export interface SendKeySequenceOptions extends BaseEcpOptions {
     /** The remote keys to press, in order. */
     keys: RemoteKeyText[];
@@ -2672,10 +2739,19 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
     keyDelayMs?: number;
 }
 
+/**
+ * @public
+ */
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export type CloseChannelOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface LaunchAppOptions extends BaseEcpOptions {
     /** The channel id to launch (for example 'dev' for the sideloaded dev channel). */
     appId: string;
@@ -2687,6 +2763,9 @@ export interface LaunchAppOptions extends BaseEcpOptions {
     params?: Record<string, string>;
 }
 
+/**
+ * @public
+ */
 export interface ExitAppOptions extends BaseEcpOptions {
     /** The channel id to exit (for example 'dev' for the sideloaded dev channel). */
     appId: string;
@@ -2697,11 +2776,17 @@ export interface ExitAppOptions extends BaseEcpOptions {
     force?: boolean;
 }
 
+/**
+ * @public
+ */
 export interface GetFilePathsOptions {
     files: FileEntry[];
     rootDir: string;
 }
 
+/**
+ * @public
+ */
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
@@ -2712,6 +2797,9 @@ export interface StageOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export interface ZipOptions {
     /**
      * The directory containing the files to be zipped
@@ -2729,7 +2817,8 @@ export interface ZipOptions {
     cwd?: string;
 }
 
-type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
+/** @public */
+export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     appType?: 'channel' | 'dcl';
     close?: boolean;
     remoteDebug?: boolean;
@@ -2740,16 +2829,25 @@ type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };
 
+/**
+ * @public
+ */
 export type SideloadOptions = BaseSideloadOptions & (
     | { zip: string; dir?: never }
     | { dir: string; zip?: never }
 );
 
+/**
+ * @public
+ */
 export interface PackageUploadOverridesOptions {
     route?: string;
     formData?: Record<string, any>;
 }
 
+/**
+ * @public
+ */
 export interface BaseRequestOptions {
     device: DeviceOption;
     username?: string;
@@ -2758,6 +2856,9 @@ export interface BaseRequestOptions {
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export interface BaseEcpOptions {
     device: DeviceOption;
     ecpPort?: number;
@@ -2765,6 +2866,9 @@ export interface BaseEcpOptions {
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export interface EcpOptions {
     /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
     method?: 'GET' | 'POST';
@@ -2780,6 +2884,9 @@ export interface EcpOptions {
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export interface EcpResult {
     /** The http status code of the response, or undefined when the transport produced no response */
     status: number | undefined;
@@ -2792,11 +2899,17 @@ export interface EcpResult {
     json: Record<string, any> | undefined;
 }
 
+/**
+ * @public
+ */
 export interface QueryRegistryOptions extends BaseEcpOptions {
     /** The app whose registry to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuRegistry {
     /** The developer id the device is keyed with */
     devId?: string;
@@ -2808,13 +2921,22 @@ export interface RokuRegistry {
     sections: Record<string, Record<string, string>>;
 }
 
+/**
+ * @public
+ */
 export interface QueryAppStateOptions extends BaseEcpOptions {
     /** The app whose state to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export type RokuAppStateValue = 'active' | 'background' | 'inactive' | 'unknown';
 
+/**
+ * @public
+ */
 export interface RokuAppState {
     appId?: string;
     appDevId?: string;
@@ -2823,14 +2945,23 @@ export interface RokuAppState {
     state: RokuAppStateValue;
 }
 
+/**
+ * @public
+ */
 export type QueryRendezvousOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface RokuRendezvous {
     trackingEnabled: boolean;
     /** Rendezvous events recorded since the last query */
     items: RokuRendezvousItem[];
 }
 
+/**
+ * @public
+ */
 export interface RokuRendezvousItem {
     id: string;
     /** Event start time, in seconds (as reported by the device) */
@@ -2841,12 +2972,21 @@ export interface RokuRendezvousItem {
     file: string;
 }
 
+/**
+ * @public
+ */
 export interface SetRendezvousTrackingOptions extends BaseEcpOptions {
     enabled: boolean;
 }
 
+/**
+ * @public
+ */
 export type ConvertToSquashfsOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export interface RekeyDeviceOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
@@ -2857,6 +2997,9 @@ export interface RekeyDeviceOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export interface CreateSignedPackageOptions extends BaseRequestOptions {
     signingPassword: string;
     appTitle?: string;
@@ -2873,17 +3016,32 @@ export interface CreateSignedPackageOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export type DeleteDevChannelOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export type RebootDeviceOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export type CheckForUpdateOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export interface GetOutputZipFilePathOptions {
     out?: string;
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export interface DeployOptions extends BaseRequestOptions {
     files?: FileEntry[];
     rootDir?: string;
@@ -2893,8 +3051,14 @@ export interface DeployOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export type GetDevIdOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
     /**
      * The filename of the component library to delete
@@ -2902,10 +3066,19 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
     fileName: string;
 }
 
+/**
+ * @public
+ */
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export type GetInstalledPackagesOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export interface LoadConfigFileOptions {
     /**
      * The current working directory to use for relative paths
@@ -2917,6 +3090,9 @@ export interface LoadConfigFileOptions {
     configPath?: string;
 }
 
+/**
+ * @public
+ */
 export interface ZipResult {
     /**
      * The path to the created zip file
@@ -2924,6 +3100,9 @@ export interface ZipResult {
     zipPath: string;
 }
 
+/**
+ * @public
+ */
 export interface CreateSignedPackageResult {
     /**
      * The path to the created signed package file
@@ -2931,6 +3110,9 @@ export interface CreateSignedPackageResult {
     pkgPath: string;
 }
 
+/**
+ * @public
+ */
 export interface StageResult {
     /**
      * The path to the staging directory
@@ -2938,6 +3120,9 @@ export interface StageResult {
     stagingDir: string;
 }
 
+/**
+ * @public
+ */
 export interface GetDevIdResult {
     /**
      * The developer ID from the device
@@ -2946,9 +3131,18 @@ export interface GetDevIdResult {
 }
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
+/**
+ * @public
+ */
 export const rokuDeploy = new RokuDeploy();
+/**
+ * @public
+ */
 export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';
 
+/**
+ * @public
+ */
 export interface RokuAppDescriptor {
     /** The channel id, for example 'dev' for the sideloaded dev channel. */
     id: string;
@@ -2962,6 +3156,9 @@ export interface RokuAppDescriptor {
     version?: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuActiveApp {
     /**
      * The active channel's id. Undefined when the active "app" is the Roku home screen or a screensaver,

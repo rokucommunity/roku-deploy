@@ -3,6 +3,7 @@ import type { RokuMessages } from './RokuDeploy';
 /**
  * Error codes for all RokuDeploy errors.
  * These provide programmatic identification of error types.
+ * @public
  */
 export enum RokuDeployErrorCode {
     INVALID_RESPONSE_CODE = 'INVALID_RESPONSE_CODE',
@@ -24,6 +25,7 @@ export enum RokuDeployErrorCode {
 /**
  * Abstracted HTTP request details - NOT tied to request library.
  * This allows switching from postman-request to native fetch later.
+ * @public
  */
 export interface HttpRequestDetails {
     url?: string;
@@ -35,6 +37,7 @@ export interface HttpRequestDetails {
 /**
  * Abstracted HTTP response details - NOT tied to request library.
  * This allows switching from postman-request to native fetch later.
+ * @public
  */
 export interface HttpResponseDetails {
     statusCode?: number;
@@ -44,6 +47,7 @@ export interface HttpResponseDetails {
 
 /**
  * Combined HTTP details containing both request and response information.
+ * @public
  */
 export interface HttpDetails {
     request?: HttpRequestDetails;
@@ -52,6 +56,7 @@ export interface HttpDetails {
 
 /**
  * Details for device communication errors
+ * @public
  */
 export interface DeviceErrorDetails {
     httpDetails?: HttpDetails;
@@ -60,6 +65,7 @@ export interface DeviceErrorDetails {
 
 /**
  * Details for network/connection errors
+ * @public
  */
 export interface ConnectionErrorDetails {
     httpDetails?: HttpDetails;
@@ -68,6 +74,7 @@ export interface ConnectionErrorDetails {
 
 /**
  * Details for configuration errors
+ * @public
  */
 export interface ConfigurationErrorDetails {
     optionName?: string;
@@ -78,11 +85,13 @@ export interface ConfigurationErrorDetails {
 /**
  * Details for compile errors (same as device errors)
  * rokuMessages.errors contains compile error messages
+ * @public
  */
 export type CompileErrorDetails = DeviceErrorDetails;
 
 /**
  * Details for convert errors
+ * @public
  */
 export interface ConvertErrorDetails {
     httpDetails?: HttpDetails;
@@ -91,6 +100,7 @@ export interface ConvertErrorDetails {
 
 /**
  * Details for unsupported firmware errors
+ * @public
  */
 export interface UnsupportedFirmwareDetails {
     currentVersion?: string;
@@ -101,6 +111,7 @@ export interface UnsupportedFirmwareDetails {
 /**
  * Base class for all RokuDeploy errors.
  * Provides consistent error handling with typed details and serialization support.
+ * @public
  */
 export abstract class RokuDeployError<T = unknown> extends Error {
     constructor(message: string, details?: T, cause?: Error) {
@@ -149,6 +160,7 @@ export abstract class RokuDeployError<T = unknown> extends Error {
 /**
  * Intermediate base class for device communication errors.
  * These errors occur when communicating with a Roku device.
+ * @public
  */
 export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
     /**
@@ -161,6 +173,7 @@ export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
 
 /**
  * Intermediate base class for configuration errors.
+ * @public
  */
 export abstract class ConfigurationError extends RokuDeployError<ConfigurationErrorDetails> {
     /**
@@ -177,6 +190,7 @@ export abstract class ConfigurationError extends RokuDeployError<ConfigurationEr
 
 /**
  * Thrown when the device returns an unexpected HTTP status code
+ * @public
  */
 export class InvalidDeviceResponseCodeError extends DeviceError {
     public readonly code = RokuDeployErrorCode.INVALID_RESPONSE_CODE;
@@ -184,6 +198,7 @@ export class InvalidDeviceResponseCodeError extends DeviceError {
 
 /**
  * Thrown when authentication fails (HTTP 401)
+ * @public
  */
 export class UnauthorizedDeviceResponseError extends DeviceError {
     public readonly code = RokuDeployErrorCode.UNAUTHORIZED;
@@ -191,6 +206,7 @@ export class UnauthorizedDeviceResponseError extends DeviceError {
 
 /**
  * Thrown when the device returns an error message in the response body
+ * @public
  */
 export class FailedDeviceResponseError extends DeviceError {
     public readonly code = RokuDeployErrorCode.FAILED_RESPONSE;
@@ -198,6 +214,7 @@ export class FailedDeviceResponseError extends DeviceError {
 
 /**
  * Thrown when the device response cannot be parsed
+ * @public
  */
 export class UnparsableDeviceResponseError extends DeviceError {
     public readonly code = RokuDeployErrorCode.UNPARSABLE_RESPONSE;
@@ -205,6 +222,7 @@ export class UnparsableDeviceResponseError extends DeviceError {
 
 /**
  * Thrown when the device returns an unexpected response that doesn't fit other categories
+ * @public
  */
 export class UnknownDeviceResponseError extends DeviceError {
     public readonly code = RokuDeployErrorCode.UNKNOWN_RESPONSE;
@@ -212,6 +230,7 @@ export class UnknownDeviceResponseError extends DeviceError {
 
 /**
  * Thrown when the device cannot be reached
+ * @public
  */
 export class DeviceUnreachableError extends DeviceError {
     public readonly code = RokuDeployErrorCode.DEVICE_UNREACHABLE;
@@ -219,6 +238,7 @@ export class DeviceUnreachableError extends DeviceError {
 
 /**
  * Thrown when ECP (External Control Protocol) is disabled on the device
+ * @public
  */
 export class EcpNetworkAccessModeDisabledError extends DeviceError {
     public readonly code = RokuDeployErrorCode.ECP_DISABLED;
@@ -227,6 +247,7 @@ export class EcpNetworkAccessModeDisabledError extends DeviceError {
 /**
  * Thrown when a Roku device refuses to accept connections because it requires
  * the user to check for updates (even if no updates are actually available).
+ * @public
  */
 export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDetails> {
     constructor(details?: ConnectionErrorDetails, cause?: Error) {
@@ -242,6 +263,7 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
  * Thrown when a Roku device ends the connection unexpectedly (ECONNRESET).
  * Typically this happens when the device needs to check for updates,
  * but it can also happen for other reasons.
+ * @public
  */
 export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails> {
     // eslint-disable-next-line @typescript-eslint/no-useless-constructor
@@ -256,6 +278,7 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
 
 /**
  * Thrown when compilation fails during sideload
+ * @public
  */
 export class CompileError extends RokuDeployError<CompileErrorDetails> {
     public readonly code = RokuDeployErrorCode.COMPILE_ERROR;
@@ -271,6 +294,7 @@ export class CompileError extends RokuDeployError<CompileErrorDetails> {
 
 /**
  * Thrown when squashfs conversion fails
+ * @public
  */
 export class ConvertError extends RokuDeployError<ConvertErrorDetails> {
     public readonly code = RokuDeployErrorCode.CONVERT_ERROR;
@@ -278,6 +302,7 @@ export class ConvertError extends RokuDeployError<ConvertErrorDetails> {
 
 /**
  * Thrown when a required option is missing
+ * @public
  */
 export class MissingRequiredOptionError extends ConfigurationError {
     public readonly code = RokuDeployErrorCode.MISSING_REQUIRED_OPTION;
@@ -285,6 +310,7 @@ export class MissingRequiredOptionError extends ConfigurationError {
 
 /**
  * Thrown when an option has an invalid value
+ * @public
  */
 export class InvalidOptionError extends ConfigurationError {
     public readonly code = RokuDeployErrorCode.INVALID_OPTION;
@@ -292,6 +318,7 @@ export class InvalidOptionError extends ConfigurationError {
 
 /**
  * Thrown when the device firmware version doesn't support the requested operation
+ * @public
  */
 export class UnsupportedFirmwareVersionError extends RokuDeployError<UnsupportedFirmwareDetails> {
     public readonly code = RokuDeployErrorCode.UNSUPPORTED_FIRMWARE;
@@ -303,6 +330,7 @@ export class UnsupportedFirmwareVersionError extends RokuDeployError<Unsupported
 
 /**
  * Check if an error is a RokuDeployError
+ * @public
  */
 export function isRokuDeployError(e: unknown): e is RokuDeployError {
     return e instanceof RokuDeployError;
@@ -310,6 +338,7 @@ export function isRokuDeployError(e: unknown): e is RokuDeployError {
 
 /**
  * Check if an error is a DeviceError
+ * @public
  */
 export function isDeviceError(e: unknown): e is DeviceError {
     return e instanceof DeviceError;
@@ -317,6 +346,7 @@ export function isDeviceError(e: unknown): e is DeviceError {
 
 /**
  * Check if an error is a ConfigurationError
+ * @public
  */
 export function isConfigurationError(e: unknown): e is ConfigurationError {
     return e instanceof ConfigurationError;
@@ -324,6 +354,7 @@ export function isConfigurationError(e: unknown): e is ConfigurationError {
 
 /**
  * Check if an error has a specific error code
+ * @public
  */
 export function hasErrorCode<T extends RokuDeployErrorCode>(
     e: unknown,
@@ -334,6 +365,7 @@ export function hasErrorCode<T extends RokuDeployErrorCode>(
 
 /**
  * Check if an error is an UpdateCheckRequiredError
+ * @public
  */
 export function isUpdateCheckRequiredError(e: unknown): e is UpdateCheckRequiredError {
     return e instanceof UpdateCheckRequiredError;
@@ -341,6 +373,7 @@ export function isUpdateCheckRequiredError(e: unknown): e is UpdateCheckRequired
 
 /**
  * Check if an error is a ConnectionResetError
+ * @public
  */
 export function isConnectionResetError(e: unknown): e is ConnectionResetError {
     return e instanceof ConnectionResetError;
@@ -348,6 +381,7 @@ export function isConnectionResetError(e: unknown): e is ConnectionResetError {
 
 /**
  * Check if an error is a CompileError
+ * @public
  */
 export function isCompileError(e: unknown): e is CompileError {
     return e instanceof CompileError;
@@ -355,6 +389,7 @@ export function isCompileError(e: unknown): e is CompileError {
 
 /**
  * Check if an error is an UnauthorizedDeviceResponseError
+ * @public
  */
 export function isUnauthorizedError(e: unknown): e is UnauthorizedDeviceResponseError {
     return e instanceof UnauthorizedDeviceResponseError;
@@ -362,6 +397,7 @@ export function isUnauthorizedError(e: unknown): e is UnauthorizedDeviceResponse
 
 /**
  * Check if an error is an InvalidDeviceResponseCodeError
+ * @public
  */
 export function isInvalidDeviceResponseCodeError(e: unknown): e is InvalidDeviceResponseCodeError {
     return e instanceof InvalidDeviceResponseCodeError;
@@ -369,6 +405,7 @@ export function isInvalidDeviceResponseCodeError(e: unknown): e is InvalidDevice
 
 /**
  * Check if an error is a FailedDeviceResponseError
+ * @public
  */
 export function isFailedDeviceResponseError(e: unknown): e is FailedDeviceResponseError {
     return e instanceof FailedDeviceResponseError;
@@ -376,6 +413,7 @@ export function isFailedDeviceResponseError(e: unknown): e is FailedDeviceRespon
 
 /**
  * Check if an error is an UnparsableDeviceResponseError
+ * @public
  */
 export function isUnparsableDeviceResponseError(e: unknown): e is UnparsableDeviceResponseError {
     return e instanceof UnparsableDeviceResponseError;
@@ -383,6 +421,7 @@ export function isUnparsableDeviceResponseError(e: unknown): e is UnparsableDevi
 
 /**
  * Check if an error is an UnknownDeviceResponseError
+ * @public
  */
 export function isUnknownDeviceResponseError(e: unknown): e is UnknownDeviceResponseError {
     return e instanceof UnknownDeviceResponseError;
@@ -390,6 +429,7 @@ export function isUnknownDeviceResponseError(e: unknown): e is UnknownDeviceResp
 
 /**
  * Check if an error is a DeviceUnreachableError
+ * @public
  */
 export function isDeviceUnreachableError(e: unknown): e is DeviceUnreachableError {
     return e instanceof DeviceUnreachableError;
@@ -397,6 +437,7 @@ export function isDeviceUnreachableError(e: unknown): e is DeviceUnreachableErro
 
 /**
  * Check if an error is an EcpNetworkAccessModeDisabledError
+ * @public
  */
 export function isEcpNetworkAccessModeDisabledError(e: unknown): e is EcpNetworkAccessModeDisabledError {
     return e instanceof EcpNetworkAccessModeDisabledError;
@@ -404,6 +445,7 @@ export function isEcpNetworkAccessModeDisabledError(e: unknown): e is EcpNetwork
 
 /**
  * Check if an error is a ConvertError
+ * @public
  */
 export function isConvertError(e: unknown): e is ConvertError {
     return e instanceof ConvertError;
@@ -411,6 +453,7 @@ export function isConvertError(e: unknown): e is ConvertError {
 
 /**
  * Check if an error is a MissingRequiredOptionError
+ * @public
  */
 export function isMissingRequiredOptionError(e: unknown): e is MissingRequiredOptionError {
     return e instanceof MissingRequiredOptionError;
@@ -418,6 +461,7 @@ export function isMissingRequiredOptionError(e: unknown): e is MissingRequiredOp
 
 /**
  * Check if an error is an InvalidOptionError
+ * @public
  */
 export function isInvalidOptionError(e: unknown): e is InvalidOptionError {
     return e instanceof InvalidOptionError;
@@ -425,6 +469,7 @@ export function isInvalidOptionError(e: unknown): e is InvalidOptionError {
 
 /**
  * Check if an error is an UnsupportedFirmwareVersionError
+ * @public
  */
 export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedFirmwareVersionError {
     return e instanceof UnsupportedFirmwareVersionError;
@@ -437,6 +482,7 @@ export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedF
 /**
  * Extract HttpDetails from a request library response.
  * This abstracts the response format so we can switch HTTP libraries later.
+ * @public
  */
 export function extractHttpDetails(
     response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string; headers?: Record<string, string> } } | undefined,

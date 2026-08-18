@@ -2,6 +2,7 @@
 
 /**
  * Configuration for a local network device (IP, hostname, domain, or *.local)
+ * @public
  */
 export interface LocalDeviceConfig {
     host: string;
@@ -11,6 +12,7 @@ export interface LocalDeviceConfig {
 
 /**
  * Configuration for an RCE device addressed by ESN
+ * @public
  */
 export interface RceDeviceConfigByEsn {
     esn: string;
@@ -20,6 +22,7 @@ export interface RceDeviceConfigByEsn {
 /**
  * Configuration for an RCE device addressed by device ID (the numeric id the management api
  * assigns, as seen in `DeviceOut.id`)
+ * @public
  */
 export interface RceDeviceConfigById {
     id: number;
@@ -28,6 +31,7 @@ export interface RceDeviceConfigById {
 
 /**
  * Configuration for an RCE device addressed by instance URL
+ * @public
  */
 export interface RceDeviceConfigByUrl {
     instanceUrl: string;
@@ -36,6 +40,7 @@ export interface RceDeviceConfigByUrl {
 
 /**
  * Configuration for any RCE (Roku Cloud Emulator) device
+ * @public
  */
 export type RceDeviceConfig =
     | RceDeviceConfigByEsn
@@ -45,12 +50,14 @@ export type RceDeviceConfig =
 /**
  * Configuration specifying how to connect to a device.
  * Either a local network device or an RCE device.
+ * @public
  */
 export type DeviceConfig = LocalDeviceConfig | RceDeviceConfig;
 
 /**
  * What the user provides as a device option.
  * Either a registry name (string) or an inline device config.
+ * @public
  */
 export type DeviceOption = string | DeviceConfig;
 
@@ -59,11 +66,13 @@ export type DeviceOption = string | DeviceConfig;
 /**
  * Any object that may carry device identifier keys (a DeviceConfig, a registry entry, etc.)
  * Lets the guards below work on partially-populated shapes, not just the strict union.
+ * @public
  */
-type DeviceConfigLike = Partial<LocalDeviceConfig & RceDeviceConfigByEsn & RceDeviceConfigById & RceDeviceConfigByUrl>;
+export type DeviceConfigLike = Partial<LocalDeviceConfig & RceDeviceConfigByEsn & RceDeviceConfigById & RceDeviceConfigByUrl>;
 
 /**
  * Check if a device config is for a local network device (has a non-empty host)
+ * @public
  */
 export function isLocalDeviceConfig(config: DeviceConfigLike): config is LocalDeviceConfig {
     return !!config.host;
@@ -71,6 +80,7 @@ export function isLocalDeviceConfig(config: DeviceConfigLike): config is LocalDe
 
 /**
  * Check if a device config is for an RCE device
+ * @public
  */
 export function isRceDeviceConfig(config: DeviceConfigLike): config is RceDeviceConfig {
     return isRceDeviceConfigByEsn(config) || isRceDeviceConfigById(config) || isRceDeviceConfigByUrl(config);

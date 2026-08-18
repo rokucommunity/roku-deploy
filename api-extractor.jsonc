@@ -1,0 +1,75 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+    /**
+     * The entry point that api-extractor analyzes. Everything reachable from here is a candidate
+     * for the public API; we then use release tags (@public / @internal) to decide what's actually exposed.
+     */
+    "mainEntryPointFilePath": "<projectFolder>/dist/index.d.ts",
+    "projectFolder": ".",
+    "compiler": {
+        "tsconfigFilePath": "<projectFolder>/tsconfig.json"
+    },
+    /**
+     * The API report (.api.md) is the committed contract describing our public surface.
+     * Both scripts regenerate the trimmed dist/index.d.ts rollup; the difference is what they do with
+     * this report file:
+     *   - `npm run api:build-and-validate` (api-extractor run, no --local): CI gate — compares against the
+     *     committed report and FAILS if the public API drifted.
+     *   - `npm run api:build-and-update` (api-extractor run --local): OVERWRITES the committed report to
+     *     accept an intentional API change (does not fail).
+     */
+    "apiReport": {
+        "enabled": true,
+        "reportFolder": "<projectFolder>/api",
+        "reportFileName": "roku-deploy.api.md"
+    },
+    /**
+     * Roll all of the per-file .d.ts files up into a single index.d.ts, trimming out everything
+     * that is NOT marked @public. This trimmed file is what we ship to consumers (see "typings" in package.json),
+     * so consumers only ever see the API we deliberately marked @public.
+     */
+    "dtsRollup": {
+        "enabled": true,
+        "untrimmedFilePath": "<projectFolder>/.tmp/index.untrimmed.d.ts",
+        "publicTrimmedFilePath": "<projectFolder>/dist/index.d.ts"
+    },
+    "docModel": {
+        "enabled": false
+    },
+    "tsdocMetadata": {
+        "enabled": false
+    },
+    /**
+     * Every exported symbol must carry a release tag (@public / @internal); an untagged export is a
+     * hard error so nothing can silently leak into the public surface.
+     */
+    "messages": {
+        /**
+         * TSDoc *syntax* linting (hyphens in @param, escaping >/}, unknown tags, etc.) is not what this
+         * check is about — we only care about the API surface. Silence those so the signal is release
+         * tags and forgotten exports.
+         */
+        "tsdocMessageReporting": {
+            "default": {
+                "logLevel": "none"
+            }
+        },
+        "extractorMessageReporting": {
+            "ae-missing-release-tag": {
+                "logLevel": "error",
+                "addToApiReportFile": true
+            },
+            "ae-forgotten-export": {
+                "logLevel": "error",
+                "addToApiReportFile": true
+            },
+            /**
+             * The underscore-prefix convention for @internal names is stylistic, not a surface concern.
+             * Don't enforce it (renaming internal symbols would churn call sites for no API benefit).
+             */
+            "ae-internal-missing-underscore": {
+                "logLevel": "none"
+            }
+        }
+    }
+}
