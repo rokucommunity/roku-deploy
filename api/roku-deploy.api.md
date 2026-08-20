@@ -160,22 +160,6 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
 // @public (undocumented)
 export type DeleteDevChannelOptions = BaseRequestOptions;
 
-// @public (undocumented)
-export interface DeployOptions extends BaseRequestOptions {
-    // (undocumented)
-    cwd?: string;
-    // (undocumented)
-    deleteDevChannel?: boolean;
-    // (undocumented)
-    files?: FileEntry[];
-    // (undocumented)
-    out?: string;
-    // (undocumented)
-    rootDir?: string;
-    // (undocumented)
-    stagingDir?: string;
-}
-
 // @public
 export type DeviceConfig = LocalDeviceConfig | RceDeviceConfig;
 
@@ -602,14 +586,6 @@ export interface GetFilePathsOptions {
 // @public (undocumented)
 export type GetInstalledPackagesOptions = BaseRequestOptions;
 
-// @public (undocumented)
-export interface GetOutputZipFilePathOptions {
-    // (undocumented)
-    cwd?: string;
-    // (undocumented)
-    out?: string;
-}
-
 // Warning: (ae-internal-missing-underscore) The name "hasErrorCode" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal
@@ -780,7 +756,9 @@ export interface LocalDeviceConfig {
     host: string;
 }
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "ManifestData" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export interface ManifestData {
     // (undocumented)
     [key: string]: any;
@@ -1126,9 +1104,6 @@ export interface RokuMessages {
 }
 
 // @public (undocumented)
-export type RokuPackage = RokuPlugin;
-
-// @public (undocumented)
 export interface RokuPlugin {
     // (undocumented)
     appType: 'channel' | 'dcl';
@@ -1178,7 +1153,9 @@ export interface RokuRendezvousItem {
 // @public (undocumented)
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
-// @public (undocumented)
+// Warning: (ae-internal-missing-underscore) The name "SendKeyEventOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
 export interface SendKeyEventOptions extends BaseEcpOptions {
     // (undocumented)
     action?: 'keydown' | 'keypress' | 'keyup';

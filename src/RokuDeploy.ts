@@ -2472,7 +2472,7 @@ export class RokuDeploy {
 }
 
 /**
- * @public
+ * @internal
  */
 export interface ManifestData {
     [key: string]: any;
@@ -2516,11 +2516,6 @@ export interface RokuPlugin {
     pkgPath: string;
     size: string;
 }
-/**
- * @public
- */
-export type RokuPackage = RokuPlugin;
-
 /**
  * @public
  */
@@ -2689,7 +2684,7 @@ export enum RemoteKey {
 export type RemoteKeyText = keyof typeof RemoteKey;
 
 /**
- * @public
+ * @internal
  */
 export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
@@ -3031,26 +3026,6 @@ export type RebootDeviceOptions = BaseRequestOptions;
  * @public
  */
 export type CheckForUpdateOptions = BaseRequestOptions;
-
-/**
- * @public
- */
-export interface GetOutputZipFilePathOptions {
-    out?: string;
-    cwd?: string;
-}
-
-/**
- * @public
- */
-export interface DeployOptions extends BaseRequestOptions {
-    files?: FileEntry[];
-    rootDir?: string;
-    stagingDir?: string;
-    deleteDevChannel?: boolean;
-    out?: string;
-    cwd?: string;
-}
 
 /**
  * @public
