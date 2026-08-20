@@ -551,7 +551,9 @@ export interface ExitAppOptions extends BaseEcpOptions {
     force?: boolean;
 }
 
-// @public
+// Warning: (ae-internal-missing-underscore) The name "extractHttpDetails" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
 export function extractHttpDetails(response: {
     statusCode?: number;
     headers?: Record<string, string>;
@@ -608,7 +610,9 @@ export interface GetOutputZipFilePathOptions {
     out?: string;
 }
 
-// @public
+// Warning: (ae-internal-missing-underscore) The name "hasErrorCode" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
 export function hasErrorCode<T extends RokuDeployErrorCode>(e: unknown, code: T): e is RokuDeployError & {
     code: T;
 };
@@ -986,6 +990,7 @@ export class RokuDeploy {
     // (undocumented)
     getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult>;
+    // @internal
     getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode>;
     getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]>;
     // (undocumented)
@@ -998,7 +1003,6 @@ export class RokuDeploy {
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
     loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
-    static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
     queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp>;
     queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]>;
     queryAppState(options: QueryAppStateOptions): Promise<RokuAppState>;

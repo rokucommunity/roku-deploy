@@ -354,7 +354,7 @@ export function isConfigurationError(e: unknown): e is ConfigurationError {
 
 /**
  * Check if an error has a specific error code
- * @public
+ * @internal
  */
 export function hasErrorCode<T extends RokuDeployErrorCode>(
     e: unknown,
@@ -482,7 +482,7 @@ export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedF
 /**
  * Extract HttpDetails from a request library response.
  * This abstracts the response format so we can switch HTTP libraries later.
- * @public
+ * @internal
  */
 export function extractHttpDetails(
     response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string; headers?: Record<string, string> } } | undefined,

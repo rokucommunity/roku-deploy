@@ -55,7 +55,7 @@ export class RokuDeploy {
      * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
      * both channels and component libraries).
      */
-    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
+    private static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
 
     /**
      * The logger instance for this RokuDeploy instance
@@ -655,6 +655,7 @@ export class RokuDeploy {
      *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
      *   - 'limited': Restricted functionality, text and movement commands only
      *   - 'permissive': Full access for internal networks
+     * @internal
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
