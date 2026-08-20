@@ -970,8 +970,6 @@ export class RokuDeploy {
     captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult>;
     // (undocumented)
     checkForUpdate(options: CheckForUpdateOptions): Promise<HttpResponse>;
-    // @internal (undocumented)
-    checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>): void;
     // (undocumented)
     closeChannel(options: CloseChannelOptions): Promise<void>;
     convertToSquashfs(options: ConvertToSquashfsOptions): Promise<any>;

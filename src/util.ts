@@ -12,6 +12,12 @@ import type { StandardizedFileEntry } from './RokuDeploy';
 import * as isGlob from 'is-glob';
 import * as picomatch from 'picomatch';
 
+/**
+ * Internal helper utilities for roku-deploy. Not part of the public API — the only helpers
+ * we expose publicly are the `standardizePath`/`standardizePathPosix` tagged-template
+ * functions exported at the bottom of this file.
+ * @internal
+ */
 export class Util {
     //Map<filesystem root path, is case-sensitive>
     private isFileSystemCaseSensitiveCache = new Map<string, boolean>();
@@ -539,8 +545,10 @@ export class Util {
     private static wordSplitRegex = /[A-Z\xc0-\xd6\xd8-\xde]?[a-z\xdf-\xf6\xf8-\xff]+(?:['’](?:d|ll|m|re|s|t|ve))?(?=[A-Z\xc0-\xd6\xd8-\xde]|\b|_|\d)|[A-Z\xc0-\xd6\xd8-\xde]+(?:['’](?:D|LL|M|RE|S|T|VE))?(?=[A-Z\xc0-\xd6\xd8-\xde][a-z\xdf-\xf6\xf8-\xff]|\b|_|\d)|[A-Z\xc0-\xd6\xd8-\xde]?[a-z\xdf-\xf6\xf8-\xff]+|[A-Z\xc0-\xd6\xd8-\xde]+|\d+/g;
 }
 
+/** @internal */
 export let util = new Util();
 
+/** @internal */
 export function defer<T>() {
     let _resolve: (value?: PromiseLike<T> | T) => void;
     let _reject: (reason?: any) => void;
@@ -592,6 +600,7 @@ export function defer<T>() {
     };
 }
 
+/** @internal */
 export interface Deferred<T> {
     promise: Promise<T>;
     tryResolve: (value?: PromiseLike<T> | T) => void;
