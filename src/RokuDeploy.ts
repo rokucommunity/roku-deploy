@@ -617,7 +617,7 @@ export class RokuDeploy {
             }
             throw e;
         }
-        const deviceInfoRoot = result.json?.['device-info'];
+        const deviceInfoRoot = (await this.parseEcpXml(result))?.['device-info'];
         if (!deviceInfoRoot) {
             //the response was not device-info XML (an empty body, a proxy error page, ...) - there
             //is no underlying error to carry as a cause, the body just wasn't what we asked for
@@ -891,8 +891,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Send a raw External Control Protocol (ECP) request to a device and return the response with
-     * its XML body parsed to JSON. This is the single ECP transport: every ECP convenience method
+     * Send a raw External Control Protocol (ECP) request to a device and return the raw response
+     * (status code and body). This is the single ECP transport: every ECP convenience method
      * funnels through it, and it is public so any ECP route can be reached even when no dedicated
      * wrapper exists for it yet.
      *
@@ -942,8 +942,7 @@ export class RokuDeploy {
 
         return {
             status: response?.response?.statusCode,
-            body: response?.body,
-            json: await this.parseEcpXml(response?.body, response)
+            body: response?.body
         };
     }
 
@@ -1074,7 +1073,7 @@ export class RokuDeploy {
         });
         //devices report exit-app failures through the ECP envelope (a 202 with the error in the
         //body), so surface that message; fall back to a plain status check when there is no envelope
-        const root = result.json?.['exit-app'];
+        const root = (await this.parseEcpXml(result))?.['exit-app'];
         if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
             throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
                 httpDetails: this.buildEcpHttpDetails(result)
@@ -1104,11 +1103,13 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
+        let json: Record<string, any> | undefined;
         try {
             result = await this.sendEcpRequest(options.device, 'query/apps', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
+            json = await this.parseEcpXml(result);
         } catch (e) {
             if (e instanceof UnparsableDeviceResponseError) {
                 this.logger.warn('Error parsing installed app list:', e);
@@ -1117,7 +1118,7 @@ export class RokuDeploy {
             throw e;
         }
         this.assertEcpStatusOk(result);
-        const rawAppNodes = result.json?.apps?.app;
+        const rawAppNodes = json?.apps?.app;
         if (!rawAppNodes) {
             return [];
         }
@@ -1144,11 +1145,13 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
+        let json: Record<string, any> | undefined;
         try {
             result = await this.sendEcpRequest(options.device, 'query/active-app', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
+            json = await this.parseEcpXml(result);
         } catch (e) {
             if (e instanceof UnparsableDeviceResponseError) {
                 this.logger.warn('Error parsing active app:', e);
@@ -1157,7 +1160,7 @@ export class RokuDeploy {
             throw e;
         }
         this.assertEcpStatusOk(result);
-        const rawActiveAppNode = result.json?.['active-app']?.app;
+        const rawActiveAppNode = json?.['active-app']?.app;
         if (!rawActiveAppNode) {
             return {};
         }
@@ -1178,7 +1181,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
+        const root = await this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
 
         const registry = root.registry ?? {};
         const sections: RokuRegistry['sections'] = {};
@@ -1216,7 +1219,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
+        const root = await this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
 
         const knownStates: RokuAppStateValue[] = ['active', 'background', 'inactive'];
         const state = knownStates.find(knownState => knownState === root.state?.toLowerCase()) ?? 'unknown';
@@ -1243,7 +1246,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
+        const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
 
         return {
             trackingEnabled: root.data?.['tracking-enabled'] === 'true',
@@ -1272,7 +1275,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
+        const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
         return root['tracking-enabled'] === 'true';
     }
 
@@ -1957,7 +1960,8 @@ export class RokuDeploy {
      * undefined so the caller can inspect the status and raw body instead; a body that looks like
      * XML but cannot be parsed throws.
      */
-    private async parseEcpXml(body: string, response?: HttpResponse): Promise<Record<string, any> | undefined> {
+    private async parseEcpXml(result: EcpResult): Promise<Record<string, any> | undefined> {
+        const body = result.body;
         if (typeof body !== 'string' || !body.trim().startsWith('<')) {
             return undefined;
         }
@@ -1969,7 +1973,7 @@ export class RokuDeploy {
             return { ...parsedContent };
         } catch (e) {
             throw new UnparsableDeviceResponseError('Could not parse ECP response', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             }, e instanceof Error ? e : undefined);
         }
     }
@@ -2003,8 +2007,7 @@ export class RokuDeploy {
                 });
                 return {
                     status: response?.response?.statusCode,
-                    body: response?.body,
-                    json: undefined
+                    body: response?.body
                 } as EcpResult;
             } catch (e) {
                 this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
@@ -2111,8 +2114,8 @@ export class RokuDeploy {
      * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
      * UnparsableDeviceResponseError when the expected root element is missing entirely.
      */
-    private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
-        const root = result.json?.[rootKey];
+    private async getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Promise<Record<string, any>> {
+        const root = (await this.parseEcpXml(result))?.[rootKey];
         if (!root) {
             //a non-xml ECP response is usually the device explaining itself in plain text (for
             //example `ECP command not allowed in Limited mode.`), so carry that text in the error
@@ -2785,11 +2788,6 @@ export interface EcpResult {
     status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
-    /**
-     * The XML response body parsed to a plain object (keyed by the XML root element), or undefined
-     * when the response had no XML body
-     */
-    json: Record<string, any> | undefined;
 }
 
 export interface QueryRegistryOptions extends BaseEcpOptions {
