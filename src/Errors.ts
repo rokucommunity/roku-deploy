@@ -22,8 +22,7 @@ export enum RokuDeployErrorCode {
 }
 
 /**
- * Abstracted HTTP request details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP request details, independent of the underlying HTTP library
  */
 export interface HttpRequestDetails {
     url?: string;
@@ -33,8 +32,7 @@ export interface HttpRequestDetails {
 }
 
 /**
- * Abstracted HTTP response details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP response details, independent of the underlying HTTP library
  */
 export interface HttpResponseDetails {
     statusCode?: number;
@@ -435,8 +433,7 @@ export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedF
 // ============================================================================
 
 /**
- * Extract HttpDetails from a request library response.
- * This abstracts the response format so we can switch HTTP libraries later.
+ * Extract HttpDetails from a request library response
  */
 export function extractHttpDetails(
     response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string; headers?: Record<string, string> } } | undefined,

@@ -892,18 +892,12 @@ export class RokuDeploy {
 
     /**
      * Send a raw External Control Protocol (ECP) request to a device and return the response with
-     * its XML body parsed to JSON. This is the single ECP transport: every ECP convenience method
-     * funnels through it, and it is public so any ECP route can be reached even when no dedicated
-     * wrapper exists for it yet.
-     *
-     * Local devices are addressed as `http://<host>:<ecpPort>/<route>`; Cloud Emulator devices go
-     * through their instance's `/ecp1/<route>` proxy (authenticated with the config's api token),
-     * so callers never branch on device kind.
+     * its XML body parsed to JSON. Works for both local and Cloud Emulator devices, and can reach
+     * any ECP route even when no dedicated wrapper exists for it yet.
      * @param device the device to send the request to
      * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
      * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
-     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
-     *                chanperf response, for example) come back to the caller instead of throwing.
+     *                `verify` defaults to false so raw ECP status bodies come back to the caller instead of throwing.
      */
     public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
         options = { ...this.options, ...options } as EcpOptions;
@@ -986,11 +980,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Press a sequence of remote keys, in order. Each press rides the same transport as `keyPress`
-     * (LAN ECP for local devices; the RCE instance-api key route with the raw ecp1-proxy fallback
-     * for Cloud Emulator devices), waits for the previous press's response plus a small delay
-     * (keyDelayMs) so on-screen navigation keeps up, and the first failed press throws with the
-     * failing key and step.
+     * Press a sequence of remote keys, in order, waiting `keyDelayMs` between presses so on-screen
+     * navigation keeps up. The first failed press throws with the failing key and step.
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...options } as SendKeySequenceOptions;
@@ -1014,11 +1005,9 @@ export class RokuDeploy {
     }
 
     /**
-     * Enter the developer-settings key combo on a Roku Cloud Emulator device through its instance
-     * api (the same combo a physical remote's key sequence would send). The device then shows the
-     * on-screen developer setup wizard for the user to complete; this call only triggers that
-     * screen, it does not finish the setup itself. Local devices are not supported - the combo
-     * endpoint only exists on the RCE instance api.
+     * Enter the developer-settings key combo on a Roku Cloud Emulator device, causing it to show
+     * the on-screen developer setup wizard for the user to complete (this call only triggers that
+     * screen, it does not finish the setup). Local devices are not supported.
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
@@ -1470,11 +1459,10 @@ export class RokuDeploy {
     }
 
     /**
-     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
-     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
-     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
-     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
-     * enhance it without making another request to the device.
+     * Enhance a raw device-info object into its normalized form: camel-cases the property names and
+     * normalizes each value to its native format (booleans, numbers, decoded html entities, etc.).
+     * The same enhancement `getDeviceInfo` applies with `{ enhance: true }`, for callers that
+     * already have a raw device-info object and don't want another device request.
      * @param deviceInfo the raw device-info object to enhance
      */
     public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
@@ -2597,10 +2585,9 @@ export interface ValidateDeveloperPasswordOptions {
 }
 
 /**
- * The remote-control keys a Roku understands, in the canonical casing the device expects. Exposed
- * for convenience and discoverability: pass a `RemoteKey` value and you get the casing right without
- * thinking about it. It is NOT an enforced list - every key option also accepts a raw string, so a
- * key without a member here (or a `Lit_<char>` literal) can still be sent.
+ * The remote-control keys a Roku understands, in the canonical casing the device expects. This is
+ * NOT an enforced list - every key option also accepts a raw string, so a key without a member
+ * here (or a `Lit_<char>` literal) can still be sent.
  */
 export enum RemoteKey {
     Back = 'Back',

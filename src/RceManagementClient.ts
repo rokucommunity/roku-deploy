@@ -4,9 +4,8 @@ import type { RceDeviceConfig } from './DeviceConfig';
 import { isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
 
 /**
- * Default base URL for the Roku Cloud Emulator (RCE) management API. This is the core management
- * surface (device inventory, lifecycle, snapshots, firmware, usage) and is distinct from a running
- * device's own instance API. It is authenticated with an RCE bearer token.
+ * Default base URL for the Roku Cloud Emulator (RCE) management API (distinct from a running
+ * device's own instance API).
  */
 export const defaultRceManagementBaseUrl = 'https://api.rce.roku.com/api/v1';
 
@@ -70,8 +69,8 @@ export class RceManagementClient {
     }
 
     /**
-     * Boot a device from a snapshot. Resolves with the device, whose running_device block carries
-     * the instance API URL and video (Janus) connection details.
+     * Boot a device from a snapshot. Resolves with the device, whose `running_device` block carries
+     * the instance connection details.
      */
     public startDevice(options: StartDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/start`, { body: options.start, token: options.token });
@@ -153,10 +152,9 @@ export class RceManagementClient {
     }
 
     /**
-     * Normalize a device config's id to the numeric device id the management api uses. The type
-     * says number, but device configs also arrive from untyped sources (a json launch config, a
-     * javascript caller), so a numeric string is coerced and anything else throws a clear error
-     * instead of turning into a request to `/devices/NaN` and a baffling server-side error.
+     * Normalize a device config's id to the numeric device id the management api uses. Device
+     * configs also arrive from untyped sources, so a numeric string is coerced and anything else
+     * throws a clear error instead of turning into a request to `/devices/NaN`.
      */
     private parseDeviceId(id: number | string): number {
         if (typeof id === 'number' && Number.isInteger(id)) {
@@ -182,25 +180,19 @@ export class RceManagementClient {
     }
 
     /**
-     * Single choke point for HTTP so auth and error handling stay consistent, and so tests can stub
-     * one method rather than the network. A per-call token wins over the constructor token.
+     * Sends an authenticated request and returns the parsed JSON body. A per-call token wins over
+     * the constructor token. Non-2xx responses reject.
      */
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse> {
         const url = this.baseUrl + path + this.buildQueryString(options?.query);
         const needleOptions: needle.NeedleOptions = {
             json: true,
-            //needle's `timeout` alias only bounds connection establishment; a server that accepts
-            //the connection but never responds would hang the request forever. Map the timeout to
-            //both the connection and first-response-byte timers, the same way request.ts does (and
-            //like there, deliberately do NOT set `read_timeout` - see request.ts for the hazards
-            //of needle's read timer)
+            //bound both connection establishment and the first response byte, the same way
+            //request.ts does (and like there, deliberately do NOT set `read_timeout`)
             open_timeout: this.timeout,
             response_timeout: this.timeout,
-            //needle's default (Node's global pooling agent, no `Connection: close`) leaves a
-            //keep-alive socket open after the response, which keeps the Node event loop alive so a
-            //CLI process that only talked to the management api never exits - see request.ts for
-            //the full story. A fresh un-pooled socket per request costs a TLS handshake, which is
-            //fine for this low-volume api.
+            //disable keep-alive/pooling so a lingering socket doesn't hold the Node event loop
+            //open after the response (see request.ts); fine for this low-volume api
             connection: 'close',
             agent: false,
             headers: {

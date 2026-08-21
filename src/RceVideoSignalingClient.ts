@@ -4,34 +4,16 @@ import * as WebSocket from 'ws';
 import type { IceServer } from './RceManagementClient';
 
 /**
- * Negotiates a Roku Cloud Emulator (RCE) device's video/audio stream from its Janus gateway, using
- * the standard Janus WebSocket JSON gateway protocol (subprotocol 'janus-protocol'):
+ * Negotiates a Roku Cloud Emulator (RCE) device's video/audio stream from its Janus gateway over
+ * the Janus WebSocket signaling protocol: connect() resolves with the gateway's SDP offer, the
+ * caller answers it (with its own RTCPeerConnection) via sendAnswer(), and trickles its local ICE
+ * candidates via sendCandidate()/sendCandidatesComplete().
  *
- *   1. connect, then `{janus:'create'}` for a session
- *   2. `{janus:'attach', plugin:'janus.plugin.streaming'}` for a plugin handle
- *   3. `{janus:'message', body:{request:'watch', id, pin}}`, which resolves with an `event`
- *      carrying a jsep SDP offer
- *   4. the caller answers the offer (with its own RTCPeerConnection) and calls sendAnswer(), which
- *      sends `{janus:'message', body:{request:'start'}, jsep: answer}`
- *   5. the caller trickles its local ICE candidates via sendCandidate()/sendCandidatesComplete(),
- *      and a keepalive is sent every 25s (Janus sessions time out at 60s)
- *
- * This client owns the Janus *signaling* session only: it has no WebRTC dependency and never
- * creates a peer connection of its own. Offers, answers and ICE candidates are plain data in and
- * out; the caller is responsible for its own RTCPeerConnection and for feeding this class the
- * answer/candidates it produces.
- *
- * The reason this lives here rather than in the caller: the Janus WebSocket host used by RCE
- * instances requires an `Authorization: Bearer <management api token>` header on the WebSocket
- * handshake itself, which only a Node WebSocket client can set (a browser WebSocket cannot set
- * handshake headers), so this class is meant to run somewhere with Node's `ws`, handing the
- * resulting offer/answer/candidates off to wherever the actual peer connection lives (for example
- * across a message channel to a browser or webview).
- *
- * Janus acknowledges an asynchronous plugin request immediately with `{janus:'ack'}`, then delivers
- * the actual result later as `{janus:'event', ...}` (or `{janus:'success', ...}` for core-level
- * requests like create/attach/destroy). Both are treated as the resolution of the request that
- * shares their `transaction` id; the intervening `ack` is otherwise ignored.
+ * This client owns the *signaling* session only: it has no WebRTC dependency and never creates a
+ * peer connection of its own. It must run somewhere with Node's `ws`, because the RCE Janus host
+ * requires an `Authorization` header on the WebSocket handshake itself (which a browser WebSocket
+ * cannot set); the offer/answer/candidates are plain data that can be handed off to wherever the
+ * actual peer connection lives.
  */
 export class RceVideoSignalingClient extends EventEmitter {
     constructor(
@@ -60,8 +42,7 @@ export class RceVideoSignalingClient extends EventEmitter {
     /**
      * Rejects the websocket-handshake promise inside a negotiate() still waiting on 'open'. Stored
      * here because stop() strips the socket listeners that promise is built on, so stop() (and the
-     * unexpected-close handler) must be able to settle it directly or a connect() cancelled
-     * mid-handshake would sit unresolved until the negotiation timeout fired.
+     * unexpected-close handler) must be able to settle it directly.
      */
     private rejectConnected: ((error: Error) => void) | undefined;
 
@@ -76,15 +57,12 @@ export class RceVideoSignalingClient extends EventEmitter {
     }
 
     /**
-     * Connect and negotiate as far as the SDP offer. Resolves with the offer (and the configured
-     * ice servers, echoed back for the caller's convenience) once Janus's 'watch' request returns
-     * one. Rejects (and tears the session down via stop()) if negotiation has not reached that point
-     * within `negotiationTimeoutMs`, so a silently unresponsive gateway (a WAF sinkhole, a dropped
-     * session) fails loudly instead of leaving the caller waiting forever.
+     * Connect and negotiate as far as the SDP offer. Resolves with the offer and the configured ice
+     * servers. Rejects (and tears the session down) if negotiation has not completed within
+     * `negotiationTimeoutMs`.
      *
-     * One session at a time: a second connect() while one is active rejects (it would orphan the
-     * first websocket with its listeners still driving this client). Call stop() first; after
-     * stop() (or an unexpected close), connect() may be called again.
+     * One session at a time: a second connect() while one is active rejects. Call stop() first;
+     * after stop() (or an unexpected close), connect() may be called again.
      */
     public async connect(): Promise<RceVideoSignalingOffer> {
         if (this.webSocket) {
@@ -425,24 +403,20 @@ export class RceVideoSignalingClient extends EventEmitter {
 
 /**
  * Everything needed to negotiate a stream from a running RCE device's Janus gateway (built from the
- * device's `running_device` Janus fields, plus the management api token used for the WebSocket
- * handshake).
+ * device's `running_device` Janus fields).
  */
 export interface RceVideoSignalingConfig {
     websocketUrl: string;
     streamId: number;
     pin?: string;
     /**
-     * The management api's `janus_token` device field. This gateway uses Janus API-secret auth, so
-     * it is sent as the `apisecret` field on every Janus request (not `token`, a stored-token auth
-     * field Janus also supports but this gateway rejects with a 403 "Unauthorized request" on
-     * create). Distinct from `apiToken`, which authenticates the WebSocket handshake itself.
+     * The management api's `janus_token` device field, sent with every Janus request. Distinct from
+     * `apiToken`, which authenticates the WebSocket handshake itself.
      */
     janusToken?: string;
     /**
      * RCE management api bearer token, sent as `Authorization: Bearer <apiToken>` on the WebSocket
-     * handshake. The Janus WebSocket host requires this; it is not the same credential as
-     * `janusToken`.
+     * handshake. Not the same credential as `janusToken`.
      */
     apiToken: string;
     iceServers?: IceServer[];

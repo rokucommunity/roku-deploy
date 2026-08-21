@@ -27,12 +27,9 @@ export class Request {
         const { url, data, needleOptions } = this.translateOptions(params, 'POST');
         //Never let needle's own digest dance send a request body: needle sends the FULL body on the
         //unauthenticated first leg, but the Roku answers that leg's 401 without reading the body and closes
-        //the socket. A body still being written at that moment dies with a raw `write EPIPE`, and needle
-        //fails the whole request before its 401 retry can run. (Bodies small enough to fit in the socket
-        //buffers finish writing before the close, which is why only large zips ever hit this.)
-        //`request`/`postman-request` never had this problem because they never sent the body
-        //unauthenticated: the first leg was a bodyless probe, and the body only went out WITH the
-        //Authorization header. Replicate that here for any authenticated POST that has a body.
+        //the socket, so large bodies (e.g. zips) die with a raw `write EPIPE` before needle's 401 retry can
+        //run. `request`/`postman-request` only ever sent the body WITH the Authorization header (the first
+        //leg was a bodyless probe); replicate that here for any authenticated POST that has a body.
         if (data && needleOptions.auth === 'digest') {
             return this.postWithDigestPreflight(url, data, needleOptions, callback);
         }
@@ -135,31 +132,22 @@ export class Request {
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
             parse_response: false,
-            //`request` had a single `timeout` that governed how long to wait to establish the connection and
-            //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
-            //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
-            //every chunk and, in the digest-auth retry path, a read-timer can be left running after the request
-            //has already completed — it later fires `request.destroy()` and emits a spurious error, and (worse)
-            //keeps the Node event loop alive so a process that only made roku-deploy requests never exits.
+            //map `request`'s single `timeout` to needle's `open_timeout` (connection) and `response_timeout`
+            //(time to first response byte). Deliberately do NOT set `read_timeout`: in the digest-auth retry
+            //path its re-armed read-timer can outlive the request, later firing `request.destroy()` with a
+            //spurious error and keeping the Node event loop alive so the process never exits.
             open_timeout: params.timeout,
             response_timeout: params.timeout,
             headers: params.headers
         };
 
-        //`request` was configured with `agentOptions: { keepAlive: false }` so each exchange used a fresh
-        //socket that closed when done. needle does NOT honor `agentOptions`, and on modern Node it does not
-        //send `Connection: close` by default, so the socket to the Roku is left open (keep-alive) after the
-        //response. That lingering socket keeps the Node event loop alive, so a process that only made
-        //roku-deploy requests never exits. Translate the old keepAlive:false intent into needle's
-        //`connection: 'close'` so needle sends `Connection: close` and tears the socket down after each
-        //response. Only skip this if the caller explicitly asked to keep the connection alive.
-        //
-        //ALSO pass `agent: false`. needle defaults `agent` to null, which makes Node use `http.globalAgent`
-        //- a POOLING agent. The `Connection: close` header alone does NOT stop that pooling: the request
-        //immediately following an on-device delete could be handed a POOLED keep-alive socket that the Roku
-        //had already closed, producing an instant ECONNRESET ("socket hang up"). `agent: false` tells Node to
-        //create a brand-new, un-pooled socket for every request and destroy it afterward, so a dead socket
-        //can never be handed to the next request. The `Connection: close` header stays as belt-and-suspenders.
+        //`request` used `agentOptions: { keepAlive: false }` so each exchange got a fresh socket that closed
+        //when done. needle ignores `agentOptions` and leaves the socket open, which keeps the Node event
+        //loop alive so the process never exits — so send `Connection: close` via needle's `connection`
+        //option. ALSO pass `agent: false`: needle otherwise uses the POOLING `http.globalAgent`, which can
+        //hand the next request a pooled keep-alive socket the Roku already closed (instant ECONNRESET).
+        //`agent: false` forces a fresh, un-pooled socket per request; the `Connection: close` header stays
+        //as belt-and-suspenders. Only skip this if the caller explicitly asked to keep the connection alive.
         if (params.agentOptions?.keepAlive !== true) {
             needleOptions.connection = 'close';
             needleOptions.agent = false;
@@ -273,18 +261,10 @@ export class Request {
 
     /**
      * Reshape needle's response into the `request`-compatible response roku-deploy expects (and attaches
-     * to thrown errors).
-     *
-     * Maximum-parity strategy: needle's callback `resp` is the *same* underlying Node
-     * `http.IncomingMessage` that `postman-request` exposed (needle just augments it with `.body`/`.raw`/
-     * `.bytes`). So rather than fabricate a minimal plain object — which would drop everything underneath
-     * (`statusCode`/`statusMessage`/`rawHeaders`/`httpVersion*`/`socket`/`req`/`complete`/... that a
-     * consumer might reach into) — we KEEP needle's IncomingMessage and only layer on the two things
-     * `request`/`postman-request` added on top of it:
-     *   1. a `.request` object exposing the outgoing-request fields consumers read (`host`, `href`, ...),
-     *   2. a string `.body` (postman put the decoded string here; needle leaves a Buffer under
-     *      `parse_response:false`).
-     * This way the vast majority of the old response's reachable surface is reproduced for free.
+     * to thrown errors). needle's callback `resp` is the *same* underlying Node `http.IncomingMessage`
+     * that `postman-request` exposed, so we KEEP it (preserving its full reachable surface) and only
+     * layer on the two things `request`/`postman-request` added: a `.request` object exposing the
+     * outgoing-request fields consumers read, and a string `.body`.
      */
     private buildResponse(needleResponse: any, url: string, body: string): RequestResponse {
         //`request`/`postman-request` could hand back a callback with no response object; roku-deploy's
@@ -397,10 +377,8 @@ export const request = new Request();
 
 /**
  * The subset of the legacy `request`/`postman-request` options object that roku-deploy actually
- * builds and this shim consumes. We previously typed these as `request.OptionsWithUrl` (from
- * `@types/request`), but that pulled a dependency purely for a type and forced `as any` reads for the
- * fields the `@types/request` surface didn't cleanly expose. Declaring exactly what we use lets us drop
- * `@types/request` entirely and read every field type-safely.
+ * builds and this shim consumes. Declared explicitly (rather than depending on `@types/request`
+ * purely for a type) so every field reads type-safely.
  */
 export interface RequestOptions {
 
