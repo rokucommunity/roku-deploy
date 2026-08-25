@@ -393,7 +393,7 @@ export class RceVideoSignalingClient extends EventEmitter {
         return {
             ...request,
             transaction: transaction,
-            //the RCE Janus gateway uses API-secret auth: the janus_token value must be sent as
+            //the RCE Janus gateway uses API-secret auth: the janusToken value must be sent as
             //apisecret on every request, not as token (a stored-token auth field Janus also supports,
             //but this gateway does not accept - it 403s "Unauthorized request" on create with token)
             ...(this.config.janusToken !== undefined ? { apisecret: this.config.janusToken } : {})
@@ -433,7 +433,7 @@ export interface RceVideoSignalingConfig {
     streamId: number;
     pin?: string;
     /**
-     * The management api's `janus_token` device field. This gateway uses Janus API-secret auth, so
+     * The management api's `janusToken` device field. This gateway uses Janus API-secret auth, so
      * it is sent as the `apisecret` field on every Janus request (not `token`, a stored-token auth
      * field Janus also supports but this gateway rejects with a 403 "Unauthorized request" on
      * create). Distinct from `apiToken`, which authenticates the WebSocket handshake itself.

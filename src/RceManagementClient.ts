@@ -1,7 +1,7 @@
-/* eslint-disable camelcase */
 import * as needle from 'needle';
 import type { RceDeviceConfig } from './DeviceConfig';
 import { isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
+import { util } from './util';
 
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API. This is the core management
@@ -13,6 +13,11 @@ export const defaultRceManagementBaseUrl = 'https://api.rce.roku.com/api/v1';
 /**
  * Client for the Roku Cloud Emulator management API. All calls send the bearer token and return the
  * parsed JSON response.
+ *
+ * The api speaks snake_case on the wire; this client converts at the boundary so callers only ever
+ * see camelCase: request bodies are converted camelCase -> snake_case on the way out, and response
+ * bodies snake_case -> camelCase on the way in. Caller-defined data bags (`properties`) pass
+ * through untouched in both directions.
  */
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions) {
@@ -70,7 +75,7 @@ export class RceManagementClient {
     }
 
     /**
-     * Boot a device from a snapshot. Resolves with the device, whose running_device block carries
+     * Boot a device from a snapshot. Resolves with the device, whose runningDevice block carries
      * the instance API URL and video (Janus) connection details.
      */
     public startDevice(options: StartDeviceOptions): Promise<RceDevice> {
@@ -127,7 +132,7 @@ export class RceManagementClient {
         //the response is a plain array (no total-count envelope), so this is also the only way to
         //know the whole inventory was searched
         const devices = await this.listDevices({ items: 0, token: options.token });
-        return devices.find((device) => device.serial_number === options.esn);
+        return devices.find((device) => device.serialNumber === options.esn);
     }
 
     /**
@@ -174,7 +179,7 @@ export class RceManagementClient {
      */
     public async getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string> {
         const device = await this.getDevice({ deviceId: options.deviceId, token: options.token });
-        const url = device.running_device?.instance_api_url;
+        const url = device.runningDevice?.instanceApiUrl;
         if (!url) {
             throw new Error(`Device ${options.deviceId} is not running (status '${device.status}'); start it before connecting to its instance`);
         }
@@ -194,8 +199,8 @@ export class RceManagementClient {
             //both the connection and first-response-byte timers, the same way request.ts does (and
             //like there, deliberately do NOT set `read_timeout` - see request.ts for the hazards
             //of needle's read timer)
-            open_timeout: this.timeout,
-            response_timeout: this.timeout,
+            open_timeout: this.timeout, //eslint-disable-line camelcase
+            response_timeout: this.timeout, //eslint-disable-line camelcase
             //needle's default (Node's global pooling agent, no `Connection: close`) leaves a
             //keep-alive socket open after the response, which keeps the Node event loop alive so a
             //CLI process that only talked to the management api never exits - see request.ts for
@@ -208,8 +213,11 @@ export class RceManagementClient {
                 Accept: 'application/json'
             }
         };
+        const wireBody = options?.body === undefined
+            ? null
+            : convertKeys(options.body, toSnakeCaseKey);
         return new Promise<TResponse>((resolve, reject) => {
-            needle.request(method, url, options?.body ?? null, needleOptions, (error, response) => {
+            needle.request(method, url, wireBody, needleOptions, (error, response) => {
                 if (error) {
                     reject(error);
                     return;
@@ -219,7 +227,7 @@ export class RceManagementClient {
                     reject(new Error(`RCE management ${method.toUpperCase()} ${path} failed (status ${statusCode})`));
                     return;
                 }
-                resolve(response.body as TResponse);
+                resolve(convertKeys(response.body, toCamelCaseKey) as TResponse);
             });
         });
     }
@@ -233,6 +241,38 @@ export class RceManagementClient {
             .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
         return parts.length > 0 ? `?${parts.join('&')}` : '';
     }
+}
+
+/**
+ * Object keys whose VALUES are caller-defined data bags rather than api schema: their contents must
+ * pass through the wire-casing conversion untouched (in both directions).
+ */
+const passthroughKeys = new Set(['properties', 'currentDevices', 'current_devices']);
+
+function toSnakeCaseKey(key: string): string {
+    return key.replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`);
+}
+
+function toCamelCaseKey(key: string): string {
+    return util.camelCase(key);
+}
+
+/**
+ * Recursively rename the keys of plain objects (and objects inside arrays) using `convert`,
+ * leaving `passthroughKeys` values and all non-object values untouched.
+ */
+function convertKeys(value: unknown, convert: (key: string) => string): unknown {
+    if (Array.isArray(value)) {
+        return value.map((item) => convertKeys(item, convert));
+    }
+    if (value && typeof value === 'object' && value.constructor === Object) {
+        const result: Record<string, unknown> = {};
+        for (const [key, child] of Object.entries(value)) {
+            result[convert(key)] = passthroughKeys.has(key) ? child : convertKeys(child, convert);
+        }
+        return result;
+    }
+    return value;
 }
 
 export interface RceManagementClientOptions {
@@ -378,56 +418,56 @@ export interface IceServer {
 
 export interface RceDeviceInstance {
     id: number;
-    creator_id: string;
-    created_at: string;
-    started_at?: string | null;
-    snapshot_id: number;
-    snapshot_name?: string;
-    janus_id?: number | null;
-    janus_pin?: string | null;
-    janus_token?: string | null;
-    janus_websocket_url?: string | null;
-    janus_ice_servers?: IceServer[] | null;
-    instance_api_url?: string | null;
-    instance_uuid: string;
-    firmware_version_id: string;
-    max_runtime: number;
+    creatorId: string;
+    createdAt: string;
+    startedAt?: string | null;
+    snapshotId: number;
+    snapshotName?: string;
+    janusId?: number | null;
+    janusPin?: string | null;
+    janusToken?: string | null;
+    janusWebsocketUrl?: string | null;
+    janusIceServers?: IceServer[] | null;
+    instanceApiUrl?: string | null;
+    instanceUuid: string;
+    firmwareVersionId: string;
+    maxRuntime: number;
 }
 
 export interface RceDevice {
     id: number;
-    device_type: DeviceType;
+    deviceType: DeviceType;
     name: string;
-    account_name?: string | null;
-    last_snapshot_name?: string | null;
+    accountName?: string | null;
+    lastSnapshotName?: string | null;
     snapshots?: number[];
     status?: DeviceStatus;
-    created_at: string;
+    createdAt: string;
     note?: string | null;
-    serial_number?: string | null;
+    serialNumber?: string | null;
     properties?: Record<string, any> | null;
-    last_snapshot_id?: number | null;
-    firmware_version_id?: string | null;
-    running_device?: RceDeviceInstance | null;
+    lastSnapshotId?: number | null;
+    firmwareVersionId?: string | null;
+    runningDevice?: RceDeviceInstance | null;
 }
 
 export interface DeviceCreate {
     name: string;
-    device_type: CreatableDeviceType;
-    account_name?: string | null;
+    deviceType: CreatableDeviceType;
+    accountName?: string | null;
     note?: string | null;
     properties?: Record<string, any> | null;
 }
 
 export interface DeviceStart {
-    snapshot_id: number;
-    firmware_version_id: string;
-    max_runtime: number;
+    snapshotId: number;
+    firmwareVersionId: string;
+    maxRuntime: number;
 }
 
 export interface DeviceUpdate {
     name?: string;
-    account_name?: string | null;
+    accountName?: string | null;
     note?: string | null;
     properties?: Record<string, any> | null;
 }
@@ -437,52 +477,52 @@ export interface DeviceRun {
     /**
      * ID of the device instance.
      */
-    instance_id?: number;
+    instanceId?: number;
     /**
      * The ID of the user who started the device.
      */
-    creator_id?: string;
+    creatorId?: string;
     /**
      * The username of the user who started the device.
      */
-    creator_username?: string;
-    snapshot_id?: number;
-    snapshot_name?: string;
+    creatorUsername?: string;
+    snapshotId?: number;
+    snapshotName?: string;
     status?: DeviceInstanceStatus;
-    created_at?: string;
-    started_at?: string | null;
-    ended_at?: string | null;
+    createdAt?: string;
+    startedAt?: string | null;
+    endedAt?: string | null;
     /**
      * Runtime of the device instance, in seconds.
      */
     runtime?: number;
-    firmware_version_id?: string | null;
+    firmwareVersionId?: string | null;
     /**
      * The maximum runtime allowed for the device instance, in seconds.
      */
-    max_runtime?: number;
+    maxRuntime?: number;
     [key: string]: unknown;
 }
 
 export interface Snapshot {
     id: number;
-    created_at: string;
-    parent_id?: number | null;
+    createdAt: string;
+    parentId?: number | null;
     name?: string;
-    firmware_version_display_name?: string | null;
-    started_at?: string | null;
+    firmwareVersionDisplayName?: string | null;
+    startedAt?: string | null;
     children?: number[];
     ready?: boolean;
     live: boolean;
     base: boolean;
     note?: string | null;
     properties?: Record<string, any> | null;
-    firmware_version_id?: string | null;
+    firmwareVersionId?: string | null;
 }
 
 export interface SnapshotCreate {
     name: string;
-    parent_id?: number | null;
+    parentId?: number | null;
     note?: string | null;
     properties?: Record<string, any> | null;
 }
@@ -494,25 +534,25 @@ export interface SnapshotUpdate {
 }
 
 export interface FirmwareVersion {
-    firmware_version_id: string;
-    device_type: DeviceType;
-    display_name?: string | null;
+    firmwareVersionId: string;
+    deviceType: DeviceType;
+    displayName?: string | null;
 }
 
 export interface UserOrganisation {
     id: number;
-    idp_id: string;
+    idpId: string;
     name: string;
-    max_devices: number;
-    max_snapshots: number;
-    max_project_runtime: number;
-    current_devices: Record<string, number>;
+    maxDevices: number;
+    maxSnapshots: number;
+    maxProjectRuntime: number;
+    currentDevices: Record<string, number>;
 }
 
 export interface User {
     id: string;
     username: string;
-    full_name?: string | null;
+    fullName?: string | null;
     email?: string | null;
     organisation: UserOrganisation;
 }
