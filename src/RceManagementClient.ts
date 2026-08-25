@@ -199,8 +199,8 @@ export class RceManagementClient {
             //both the connection and first-response-byte timers, the same way request.ts does (and
             //like there, deliberately do NOT set `read_timeout` - see request.ts for the hazards
             //of needle's read timer)
-            open_timeout: this.timeout, //eslint-disable-line camelcase
-            response_timeout: this.timeout, //eslint-disable-line camelcase
+            'open_timeout': this.timeout,
+            'response_timeout': this.timeout,
             //needle's default (Node's global pooling agent, no `Connection: close`) leaves a
             //keep-alive socket open after the response, which keeps the Node event loop alive so a
             //CLI process that only talked to the management api never exits - see request.ts for

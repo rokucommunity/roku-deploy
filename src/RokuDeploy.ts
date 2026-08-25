@@ -271,8 +271,7 @@ export class RokuDeploy {
 
                     //attach the remotedebug_connect_early if present
                     if (options.remoteDebugConnectEarly) {
-                        // eslint-disable-next-line camelcase
-                        requestOptions.formData.remotedebug_connect_early = '1';
+                        requestOptions.formData = { ...requestOptions.formData, 'remotedebug_connect_early': '1' };
                     }
 
                     //apply any supplied formData overrides
@@ -481,9 +480,9 @@ export class RokuDeploy {
         let results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let requestOptions = await this.generateBaseRequestOptions('plugin_package', deviceConfig, options, {
                 mysubmit: 'Package',
-                pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
+                'pkg_time': (new Date()).getTime(),
                 passwd: options.signingPassword,
-                app_name: appName //eslint-disable-line camelcase
+                'app_name': appName
             });
             return this.doPostRequest(requestOptions);
         });
@@ -1335,9 +1334,7 @@ export class RokuDeploy {
                 'app_type': 'dcl',
                 fileName: options.fileName
             };
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
+            deleteOptions.qs = { ...deleteOptions.qs, 'dcl_enabled': '1' };
             return this.doPostRequest(deleteOptions);
         });
     }
@@ -1370,9 +1367,7 @@ export class RokuDeploy {
 
         const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
+            deleteOptions.qs = { ...deleteOptions.qs, 'dcl_enabled': '1' };
             return this.doGetRequest(deleteOptions);
         });
         const packages = this.getPackagesFromResponseBody(result.body);

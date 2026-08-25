@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
@@ -134,15 +133,15 @@ export class Request {
 
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
-            parse_response: false,
+            'parse_response': false,
             //`request` had a single `timeout` that governed how long to wait to establish the connection and
             //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
             //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
             //every chunk and, in the digest-auth retry path, a read-timer can be left running after the request
             //has already completed — it later fires `request.destroy()` and emits a spurious error, and (worse)
             //keeps the Node event loop alive so a process that only made roku-deploy requests never exits.
-            open_timeout: params.timeout,
-            response_timeout: params.timeout,
+            'open_timeout': params.timeout,
+            'response_timeout': params.timeout,
             headers: params.headers
         };
 
@@ -239,7 +238,7 @@ export class Request {
                 const filePath = (value).path;
                 result[key] = {
                     file: filePath,
-                    content_type: 'application/octet-stream'
+                    'content_type': 'application/octet-stream'
                 };
             } else {
                 result[key] = value;
