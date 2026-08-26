@@ -2242,6 +2242,19 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a');
         });
 
+        it('sends a space character as a URI-encoded literal', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: ' ' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_%20');
+        });
+
+        it('sends one keypress per code point (not per UTF-16 code unit) for an astral character like an emoji', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: '😀' });
+            expect(stub.callCount).to.equal(1);
+            expect(stub.getCall(0).args[0].url).to.equal(`https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/${encodeURIComponent('Lit_😀')}`);
+        });
+
         it('routes keydown and keyup through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
@@ -2322,6 +2335,24 @@ describe('RokuDeploy', () => {
 
             expect(result.status).to.equal(200);
             expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+        });
+
+        it('canonicalizes then URI-encodes a literal key on the instance-api route', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: rceDevice, key: 'lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Lit_%26');
+        });
+
+        it('URI-encodes a literal space key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_ ' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%20');
+        });
+
+        it('URI-encodes a literal ampersand key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%26');
         });
     });
 
