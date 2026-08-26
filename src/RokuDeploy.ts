@@ -952,6 +952,11 @@ export class RokuDeploy {
         };
     }
 
+    /**
+     * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
+     * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
+     * double-encoded.
+     */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...options } as KeyPressOptions;
         return this.sendKeyEvent({
@@ -961,6 +966,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Press a remote-control key without releasing it (pair with `keyUp`). Pass the key raw -
+     * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...options } as KeyDownOptions;
         return this.sendKeyEvent({
@@ -969,6 +978,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Release a remote-control key held by `keyDown`. Pass the key raw - it is URI-encoded when
+     * the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...options } as KeyUpOptions;
         return this.sendKeyEvent({
@@ -977,6 +990,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Type text on the device by sending each character as a `Lit_` keypress. Pass the text raw -
+     * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
+     */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['device', 'text']);
