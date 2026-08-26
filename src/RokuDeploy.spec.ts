@@ -825,6 +825,20 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/device-info');
             expect(result.status).to.equal(200);
             expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
+            expect(result.headers).to.eql({});
+        });
+
+        it('returns the response headers so callers can pick a parser from the content-type', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => {
+                return Promise.resolve({
+                    response: { statusCode: 200, headers: { 'content-type': 'text/xml; charset="utf-8"' } },
+                    body: '<device-info />'
+                });
+            });
+
+            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(result.headers).to.eql({ 'content-type': 'text/xml; charset="utf-8"' });
         });
 
         it('sends POST requests with a custom ecp port', async () => {
@@ -917,7 +931,7 @@ describe('RokuDeploy', () => {
 
         it('parseEcpXml wraps a parse failure and a non-Error parse rejection', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info><unclosed' });
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info><unclosed', headers: {} });
             }, 'Could not parse ECP response');
 
             //a non-Error rejection from the xml parser must not be attached as the cause
@@ -925,7 +939,7 @@ describe('RokuDeploy', () => {
             sinon.stub(xml2js, 'parseStringPromise').callsFake(() => Promise.reject('not an error instance'));
             let caughtError: errors.UnparsableDeviceResponseError;
             try {
-                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info></device-info>' });
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info></device-info>', headers: {} });
             } catch (e) {
                 caughtError = e as errors.UnparsableDeviceResponseError;
             }

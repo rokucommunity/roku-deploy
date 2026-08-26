@@ -942,7 +942,8 @@ export class RokuDeploy {
 
         return {
             status: response?.response?.statusCode,
-            body: response?.body
+            body: response?.body,
+            headers: response?.response?.headers ?? {}
         };
     }
 
@@ -2788,6 +2789,8 @@ export interface EcpResult {
     status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
+    /** The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response */
+    headers: Record<string, string | string[]>;
 }
 
 export interface QueryRegistryOptions extends BaseEcpOptions {
