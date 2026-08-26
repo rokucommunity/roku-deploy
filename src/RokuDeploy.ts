@@ -63,17 +63,49 @@ export class RokuDeploy {
      * Default values for common options used across multiple functions
      */
     private static readonly defaults = {
-        timeout: 150000,
         /**
-         * The default timeout for ECP requests, in milliseconds. ECP commands are small and fast,
-         * so this is much lower than `timeout` (which must accommodate large installer uploads).
+         * Built-in timeouts (in milliseconds) per traffic class (see `resolveTimeout`)
          */
-        ecpTimeout: 10000,
+        timeouts: {
+            default: 150000,
+            ecp: 10000,
+            rceManagement: 30000
+        },
         packagePort: 80,
         ecpPort: 8060,
         outDir: './out',
         outFile: 'roku-deploy.zip'
     };
+
+    /**
+     * Resolve a request's timeout, most specific first: per-call, `timeouts.<group>`, built-in
+     * group value, `timeouts.default` (or legacy `timeout`), built-in default. A built-in group
+     * value deliberately outranks the root default so raising the root never slows fail-fast traffic.
+     */
+    private resolveTimeout(group: keyof typeof RokuDeploy.defaults.timeouts, perCallTimeout?: number): number {
+        if (perCallTimeout !== undefined) {
+            return perCallTimeout;
+        }
+        if (group === 'default') {
+            return this.options.timeouts?.default
+                ?? this.options.timeout
+                ?? RokuDeploy.defaults.timeouts.default;
+        }
+        return this.options.timeouts?.[group] ?? RokuDeploy.defaults.timeouts[group];
+    }
+
+    /**
+     * Merge constructor options into a per-call options object. The constructor `timeout` is
+     * excluded: only a caller-supplied timeout travels with the options, and the transports resolve
+     * the rest per traffic class (see `resolveTimeout`).
+     */
+    private mergeOptions<T extends { timeout?: number }>(options: T): T {
+        const merged = { ...this.options, ...options } as T;
+        if (options?.timeout === undefined) {
+            delete merged.timeout;
+        }
+        return merged;
+    }
 
     /**
      * Network error codes that mean the request never reached a live endpoint (host gone,
@@ -193,7 +225,7 @@ export class RokuDeploy {
      * @param options
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
-        options = { ...this.options, ...options } as SideloadOptions;
+        options = this.mergeOptions(options);
         this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
@@ -375,7 +407,7 @@ export class RokuDeploy {
      * @param options
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
-        options = { ...this.options, ...options } as ConvertToSquashfsOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
@@ -426,7 +458,7 @@ export class RokuDeploy {
      * @param options
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
-        options = { ...this.options, ...options } as CreateSignedPackageOptions;
+        options = this.mergeOptions(options);
         this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['device', 'password', 'signingPassword']);
         this.validatePort(options.packagePort, 'packagePort');
@@ -521,7 +553,7 @@ export class RokuDeploy {
      * @param options
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
-        options = { ...this.options, ...options } as RekeyDeviceOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
@@ -594,7 +626,7 @@ export class RokuDeploy {
     public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
-        options = { ...this.options, ...options } as GetDeviceInfoOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -654,7 +686,7 @@ export class RokuDeploy {
      *   - 'permissive': Full access for internal networks
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
-        options = { ...this.options, ...options } as GetDeviceInfoOptions;
+        options = this.mergeOptions(options);
         try {
             const deviceInfo = await this.getDeviceInfo(options);
             return deviceInfo['ecp-setting-mode'];
@@ -672,7 +704,7 @@ export class RokuDeploy {
      * @returns
      */
     public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
-        options = { ...this.options, ...options } as GetDevIdOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
         const deviceInfo = await this.getDeviceInfo(options);
         this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
@@ -685,7 +717,7 @@ export class RokuDeploy {
      */
 
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
-        options = { ...this.options, ...options } as CaptureScreenshotOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
@@ -757,7 +789,7 @@ export class RokuDeploy {
     }
 
     public async rebootDevice(options: RebootDeviceOptions) {
-        options = { ...this.options, ...options } as RebootDeviceOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
@@ -790,7 +822,7 @@ export class RokuDeploy {
     }
 
     public async checkForUpdate(options: CheckForUpdateOptions) {
-        options = { ...this.options, ...options } as CheckForUpdateOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
@@ -906,12 +938,12 @@ export class RokuDeploy {
      *                chanperf response, for example) come back to the caller instead of throwing.
      */
     public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
-        options = { ...this.options, ...options } as EcpOptions;
+        options = this.mergeOptions(options);
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const timeout = this.resolveTimeout('ecp', options.timeout);
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         const verify = options.verify ?? false;
@@ -947,7 +979,7 @@ export class RokuDeploy {
     }
 
     public async keyPress(options: KeyPressOptions) {
-        options = { ...this.options, ...options } as KeyPressOptions;
+        options = this.mergeOptions(options);
         return this.sendKeyEvent({
             ...options,
             key: options.key,
@@ -956,7 +988,7 @@ export class RokuDeploy {
     }
 
     public async keyDown(options: KeyDownOptions) {
-        options = { ...this.options, ...options } as KeyDownOptions;
+        options = this.mergeOptions(options);
         return this.sendKeyEvent({
             ...options,
             action: 'keydown'
@@ -964,7 +996,7 @@ export class RokuDeploy {
     }
 
     public async keyUp(options: KeyUpOptions) {
-        options = { ...this.options, ...options } as KeyUpOptions;
+        options = this.mergeOptions(options);
         return this.sendKeyEvent({
             ...options,
             action: 'keyup'
@@ -972,7 +1004,7 @@ export class RokuDeploy {
     }
 
     public async sendText(options: SendTextOptions) {
-        options = { ...this.options, ...options } as SendTextOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'text']);
         const chars = options.text.split('');
         for (const char of chars) {
@@ -992,7 +1024,7 @@ export class RokuDeploy {
      * failing key and step.
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
-        options = { ...this.options, ...options } as SendKeySequenceOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'keys']);
         const keyDelayMs = options.keyDelayMs ?? 250;
         for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
@@ -1020,7 +1052,7 @@ export class RokuDeploy {
      * endpoint only exists on the RCE instance api.
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
-        options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
         const deviceConfig = this.resolveDevice(options.device);
         if (!isRceDeviceConfig(deviceConfig)) {
@@ -1034,7 +1066,7 @@ export class RokuDeploy {
             const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
             return this.doPostRequest({
                 url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+                timeout: this.resolveTimeout('ecp', options.timeout),
                 headers: this.buildRceAuthHeaders(rceToken)
             }, true);
         });
@@ -1045,7 +1077,7 @@ export class RokuDeploy {
      * @param options
      */
     public async launchApp(options: LaunchAppOptions): Promise<void> {
-        options = { ...this.options, ...options } as LaunchAppOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const queryString = this.buildLaunchQueryString(options);
@@ -1062,7 +1094,7 @@ export class RokuDeploy {
      * @param options
      */
     public async exitApp(options: ExitAppOptions): Promise<void> {
-        options = { ...this.options, ...options } as ExitAppOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const forceSegment = options.force ? '/true' : '';
@@ -1085,7 +1117,7 @@ export class RokuDeploy {
     }
 
     public async closeChannel(options: CloseChannelOptions) {
-        options = { ...this.options, ...options } as CloseChannelOptions;
+        options = this.mergeOptions(options);
         // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
         await this.sendKeyEvent({
             ...options,
@@ -1099,7 +1131,7 @@ export class RokuDeploy {
      * @param options
      */
     public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
-        options = { ...this.options, ...options } as QueryAppsOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1141,7 +1173,7 @@ export class RokuDeploy {
      * @param options
      */
     public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
-        options = { ...this.options, ...options } as QueryActiveAppOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1174,7 +1206,7 @@ export class RokuDeploy {
      * @param options
      */
     public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
-        options = { ...this.options, ...options } as QueryRegistryOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
@@ -1212,7 +1244,7 @@ export class RokuDeploy {
      * @param options
      */
     public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
-        options = { ...this.options, ...options } as QueryAppStateOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
@@ -1239,7 +1271,7 @@ export class RokuDeploy {
      * @param options
      */
     public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
-        options = { ...this.options, ...options } as QueryRendezvousOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
 
         const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
@@ -1267,7 +1299,7 @@ export class RokuDeploy {
      * @param options
      */
     public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
-        options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'enabled']);
 
         const result = await this.sendEcpRequest(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
@@ -1284,7 +1316,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
-        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        options = this.mergeOptions(options);
         this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
@@ -1307,7 +1339,7 @@ export class RokuDeploy {
      * @param options
      */
     public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
-        options = { ...this.options, ...options } as DeleteDevChannelOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
@@ -1326,7 +1358,7 @@ export class RokuDeploy {
      * Delete the component library with the specified filename from the device
      */
     public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
-        options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
 
         const deviceConfig = this.resolveDevice(options.device);
@@ -1349,7 +1381,7 @@ export class RokuDeploy {
      * Delete all component libraries from the device
      */
     public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
-        options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
+        options = this.mergeOptions(options);
         const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
@@ -1366,7 +1398,7 @@ export class RokuDeploy {
      * file names of installed component libraries or the dev channel.
      */
     public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
-        options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
+        options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device);
@@ -1539,7 +1571,7 @@ export class RokuDeploy {
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const timeout = this.resolveTimeout('default', options.timeout);
         const username = mergedOptions.username ?? 'rokudev';
 
         const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
@@ -1848,7 +1880,7 @@ export class RokuDeploy {
      * instance URL. Split out so tests can supply a fake.
      */
     private createRceManagementClient(rceToken: string): RceManagementClient {
-        return new RceManagementClient({ token: rceToken });
+        return new RceManagementClient({ token: rceToken, timeout: this.resolveTimeout('rceManagement') });
     }
 
     /**
@@ -1988,7 +2020,7 @@ export class RokuDeploy {
      * normal sendEcpRequest() transport below, so RCE devices in normal mode and LAN devices are unaffected.
      */
     private async sendKeyEvent(options: SendKeyEventOptions) {
-        options = { ...this.options, ...options };
+        options = this.mergeOptions(options);
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['device', 'key']);
 
@@ -2003,7 +2035,7 @@ export class RokuDeploy {
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                     const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
-                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                    return this.doPostRequest({ url: url, timeout: this.resolveTimeout('ecp', options.timeout), headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
                     status: response?.response?.statusCode,

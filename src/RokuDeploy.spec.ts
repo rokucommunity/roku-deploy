@@ -7670,10 +7670,73 @@ describe('RokuDeploy', () => {
             });
         });
 
+        describe('timeouts (layered resolution)', () => {
+            it('does not bleed a long root timeout into ECP calls', async () => {
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, timeout: 999999 });
+                const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ response: { statusCode: 200 }, body: '' });
+                await rd.sendEcpRequest({ host: 'localhost' }, 'query/device-info');
+                expect(stub.getCall(0).args[0].timeout).to.equal(10000);
+            });
+
+            it('does not bleed timeouts.default into ECP calls (built-in class value outranks the root)', async () => {
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, timeouts: { default: 777777 } });
+                const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ response: { statusCode: 200 }, body: '' });
+                await rd.sendEcpRequest({ host: 'localhost' }, 'query/device-info');
+                expect(stub.getCall(0).args[0].timeout).to.equal(10000);
+            });
+
+            it('applies timeouts.ecp to ECP calls, and a per-call timeout still wins', async () => {
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, timeouts: { ecp: 1234 } });
+                const stub = sinon.stub(rd as any, 'doGetRequest').resolves({ response: { statusCode: 200 }, body: '' });
+                await rd.sendEcpRequest({ host: 'localhost' }, 'query/device-info');
+                await rd.sendEcpRequest({ host: 'localhost' }, 'query/device-info', { timeout: 55 });
+                expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+                expect(stub.getCall(1).args[0].timeout).to.equal(55);
+            });
+
+            it('applies timeouts.default to installer traffic, preferring it over the legacy timeout option', async () => {
+                const rd = new RokuDeploy({ timeouts: { default: 4321 }, timeout: 999 });
+                const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
+                expect(result.timeout).to.equal(4321);
+            });
+
+            it('applies the legacy timeout option to installer traffic when timeouts.default is absent', async () => {
+                const rd = new RokuDeploy({ timeout: 8888 });
+                const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
+                expect(result.timeout).to.equal(8888);
+            });
+
+            it('applies timeouts.rceManagement to the management client, defaulting to 30 seconds', () => {
+                const rd = new RokuDeploy({ timeouts: { rceManagement: 5555 } });
+                expect(rd['createRceManagementClient']('token')['timeout']).to.equal(5555);
+                expect(rokuDeploy['createRceManagementClient']('token')['timeout']).to.equal(30000);
+            });
+
+            it('rebootDevice uses the ecp timeout for its device-info check and the root timeout for the reboot post', async () => {
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'p', timeout: 999999 });
+                const getStub = sinon.stub(rd as any, 'doGetRequest').resolves({ response: { statusCode: 200 }, body: '<device-info><software-version>15.0.4</software-version></device-info>' });
+                const postStub = sinon.stub(rd as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+                sinon.stub(util, 'dnsLookup').resolves('localhost');
+                await rd.rebootDevice({ device: { host: 'localhost' }, password: 'p' });
+                expect(getStub.getCall(0).args[0].timeout).to.equal(10000);
+                expect(postStub.getCall(0).args[0].timeout).to.equal(999999);
+            });
+
+            it('rebootDevice applies an explicit per-call timeout to both its requests', async () => {
+                const rd = new RokuDeploy({ device: { host: 'localhost' }, password: 'p' });
+                const getStub = sinon.stub(rd as any, 'doGetRequest').resolves({ response: { statusCode: 200 }, body: '<device-info><software-version>15.0.4</software-version></device-info>' });
+                const postStub = sinon.stub(rd as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+                sinon.stub(util, 'dnsLookup').resolves('localhost');
+                await rd.rebootDevice({ device: { host: 'localhost' }, password: 'p', timeout: 42 });
+                expect(getStub.getCall(0).args[0].timeout).to.equal(42);
+                expect(postStub.getCall(0).args[0].timeout).to.equal(42);
+            });
+        });
+
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', async () => {
                 const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
-                expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
+                expect(result.timeout).to.equal(RokuDeploy['defaults'].timeouts.default);
             });
 
             it('uses default packagePort', async () => {
@@ -7712,7 +7775,7 @@ describe('RokuDeploy', () => {
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
                 await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeouts.ecp);
             });
 
             it('allows overriding ecpPort', async () => {
@@ -7742,7 +7805,7 @@ describe('RokuDeploy', () => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].timeouts.ecp);
             });
         });
 
