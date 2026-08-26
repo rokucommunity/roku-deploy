@@ -64,13 +64,39 @@ export interface RokuDeployConstructorOptions {
     ecpPort?: number;
     /**
      * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
+     * Shorthand for `timeouts.default`; use `timeouts` to target a specific traffic class.
      */
     timeout?: number;
+    /**
+     * Timeouts (in milliseconds) per traffic class, each falling back to the built-in value for its
+     * class when omitted. A timeout supplied on an individual method call always wins.
+     */
+    timeouts?: RokuDeployTimeouts;
     /**
      * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
      * rceToken of its own. A config-supplied rceToken always wins over this default.
      */
     rceToken?: string;
+}
+
+/**
+ * Timeouts (in milliseconds) per traffic class. Resolution, most specific first: per-call
+ * `timeout`, `timeouts.<class>`, the built-in class default, `timeouts.default` (or the legacy
+ * `timeout` option). A class default outranks `default` so raising it never slows fail-fast traffic.
+ */
+export interface RokuDeployTimeouts {
+    /**
+     * Installer traffic (sideload, package, screenshot, ...). Defaults to 150000.
+     */
+    default?: number;
+    /**
+     * ECP traffic (key presses, queries, launch/exit). Defaults to 10000.
+     */
+    ecp?: number;
+    /**
+     * Roku Cloud Emulator management api traffic. Defaults to 30000.
+     */
+    rceManagement?: number;
 }
 
 export interface RokuDeployOptions {
@@ -168,8 +194,15 @@ export interface RokuDeployOptions {
      * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
      * This is mainly useful for preventing hang ups if the Roku loses power or restarts due to a firmware bug.
      * This is applied per network request to the device and does not apply to the total time it takes to completely execute a call to roku-deploy.
+     * Shorthand for `timeouts.default`; use `timeouts` to target a specific traffic class.
      */
     timeout?: number;
+
+    /**
+     * Timeouts (in milliseconds) per traffic class, each falling back to the built-in value for its
+     * class when omitted. A timeout supplied on an individual method call always wins.
+     */
+    timeouts?: RokuDeployTimeouts;
 
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
