@@ -976,7 +976,7 @@ describe('RokuDeploy', () => {
 
             const result = await rd.sendEcpRequest({ id: 123 }, 'query/device-info');
 
-            expect(result).to.eql({ status: undefined, body: undefined });
+            expect(result).to.eql({ status: undefined, headers: {}, body: undefined });
         });
 
         it('retries against a refreshed instance url when the mesh reports the cached instance gone', async () => {
