@@ -980,11 +980,10 @@ export class RokuDeploy {
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['device', 'text']);
-        const chars = options.text.split('');
-        for (const char of chars) {
+        for (const char of options.text) {
             await this.sendKeyEvent({
                 ...options,
-                key: `lit_${encodeURIComponent(char)}`,
+                key: `lit_${char}`,
                 action: 'keypress'
             });
         }
@@ -2005,10 +2004,10 @@ export class RokuDeploy {
                 if (!rceToken) {
                     throw new Error('An rceToken is required to reach ECP on an RCE device');
                 }
-                const key = this.toCanonicalRemoteKey(options.key);
+                const canonicalKey = this.toCanonicalRemoteKey(options.key);
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${encodeURIComponent(canonicalKey)}`;
                     return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
@@ -2020,7 +2019,7 @@ export class RokuDeploy {
             }
         }
 
-        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
+        return this.sendEcpRequest(options.device, `${options.action}/${encodeURIComponent(options.key)}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -2656,15 +2655,18 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
 }
 
 export interface KeyUpOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyDownOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyPressOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface SendTextOptions extends BaseEcpOptions {
@@ -2798,8 +2800,8 @@ export interface EcpResult {
     status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
-    /** 
-     * The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response 
+    /**
+     * The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response
      * @see {@link https://nodejs.org/api/http.html#messageheaders | message.headers docs}
      */
     headers: Record<string, string | string[]>;
