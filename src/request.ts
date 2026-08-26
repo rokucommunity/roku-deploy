@@ -176,13 +176,18 @@ export class Request {
 
         let data: any = null;
         if (method === 'POST') {
-            const formData = this.translateFormData(params.formData);
-            //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
-            //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
-            //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
-            if (Object.keys(formData).length > 0) {
-                data = formData;
-                needleOptions.multipart = true;
+            //a raw body is written to the wire as-is (no multipart/urlencoding), for routes that read the raw request body
+            if (params.body !== undefined && params.body !== null) {
+                data = params.body;
+            } else {
+                const formData = this.translateFormData(params.formData);
+                //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
+                //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
+                //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
+                if (Object.keys(formData).length > 0) {
+                    data = formData;
+                    needleOptions.multipart = true;
+                }
             }
         }
 
@@ -424,6 +429,9 @@ export interface RequestOptions {
 
     /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
     formData?: Record<string, any>;
+
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Takes precedence over `formData`. */
+    body?: string | Buffer;
 
     /** Query-string object appended to the url. */
     qs?: Record<string, any>;
