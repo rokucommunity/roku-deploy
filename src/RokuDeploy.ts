@@ -2798,7 +2798,10 @@ export interface EcpResult {
     status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
-    /** The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response */
+    /** 
+     * The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response 
+     * @see {@link https://nodejs.org/api/http.html#messageheaders | message.headers docs}
+     */
     headers: Record<string, string | string[]>;
 }
 
