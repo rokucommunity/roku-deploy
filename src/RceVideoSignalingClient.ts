@@ -4,16 +4,9 @@ import * as WebSocket from 'ws';
 import type { IceServer } from './RceManagementClient';
 
 /**
- * Negotiates a Roku Cloud Emulator (RCE) device's video/audio stream from its Janus gateway over
- * the Janus WebSocket signaling protocol: connect() resolves with the gateway's SDP offer, the
- * caller answers it (with its own RTCPeerConnection) via sendAnswer(), and trickles its local ICE
- * candidates via sendCandidate()/sendCandidatesComplete().
- *
- * This client owns the *signaling* session only: it has no WebRTC dependency and never creates a
- * peer connection of its own. It must run somewhere with Node's `ws`, because the RCE Janus host
- * requires an `Authorization` header on the WebSocket handshake itself (which a browser WebSocket
- * cannot set); the offer/answer/candidates are plain data that can be handed off to wherever the
- * actual peer connection lives.
+ * Negotiates a Roku Cloud Emulator (RCE) device's video/audio stream over the Janus WebSocket
+ * signaling protocol. Signaling only — no WebRTC dependency: connect() resolves with the SDP offer,
+ * and the caller answers and trickles ICE via sendAnswer()/sendCandidate()/sendCandidatesComplete().
  */
 export class RceVideoSignalingClient extends EventEmitter {
     constructor(
@@ -40,9 +33,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     private readonly pendingRequests = new Map<string, PendingJanusRequest>();
 
     /**
-     * Rejects the websocket-handshake promise inside a negotiate() still waiting on 'open'. Stored
-     * here because stop() strips the socket listeners that promise is built on, so stop() (and the
-     * unexpected-close handler) must be able to settle it directly.
+     * Settles the pending websocket-handshake promise; stored so stop() and the unexpected-close
+     * handler can reject it directly.
      */
     private rejectConnected: ((error: Error) => void) | undefined;
 
@@ -57,12 +49,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     }
 
     /**
-     * Connect and negotiate as far as the SDP offer. Resolves with the offer and the configured ice
-     * servers. Rejects (and tears the session down) if negotiation has not completed within
-     * `negotiationTimeoutMs`.
-     *
-     * One session at a time: a second connect() while one is active rejects. Call stop() first;
-     * after stop() (or an unexpected close), connect() may be called again.
+     * Connect and negotiate as far as the SDP offer. Rejects (tearing the session down) if
+     * negotiation exceeds `negotiationTimeoutMs`. One session at a time: call stop() before reconnecting.
      */
     public async connect(): Promise<RceVideoSignalingOffer> {
         if (this.webSocket) {
@@ -303,10 +291,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     }
 
     /**
-     * Resolves or rejects the pending request matching `transaction`, if there is one. A 'success' or
-     * 'event' message that carries a plugin-level error (wrong pin, unknown stream id, and so on) is
-     * still a Janus-protocol success, but is treated as a rejection here so the real reason surfaces
-     * instead of, for example, connect() later failing with a generic "no SDP offer" message.
+     * Resolves or rejects the pending request matching `transaction`, if there is one. Plugin-level
+     * errors arrive as Janus-protocol successes but are treated as rejections so the real reason surfaces.
      * @returns whether a pending request was found (and settled)
      */
     private settlePendingRequest(transaction: string | undefined, message: JanusIncomingMessage | undefined, errorMessage: string | undefined): boolean {

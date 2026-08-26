@@ -7,14 +7,9 @@ import { RceManagementClient } from './RceManagementClient';
 
 /**
  * Creates a transport for one of a Roku device's telnet consoles (for example the BrightScript
- * console on port 8085) that behaves like a `net.Socket` regardless of where the device lives: a
- * local network device is reached over plain tcp, while a Roku Cloud Emulator (RCE) instance
- * exposes the same console ports as authenticated WebSocket endpoints on its instance api.
- *
- * The returned object is a near-transparent replacement for `new net.Socket()`: it exposes the same
- * `connect()`/`write()`/`destroy()`/`setTimeout()` surface and the same
- * `'connect'`/`'ready'`/`'data'`/`'close'`/`'end'`/`'error'`/`'timeout'` events, so callers never
- * need to know which transport they got.
+ * console on port 8085) that behaves like a `net.Socket` regardless of where the device lives:
+ * plain tcp for a local network device, an authenticated WebSocket for a Roku Cloud Emulator (RCE)
+ * instance. Exposes the same method surface and events as `new net.Socket()`.
  */
 export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket {
     //runtime guard for javascript callers, since a registry name (string) cannot be resolved to a

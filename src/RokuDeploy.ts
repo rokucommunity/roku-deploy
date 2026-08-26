@@ -43,7 +43,6 @@ export class RokuDeploy {
     constructor(options?: RokuDeployConstructorOptions) {
         this.options = options ?? {};
 
-        // Use custom logger if provided, otherwise use global logger
         this.logger = this.options.logger ?? logger;
     }
 
@@ -87,10 +86,8 @@ export class RokuDeploy {
     private readonly options: RokuDeployConstructorOptions;
 
     /**
-     * One resolved instance url per unique RCE device config, cached for the lifetime of this
-     * `RokuDeploy` instance, so a multi-request flow (for example sideload's closeChannel ->
-     * deleteDevChannel -> plugin_install) avoids re-resolving the instance url through the
-     * management api on every request. Failed resolutions are evicted so the next call retries.
+     * Resolved RCE instance urls, cached per device config for the lifetime of this instance.
+     * Failed resolutions are evicted so the next call retries.
      */
     private readonly rceInstanceUrlsByCacheKey = new Map<string, Promise<string>>();
 
@@ -105,19 +102,14 @@ export class RokuDeploy {
         this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
 
-        // Set defaults and resolve paths
         const rootDir = path.resolve(cwd, options.rootDir ?? './');
         const files = options.files ?? [...DefaultFiles];
 
-        // Resolve output directory - use 'out' if provided, otherwise default to staging dir
         const out = options.out
             ? path.resolve(cwd, options.out)
             : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
 
-        //clean the staging directory
         await fsExtra.remove(out);
-
-        //make sure the staging folder exists
         await fsExtra.ensureDir(out);
 
         if (!await fsExtra.pathExists(rootDir)) {
@@ -125,11 +117,9 @@ export class RokuDeploy {
         }
 
         let fileObjects = await this.getFilePaths({ files: files, rootDir: rootDir });
-        //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
-            //make sure the containing folder exists
             await fsExtra.ensureDir(path.dirname(destFilePath));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
@@ -2057,9 +2047,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Build the HttpDetails carried by ECP wrapper errors. `sendEcpRequest()` does not retain the raw
-     * HttpResponse, so this carries what it does keep - the status code and body - which is what a
-     * caller needs to see what the device actually said.
+     * Build the HttpDetails carried by ECP wrapper errors from what `sendEcpRequest()` retains:
+     * the status code and body.
      */
     private buildEcpHttpDetails(result: EcpResult): HttpDetails {
         return {
@@ -2094,10 +2083,9 @@ export class RokuDeploy {
     }
 
     /**
-     * Unwrap a standard ECP response envelope: return the root element of the parsed body, throwing
-     * a FailedDeviceResponseError (with the device's own error message) when the element carries a
-     * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
-     * UnparsableDeviceResponseError when the expected root element is missing entirely.
+     * Unwrap a standard ECP response envelope: return the root element of the parsed body. Throws
+     * FailedDeviceResponseError on a non-OK `<status>` and UnparsableDeviceResponseError when the
+     * root element is missing.
      */
     private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
         const root = result.json?.[rootKey];
@@ -2411,12 +2399,10 @@ export class RokuDeploy {
      * @param deviceInfo
      */
     private normalizeDeviceInfoFieldValue(value: any) {
-        // non-string values have nothing to normalize; return them unchanged
         if (typeof value !== 'string') {
             return value;
         }
         let num: number;
-        // convert 'true' and 'false' string values to boolean
         if (value === 'true') {
             return true;
         } else if (value === 'false') {
@@ -2580,14 +2566,12 @@ export interface ValidateDeveloperPasswordOptions {
     /** Defaults to `80` (the developer web-server port) */
     port?: number;
 
-    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    /** Defaults to `3000` (milliseconds per HTTP round-trip) */
     timeout?: number;
 }
 
 /**
- * The remote-control keys a Roku understands, in the canonical casing the device expects. This is
- * NOT an enforced list - every key option also accepts a raw string, so a key without a member
- * here (or a `Lit_<char>` literal) can still be sent.
+ * The remote-control keys a Roku understands. Not an enforced list — key options also accept raw strings.
  */
 export enum RemoteKey {
     Back = 'Back',

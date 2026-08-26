@@ -59,7 +59,7 @@ export class Util {
     }
 
     /**
-     * Normalize path and replace all directory separators with current OS separators
+     * Normalize path and replace all directory separators with forward slashes
      * @param thePath
      */
     public standardizePathPosix(thePath: string) {
@@ -128,9 +128,7 @@ export class Util {
             return false;
         }
 
-        //get a list of every file in the parent directory for this file
         const filesInDir = await fsExtra.readdir(parentDirPath);
-        //look at each file path until we find the one we're searching for
         for (let dirFile of filesInDir) {
             const dirFilePath = this.standardizePath(`${parentDirPath}/${dirFile}`);
             if (dirFilePath.toLowerCase() === lowerFilePath) {
