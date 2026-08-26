@@ -922,7 +922,12 @@ export class RokuDeploy {
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             instanceGoneResponse = undefined;
             const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
-            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
+            const requestOptions: RequestOptions = {
+                url: `${baseUrl}/${route}`,
+                timeout: timeout,
+                headers: { ...headers, ...options.headers },
+                body: options.body
+            };
             const result = options.method === 'POST'
                 ? await this.doPostRequest(requestOptions, verify)
                 : await this.doGetRequest(requestOptions, verify);
@@ -2772,6 +2777,10 @@ export interface BaseEcpOptions {
 export interface EcpOptions {
     /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
     method?: 'GET' | 'POST';
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Ignored for GET requests. */
+    body?: string | Buffer;
+    /** Extra request headers to merge onto the request. */
+    headers?: Record<string, string>;
     /**
      * Run the standard response verification (throw on non-200 statuses and error bodies).
      * Defaults to false so raw ECP status bodies (a 202 `FAILED` registry response, for example)

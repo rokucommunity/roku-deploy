@@ -849,6 +849,27 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:9060/keypress/Home');
         });
 
+        it('threads a raw POST body through to the request layer', async () => {
+            const stub = mockDoPostRequest();
+            const body = Buffer.from('raw-body-bytes');
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', { method: 'POST', body: body });
+
+            expect(stub.getCall(0).args[0].body).to.equal(body);
+        });
+
+        it('merges caller headers onto the request', async () => {
+            const stub = mockDoPostRequest();
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', {
+                method: 'POST',
+                body: 'raw',
+                headers: { 'Content-Type': 'application/octet-stream' }
+            });
+
+            expect(stub.getCall(0).args[0].headers).to.include({ 'Content-Type': 'application/octet-stream' });
+        });
+
         it('routes an RCE device through the instance ecp1 proxy with the X-Authorization bearer header', async () => {
             const stub = mockDoGetRequest('<sgrendezvous><status>OK</status></sgrendezvous>');
 
