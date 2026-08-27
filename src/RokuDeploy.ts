@@ -607,7 +607,7 @@ export class RokuDeploy {
             }
             throw e;
         }
-        const deviceInfoRoot = result.json?.['device-info'];
+        const deviceInfoRoot = (await this.parseEcpXml(result))?.['device-info'];
         if (!deviceInfoRoot) {
             //the response was not device-info XML (an empty body, a proxy error page, ...) - there
             //is no underlying error to carry as a cause, the body just wasn't what we asked for
@@ -906,7 +906,12 @@ export class RokuDeploy {
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             instanceGoneResponse = undefined;
             const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
-            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
+            const requestOptions: RequestOptions = {
+                url: `${baseUrl}/${route}`,
+                timeout: timeout,
+                headers: { ...headers, ...options.headers },
+                body: options.body
+            };
             const result = options.method === 'POST'
                 ? await this.doPostRequest(requestOptions, verify)
                 : await this.doGetRequest(requestOptions, verify);
@@ -927,10 +932,15 @@ export class RokuDeploy {
         return {
             status: response?.response?.statusCode,
             body: response?.body,
-            json: await this.parseEcpXml(response?.body, response)
+            headers: response?.response?.headers ?? {}
         };
     }
 
+    /**
+     * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
+     * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
+     * double-encoded.
+     */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...options } as KeyPressOptions;
         return this.sendKeyEvent({
@@ -940,6 +950,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Press a remote-control key without releasing it (pair with `keyUp`). Pass the key raw -
+     * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...options } as KeyDownOptions;
         return this.sendKeyEvent({
@@ -948,6 +962,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Release a remote-control key held by `keyDown`. Pass the key raw - it is URI-encoded when
+     * the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...options } as KeyUpOptions;
         return this.sendKeyEvent({
@@ -956,14 +974,17 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Type text on the device by sending each character as a `Lit_` keypress. Pass the text raw -
+     * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
+     */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['device', 'text']);
-        const chars = options.text.split('');
-        for (const char of chars) {
+        for (const char of options.text) {
             await this.sendKeyEvent({
                 ...options,
-                key: `lit_${encodeURIComponent(char)}`,
+                key: `lit_${char}`,
                 action: 'keypress'
             });
         }
@@ -1053,7 +1074,7 @@ export class RokuDeploy {
         });
         //devices report exit-app failures through the ECP envelope (a 202 with the error in the
         //body), so surface that message; fall back to a plain status check when there is no envelope
-        const root = result.json?.['exit-app'];
+        const root = (await this.parseEcpXml(result))?.['exit-app'];
         if (root && typeof root.status === 'string' && root.status.toLowerCase() !== 'ok') {
             throw new FailedDeviceResponseError(`Could not exit app: ${root.error ?? 'Unknown error'}`, {
                 httpDetails: this.buildEcpHttpDetails(result)
@@ -1083,11 +1104,13 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
+        let json: Record<string, any> | undefined;
         try {
             result = await this.sendEcpRequest(options.device, 'query/apps', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
+            json = await this.parseEcpXml(result);
         } catch (e) {
             if (e instanceof UnparsableDeviceResponseError) {
                 this.logger.warn('Error parsing installed app list:', e);
@@ -1096,7 +1119,7 @@ export class RokuDeploy {
             throw e;
         }
         this.assertEcpStatusOk(result);
-        const rawAppNodes = result.json?.apps?.app;
+        const rawAppNodes = json?.apps?.app;
         if (!rawAppNodes) {
             return [];
         }
@@ -1123,11 +1146,13 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
+        let json: Record<string, any> | undefined;
         try {
             result = await this.sendEcpRequest(options.device, 'query/active-app', {
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
+            json = await this.parseEcpXml(result);
         } catch (e) {
             if (e instanceof UnparsableDeviceResponseError) {
                 this.logger.warn('Error parsing active app:', e);
@@ -1136,7 +1161,7 @@ export class RokuDeploy {
             throw e;
         }
         this.assertEcpStatusOk(result);
-        const rawActiveAppNode = result.json?.['active-app']?.app;
+        const rawActiveAppNode = json?.['active-app']?.app;
         if (!rawActiveAppNode) {
             return {};
         }
@@ -1157,7 +1182,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
+        const root = await this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
 
         const registry = root.registry ?? {};
         const sections: RokuRegistry['sections'] = {};
@@ -1195,7 +1220,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
+        const root = await this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
 
         const knownStates: RokuAppStateValue[] = ['active', 'background', 'inactive'];
         const state = knownStates.find(knownState => knownState === root.state?.toLowerCase()) ?? 'unknown';
@@ -1222,7 +1247,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
+        const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
 
         return {
             trackingEnabled: root.data?.['tracking-enabled'] === 'true',
@@ -1251,7 +1276,7 @@ export class RokuDeploy {
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
-        const root = this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
+        const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
         return root['tracking-enabled'] === 'true';
     }
 
@@ -1935,7 +1960,8 @@ export class RokuDeploy {
      * undefined so the caller can inspect the status and raw body instead; a body that looks like
      * XML but cannot be parsed throws.
      */
-    private async parseEcpXml(body: string, response?: HttpResponse): Promise<Record<string, any> | undefined> {
+    private async parseEcpXml(result: EcpResult): Promise<Record<string, any> | undefined> {
+        const body = result.body;
         if (typeof body !== 'string' || !body.trim().startsWith('<')) {
             return undefined;
         }
@@ -1947,7 +1973,7 @@ export class RokuDeploy {
             return { ...parsedContent };
         } catch (e) {
             throw new UnparsableDeviceResponseError('Could not parse ECP response', {
-                httpDetails: extractHttpDetails(response?.response, response?.body)
+                httpDetails: this.buildEcpHttpDetails(result)
             }, e instanceof Error ? e : undefined);
         }
     }
@@ -1973,23 +1999,22 @@ export class RokuDeploy {
                 if (!rceToken) {
                     throw new Error('An rceToken is required to reach ECP on an RCE device');
                 }
-                const key = this.toCanonicalRemoteKey(options.key);
+                const canonicalKey = this.toCanonicalRemoteKey(options.key);
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${encodeURIComponent(canonicalKey)}`;
                     return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
                     status: response?.response?.statusCode,
-                    body: response?.body,
-                    json: undefined
+                    body: response?.body
                 } as EcpResult;
             } catch (e) {
                 this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
             }
         }
 
-        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
+        return this.sendEcpRequest(options.device, `${options.action}/${encodeURIComponent(options.key)}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -2087,8 +2112,8 @@ export class RokuDeploy {
      * FailedDeviceResponseError on a non-OK `<status>` and UnparsableDeviceResponseError when the
      * root element is missing.
      */
-    private getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Record<string, any> {
-        const root = result.json?.[rootKey];
+    private async getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Promise<Record<string, any>> {
+        const root = (await this.parseEcpXml(result))?.[rootKey];
         if (!root) {
             //a non-xml ECP response is usually the device explaining itself in plain text (for
             //example `ECP command not allowed in Limited mode.`), so carry that text in the error
@@ -2618,15 +2643,18 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
 }
 
 export interface KeyUpOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyDownOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyPressOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface SendTextOptions extends BaseEcpOptions {
@@ -2739,6 +2767,10 @@ export interface BaseEcpOptions {
 export interface EcpOptions {
     /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
     method?: 'GET' | 'POST';
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Ignored for GET requests. */
+    body?: string | Buffer;
+    /** Extra request headers to merge onto the request. */
+    headers?: Record<string, string>;
     /**
      * Run the standard response verification (throw on non-200 statuses and error bodies).
      * Defaults to false so raw ECP status bodies (a 202 `FAILED` registry response, for example)
@@ -2757,10 +2789,10 @@ export interface EcpResult {
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
     /**
-     * The XML response body parsed to a plain object (keyed by the XML root element), or undefined
-     * when the response had no XML body
+     * The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response
+     * @see {@link https://nodejs.org/api/http.html#messageheaders | message.headers docs}
      */
-    json: Record<string, any> | undefined;
+    headers: Record<string, string | string[]>;
 }
 
 export interface QueryRegistryOptions extends BaseEcpOptions {

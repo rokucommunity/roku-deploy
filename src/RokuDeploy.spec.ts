@@ -817,23 +817,57 @@ describe('RokuDeploy', () => {
     });
 
     describe('sendEcpRequest', () => {
-        it('builds the LAN url from the host and ecp port, defaulting to GET, and parses the XML body', async () => {
+        it('builds the LAN url from the host and ecp port, defaulting to GET, and returns the raw body', async () => {
             const stub = mockDoGetRequest('<device-info><model-name>Roku</model-name></device-info>');
 
             const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/device-info');
             expect(result.status).to.equal(200);
-            expect(result.json).to.eql({ 'device-info': { 'model-name': 'Roku' } });
+            expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
+            expect(result.headers).to.eql({});
         });
 
-        it('sends POST requests with a custom ecp port and returns undefined json for an empty body', async () => {
+        it('returns the response headers so callers can pick a parser from the content-type', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => {
+                return Promise.resolve({
+                    response: { statusCode: 200, headers: { 'content-type': 'text/xml; charset="utf-8"' } },
+                    body: '<device-info />'
+                });
+            });
+
+            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(result.headers).to.eql({ 'content-type': 'text/xml; charset="utf-8"' });
+        });
+
+        it('sends POST requests with a custom ecp port', async () => {
             const stub = mockDoPostRequest();
 
-            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'keypress/Home', { method: 'POST', ecpPort: 9060 });
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'keypress/Home', { method: 'POST', ecpPort: 9060 });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:9060/keypress/Home');
-            expect(result.json).to.be.undefined;
+        });
+
+        it('threads a raw POST body through to the request layer', async () => {
+            const stub = mockDoPostRequest();
+            const body = Buffer.from('raw-body-bytes');
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', { method: 'POST', body: body });
+
+            expect(stub.getCall(0).args[0].body).to.equal(body);
+        });
+
+        it('merges caller headers onto the request', async () => {
+            const stub = mockDoPostRequest();
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', {
+                method: 'POST',
+                body: 'raw',
+                headers: { 'Content-Type': 'application/octet-stream' }
+            });
+
+            expect(stub.getCall(0).args[0].headers).to.include({ 'Content-Type': 'application/octet-stream' });
         });
 
         it('routes an RCE device through the instance ecp1 proxy with the X-Authorization bearer header', async () => {
@@ -846,7 +880,7 @@ describe('RokuDeploy', () => {
 
             expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
-            expect(result.json.sgrendezvous.status).to.equal('OK');
+            expect(result.body).to.equal('<sgrendezvous><status>OK</status></sgrendezvous>');
         });
 
         it('falls back to the constructor default rceToken for an RCE device config without one', async () => {
@@ -879,7 +913,7 @@ describe('RokuDeploy', () => {
             //verification must be off by default so the raw ECP status body comes back
             expect(stub.getCall(0).args[1]).to.equal(false);
             expect(result.status).to.equal(202);
-            expect(result.json['plugin-registry'].error).to.equal('Device not keyed');
+            expect(result.body).to.include('<error>Device not keyed</error>');
         });
 
         it('passes verify through to the request layer when set', async () => {
@@ -893,7 +927,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[1]).to.equal(true);
         });
 
-        it('returns undefined json (with the body preserved) for a non-xml response', async () => {
+        it('returns a non-xml response body as-is', async () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
                 response: { statusCode: 404 },
                 body: 'no healthy upstream'
@@ -903,24 +937,22 @@ describe('RokuDeploy', () => {
 
             expect(result.status).to.equal(404);
             expect(result.body).to.equal('no healthy upstream');
-            expect(result.json).to.be.undefined;
         });
 
-        it('throws when a response that looks like xml cannot be parsed', async () => {
+        it('returns an unparsable xml body as-is without throwing', async () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
                 response: { statusCode: 200 },
                 body: '<device-info><unclosed'
             });
 
-            await expectThrowsAsync(async () => {
-                await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
-            }, 'Could not parse ECP response');
+            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(result.body).to.equal('<device-info><unclosed');
         });
 
-        it('wraps a parse failure that carries no http response and a non-Error parse rejection', async () => {
-            //parseEcpXml's response argument is optional; the wrap must not blow up without it
+        it('parseEcpXml wraps a parse failure and a non-Error parse rejection', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy['parseEcpXml']('<device-info><unclosed');
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info><unclosed', headers: {} });
             }, 'Could not parse ECP response');
 
             //a non-Error rejection from the xml parser must not be attached as the cause
@@ -928,7 +960,7 @@ describe('RokuDeploy', () => {
             sinon.stub(xml2js, 'parseStringPromise').callsFake(() => Promise.reject('not an error instance'));
             let caughtError: errors.UnparsableDeviceResponseError;
             try {
-                await rokuDeploy['parseEcpXml']('<device-info></device-info>');
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info></device-info>', headers: {} });
             } catch (e) {
                 caughtError = e as errors.UnparsableDeviceResponseError;
             }
@@ -944,7 +976,7 @@ describe('RokuDeploy', () => {
 
             const result = await rd.sendEcpRequest({ id: 123 }, 'query/device-info');
 
-            expect(result).to.eql({ status: undefined, body: undefined, json: undefined });
+            expect(result).to.eql({ status: undefined, headers: {}, body: undefined });
         });
 
         it('retries against a refreshed instance url when the mesh reports the cached instance gone', async () => {
@@ -969,7 +1001,7 @@ describe('RokuDeploy', () => {
             expect(stub.callCount).to.equal(2);
             expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/new/ecp1/query/device-info');
             expect(result.status).to.equal(200);
-            expect(result.json['device-info']['model-name']).to.equal('Roku');
+            expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
         });
 
         it('returns a 404 answered by a live instance as-is without retrying', async () => {
@@ -2210,6 +2242,19 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a');
         });
 
+        it('sends a space character as a URI-encoded literal', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: ' ' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_%20');
+        });
+
+        it('sends one keypress per code point (not per UTF-16 code unit) for an astral character like an emoji', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: '😀' });
+            expect(stub.callCount).to.equal(1);
+            expect(stub.getCall(0).args[0].url).to.equal(`https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/${encodeURIComponent('Lit_😀')}`);
+        });
+
         it('routes keydown and keyup through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
@@ -2254,7 +2299,7 @@ describe('RokuDeploy', () => {
         it('tolerates a transport layer that resolved no response at all', async () => {
             sinon.stub(rokuDeploy as any, 'doPostRequest').resolves(undefined);
             const result = await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
-            expect(result).to.eql({ status: undefined, body: undefined, json: undefined });
+            expect(result).to.eql({ status: undefined, body: undefined });
         });
 
         it('throws the ECP token-required error when an RCE device has no rceToken at all', async () => {
@@ -2290,6 +2335,24 @@ describe('RokuDeploy', () => {
 
             expect(result.status).to.equal(200);
             expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+        });
+
+        it('canonicalizes then URI-encodes a literal key on the instance-api route', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: rceDevice, key: 'lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Lit_%26');
+        });
+
+        it('URI-encodes a literal space key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_ ' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%20');
+        });
+
+        it('URI-encodes a literal ampersand key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%26');
         });
     });
 
