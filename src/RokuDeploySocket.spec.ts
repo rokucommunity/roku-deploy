@@ -416,6 +416,39 @@ describe('createRokuDeploySocket', () => {
 
             expect(emittedError?.message).to.contain('handshake failed');
             expect(emittedEventNames).to.eql(['error', 'close']);
+            expect((emittedError as NodeJS.ErrnoException).code).to.be.undefined;
+        });
+
+        it(`tags a 502 upgrade rejection with code 'ECONNREFUSED', matching the LAN retry signal (nothing on the device is listening yet)`, async () => {
+            const telnetSocket = createRceTelnetSocket();
+            let emittedError: NodeJS.ErrnoException | undefined;
+            telnetSocket.on('error', (error: NodeJS.ErrnoException) => {
+                emittedError = error;
+            });
+
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('error', new Error('Unexpected server response: 502'));
+            await flushMicrotasks();
+
+            expect(emittedError?.message).to.contain('Unexpected server response: 502');
+            expect(emittedError?.code).to.equal('ECONNREFUSED');
+        });
+
+        it('leaves a 404 upgrade rejection with no code, so it stays non-retryable (the port is not whitelisted)', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            let emittedError: NodeJS.ErrnoException | undefined;
+            telnetSocket.on('error', (error: NodeJS.ErrnoException) => {
+                emittedError = error;
+            });
+
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('error', new Error('Unexpected server response: 404'));
+            await flushMicrotasks();
+
+            expect(emittedError?.message).to.contain('Unexpected server response: 404');
+            expect(emittedError?.code).to.be.undefined;
         });
 
         it('emits error then close when the instance url fails to resolve', async () => {

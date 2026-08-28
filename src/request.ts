@@ -134,6 +134,11 @@ export class Request {
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
             'parse_response': false,
+            //never let needle charset-decode a response: a signed pkg download served with a charset in its
+            //content-type (the RCE instance proxy does this) would have every non-utf8 byte replaced with
+            //U+FFFD, corrupting the binary. `request` never transcoded either (plain utf8 only), so this is
+            //also parity; `coerceBody` handles the Buffer->string conversion for text paths.
+            'decode_response': false,
             //`request` had a single `timeout` that governed how long to wait to establish the connection and
             //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
             //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
@@ -175,13 +180,18 @@ export class Request {
 
         let data: any = null;
         if (method === 'POST') {
-            const formData = this.translateFormData(params.formData);
-            //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
-            //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
-            //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
-            if (Object.keys(formData).length > 0) {
-                data = formData;
-                needleOptions.multipart = true;
+            //a raw body is written to the wire as-is (no multipart/urlencoding), for routes that read the raw request body
+            if (params.body !== undefined && params.body !== null) {
+                data = params.body;
+            } else {
+                const formData = this.translateFormData(params.formData);
+                //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
+                //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
+                //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
+                if (Object.keys(formData).length > 0) {
+                    data = formData;
+                    needleOptions.multipart = true;
+                }
             }
         }
 
@@ -423,6 +433,9 @@ export interface RequestOptions {
 
     /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
     formData?: Record<string, any>;
+
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Takes precedence over `formData`. */
+    body?: string | Buffer;
 
     /** Query-string object appended to the url. */
     qs?: Record<string, any>;

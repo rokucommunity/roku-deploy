@@ -217,7 +217,7 @@ export class RceSocket extends stream.Duplex {
             }
         });
         webSocket.on('error', (error: Error) => {
-            this.failConnection(new Error(`RCE telnet websocket error for ${url}: ${error.message}`));
+            this.failConnection(this.wrapWebSocketError(url, error));
         });
         webSocket.once('close', () => {
             //the connection is gone in both directions, so end both sides of the stream and let it
@@ -443,6 +443,20 @@ export class RceSocket extends stream.Duplex {
             return;
         }
         this.destroy(error);
+    }
+
+    /**
+     * A 502 upgrade rejection means the port is open but nothing is listening yet (channel still
+     * booting) — the same transient condition a local device reports as `ECONNREFUSED`, so it gets
+     * that code and consumers retry it. Everything else (e.g. 404 port-not-whitelisted) stays
+     * code-less and fatal. `ws` only exposes the status inside the message, hence the match.
+     */
+    private wrapWebSocketError(url: string, error: Error): NodeJS.ErrnoException {
+        const wrappedError: NodeJS.ErrnoException = new Error(`RCE telnet websocket error for ${url}: ${error.message}`);
+        if (/Unexpected server response: 502\b/.test(error.message)) {
+            wrappedError.code = 'ECONNREFUSED';
+        }
+        return wrappedError;
     }
 
     private buildWebSocketUrl(instanceUrl: string): string {

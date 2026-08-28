@@ -68,6 +68,12 @@ describe('request (needle shim)', () => {
             expect(postArgs.options.response_timeout).to.equal(12345);
         });
 
+        it('sets decode_response=false (needle charset-decoding corrupts binary downloads served with a charset)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/plugin_package', formData: { a: 'b' } });
+            expect(postArgs.options.decode_response).to.equal(false);
+        });
+
         it('does NOT set read_timeout (its lingering re-armed timer leaks a handle in the digest-auth path)', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/plugin_install', timeout: 12345, formData: { a: 'b' } });
@@ -192,6 +198,55 @@ describe('request (needle shim)', () => {
             await callPost({ url: 'http://1.2.3.4:80/x', formData: { archive: fakeStream, mysubmit: 'Replace' } });
             expect(postArgs.data.archive).to.eql({ file: '/tmp/archive.zip', content_type: 'application/octet-stream' });
             expect(postArgs.data.mysubmit).to.equal('Replace');
+        });
+    });
+
+    describe('raw body translation', () => {
+        it('sends a string body verbatim without enabling multipart', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:8060/some/route', body: 'raw-body-string' });
+            expect(postArgs.data).to.equal('raw-body-string');
+            expect(postArgs.options.multipart).to.be.undefined;
+        });
+
+        it('sends a Buffer body verbatim without enabling multipart', async () => {
+            const buffer = Buffer.from([0x00, 0x01, 0x02, 0xFF]);
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:8060/some/route', body: buffer });
+            expect(postArgs.data).to.equal(buffer);
+            expect(postArgs.options.multipart).to.be.undefined;
+        });
+
+        it('prefers a raw body over formData when both are set', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/x', body: 'raw', formData: { mysubmit: 'Replace' } });
+            expect(postArgs.data).to.equal('raw');
+            expect(postArgs.options.multipart).to.be.undefined;
+        });
+
+        it('preflights a bodied POST with credentials, sending the raw body only with the Authorization header', async () => {
+            const CHALLENGE = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
+            const calls: Array<{ data: any; options: any }> = [];
+            sinon.stub(needle, 'post').callsFake(((url: string, data: any, options: any, callback: any) => {
+                const canned = calls.length === 0
+                    ? { response: { statusCode: 401, headers: { 'www-authenticate': CHALLENGE } }, body: Buffer.alloc(0) }
+                    : { response: { statusCode: 200, headers: {} }, body: 'ok' };
+                calls.push({ data: data, options: options });
+                process.nextTick(callback, null, canned.response, canned.body);
+                return {} as any;
+            }) as any);
+
+            await callPost({
+                url: 'http://1.2.3.4:80/some/route',
+                auth: { user: 'rokudev', pass: 'aaaa' },
+                body: 'raw-body'
+            });
+
+            expect(calls).to.have.lengthOf(2);
+            //the probe carries no body; the real request carries the raw body plus the computed digest header
+            expect(calls[0].data).to.be.null;
+            expect(calls[1].data).to.equal('raw-body');
+            expect(calls[1].options.headers.authorization).to.match(/^Digest /);
         });
     });
 
