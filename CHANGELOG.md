@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.5](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.4...v4.0.0-alpha.5) - 2026-08-28
+### Fixed
+ - Fix pkg download corruption on RCE devices ([#382](https://github.com/rokucommunity/roku-deploy/pull/382))
+
+
+
 ## [4.0.0-alpha.4](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.3...v4.0.0-alpha.4) - 2026-08-27
 ### Changed
  - Tag RCE 502 upgrade rejections as ECONNREFUSED ([#376](https://github.com/rokucommunity/roku-deploy/pull/376))
