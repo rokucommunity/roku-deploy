@@ -68,6 +68,18 @@ describe('request (needle shim)', () => {
             expect(postArgs.options.response_timeout).to.equal(12345);
         });
 
+        it('sets decode_response=false (Rokus label binary .pkg/screenshot downloads as text/plain)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/plugin_install', formData: { a: 'b' } });
+            expect(postArgs.options.decode_response).to.equal(false);
+        });
+
+        it('sets decode_response=false on the streaming get used to download files', () => {
+            stubGet(null, undefined, undefined);
+            request.get({ url: 'http://1.2.3.4:80/pkgs/x.pkg' });
+            expect(getArgs.options.decode_response).to.equal(false);
+        });
+
         it('does NOT set read_timeout (its lingering re-armed timer leaks a handle in the digest-auth path)', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/plugin_install', timeout: 12345, formData: { a: 'b' } });
