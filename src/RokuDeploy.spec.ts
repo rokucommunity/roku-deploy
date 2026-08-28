@@ -1161,11 +1161,11 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('getRendezvous', () => {
+    describe('getRendezvousTracking', () => {
         it('refines tracking state and normalizes a single rendezvous item to an array', async () => {
             const stub = mockDoGetRequest('<sgrendezvous><data><tracking-enabled>true</tracking-enabled><item><id>1</id><start-tm>100</start-tm><end-tm>200</end-tm><line-number>5</line-number><file>pkg:/main.brs</file></item></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.getRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/sgrendezvous');
             expect(rendezvous).to.eql({
@@ -1177,7 +1177,7 @@ describe('RokuDeploy', () => {
         it('returns no items and trackingEnabled false when tracking is off', async () => {
             mockDoGetRequest('<sgrendezvous><data><tracking-enabled>false</tracking-enabled></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.getRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(rendezvous).to.eql({ trackingEnabled: false, items: [] });
         });
@@ -1185,7 +1185,7 @@ describe('RokuDeploy', () => {
         it('tolerates a response with no data block at all', async () => {
             mockDoGetRequest('<sgrendezvous><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.getRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(rendezvous).to.eql({ trackingEnabled: false, items: [] });
         });

@@ -1263,8 +1263,8 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
      */
-    public async getRendezvous(options: GetRendezvousOptions): Promise<RokuRendezvous> {
-        options = { ...this.options, ...options } as GetRendezvousOptions;
+    public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
+        options = { ...this.options, ...options } as GetRendezvousTrackingOptions;
         this.checkRequiredOptions(options, ['device']);
 
         const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
@@ -2862,7 +2862,7 @@ export interface RokuAppState {
     state: RokuAppStateValue;
 }
 
-export type GetRendezvousOptions = BaseEcpOptions;
+export type GetRendezvousTrackingOptions = BaseEcpOptions;
 
 export interface RokuRendezvous {
     trackingEnabled: boolean;
