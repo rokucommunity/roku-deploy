@@ -7,12 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [3.18.3](https://github.com/rokucommunity/roku-deploy/compare/3.18.2...v3.18.3) - 2026-08-28
-### Added
- - Add 1s breathing room between device tests ([#346](https://github.com/rokucommunity/roku-deploy/pull/346))
 ### Changed
  - Security enhancements ([#345](https://github.com/rokucommunity/roku-deploy/pull/345))
 ### Fixed
- - fix: signed .pkg downloads are corrupted by utf8 decoding ([#359](https://github.com/rokucommunity/roku-deploy/pull/359))
+ - bug where signed .pkg downloads are corrupted by utf8 decoding ([#359](https://github.com/rokucommunity/roku-deploy/pull/359))
+ - chore: Add 1s breathing room between device tests ([#346](https://github.com/rokucommunity/roku-deploy/pull/346))
 
 
 
