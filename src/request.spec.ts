@@ -68,6 +68,12 @@ describe('request (needle shim)', () => {
             expect(postArgs.options.response_timeout).to.equal(12345);
         });
 
+        it('sets decode_response=false (needle charset-decoding corrupts binary downloads served with a charset)', async () => {
+            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
+            await callPost({ url: 'http://1.2.3.4:80/plugin_package', formData: { a: 'b' } });
+            expect(postArgs.options.decode_response).to.equal(false);
+        });
+
         it('does NOT set read_timeout (its lingering re-armed timer leaks a handle in the digest-auth path)', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/plugin_install', timeout: 12345, formData: { a: 'b' } });

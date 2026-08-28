@@ -135,6 +135,11 @@ export class Request {
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
             parse_response: false,
+            //never let needle charset-decode a response: a signed pkg download served with a charset in its
+            //content-type (the RCE instance proxy does this) would have every non-utf8 byte replaced with
+            //U+FFFD, corrupting the binary. `request` never transcoded either (plain utf8 only), so this is
+            //also parity; `coerceBody` handles the Buffer->string conversion for text paths.
+            decode_response: false,
             //`request` had a single `timeout` that governed how long to wait to establish the connection and
             //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
             //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
