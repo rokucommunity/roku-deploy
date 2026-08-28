@@ -299,10 +299,12 @@ const REQUEST_TIMEOUT = 30_000;
     });
 
     describe('deployAndSignPackage', () => {
-        //RCE: signing on an emulator instance is unverified (rekeying/signing a cloud device has not
-        //been confirmed safe or even meaningful). Skip until that's confirmed; body kept as-is so the
-        //structure survives for the later merge with device.spec.ts.
-        it.skip('works', async () => {
+        it('works', async function deployAndSignPackage() {
+            //rekey + sign + download, then a second rekey using the downloaded pkg: several cloud
+            //round-trips. Bumped well past the suite default for that.
+            this.timeout(120_000);
+
+            //this test rekeys the device (changes its signing key); leaves it rekeyed to `options.devId` when done
             await rd.deleteDevChannel({ device: options.device, password: options.password });
             await rd.rekeyDevice({
                 device: options.device,
@@ -324,6 +326,91 @@ const REQUEST_TIMEOUT = 30_000;
                 manifestPath: `${rootDir}/manifest`
             });
             expectPathExists(pkgPath);
+            //the download is a real Roku package, not an empty file or a proxy error page
+            const pkgBuffer = fsExtra.readFileSync(pkgPath);
+            expect(pkgBuffer.length).to.be.greaterThan(0);
+            expect(pkgBuffer.subarray(0, 17).toString('latin1')).to.equal('Roku Channel PakV');
+
+            //roundtrip proof: rekey the device using the pkg we just downloaded and signed, then
+            //confirm the device's dev id still matches. This only works if the downloaded pkg is a
+            //genuinely valid signed package, so it proves rekey + sign + download all work end to end.
+            await rd.rekeyDevice({
+                device: options.device,
+                password: options.password,
+                pkg: pkgPath,
+                signingPassword: options.signingPassword,
+                devId: options.devId
+            });
+            assert.strictEqual((await rd.getDevId(options)).devId, options.devId);
+        });
+    });
+
+    describe('rekeyDevice', () => {
+        it('rekeys the device', async function rekeyDevice() {
+            //bumped from the LAN suite's default for a couple cloud round-trips (rekey + getDevId)
+            this.timeout(40_000);
+
+            //mutates the device's signing key
+            await rd.rekeyDevice({
+                device: options.device,
+                password: options.password,
+                pkg: rekeySignedPackage,
+                signingPassword: options.signingPassword,
+                devId: options.devId
+            });
+            assert.strictEqual((await rd.getDevId(options)).devId, options.devId);
+        });
+
+        it('throws when the signing password is wrong', async function rekeyDeviceWrongPassword() {
+            this.timeout(40_000);
+
+            //rekey with the correct password first so the device's key state is known
+            await rd.rekeyDevice({
+                device: options.device,
+                password: options.password,
+                pkg: rekeySignedPackage,
+                signingPassword: options.signingPassword,
+                devId: options.devId
+            });
+
+            let thrown: Error;
+            try {
+                await rd.rekeyDevice({
+                    device: options.device,
+                    password: options.password,
+                    pkg: rekeySignedPackage,
+                    signingPassword: 'NOT_THE_SIGNING_PASSWORD',
+                    devId: options.devId
+                });
+            } catch (e) {
+                thrown = e as Error;
+            }
+            try {
+                assert.ok(thrown, 'expected rekeyDevice to throw for a wrong signing password');
+                assert.ok(
+                    thrown instanceof errors.FailedDeviceResponseError,
+                    `expected FailedDeviceResponseError, got ${thrown?.constructor?.name}: ${thrown?.message}`
+                );
+                //firmware 15.x reports this via the response body's roku messages ("Signature verification
+                //failed."), which checkRequest throws before rekeyDevice's own "Rekey Failure:" parsing runs;
+                //accept either shape so the test survives firmware messaging differences
+                assert.ok(
+                    /Signature verification failed|^Rekey Failure:/.test(thrown.message),
+                    `expected a signature/rekey failure message, got: ${thrown.message}`
+                );
+                //a failed rekey leaves the device with NO key (keyed-developer-id comes back empty)
+                assert.strictEqual((await rd.getDevId(options)).devId, '');
+            } finally {
+                //always restore the key (rekeyDevice self-verifies the resulting dev id) so a failed
+                //assertion can't leave the shared device with no key
+                await rd.rekeyDevice({
+                    device: options.device,
+                    password: options.password,
+                    pkg: rekeySignedPackage,
+                    signingPassword: options.signingPassword,
+                    devId: options.devId
+                });
+            }
         });
     });
 
