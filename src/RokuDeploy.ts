@@ -715,7 +715,10 @@ export class RokuDeploy {
         // Always download to buffer
         const buffer = await this.downloadToBuffer(requestParams);
 
-        const result: CaptureScreenshotResult = { buffer: buffer };
+        const result: CaptureScreenshotResult = {
+            buffer: buffer,
+            format: deviceExt.slice(1).toLowerCase() as 'jpg' | 'png'
+        };
 
         // If out is provided, also save to disk
         if (options.out) {
@@ -2586,6 +2589,10 @@ export interface CaptureScreenshotResult {
      * The screenshot image data
      */
     buffer: Buffer;
+    /**
+     * The image format of the buffer, as reported by the device
+     */
+    format: 'jpg' | 'png';
     /**
      * The file path where the screenshot was saved (only present when `out` option was provided)
      */
