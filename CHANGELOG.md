@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.18.3](https://github.com/rokucommunity/roku-deploy/compare/3.18.2...v3.18.3) - 2026-08-28
+### Changed
+ - Security enhancements ([#345](https://github.com/rokucommunity/roku-deploy/pull/345))
+### Fixed
+ - bug where signed .pkg downloads are corrupted by utf8 decoding ([#359](https://github.com/rokucommunity/roku-deploy/pull/359))
+ - chore: Add 1s breathing room between device tests ([#346](https://github.com/rokucommunity/roku-deploy/pull/346))
+
+
+
 ## [3.18.2](https://github.com/rokucommunity/roku-deploy/compare/3.18.1...v3.18.2) - 2026-07-20
 ### Fixed
  - Restore dist/Logger as a compatibility shim ([#327](https://github.com/rokucommunity/roku-deploy/pull/327))
