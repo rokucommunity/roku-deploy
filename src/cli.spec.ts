@@ -190,7 +190,7 @@ describe('cli', function cli() {
 
     it('Takes a screenshot', async () => {
         const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
-            return Promise.resolve({ buffer: Buffer.from(''), filePath: '' });
+            return Promise.resolve({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
         });
 
         const command = new CaptureScreenshotCommand();
@@ -210,7 +210,7 @@ describe('cli', function cli() {
 
     it('Takes a screenshot using the provided cwd', async () => {
         const stub = sinon.stub(rokuDeploy, 'captureScreenshot').callsFake(async () => {
-            return Promise.resolve({ buffer: Buffer.from(''), filePath: '' });
+            return Promise.resolve({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
         });
 
         const command = new CaptureScreenshotCommand();

@@ -5411,6 +5411,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
             let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
+            expect(result.format).to.equal('png');
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.png');
             expect(fsExtra.existsSync(result.filePath));
@@ -5439,6 +5440,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
             let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
+            expect(result.format).to.equal('jpg');
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.jpg');
             expect(fsExtra.existsSync(result.filePath));
