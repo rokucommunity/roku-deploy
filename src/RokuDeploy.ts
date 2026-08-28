@@ -1123,8 +1123,8 @@ export class RokuDeploy {
      * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
      * @param options
      */
-    public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
-        options = { ...this.options, ...options } as QueryAppsOptions;
+    public async getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]> {
+        options = { ...this.options, ...options } as GetAppsOptions;
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1165,8 +1165,8 @@ export class RokuDeploy {
      * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
      * @param options
      */
-    public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
-        options = { ...this.options, ...options } as QueryActiveAppOptions;
+    public async getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp> {
+        options = { ...this.options, ...options } as GetActiveAppOptions;
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1198,8 +1198,8 @@ export class RokuDeploy {
      * `Device not keyed`).
      * @param options
      */
-    public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
-        options = { ...this.options, ...options } as QueryRegistryOptions;
+    public async getRegistry(options: GetRegistryOptions): Promise<RokuRegistry> {
+        options = { ...this.options, ...options } as GetRegistryOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
@@ -1236,8 +1236,8 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
      */
-    public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
-        options = { ...this.options, ...options } as QueryAppStateOptions;
+    public async getAppState(options: GetAppStateOptions): Promise<RokuAppState> {
+        options = { ...this.options, ...options } as GetAppStateOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
@@ -1263,8 +1263,8 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
      */
-    public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
-        options = { ...this.options, ...options } as QueryRendezvousOptions;
+    public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
+        options = { ...this.options, ...options } as GetRendezvousTrackingOptions;
         this.checkRequiredOptions(options, ['device']);
 
         const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
@@ -2607,9 +2607,9 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
 
-export type QueryAppsOptions = BaseEcpOptions;
+export type GetAppsOptions = BaseEcpOptions;
 
-export type QueryActiveAppOptions = BaseEcpOptions;
+export type GetActiveAppOptions = BaseEcpOptions;
 
 export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
@@ -2831,7 +2831,7 @@ export interface EcpResult {
     headers: Record<string, string | string[]>;
 }
 
-export interface QueryRegistryOptions extends BaseEcpOptions {
+export interface GetRegistryOptions extends BaseEcpOptions {
     /** The app whose registry to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
@@ -2847,7 +2847,7 @@ export interface RokuRegistry {
     sections: Record<string, Record<string, string>>;
 }
 
-export interface QueryAppStateOptions extends BaseEcpOptions {
+export interface GetAppStateOptions extends BaseEcpOptions {
     /** The app whose state to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
@@ -2862,7 +2862,7 @@ export interface RokuAppState {
     state: RokuAppStateValue;
 }
 
-export type QueryRendezvousOptions = BaseEcpOptions;
+export type GetRendezvousTrackingOptions = BaseEcpOptions;
 
 export interface RokuRendezvous {
     trackingEnabled: boolean;
