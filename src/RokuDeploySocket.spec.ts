@@ -103,7 +103,11 @@ describe('createRokuDeploySocket', () => {
     });
 
     it('throws when given a device config with no recognized identifier', () => {
-        expect(() => createRokuDeploySocket({ device: {} as any, port: 8085 })).to.throw('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
+        expect(() => createRokuDeploySocket({ device: {} as any, port: 8085 })).to.throw('Device config must specify exactly one targeting identifier: host, esn, id, or instanceUrl');
+    });
+
+    it('throws when given a device config with multiple identifiers', () => {
+        expect(() => createRokuDeploySocket({ device: { host: '1.2.3.4', esn: 'ABC123' } as any, port: 8085 })).to.throw('Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
     });
 
     describe('local device', () => {
