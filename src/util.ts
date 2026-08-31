@@ -149,7 +149,8 @@ export class Util {
         const globResults = patterns.map(async (pattern) => {
             //canonicalize separators so callers can use either style: every backslash becomes a forward
             //slash EXCEPT the literal-bracket escapes `\[` and `\]`, the only glob escapes with no
-            //backslash-free alternative (use `[*]`/`[?]` for a literal `*`/`?`)
+            //backslash-free alternative (use `[*]`/`[?]` for a literal `*`/`?`). `path.*` joins never
+            //emit `\[`/`\]` on their own, so a surviving backslash can only be an intentional bracket escape
             pattern = pattern.replace(/\\(?![[\]])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {

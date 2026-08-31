@@ -5,8 +5,17 @@ import type { IceServer } from './RceManagementClient';
 
 /**
  * Negotiates a Roku Cloud Emulator (RCE) device's video/audio stream over the Janus WebSocket
- * signaling protocol. Signaling only — no WebRTC dependency: connect() resolves with the SDP offer,
- * and the caller answers and trickles ICE via sendAnswer()/sendCandidate()/sendCandidatesComplete().
+ * signaling protocol: create a session, attach the streaming plugin, then a 'watch' request
+ * resolves with a jsep SDP offer. Signaling only — no WebRTC dependency: connect() resolves with
+ * the offer, and the caller answers and trickles ICE via sendAnswer()/sendCandidate()/
+ * sendCandidatesComplete(). A keepalive is sent every 25s (Janus sessions time out at 60s), and
+ * async plugin requests are acked immediately with their result delivered later as an event; both
+ * settle the pending request sharing their `transaction` id.
+ *
+ * This lives here (rather than in the caller) because the Janus WebSocket host requires an
+ * `Authorization: Bearer` header on the handshake itself, which a browser WebSocket cannot set —
+ * so this class runs under Node's `ws` and hands the offer/answer/candidates off to wherever the
+ * actual RTCPeerConnection lives (for example across a message channel to a browser or webview).
  */
 export class RceVideoSignalingClient extends EventEmitter {
     constructor(
@@ -33,8 +42,9 @@ export class RceVideoSignalingClient extends EventEmitter {
     private readonly pendingRequests = new Map<string, PendingJanusRequest>();
 
     /**
-     * Settles the pending websocket-handshake promise; stored so stop() and the unexpected-close
-     * handler can reject it directly.
+     * Settles the pending websocket-handshake promise; stored because stop() strips the socket
+     * listeners that promise is built on, so stop() and the unexpected-close handler must reject it
+     * directly or a connect() cancelled mid-handshake would hang until the negotiation timeout.
      */
     private rejectConnected: ((error: Error) => void) | undefined;
 
@@ -50,7 +60,9 @@ export class RceVideoSignalingClient extends EventEmitter {
 
     /**
      * Connect and negotiate as far as the SDP offer. Rejects (tearing the session down) if
-     * negotiation exceeds `negotiationTimeoutMs`. One session at a time: call stop() before reconnecting.
+     * negotiation exceeds `negotiationTimeoutMs`, so a silently unresponsive gateway fails loudly.
+     * One session at a time — a second connect() while one is active rejects (it would orphan the
+     * first websocket with its listeners still driving this client); call stop() before reconnecting.
      */
     public async connect(): Promise<RceVideoSignalingOffer> {
         if (this.webSocket) {
@@ -396,8 +408,9 @@ export interface RceVideoSignalingConfig {
     streamId: number;
     pin?: string;
     /**
-     * The management api's `janus_token` device field, sent with every Janus request. Distinct from
-     * `apiToken`, which authenticates the WebSocket handshake itself.
+     * The management api's `janus_token` device field, sent as the `apisecret` field on every Janus
+     * request (NOT `token`, a stored-token auth field Janus also supports but this gateway rejects
+     * with a 403 on create). Distinct from `apiToken`, which authenticates the WebSocket handshake itself.
      */
     janusToken?: string;
     /**

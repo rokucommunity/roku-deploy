@@ -79,8 +79,9 @@ export class LocalSocket extends net.Socket {
  * device's `rceToken`.
  *
  * Extending `stream.Duplex` (rather than a plain `EventEmitter`) matters: consumers hand this
- * socket to `telnet-client`, whose injected-socket guard requires internals only a real Node
- * stream provides.
+ * socket to `telnet-client`, whose `_checkSocket()` injected-socket guard requires `pipe`,
+ * `_write`, `_writableState`, `_read`, and `_readableState` — internals only a real Node stream
+ * provides.
  */
 export class RceSocket extends stream.Duplex {
     constructor(options: RceSocketOptions) {
@@ -126,7 +127,8 @@ export class RceSocket extends stream.Duplex {
      * is registered as a one-time `'connect'` listener.
      *
      * Unlike `net.Socket`, this socket cannot be reconnected: calling connect() a second time (or
-     * on a destroyed socket) throws.
+     * on a destroyed socket) throws — a second websocket would orphan the first with its listeners
+     * still feeding this stream, so both misuses fail loudly instead of leaking.
      */
     public connect(connectListener?: () => void): this {
         if (this.destroyed) {
@@ -221,8 +223,8 @@ export class RceSocket extends stream.Duplex {
     }
 
     /**
-     * Sends a chunk, unchanged, as a binary websocket frame (the RCE port endpoints reject TEXT
-     * frames). A write issued before the websocket has opened is held and flushed on `'open'`,
+     * Sends a chunk, unchanged, as a binary websocket frame (the RCE port endpoints reject a TEXT
+     * frame with close code 1003). A write issued before the websocket has opened is held and flushed on `'open'`,
      * matching the buffering `net.Socket` applies to writes issued while connecting.
      */
     public _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {

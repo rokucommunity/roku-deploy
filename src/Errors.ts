@@ -22,7 +22,8 @@ export enum RokuDeployErrorCode {
 }
 
 /**
- * HTTP request details
+ * HTTP request details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpRequestDetails {
     url?: string;
@@ -32,7 +33,8 @@ export interface HttpRequestDetails {
 }
 
 /**
- * HTTP response details
+ * HTTP response details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpResponseDetails {
     statusCode?: number;

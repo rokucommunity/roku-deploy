@@ -70,7 +70,7 @@ export class RceManagementClient {
 
     /**
      * Boot a device from a snapshot. Resolves with the device, whose `running_device` block carries
-     * the instance connection details.
+     * the instance API URL and video (Janus) connection details.
      */
     public startDevice(options: StartDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/start`, { body: options.start, token: options.token });
@@ -180,15 +180,18 @@ export class RceManagementClient {
     }
 
     /**
-     * Sends an authenticated request and returns the parsed JSON body. A per-call token wins over
-     * the constructor token. Non-2xx responses reject.
+     * Sends an authenticated request and returns the parsed JSON body; non-2xx responses reject.
+     * The single HTTP choke point, so auth and error handling stay consistent and tests can stub
+     * one method rather than the network. A per-call token wins over the constructor token.
      */
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse> {
         const url = this.baseUrl + path + this.buildQueryString(options?.query);
         const needleOptions: needle.NeedleOptions = {
             json: true,
-            //bound both connection establishment and the first response byte, the same way
-            //request.ts does (and like there, deliberately do NOT set `read_timeout`)
+            //needle's `timeout` alias only bounds connection establishment; a server that accepts the
+            //connection but never responds would hang the request forever. Bound both the connection and
+            //first-response-byte timers, the same way request.ts does (and like there, deliberately do
+            //NOT set `read_timeout` - see request.ts for the hazards of needle's read timer)
             open_timeout: this.timeout,
             response_timeout: this.timeout,
             //disable keep-alive/pooling so a lingering socket doesn't hold the Node event loop

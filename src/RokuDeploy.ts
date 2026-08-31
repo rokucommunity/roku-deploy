@@ -86,8 +86,9 @@ export class RokuDeploy {
     private readonly options: RokuDeployConstructorOptions;
 
     /**
-     * Resolved RCE instance urls, cached per device config for the lifetime of this instance.
-     * Failed resolutions are evicted so the next call retries.
+     * Resolved RCE instance urls, cached per device config for the lifetime of this instance so a
+     * multi-request flow avoids re-resolving through the management api on every request. Failed
+     * resolutions are evicted so the next call retries.
      */
     private readonly rceInstanceUrlsByCacheKey = new Map<string, Promise<string>>();
 
@@ -884,13 +885,17 @@ export class RokuDeploy {
     }
 
     /**
-     * Send a raw External Control Protocol (ECP) request to a device and return the response with
-     * its XML body parsed to JSON. Works for both local and Cloud Emulator devices, and can reach
-     * any ECP route even when no dedicated wrapper exists for it yet.
+     * Send a raw External Control Protocol (ECP) request to a device and return the raw response
+     * (status code and body). This is the single ECP transport: every ECP convenience method
+     * funnels through it, and it is public so any ECP route can be reached even when no dedicated
+     * wrapper exists for it yet. Local devices are addressed as `http://<host>:<ecpPort>/<route>`;
+     * Cloud Emulator devices go through their instance's `/ecp1/<route>` proxy, so callers never
+     * branch on device kind.
      * @param device the device to send the request to
      * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
      * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
-     *                `verify` defaults to false so raw ECP status bodies come back to the caller instead of throwing.
+     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
+     *                chanperf response, for example) come back to the caller instead of throwing.
      */
     public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
         options = { ...this.options, ...options } as EcpOptions;
@@ -994,8 +999,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Press a sequence of remote keys, in order, waiting `keyDelayMs` between presses so on-screen
-     * navigation keeps up. The first failed press throws with the failing key and step.
+     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
+     * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...options } as SendKeySequenceOptions;
@@ -1021,7 +1026,8 @@ export class RokuDeploy {
     /**
      * Enter the developer-settings key combo on a Roku Cloud Emulator device, causing it to show
      * the on-screen developer setup wizard for the user to complete (this call only triggers that
-     * screen, it does not finish the setup). Local devices are not supported.
+     * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
+     * only exists on the RCE instance api.
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
@@ -2112,8 +2118,8 @@ export class RokuDeploy {
 
     /**
      * Unwrap a standard ECP response envelope: return the root element of the parsed body. Throws
-     * FailedDeviceResponseError on a non-OK `<status>` and UnparsableDeviceResponseError when the
-     * root element is missing.
+     * FailedDeviceResponseError on a non-OK `<status>` (which ECP reports with a 202 rather than an
+     * error status code) and UnparsableDeviceResponseError when the root element is missing.
      */
     private async getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Promise<Record<string, any>> {
         const root = (await this.parseEcpXml(result))?.[rootKey];
@@ -2603,7 +2609,8 @@ export interface ValidateDeveloperPasswordOptions {
 }
 
 /**
- * The remote-control keys a Roku understands. Not an enforced list — key options also accept raw strings.
+ * The remote-control keys a Roku understands, in the canonical casing the device expects. Not an
+ * enforced list — key options also accept raw strings (e.g. a `Lit_<char>` literal).
  */
 export enum RemoteKey {
     Back = 'Back',
