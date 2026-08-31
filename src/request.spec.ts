@@ -2,23 +2,23 @@ import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import { PassThrough } from 'stream';
 import * as needle from 'needle';
-import { request } from './request';
+import { buildDigestAuthorization, parseDigestChallenge, request } from './request';
 
 const sinon = createSandbox();
 
 /**
- * Unit tests for the needle compatibility shim.
+ * Unit tests for the HTTP transport.
  *
- * These pin down the translation between roku-deploy's `request`/`postman-request`-style
- * options/response and needle, by stubbing `needle` directly. The error/response SHAPE
- * here is part of roku-deploy's public surface (it's attached to thrown errors), so getting any
- * of this wrong is a breaking change.
+ * These pin down the translation between roku-deploy's request options/`HttpResponse` and needle,
+ * by stubbing `needle` directly. The response SHAPE here is part of roku-deploy's public surface
+ * (it's attached to thrown errors), so getting any of this wrong is a breaking change.
  */
-describe('request (needle shim)', () => {
+describe('request (http transport)', () => {
 
     /** captured args from the stubbed needle call: { url, data, options, callback } */
     let postArgs: { url: string; data: any; options: any; callback: any };
     let getArgs: { url: string; options: any; callback: any };
+    let headArgs: { url: string; options: any; callback: any };
 
     /** Stub needle.post and capture/drive the callback */
     function stubPost(err: any, response: any, body: any) {
@@ -41,22 +41,46 @@ describe('request (needle shim)', () => {
         }) as any);
     }
 
-    /** Promise wrapper around the callback-style shim methods */
-    function callPost(params: any): Promise<{ error: any; response: any; body: any }> {
-        return new Promise((resolve) => {
-            request.post(params, (error, response, body) => resolve({ error: error, response: response, body: body }));
-        });
+    /** Stub needle.head and capture/drive the callback */
+    function stubHead(err: any, response: any, body: any) {
+        return sinon.stub(needle, 'head').callsFake(((url: string, options: any, callback: any) => {
+            headArgs = { url: url, options: options, callback: callback };
+            process.nextTick(callback, err, response, body);
+            return {} as any;
+        }) as any);
     }
-    function callGet(params: any): Promise<{ error: any; response: any; body: any }> {
-        return new Promise((resolve) => {
-            request.get(params, (error, response, body) => resolve({ error: error, response: response, body: body }));
-        });
+
+    /** Settle-capturing wrappers around the promise methods */
+    async function callPost(params: any): Promise<{ error: any; response: any; body: any }> {
+        try {
+            const response = await request.post(params);
+            return { error: null, response: response, body: response?.body };
+        } catch (error) {
+            return { error: error, response: undefined, body: undefined };
+        }
+    }
+    async function callGet(params: any): Promise<{ error: any; response: any; body: any }> {
+        try {
+            const response = await request.get(params);
+            return { error: null, response: response, body: response?.body };
+        } catch (error) {
+            return { error: error, response: undefined, body: undefined };
+        }
+    }
+    async function callHead(params: any): Promise<{ error: any; response: any; body: any }> {
+        try {
+            const response = await request.head(params);
+            return { error: null, response: response, body: response?.body };
+        } catch (error) {
+            return { error: error, response: undefined, body: undefined };
+        }
     }
 
     afterEach(() => {
         sinon.restore();
         postArgs = undefined;
         getArgs = undefined;
+        headArgs = undefined;
     });
 
     describe('option translation', () => {
@@ -90,18 +114,20 @@ describe('request (needle shim)', () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' } });
             expect(postArgs.options.connection).to.equal('close');
+            expect(postArgs.options.agent).to.equal(false);
         });
 
-        it('closes the connection when agentOptions.keepAlive is false (request parity)', async () => {
+        it('closes the connection when keepAlive is explicitly false', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
-            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, agentOptions: { keepAlive: false } });
+            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, keepAlive: false });
             expect(postArgs.options.connection).to.equal('close');
         });
 
         it('leaves the connection alone when the caller explicitly opts into keepAlive', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
-            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, agentOptions: { keepAlive: true } });
+            await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' }, keepAlive: true });
             expect(postArgs.options.connection).to.be.undefined;
+            expect(postArgs.options.agent).to.be.undefined;
         });
 
         it('closes the connection by default on GET too', async () => {
@@ -111,18 +137,6 @@ describe('request (needle shim)', () => {
         });
 
         it('translates auth into digest username/password', async () => {
-            stubPost(null, { statusCode: 200, headers: {} }, 'ok');
-            await callPost({
-                url: 'http://1.2.3.4:80/x',
-                auth: { user: 'rokudev', pass: 'aaaa', sendImmediately: false },
-                formData: { a: 'b' }
-            });
-            expect(postArgs.options.auth).to.equal('digest');
-            expect(postArgs.options.username).to.equal('rokudev');
-            expect(postArgs.options.password).to.equal('aaaa');
-        });
-
-        it('accepts auth specified as username/password (request alias)', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({
                 url: 'http://1.2.3.4:80/x',
@@ -159,6 +173,22 @@ describe('request (needle shim)', () => {
         });
     });
 
+    describe('head', () => {
+        it('issues a needle head request with the translated options', async () => {
+            stubHead(null, { statusCode: 200, headers: {} }, Buffer.alloc(0));
+            const { response } = await callHead({
+                url: 'http://1.2.3.4:80/plugin_install',
+                timeout: 3000,
+                auth: { username: 'rokudev', password: 'aaaa' }
+            });
+            expect(headArgs.url).to.equal('http://1.2.3.4:80/plugin_install');
+            expect(headArgs.options.open_timeout).to.equal(3000);
+            expect(headArgs.options.auth).to.equal('digest');
+            expect(response.statusCode).to.equal(200);
+            expect(response.request.method).to.equal('HEAD');
+        });
+    });
+
     describe('formData / multipart translation', () => {
         it('enables multipart and passes form data when fields are present', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
@@ -167,7 +197,7 @@ describe('request (needle shim)', () => {
             expect(postArgs.data).to.eql({ mysubmit: 'Replace' });
         });
 
-        it('drops null/undefined/empty-string fields (request did this implicitly)', async () => {
+        it('drops null/undefined/empty-string fields (needle throws on empty multipart values)', async () => {
             stubPost(null, { statusCode: 200, headers: {} }, 'ok');
             await callPost({
                 url: 'http://1.2.3.4:80/x',
@@ -238,7 +268,7 @@ describe('request (needle shim)', () => {
 
             await callPost({
                 url: 'http://1.2.3.4:80/some/route',
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 body: 'raw-body'
             });
 
@@ -285,127 +315,57 @@ describe('request (needle shim)', () => {
         });
     });
 
-    describe('response reshape (postman-request compatibility)', () => {
-        it('guarantees the request-compat fields on the response (verified against postman-request 3.17.6)', async () => {
-            //For maximum parity the shim returns needle's underlying http.IncomingMessage (so consumers
-            //keep access to statusCode/statusMessage/rawHeaders/httpVersion/req/socket/... just like with
-            //postman-request) and layers on the `request`-compat extras postman added. We therefore
-            //assert the GUARANTEED fields are present/correct rather than deep-equaling the whole object
-            //(it legitimately carries the full IncomingMessage surface, which we intentionally preserve).
+    describe('response shape', () => {
+        it('carries statusCode, statusMessage, headers, string body, and the originating request', async () => {
             const headers = { 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' };
-            stubPost(null, { statusCode: 401, headers: headers }, Buffer.alloc(0));
+            stubPost(null, { statusCode: 401, statusMessage: 'Unauthorized', headers: headers }, Buffer.alloc(0));
             const { response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa' },
-                formData: { mysubmit: 'Delete', archive: '' }
+                headers: { 'User-Agent': 'roku-deploy/test' },
+                formData: { mysubmit: 'Delete' }
             });
             expect(response.statusCode).to.equal(401);
-            expect(response.headers).to.eql({ 'content-length': '0', 'www-authenticate': 'Digest realm="rokudev"' });
-            //postman-request attached the (string) body to response.body too; the shim must match
+            expect(response.statusMessage).to.equal('Unauthorized');
+            expect(response.headers).to.eql(headers);
             expect(response.body).to.equal('');
-            //the request-compat object postman exposed at response.request
-            expect(response.request.host).to.equal('1.2.3.4');
-            expect(response.request.href).to.equal('http://1.2.3.4:80/plugin_install');
-            expect(response.request.uri).to.include({
-                host: '1.2.3.4:80',
-                hostname: '1.2.3.4',
-                port: '80',
-                protocol: 'http:',
-                href: 'http://1.2.3.4:80/plugin_install',
-                pathname: '/plugin_install'
-            });
-        });
-
-        it('attaches the string body to response.body (postman-request parity)', async () => {
-            stubGet(null, { statusCode: 200, headers: {} }, Buffer.from('<device-info/>'));
-            const { response, body } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
-            //the body is on BOTH the callback arg and response.body, and they're the same string
-            expect(response.body).to.equal('<device-info/>');
-            expect(response.body).to.equal(body);
-        });
-
-        it('exposes statusCode, headers, request.host and request.href', async () => {
-            stubPost(null, { statusCode: 401, headers: { server: 'Roku' } }, '');
-            const { response } = await callPost({ url: 'http://1.2.3.4:80/plugin_install', formData: { a: 'b' } });
-            expect(response.statusCode).to.equal(401);
-            expect(response.headers).to.eql({ server: 'Roku' });
-            //request.host strips the default :80 (matches request's behavior / URL semantics)
-            expect(response.request.host).to.equal('1.2.3.4');
-            expect(response.request.href).to.equal('http://1.2.3.4:80/plugin_install');
-        });
-
-        it('populates request.method and request.headers from the underlying req when present', async () => {
-            //needle's resp IS an http.IncomingMessage with a `.req` (ClientRequest). Simulate that so the
-            //shim can surface the outgoing method/headers the way postman-request did.
-            const fakeResp: any = {
-                statusCode: 200,
-                headers: {},
-                req: {
-                    method: 'POST',
-                    getHeaders: () => ({ 'user-agent': 'roku-deploy/test' })
-                }
-            };
-            stubGet(null, fakeResp, 'ok');
-            const { response } = await callGet({ url: 'http://1.2.3.4:80/plugin_install' });
+            expect(response.request.url).to.equal('http://1.2.3.4:80/plugin_install');
             expect(response.request.method).to.equal('POST');
-            //needle lowercases outgoing header names; the shim re-cases them to match postman-request
+            expect(response.request.host).to.equal('1.2.3.4');
             expect(response.request.headers).to.eql({ 'User-Agent': 'roku-deploy/test' });
         });
 
-        it('does not clobber a pre-existing response.request', async () => {
-            //if the underlying response already carries a `request` object, leave it untouched
-            const preExisting = { host: 'pre.existing', href: 'http://pre.existing/x', custom: 'kept' };
-            const fakeResp: any = { statusCode: 200, headers: {}, request: preExisting };
-            stubGet(null, fakeResp, 'ok');
-            const { response } = await callGet({ url: 'http://1.2.3.4:80/plugin_install' });
-            expect(response.request).to.equal(preExisting);
-            expect(response.request.custom).to.equal('kept');
+        it('sets request.method to GET for gets', async () => {
+            stubGet(null, { statusCode: 200, headers: {} }, '<device-info/>');
+            const { response } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
+            expect(response.request.method).to.equal('GET');
+            expect(response.body).to.equal('<device-info/>');
         });
 
-        it('leaves request.uri.hostname null when the url cannot be parsed (url.parse parity)', async () => {
+        it('defaults headers to an empty object when the underlying response has none', async () => {
+            stubGet(null, { statusCode: 200 }, 'ok');
+            const { response } = await callGet({ url: 'http://1.2.3.4:8060/x' });
+            expect(response.headers).to.eql({});
+        });
+
+        it('leaves request.host undefined when the url cannot be parsed', async () => {
             stubGet(null, { statusCode: 200, headers: {} }, 'ok');
             const { response } = await callGet({ url: 'not-a-valid-url' });
-            //url.parse() of a bare token yields null host/hostname (this is what postman-request produced too)
-            expect(response.request.host).to.be.null;
-            expect(response.request.uri.hostname).to.be.null;
+            expect(response.request.host).to.be.undefined;
+            expect(response.request.url).to.equal('not-a-valid-url');
         });
 
-        it('exposes the port via request.uri (host=hostname, uri.host=host:port) — postman-request parity', async () => {
-            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
-            const { response } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
-            //postman-request set response.request.host to the hostname only; the port lived on uri.host
-            expect(response.request.host).to.equal('1.2.3.4');
-            expect(response.request.uri.host).to.equal('1.2.3.4:8060');
-            expect(response.request.uri.port).to.equal('8060');
-        });
-
-        it('passes the raw headers object through (so callers can read e.g. headers.server)', async () => {
-            stubGet(null, { statusCode: 500, headers: { server: 'Apache', 'content-type': 'text/html' } }, 'body');
-            const { response } = await callGet({ url: 'http://1.2.3.4:8060/query/device-info' });
-            expect(response.headers.server).to.equal('Apache');
-            expect(response.headers['content-type']).to.equal('text/html');
-        });
-
-        it('yields an undefined response (no crash) when needle delivers no response object', async () => {
-            //request/postman-request could call back with no response; checkRequest guards on this.
+        it('rejects when needle delivers neither an error nor a response', async () => {
             stubPost(null, undefined, undefined);
             const { error, response } = await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' } });
-            expect(error).to.be.null;
+            expect(error?.message).to.include('No response received');
             expect(response).to.be.undefined;
-        });
-
-        it('still exposes the raw url as request.href when the url cannot be parsed', async () => {
-            stubGet(null, { statusCode: 200, headers: {} }, 'ok');
-            const { response } = await callGet({ url: 'not-a-valid-url' });
-            expect(response.request.host).to.be.null;
-            expect(response.request.href).to.equal('not-a-valid-url');
         });
     });
 
     describe('digest preflight for bodied POSTs', () => {
         //needle's own digest dance sends the body on the unauthenticated first leg, which the Roku kills
-        //mid-write for large bodies (write EPIPE). The shim therefore probes bodyless first and only sends
-        //the body WITH a computed Authorization header. These tests pin that two-request sequence down.
+        //mid-write for large bodies (write EPIPE). The transport therefore probes bodyless first and only
+        //sends the body WITH a computed Authorization header. These tests pin that two-request sequence down.
 
         const CHALLENGE = 'Digest qop="auth", realm="rokudev", nonce="abc123"';
 
@@ -428,7 +388,7 @@ describe('request (needle shim)', () => {
             ]);
             const { error, response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa', sendImmediately: false },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(calls).to.have.lengthOf(2);
@@ -458,7 +418,7 @@ describe('request (needle shim)', () => {
             await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
                 qs: { dcl_enabled: '1' },
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Delete', fileName: 'a.zip' }
             });
             const authorization = calls[1].options.headers.authorization as string;
@@ -472,7 +432,7 @@ describe('request (needle shim)', () => {
             ]);
             const { error } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev' },
+                auth: { username: 'rokudev' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(error).to.be.null;
@@ -487,7 +447,7 @@ describe('request (needle shim)', () => {
             ]);
             const { error, response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(calls).to.have.lengthOf(2);
@@ -505,7 +465,7 @@ describe('request (needle shim)', () => {
             ]);
             const { response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(calls).to.have.lengthOf(2);
@@ -523,7 +483,7 @@ describe('request (needle shim)', () => {
             ]);
             const { response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(calls).to.have.lengthOf(2);
@@ -536,7 +496,7 @@ describe('request (needle shim)', () => {
             const calls = stubPostSequence([{ error: networkError }]);
             const { error, response } = await callPost({
                 url: 'http://1.2.3.4:80/plugin_install',
-                auth: { user: 'rokudev', pass: 'aaaa' },
+                auth: { username: 'rokudev', password: 'aaaa' },
                 formData: { mysubmit: 'Replace' }
             });
             expect(calls).to.have.lengthOf(1);
@@ -550,7 +510,7 @@ describe('request (needle shim)', () => {
             ]);
             await callPost({
                 url: 'http://1.2.3.4:8060/keypress/Home',
-                auth: { user: 'rokudev', pass: 'aaaa' }
+                auth: { username: 'rokudev', password: 'aaaa' }
             });
             expect(calls).to.have.lengthOf(1);
         });
@@ -568,7 +528,7 @@ describe('request (needle shim)', () => {
     });
 
     describe('error passthrough', () => {
-        it('forwards a needle error to the callback with undefined response/body (post)', async () => {
+        it('rejects with the needle error (post)', async () => {
             const networkError = new Error('socket hang up');
             stubPost(networkError, undefined, undefined);
             const { error, response, body } = await callPost({ url: 'http://1.2.3.4:80/x', formData: { a: 'b' } });
@@ -577,7 +537,7 @@ describe('request (needle shim)', () => {
             expect(body).to.be.undefined;
         });
 
-        it('forwards a needle error to the callback with undefined response/body (get)', async () => {
+        it('rejects with the needle error (get)', async () => {
             const networkError = new Error('ECONNREFUSED');
             stubGet(networkError, undefined, undefined);
             const { error, response, body } = await callGet({ url: 'http://1.2.3.4:8060/x' });
@@ -587,18 +547,18 @@ describe('request (needle shim)', () => {
         });
     });
 
-    describe('streaming get (getToFile path)', () => {
-        it('returns the needle stream when no callback is given', () => {
+    describe('getStream (file download path)', () => {
+        it('returns the needle stream', () => {
             const fakeStream = new PassThrough();
             sinon.stub(needle, 'get').returns(fakeStream as any);
-            const result = request.get({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { user: 'u', pass: 'p' } } as any);
+            const result = request.getStream({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { username: 'u', password: 'p' } });
             expect(result).to.equal(fakeStream);
         });
 
         it(`bridges needle's 'err' event to 'error'`, (done) => {
             const fakeStream = new PassThrough();
             sinon.stub(needle, 'get').returns(fakeStream as any);
-            const stream: any = request.get({ url: 'http://1.2.3.4:80/x', auth: { user: 'u', pass: 'p' } } as any);
+            const stream: any = request.getStream({ url: 'http://1.2.3.4:80/x', auth: { username: 'u', password: 'p' } });
             const theError = new Error('stream blew up');
             stream.on('error', (e) => {
                 expect(e).to.equal(theError);
@@ -610,7 +570,7 @@ describe('request (needle shim)', () => {
         it('swallows the intermediate 401 response, then forwards the retried 200 (digest auth)', () => {
             const fakeStream = new PassThrough();
             sinon.stub(needle, 'get').returns(fakeStream as any);
-            const stream: any = request.get({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { user: 'u', pass: 'p' } } as any);
+            const stream: any = request.getStream({ url: 'http://1.2.3.4:80/pkgs/dev.pkg', auth: { username: 'u', password: 'p' } });
 
             const seen: number[] = [];
             stream.on('response', (resp) => seen.push(resp.statusCode));
@@ -626,7 +586,7 @@ describe('request (needle shim)', () => {
         it('does NOT swallow a 401 when there is no digest auth (no credentials)', () => {
             const fakeStream = new PassThrough();
             sinon.stub(needle, 'get').returns(fakeStream as any);
-            const stream: any = request.get({ url: 'http://1.2.3.4:8060/x' } as any);
+            const stream: any = request.getStream({ url: 'http://1.2.3.4:8060/x' });
 
             const seen: number[] = [];
             stream.on('response', (resp) => seen.push(resp.statusCode));
@@ -638,7 +598,7 @@ describe('request (needle shim)', () => {
         it('forwards a response event that has no response object (digest auth)', () => {
             const fakeStream = new PassThrough();
             sinon.stub(needle, 'get').returns(fakeStream as any);
-            const stream: any = request.get({ url: 'http://1.2.3.4:80/x', auth: { user: 'u', pass: 'p' } } as any);
+            const stream: any = request.getStream({ url: 'http://1.2.3.4:80/x', auth: { username: 'u', password: 'p' } });
 
             let fired = false;
             stream.on('response', () => {
@@ -647,6 +607,89 @@ describe('request (needle shim)', () => {
             //an undefined resp must not be mistaken for the 401 challenge to swallow
             fakeStream.emit('response', undefined);
             expect(fired).to.be.true;
+        });
+    });
+
+    describe('parseDigestChallenge', () => {
+        it('parses quoted values', () => {
+            const parsed = parseDigestChallenge('Digest realm="rokudev", nonce="abc123", qop="auth"');
+            expect(parsed).to.eql({ realm: 'rokudev', nonce: 'abc123', qop: 'auth' });
+        });
+
+        it('parses unquoted values', () => {
+            const parsed = parseDigestChallenge('Digest realm=rokudev, algorithm=MD5, stale=false');
+            expect(parsed).to.eql({ realm: 'rokudev', algorithm: 'MD5', stale: 'false' });
+        });
+    });
+
+    describe('buildDigestAuthorization', () => {
+        it('includes opaque parameter when present in challenge', () => {
+            const authorization = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'password',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: {
+                    realm: 'rokudev',
+                    nonce: 'abc123',
+                    qop: 'auth',
+                    opaque: 'opaque-value'
+                }
+            });
+            expect(authorization).to.match(/^Digest /);
+            expect(authorization).to.include('opaque="opaque-value"');
+            expect(authorization).to.include('qop=auth');
+            expect(authorization).to.include('nc=00000001');
+        });
+
+        it('omits opaque parameter when not present in challenge', () => {
+            const authorization = buildDigestAuthorization({
+                username: 'rokudev',
+                password: 'password',
+                method: 'HEAD',
+                uri: '/plugin_install',
+                challenge: {
+                    realm: 'rokudev',
+                    nonce: 'abc123',
+                    qop: 'auth'
+                }
+            });
+            expect(authorization).to.not.include('opaque');
+        });
+
+        it('handles digest auth edge cases (MD5-SESS, missing qop, default algorithm, empty values)', () => {
+            //MD5-SESS algorithm takes the session-key ha1 branch
+            const md5Sess = buildDigestAuthorization({
+                username: 'user',
+                password: 'pass',
+                method: 'HEAD',
+                uri: '/x',
+                challenge: { realm: 'r', nonce: 'n', algorithm: 'MD5-sess', qop: 'auth' }
+            });
+            expect(md5Sess).to.include('algorithm=MD5-SESS');
+
+            //no qop: the response digest omits the nc/cnonce/qop segment entirely
+            const noQop = buildDigestAuthorization({
+                username: 'user',
+                password: 'pass',
+                method: 'HEAD',
+                uri: '/x',
+                challenge: { realm: 'r', nonce: 'n' }
+            });
+            expect(noQop).to.not.include('qop=');
+            expect(noQop).to.not.include('nc=');
+
+            //missing realm/nonce default to empty strings rather than throwing
+            const emptyChallenge = buildDigestAuthorization({
+                username: 'user',
+                password: 'pass',
+                method: 'HEAD',
+                uri: '/x',
+                challenge: {}
+            });
+            expect(emptyChallenge).to.include('realm=""');
+            expect(emptyChallenge).to.include('nonce=""');
+            expect(emptyChallenge).to.include('algorithm=MD5');
         });
     });
 });

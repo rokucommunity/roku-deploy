@@ -1,42 +1,69 @@
 /* eslint-disable camelcase */
+import * as crypto from 'crypto';
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
-import { buildDigestAuthorization, parseDigestChallenge } from './fetch';
 
 /**
- * A thin compatibility shim over `needle` that mimics the small slice of the
- * `request`/`postman-request` API that roku-deploy relies on. We migrated off
- * `postman-request` (unmaintained, pulls in a large dependency tree) but a lot
- * of roku-deploy's public surface — most notably the `results`/`response`
- * object attached to thrown errors — was shaped by `request`. To keep this a
- * non-breaking change, this shim reconstructs that same shape on top of
- * needle's response object.
- *
- * Only `post` and `get` are implemented, since those are the only verbs
- * roku-deploy uses. `get` additionally supports the callback-less streaming
- * form (`request.get(opts).on(...).pipe(...)`) used when downloading files.
+ * roku-deploy's HTTP transport: a thin promise wrapper over `needle` carrying the device-specific
+ * behavior roku-deploy needs (a digest dance that never sends a body unauthenticated, socket and
+ * timeout handling that lets the process exit, binary-safe downloads). Responses come back as
+ * roku-deploy's own `HttpResponse` shape rather than any HTTP library's native response, so the
+ * library underneath can be swapped without breaking consumers.
  */
 export class Request {
 
     /**
-     * POST a multipart/form-data request, `request`-style. Invokes `callback`
-     * with `(error, response, body)`.
+     * POST a request. A raw `body` is sent verbatim; otherwise `formData` (if any) is sent as
+     * multipart/form-data, and an empty formData object falls back to a bodyless POST.
      */
-    public post(params: RequestOptions, callback: RequestCallback) {
+    public async post(params: RequestOptions): Promise<HttpResponse> {
         const { url, data, needleOptions } = this.translateOptions(params, 'POST');
         //Never let needle's own digest dance send a request body: needle sends the FULL body on the
-        //unauthenticated first leg, but the Roku answers that leg's 401 without reading the body and closes
-        //the socket. A body still being written at that moment dies with a raw `write EPIPE`, and needle
-        //fails the whole request before its 401 retry can run. (Bodies small enough to fit in the socket
-        //buffers finish writing before the close, which is why only large zips ever hit this.)
-        //`request`/`postman-request` never had this problem because they never sent the body
-        //unauthenticated: the first leg was a bodyless probe, and the body only went out WITH the
-        //Authorization header. Replicate that here for any authenticated POST that has a body.
+        //unauthenticated first leg, but the Roku answers the 401 without reading it and closes the socket —
+        //a body still mid-write dies with `write EPIPE` before needle's retry can run (only large zips hit
+        //this; smaller bodies fit in the socket buffers). So for any authenticated POST with a body, probe
+        //for the challenge first and only ever send the body WITH the Authorization header.
         if (data && needleOptions.auth === 'digest') {
-            return this.postWithDigestPreflight(url, data, needleOptions, callback);
+            return this.postWithDigestPreflight(url, data, needleOptions);
         }
-        return needle.post(url, data, needleOptions, this.createNeedleCallback(url, callback));
+        return this.send('post', url, data, needleOptions);
+    }
+
+    /**
+     * GET a request.
+     */
+    public async get(params: RequestOptions): Promise<HttpResponse> {
+        const { url, needleOptions } = this.translateOptions(params, 'GET');
+        return this.send('get', url, null, needleOptions);
+    }
+
+    /**
+     * HEAD a request. Useful for credential/status probes (the response body is always empty).
+     */
+    public async head(params: RequestOptions): Promise<HttpResponse> {
+        const { url, needleOptions } = this.translateOptions(params, 'HEAD');
+        return this.send('head', url, null, needleOptions);
+    }
+
+    /**
+     * GET as a readable stream (`.on('response'|'data'|'error')`, `.pipe(...)`) for file downloads.
+     */
+    public getStream(params: RequestOptions): NodeJS.ReadableStream {
+        const { url, needleOptions } = this.translateOptions(params, 'GET');
+        const stream = needle.get(url, needleOptions);
+
+        //needle's stream emits its failures on the `'err'` event, but roku-deploy's download paths
+        //listen on `'error'`, so bridge `'err'` -> `'error'`.
+        stream.on('err', (err) => stream.emit('error', err));
+
+        //digest auth in streaming mode: needle emits a `'response'` for the 401 challenge and a second one
+        //for the authenticated retry. roku-deploy's download paths treat any non-200 `'response'` as a hard
+        //failure — so swallow the intermediate 401 and forward only the retried response.
+        if (needleOptions.auth && needleOptions.username !== undefined) {
+            this.interceptIntermediate401(stream);
+        }
+        return stream;
     }
 
     /**
@@ -46,7 +73,7 @@ export class Request {
      * yield a usable challenge (endpoint not auth-protected, unexpected status), the real request is sent
      * unchanged and needle's own 401 dance remains as the fallback.
      */
-    private postWithDigestPreflight(url: string, data: any, needleOptions: needle.NeedleOptions, callback: RequestCallback) {
+    private postWithDigestPreflight(url: string, data: any, needleOptions: needle.NeedleOptions): Promise<HttpResponse> {
         //probe with no body and NO credentials: we want the raw 401 challenge back, not needle answering it
         //(which would consume the challenge before the real request could use it)
         const probeOptions: needle.NeedleOptions = { ...needleOptions };
@@ -55,127 +82,116 @@ export class Request {
         delete probeOptions.password;
         delete probeOptions.auth;
 
-        return needle.post(url, null, probeOptions, (probeError, probeResponse) => {
-            if (probeError) {
-                return callback(probeError, undefined, undefined);
-            }
-            const authorizedOptions: needle.NeedleOptions = { ...needleOptions };
-            const challengeHeader = probeResponse?.headers?.['www-authenticate'];
-            if (probeResponse?.statusCode === 401 && typeof challengeHeader === 'string') {
-                const authorization = buildDigestAuthorization({
-                    username: needleOptions.username,
-                    password: needleOptions.password ?? '',
-                    method: 'POST',
-                    //the digest uri must match the request line, which includes any query string
-                    uri: urlModule.parse(url).path,
-                    challenge: parseDigestChallenge(challengeHeader)
-                });
-                authorizedOptions.headers = { ...authorizedOptions.headers, authorization: authorization };
-            }
-            needle.post(url, data, authorizedOptions, this.createNeedleCallback(url, callback));
+        return new Promise<HttpResponse>((resolve, reject) => {
+            needle.post(url, null, probeOptions, (probeError, probeResponse) => {
+                if (probeError) {
+                    return reject(probeError);
+                }
+                const authorizedOptions: needle.NeedleOptions = { ...needleOptions };
+                const challengeHeader = probeResponse?.headers?.['www-authenticate'];
+                if (probeResponse?.statusCode === 401 && typeof challengeHeader === 'string') {
+                    const authorization = buildDigestAuthorization({
+                        username: needleOptions.username,
+                        password: needleOptions.password ?? '',
+                        method: 'POST',
+                        //the digest uri must match the request line, which includes any query string
+                        uri: urlModule.parse(url).path,
+                        challenge: parseDigestChallenge(challengeHeader)
+                    });
+                    authorizedOptions.headers = { ...authorizedOptions.headers, authorization: authorization };
+                }
+                needle.post(url, data, authorizedOptions, this.createNeedleCallback(url, 'POST', authorizedOptions, resolve, reject));
+            });
         });
     }
 
-    /**
-     * Build the needle callback that reshapes `(error, response, body)` into the `request`-style
-     * `(error, response, body)` the rest of roku-deploy consumes.
-     */
-    private createNeedleCallback(url: string, callback: RequestCallback) {
+    private send(method: 'get' | 'post' | 'head', url: string, data: any, needleOptions: needle.NeedleOptions): Promise<HttpResponse> {
+        return new Promise<HttpResponse>((resolve, reject) => {
+            const callback = this.createNeedleCallback(url, method.toUpperCase(), needleOptions, resolve, reject);
+            if (method === 'post') {
+                needle.post(url, data, needleOptions, callback);
+            } else if (method === 'get') {
+                needle.get(url, needleOptions, callback);
+            } else {
+                needle.head(url, needleOptions, callback);
+            }
+        });
+    }
+
+    private createNeedleCallback(url: string, method: string, needleOptions: needle.NeedleOptions, resolve: (response: HttpResponse) => void, reject: (error: Error) => void) {
         return (error: Error | null, response: any, body: any) => {
             if (error) {
-                return callback(error, undefined, undefined);
+                return reject(error);
             }
-            const coerced = this.coerceBody(body);
-            return callback(null, this.buildResponse(response, url, coerced), coerced);
+            if (!response) {
+                return reject(new Error(`No response received from ${url}`));
+            }
+            resolve(this.buildResponse(response, url, method, needleOptions, this.coerceBody(body)));
         };
     }
 
     /**
-     * GET a request, `request`-style. With a `callback`, invokes it with
-     * `(error, response, body)`. Without a callback, returns needle's readable
-     * stream (which supports `.on('error'|'response', ...)` and `.pipe(...)`)
-     * for the file-download path.
+     * Build roku-deploy's own `HttpResponse` from needle's response, carrying just the fields
+     * consumers read plus the request that produced it (for error messages and diagnostics).
      */
-    public get(params: RequestOptions, callback?: RequestCallback) {
-        const { url, needleOptions } = this.translateOptions(params, 'GET');
-        if (callback) {
-            return needle.get(url, needleOptions, (error, response, body) => {
-                if (error) {
-                    return callback(error, undefined, undefined);
-                }
-                const coerced = this.coerceBody(body);
-                return callback(null, this.buildResponse(response, url, coerced), coerced);
-            });
-        }
-        //streaming form (no callback) - used by getToFile to pipe the response to disk.
-        const stream = needle.get(url, needleOptions);
-
-        //needle's stream emits its failures on the `'err'` event, but `request` (and roku-deploy's
-        //getToFile) listens on `'error'`, so bridge `'err'` -> `'error'` to preserve that behavior.
-        stream.on('err', (err) => stream.emit('error', err));
-
-        //digest auth in streaming mode: needle issues the unauthenticated request, emits a `'response'`
-        //for the 401 challenge, and *then* transparently retries with the Authorization header (emitting
-        //a second `'response'`). `request`/`postman-request` only ever surfaced the final response, and
-        //roku-deploy's `getToFile` treats any non-200 `'response'` as a hard failure. So when we're doing
-        //digest auth, swallow the intermediate 401 `'response'` event and only forward the retried one.
-        if (needleOptions.auth && needleOptions.username !== undefined) {
-            this.interceptIntermediate401(stream);
-        }
-        return stream;
+    private buildResponse(needleResponse: any, url: string, method: string, needleOptions: needle.NeedleOptions, body: string): HttpResponse {
+        return {
+            statusCode: needleResponse.statusCode,
+            statusMessage: needleResponse.statusMessage,
+            headers: needleResponse.headers ?? {},
+            body: body,
+            request: {
+                url: url,
+                method: method,
+                //legacy url.parse is total for string input (it never throws), unlike `new URL()`
+                host: urlModule.parse(url).hostname ?? undefined,
+                headers: needleOptions.headers as Record<string, any>
+            }
+        };
     }
 
     /**
-     * Translate the `request`-style options object that roku-deploy builds into the
-     * `(url, data, needleOptions)` triple that needle expects.
+     * Translate roku-deploy's request options into the `(url, data, needleOptions)` triple that
+     * needle expects.
      */
-    private translateOptions(params: RequestOptions, method: 'GET' | 'POST') {
+    private translateOptions(params: RequestOptions, method: 'GET' | 'POST' | 'HEAD') {
         const url = this.buildUrl(params);
 
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
             parse_response: false,
-            //never let needle charset-decode a response: a signed pkg download served with a charset in its
-            //content-type (the RCE instance proxy does this) would have every non-utf8 byte replaced with
-            //U+FFFD, corrupting the binary. `request` never transcoded either (plain utf8 only), so this is
-            //also parity; `coerceBody` handles the Buffer->string conversion for text paths.
+            //never let needle charset-decode a response: a signed pkg served with a charset in its
+            //content-type (the RCE instance proxy does this) would get every non-utf8 byte replaced with
+            //U+FFFD, corrupting the binary. `coerceBody` handles the Buffer->string conversion for text paths.
             decode_response: false,
-            //`request` had a single `timeout` that governed how long to wait to establish the connection and
-            //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
-            //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
-            //every chunk and, in the digest-auth retry path, a read-timer can be left running after the request
-            //has already completed — it later fires `request.destroy()` and emits a spurious error, and (worse)
-            //keeps the Node event loop alive so a process that only made roku-deploy requests never exits.
+            //`timeout` bounds the connection and the time to the first response byte. Deliberately do NOT
+            //set `read_timeout`: its per-chunk re-armed timer can be left running after a digest-auth retry
+            //completes — later firing a spurious `request.destroy()` error and keeping the Node event loop
+            //alive so the process never exits.
             open_timeout: params.timeout,
             response_timeout: params.timeout,
             headers: params.headers
         };
 
-        //`request` was configured with `agentOptions: { keepAlive: false }` so each exchange used a fresh
-        //socket that closed when done. needle does NOT honor `agentOptions`, and on modern Node it does not
-        //send `Connection: close` by default, so the socket to the Roku is left open (keep-alive) after the
-        //response. That lingering socket keeps the Node event loop alive, so a process that only made
-        //roku-deploy requests never exits. Translate the old keepAlive:false intent into needle's
-        //`connection: 'close'` so needle sends `Connection: close` and tears the socket down after each
-        //response. Only skip this if the caller explicitly asked to keep the connection alive.
+        //needle does not send `Connection: close` on modern Node, so the socket to the Roku stays open
+        //after the response and keeps the Node event loop alive — a process that only made roku-deploy
+        //requests would never exit. Send `Connection: close` unless the caller asked for keep-alive.
         //
-        //ALSO pass `agent: false`. needle defaults `agent` to null, which makes Node use `http.globalAgent`
-        //- a POOLING agent. The `Connection: close` header alone does NOT stop that pooling: the request
-        //immediately following an on-device delete could be handed a POOLED keep-alive socket that the Roku
-        //had already closed, producing an instant ECONNRESET ("socket hang up"). `agent: false` tells Node to
-        //create a brand-new, un-pooled socket for every request and destroy it afterward, so a dead socket
-        //can never be handed to the next request. The `Connection: close` header stays as belt-and-suspenders.
-        if (params.agentOptions?.keepAlive !== true) {
+        //ALSO pass `agent: false`: needle otherwise uses Node's POOLING `http.globalAgent`, and the header
+        //alone does not stop pooling — the request right after an on-device delete could be handed a pooled
+        //keep-alive socket the Roku had already closed, an instant ECONNRESET ("socket hang up").
+        //`agent: false` forces a fresh un-pooled socket per request, destroyed afterward.
+        if (params.keepAlive !== true) {
             needleOptions.connection = 'close';
             needleOptions.agent = false;
         }
 
-        //digest auth. `request` was configured with `auth.sendImmediately: false`, which performs the
-        //401-challenge/response digest dance. needle does the same when `auth: 'digest'` is set.
+        //digest auth: needle performs the 401-challenge/response dance when `auth: 'digest'` is set
+        //(except for bodied POSTs, which take the preflight path in post() above)
         const auth = params.auth;
         if (auth) {
-            needleOptions.username = auth.user ?? auth.username;
-            needleOptions.password = auth.pass ?? auth.password;
+            needleOptions.username = auth.username;
+            needleOptions.password = auth.password;
             needleOptions.auth = 'digest';
         }
 
@@ -188,7 +204,7 @@ export class Request {
                 const formData = this.translateFormData(params.formData);
                 //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
                 //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
-                //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
+                //empty object. So fall back to a null body.
                 if (Object.keys(formData).length > 0) {
                     data = formData;
                     needleOptions.multipart = true;
@@ -200,8 +216,7 @@ export class Request {
     }
 
     /**
-     * Append the `qs` query-string object (if any) onto the url. `request` accepted
-     * `qs` as a separate option; needle expects it baked into the url.
+     * Append the `qs` query-string object (if any) onto the url; needle expects it baked into the url.
      */
     private buildUrl(params: RequestOptions): string {
         let url = params.url;
@@ -222,16 +237,11 @@ export class Request {
     }
 
     /**
-     * Convert a `request`-style `formData` object into the shape needle's multipart
-     * builder understands.
-     *
-     * - `request` silently dropped `null`/`undefined`/empty-string fields. needle's
-     *   multipart builder instead throws `"value missing for multipart!"` on empty
-     *   values, so we drop those fields entirely (preserving the old behavior).
-     * - `request` accepted a readable stream (e.g. the zip `fs.ReadStream`) as a
-     *   field value. needle's multipart builder does not handle streams, so we
-     *   translate a stream into needle's documented `{ file, content_type }` form
-     *   using the stream's `path`.
+     * Convert a `formData` object into the shape needle's multipart builder understands:
+     * - `null`/`undefined`/empty-string fields are dropped entirely (needle's multipart builder
+     *   throws `"value missing for multipart!"` on empty values).
+     * - a readable stream (e.g. the zip `fs.ReadStream`) is translated into needle's documented
+     *   `{ file, content_type }` file-by-path form, since needle does not handle streams.
      */
     private translateFormData(formData: Record<string, any> | undefined): Record<string, any> {
         const result: Record<string, any> = {};
@@ -240,11 +250,9 @@ export class Request {
         }
         for (const key in formData) {
             const value = formData[key];
-            //drop empty values (request did this implicitly; needle would throw)
             if (value === undefined || value === null || value === '') {
                 continue;
             }
-            //a readable stream (the zip/pkg archive) -> needle file-by-path form
             if (this.isReadableStream(value)) {
                 const filePath = (value).path;
                 result[key] = {
@@ -263,12 +271,10 @@ export class Request {
     }
 
     /**
-     * Coerce needle's response body into the `string` that roku-deploy expects.
-     * With `parse_response: false`, needle hands back a `Buffer` (an *empty* Buffer
-     * for empty responses such as a bare 401), whereas `request`/`postman-request`
-     * always delivered a decoded string. roku-deploy's `checkRequest` guards on
-     * `typeof body === 'string'`, so anything other than a string would be
-     * misreported as an unparsable response.
+     * Coerce needle's response body into a `string`. With `parse_response: false`, needle hands back
+     * a `Buffer` (an *empty* Buffer for empty responses such as a bare 401); roku-deploy's response
+     * verification guards on `typeof body === 'string'`, so anything else would be misreported as an
+     * unparsable response.
      */
     private coerceBody(body: any): string {
         if (Buffer.isBuffer(body)) {
@@ -282,91 +288,13 @@ export class Request {
     }
 
     /**
-     * Reshape needle's response into the `request`-compatible response roku-deploy expects (and attaches
-     * to thrown errors).
-     *
-     * Maximum-parity strategy: needle's callback `resp` is the *same* underlying Node
-     * `http.IncomingMessage` that `postman-request` exposed (needle just augments it with `.body`/`.raw`/
-     * `.bytes`). So rather than fabricate a minimal plain object — which would drop everything underneath
-     * (`statusCode`/`statusMessage`/`rawHeaders`/`httpVersion*`/`socket`/`req`/`complete`/... that a
-     * consumer might reach into) — we KEEP needle's IncomingMessage and only layer on the two things
-     * `request`/`postman-request` added on top of it:
-     *   1. a `.request` object exposing the outgoing-request fields consumers read (`host`, `href`, ...),
-     *   2. a string `.body` (postman put the decoded string here; needle leaves a Buffer under
-     *      `parse_response:false`).
-     * This way the vast majority of the old response's reachable surface is reproduced for free.
+     * Swallow the intermediate 401 `'response'` event needle emits for the digest challenge on a
+     * streaming request, forwarding only the authenticated retry's `'response'`.
      */
-    private buildResponse(needleResponse: any, url: string, body: string): RequestResponse {
-        //`request`/`postman-request` could hand back a callback with no response object; roku-deploy's
-        //`checkRequest` explicitly guards on `!results.response`. Preserve that by passing through a missing
-        //response rather than throwing while trying to augment it.
-        if (!needleResponse) {
-            return undefined;
-        }
-
-        //Parse with the legacy `url.parse()` to match postman-request's `response.request.uri` exactly: it
-        //was a Node `Url` object (host WITH port, plus auth/hash/query/search/slashes/protocol/port). The
-        //WHATWG `URL` would strip the default `:80` and omit these fields, so we deliberately use the legacy
-        //parser here for byte-parity with what consumers read off `response.request.uri.*`.
-        //`url.parse()` is total for string input (it never throws — a bare token like 'not-a-valid-url'
-        //yields null host/hostname and the token as path/pathname), so no try/catch is needed.
-        const u = urlModule.parse(url);
-        const uri: Record<string, any> = {
-            protocol: u.protocol,
-            slashes: u.slashes,
-            auth: u.auth,
-            host: u.host,
-            port: u.port,
-            hostname: u.hostname,
-            hash: u.hash,
-            search: u.search,
-            query: u.query,
-            pathname: u.pathname,
-            path: u.path,
-            href: u.href
-        };
-
-        //needle's resp IS the http.IncomingMessage. Augment it in place to mirror postman-request's shape.
-        const response = needleResponse;
-
-        //`request`/`postman-request` attached the (string) body to `response.body`. needle leaves a Buffer
-        //here under parse_response:false, so overwrite with the decoded string to match.
-        response.body = body;
-
-        //`request`/`postman-request` exposed its outgoing `Request` object at `response.request`. Its
-        //library-internal guts (`_auth`, `_form`, `_qs`, `httpModule`, `pool`, ...) can't exist without the
-        //`request` package, but we reproduce every CONSUMABLE field a caller could portably read. Don't
-        //clobber it if needle/Node ever populates one.
-        if (!response.request) {
-            const outgoingHeaders = this.titleCaseHeaders(response.req?.getHeaders?.());
-            response.request = {
-                uri: uri,
-                method: response.req?.method ?? undefined,
-                headers: outgoingHeaders,
-                host: uri.hostname,
-                href: uri.href,
-                path: uri.path,
-                port: uri.port ?? undefined,
-                originalHost: uri.hostname,
-                originalHostHeaderName: 'Host',
-                protocol: uri.protocol,
-                readable: true,
-                writable: true
-            };
-        }
-
-        return response as RequestResponse;
-    }
-
-    /**
-     * Wrap a needle stream so that an intermediate `401` `'response'` event (the
-     * digest challenge that needle answers by retrying) is not propagated to
-     * listeners. Only the subsequent, authenticated response is forwarded.
-     */
-    private interceptIntermediate401(stream: { emit: (event: string, ...args: any[]) => boolean }) {
-        const originalEmit = stream.emit.bind(stream);
+    private interceptIntermediate401(stream: NodeJS.ReadableStream) {
         let swallowedChallenge = false;
-        stream.emit = ((event: string, ...args: any[]): boolean => {
+        const originalEmit = stream.emit.bind(stream);
+        stream.emit = ((event: string, ...args: any[]) => {
             if (event === 'response' && !swallowedChallenge) {
                 const resp = args[0];
                 if (resp && resp.statusCode === 401) {
@@ -378,39 +306,74 @@ export class Request {
             return originalEmit(event, ...args);
         }) as any;
     }
-
-    /**
-     * Title-case an HTTP header name the way `request`/`postman-request` preserved it on the outgoing
-     * request (`Content-Type`, `User-Agent`, `WWW-Authenticate`, ...). needle lowercases outgoing header
-     * names, so we re-case them to maximize parity with what consumers saw on `response.request.headers`.
-     */
-    private titleCaseHeaderName(name: string): string {
-        //title-case each hyphen-delimited segment (Content-Type, User-Agent, Authorization, ...). This
-        //covers the outgoing request headers roku-deploy sends; we don't special-case acronym headers
-        //(WWW-Authenticate etc.) because those are response headers, not outgoing-request headers.
-        return name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('-');
-    }
-
-    private titleCaseHeaders(headers: Record<string, any> | undefined): Record<string, any> | undefined {
-        if (!headers || typeof headers !== 'object') {
-            return headers;
-        }
-        const out: Record<string, any> = {};
-        for (const key of Object.keys(headers)) {
-            out[this.titleCaseHeaderName(key)] = headers[key];
-        }
-        return out;
-    }
 }
 
 export const request = new Request();
 
 /**
- * The subset of the legacy `request`/`postman-request` options object that roku-deploy actually
- * builds and this shim consumes. We previously typed these as `request.OptionsWithUrl` (from
- * `@types/request`), but that pulled a dependency purely for a type and forced `as any` reads for the
- * fields the `@types/request` surface didn't cleanly expose. Declaring exactly what we use lets us drop
- * `@types/request` entirely and read every field type-safely.
+ * Parse the comma-separated key/value pairs out of a `WWW-Authenticate: Digest ...` header.
+ * Values may be bare or double-quoted.
+ */
+export function parseDigestChallenge(header: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    const body = header.replace(/^Digest\s+/i, '');
+    const re = /([a-zA-Z]+)=(?:"((?:[^"\\]|\\.)*)"|([^,]+))/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(body)) !== null) {
+        out[m[1].toLowerCase()] = m[2] ?? m[3].trim();
+    }
+    return out;
+}
+
+function md5(input: string): string {
+    return crypto.createHash('md5').update(input).digest('hex');
+}
+
+/**
+ * Build an RFC 2617 `Authorization: Digest ...` header from a parsed challenge.
+ */
+export function buildDigestAuthorization(params: {
+    username: string;
+    password: string;
+    method: string;
+    uri: string;
+    challenge: Record<string, string>;
+}): string {
+    const { username, password, method, uri, challenge } = params;
+    const realm = challenge.realm ?? '';
+    const nonce = challenge.nonce ?? '';
+    const qop = challenge.qop;
+    const algorithm = (challenge.algorithm ?? 'MD5').toUpperCase();
+    const cnonce = crypto.randomBytes(8).toString('hex');
+    const nc = '00000001';
+
+    const ha1 = algorithm === 'MD5-SESS'
+        ? md5(`${md5(`${username}:${realm}:${password}`)}:${nonce}:${cnonce}`)
+        : md5(`${username}:${realm}:${password}`);
+    const ha2 = md5(`${method}:${uri}`);
+    const response = qop
+        ? md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+        : md5(`${ha1}:${nonce}:${ha2}`);
+
+    const parts = [
+        `username="${username}"`,
+        `realm="${realm}"`,
+        `nonce="${nonce}"`,
+        `uri="${uri}"`,
+        `algorithm=${algorithm}`,
+        `response="${response}"`
+    ];
+    if (qop) {
+        parts.push(`qop=${qop}`, `nc=${nc}`, `cnonce="${cnonce}"`);
+    }
+    if (challenge.opaque) {
+        parts.push(`opaque="${challenge.opaque}"`);
+    }
+    return `Digest ${parts.join(', ')}`;
+}
+
+/**
+ * The options accepted by every request method.
  */
 export interface RequestOptions {
 
@@ -423,13 +386,10 @@ export interface RequestOptions {
     /** Outgoing request headers. */
     headers?: Record<string, any>;
 
-    /** Digest-auth credentials. `sendImmediately: false` requests the 401-challenge/response dance. */
+    /** Digest-auth credentials. When provided, the 401-challenge/response dance is performed. */
     auth?: {
-        user?: string;
-        username?: string;
-        pass?: string;
-        password?: string;
-        sendImmediately?: boolean;
+        username: string;
+        password: string;
     };
 
     /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
@@ -442,50 +402,29 @@ export interface RequestOptions {
     qs?: Record<string, any>;
 
     /**
-     * Legacy `request` agent options. Only `keepAlive` is consulted: `request` used
-     * `{ keepAlive: false }` so each exchange used a fresh socket that closed when done.
+     * Keep the socket open after the response. Defaults to false: each request gets a fresh
+     * un-pooled socket that is closed when done, so lingering sockets never pin the Node event
+     * loop or get reused after the device closed them.
      */
-    agentOptions?: {
-        keepAlive?: boolean;
-    };
+    keepAlive?: boolean;
 }
 
 /**
- * The `response` object roku-deploy (and its consumers) see. Both `postman-request` and `needle`
- * hand back a Node `http.IncomingMessage`, so the real object carries far more than the few fields
- * roku-deploy reads — `statusCode`, `headers`, `statusMessage`, `rawHeaders`, `httpVersion*`,
- * `socket`, `req`, `complete`, etc. We keep all of that (it's needle's actual IncomingMessage) and
- * layer on the `request`-compat extras postman added. The interface therefore declares the fields we
- * guarantee, and allows the rest of the IncomingMessage surface via the index signature.
+ * roku-deploy's own HTTP response shape, deliberately independent of the underlying HTTP library
+ * (attached to thrown errors and returned by the raw request helpers).
  */
-export interface RequestResponse {
+export interface HttpResponse {
     statusCode: number;
+    statusMessage?: string;
+    /** Response headers, lower-cased names. */
     headers: Record<string, any>;
-
-    /**
-     * Mirrors `request`'s `response.request` object. roku-deploy reads `response.request.host` when
-     * constructing the "Unauthorized" error message; other consumers may read `href`/`uri`/`method`.
-     */
-    request: {
-        host: string;
-        href: string;
-        uri?: Record<string, any>;
-        method?: string;
-        headers?: Record<string, any>;
-
-        /** Plus the other consumable `request` fields we reproduce (path, port, protocol, ...). */
-        [key: string]: any;
-    };
-
-    /**
-     * The response body, as a string. `request`/`postman-request` attached the body to
-     * `response.body` in addition to returning it as the callback's 3rd argument, so we mirror that
-     * for callers that read `error.results.response.body`.
-     */
+    /** The response body, decoded as a utf8 string (empty string for bodyless responses). */
     body: string;
-
-    /** Plus the rest of the underlying http.IncomingMessage surface (statusMessage, rawHeaders, ...). */
-    [key: string]: any;
+    /** The request that produced this response. */
+    request: {
+        url: string;
+        method: string;
+        host?: string;
+        headers?: Record<string, any>;
+    };
 }
-
-export type RequestCallback = (error: Error | null, response: RequestResponse | undefined, body: string | undefined) => void;
