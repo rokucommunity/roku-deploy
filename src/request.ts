@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
@@ -130,18 +129,18 @@ export class Request {
 
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
-            parse_response: false,
+            'parse_response': false,
             //never let needle charset-decode a response: a signed pkg served with a charset in its
             //content-type (the RCE instance proxy does this) would get every non-utf8 byte replaced with
             //U+FFFD, corrupting the binary. `request` never transcoded either; `coerceBody` handles the
             //Buffer->string conversion for text paths.
-            decode_response: false,
+            'decode_response': false,
             //map `request`'s single `timeout` onto needle's `open_timeout` (connection) and `response_timeout`
             //(time to first byte). Deliberately do NOT set `read_timeout`: its per-chunk re-armed timer can be
             //left running after a digest-auth retry completes — later firing a spurious `request.destroy()`
             //error and keeping the Node event loop alive so the process never exits.
-            open_timeout: params.timeout,
-            response_timeout: params.timeout,
+            'open_timeout': params.timeout,
+            'response_timeout': params.timeout,
             headers: params.headers
         };
 
@@ -239,7 +238,7 @@ export class Request {
                 const filePath = (value).path;
                 result[key] = {
                     file: filePath,
-                    content_type: 'application/octet-stream'
+                    'content_type': 'application/octet-stream'
                 };
             } else {
                 result[key] = value;
