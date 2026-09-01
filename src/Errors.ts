@@ -22,8 +22,8 @@ export enum RokuDeployErrorCode {
 }
 
 /**
- * Abstracted HTTP request details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP request details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpRequestDetails {
     url?: string;
@@ -33,8 +33,8 @@ export interface HttpRequestDetails {
 }
 
 /**
- * Abstracted HTTP response details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP response details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpResponseDetails {
     statusCode?: number;
