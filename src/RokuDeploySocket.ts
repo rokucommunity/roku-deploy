@@ -7,19 +7,9 @@ import { RceManagementClient } from './RceManagementClient';
 
 /**
  * Creates a transport for one of a Roku device's telnet consoles (for example the BrightScript
- * console on port 8085, the SceneGraph debug server on port 8080, or the screensaver console on
- * port 8087) that behaves like a `net.Socket` regardless of where the device lives:
- *
- *   - a local network device exposes these as plain-tcp telnet ports
- *   - a Roku Cloud Emulator (RCE) instance exposes the same ports as WebSocket endpoints on its
- *     instance api (`<instanceUrl>/api/v0/ports/<port>`), authed by an
- *     `Authorization: Bearer <rceToken>` header on the WebSocket handshake
- *
- * The returned object is meant as a near-transparent replacement for `new net.Socket()`: it exposes
- * the same `connect()`/`write()`/`destroy()`/`setTimeout()` surface and the same
- * `'connect'`/`'ready'`/`'data'`/`'close'`/`'end'`/`'error'`/`'timeout'` events, satisfying both a
- * real `net.Socket` and this factory's own RCE implementation. Callers that only care about console
- * bytes never need to know (or change any of their code based on) which transport they got.
+ * console on port 8085) that behaves like a `net.Socket` regardless of where the device lives:
+ * plain tcp for a local network device, an authenticated WebSocket for a Roku Cloud Emulator (RCE)
+ * instance. Exposes the same method surface and events as `new net.Socket()`.
  */
 export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket {
     //runtime guard for javascript callers, since a registry name (string) cannot be resolved to a
@@ -42,10 +32,9 @@ export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket
 }
 
 /**
- * A `net.Socket` wired up to connect to a local device's plain-tcp telnet console using the host and
- * port resolved by `createRokuDeploySocket()`. Every behavior other than `connect()` is real
- * `net.Socket` behavior inherited unchanged; that is the entire point of extending it directly
- * instead of wrapping it in another layer.
+ * A `net.Socket` wired up to connect to a local device's plain-tcp telnet console using the host
+ * and port given at construction. Everything other than `connect()` is inherited `net.Socket`
+ * behavior, unchanged.
  */
 export class LocalSocket extends net.Socket {
     constructor(options: LocalSocketOptions) {
@@ -59,12 +48,9 @@ export class LocalSocket extends net.Socket {
     private readonly port: number;
 
     /**
-     * Connects to the host and port resolved by the factory that created this socket, matching
-     * `net.Socket`'s own no-argument-address form: the address was already decided when this
-     * instance was constructed, so there is nothing left for a caller to specify here. The
-     * additional overloads below exist only so this override remains structurally compatible with
-     * `net.Socket`'s own `connect()` overloads; nothing in this codebase calls them on a
-     * `LocalRokuDeploySocket` directly.
+     * Connects to the host and port this socket was constructed with. The additional overloads
+     * below exist only so this override remains structurally compatible with `net.Socket`'s own
+     * `connect()` overloads.
      */
     public connect(connectListener?: () => void): this;
     public connect(connectOptions: net.SocketConnectOpts, connectListener?: () => void): this;
@@ -88,13 +74,12 @@ export class LocalSocket extends net.Socket {
 
 /**
  * A `stream.Duplex` wired up to connect to a Roku Cloud Emulator (RCE) instance's telnet console
- * over its WebSocket endpoint (`<instanceUrl>/api/v0/ports/<port>`), authed by an
- * `Authorization: Bearer <rceToken>` header on the WebSocket handshake.
+ * over its WebSocket endpoint (`<instanceUrl>/api/v0/ports/<port>`), authenticated with the
+ * device's `rceToken`.
  *
- * Extending `stream.Duplex` (rather than a plain `EventEmitter`) matters beyond just matching
- * `net.Socket`'s event surface: consumers hand this socket to `telnet-client`, whose `_checkSocket()`
- * guard (used whenever a socket is injected rather than created internally) requires `pipe`,
- * `_write`, `_writableState`, `_read`, and `_readableState`, all of which only a real Node stream
+ * Extending `stream.Duplex` (rather than a plain `EventEmitter`) matters: consumers hand this
+ * socket to `telnet-client`, whose `_checkSocket()` injected-socket guard requires `pipe`,
+ * `_write`, `_writableState`, `_read`, and `_readableState` — internals only a real Node stream
  * provides.
  */
 export class RceSocket extends stream.Duplex {
@@ -136,15 +121,13 @@ export class RceSocket extends stream.Duplex {
     private pendingWrite: PendingWrite | undefined;
 
     /**
-     * Fire-and-forget, exactly like `net.Socket#connect()`: resolves the RCE instance url, opens the
-     * websocket, and emits `'connect'` then `'ready'` once the handshake completes (the same order
-     * `net.Socket` uses). `connectListener` is registered the same way `net.Socket` registers its
-     * own connect callback: as a one-time `'connect'` listener.
+     * Fire-and-forget, like `net.Socket#connect()`: resolves the RCE instance url, opens the
+     * websocket, and emits `'connect'` then `'ready'` once the handshake completes. `connectListener`
+     * is registered as a one-time `'connect'` listener.
      *
-     * Unlike `net.Socket` (which allows reconnecting a closed socket), calling this a second time
-     * throws: a second websocket would orphan the first one with its listeners still feeding this
-     * stream, and a destroyed Duplex cannot be revived, so both misuses fail loudly instead of
-     * leaking or silently never calling back.
+     * Unlike `net.Socket`, this socket cannot be reconnected: calling connect() a second time (or
+     * on a destroyed socket) throws — a second websocket would orphan the first with its listeners
+     * still feeding this stream, so both misuses fail loudly instead of leaking.
      */
     public connect(connectListener?: () => void): this {
         if (this.destroyed) {
@@ -239,13 +222,9 @@ export class RceSocket extends stream.Duplex {
     }
 
     /**
-     * Sends a chunk as a binary websocket frame. The RCE port endpoints accept binary frames only
-     * (a TEXT frame is rejected with close code 1003), and bytes are forwarded unchanged, which is
-     * exactly the byte parity a raw tcp socket provides.
-     *
-     * A write issued before the websocket has opened is held and flushed on `'open'`, the same
-     * buffering `net.Socket` applies to writes issued while connecting, so the idiomatic
-     * `socket.connect(); socket.write(...)` pattern works on both transports.
+     * Sends a chunk, unchanged, as a binary websocket frame (the RCE port endpoints reject a TEXT
+     * frame with close code 1003). A write issued before the websocket has opened is held and flushed on `'open'`,
+     * matching the buffering `net.Socket` applies to writes issued while connecting.
      */
     public _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
         const bufferedChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding);
@@ -266,10 +245,9 @@ export class RceSocket extends stream.Duplex {
     }
 
     /**
-     * Implements the writable half of `end()`. `net.Socket` sends a FIN here; a websocket has no
-     * half-close, so the closest equivalent is starting the close handshake. The websocket's own
-     * `'close'` event (see `beginConnecting()`) then ends the readable side and the stream destroys
-     * itself, so `end()` still arrives at exactly one `'close'` event, just like a `net.Socket`.
+     * Implements the writable half of `end()`. A websocket has no half-close, so the closest
+     * equivalent to `net.Socket`'s FIN is starting the close handshake; the websocket's `'close'`
+     * event then ends the readable side, so `end()` still arrives at exactly one `'close'` event.
      */
     public _final(callback: (error?: Error | null) => void): void {
         if (this.webSocket?.readyState === WebSocket.OPEN) {
@@ -513,9 +491,8 @@ export interface SocketOptions {
     device: DeviceConfig;
     /**
      * the device port to connect to (for example 8085 for the BrightScript console, 8080 for the
-     * SceneGraph debug server, or 8087 for the screensaver console). A local device connects to this
-     * tcp port directly; an RCE device reaches the same port through the instance api's
-     * `/api/v0/ports/<port>` WebSocket route
+     * SceneGraph debug server, or 8087 for the screensaver console); both transports reach the same
+     * console port
      */
     port: number;
 }
@@ -536,11 +513,10 @@ export interface RceSocketOptions extends SocketOptions {
 
 /**
  * The socket-shaped surface consumers write against instead of `net.Socket` directly. A real
- * `net.Socket` (and therefore `LocalRokuDeploySocket`, which extends it) satisfies this interface
- * structurally; `RceRokuDeploySocket` implements it directly. `remoteAddress`, `remotePort`,
- * `localAddress`, `localPort`, `localFamily`, and `timeout` are informational fields carried over
- * from `net.Socket` for logging; an RCE connection has no tcp-level address to report for the first
- * five, so it always reports `undefined` for those.
+ * `net.Socket` (and therefore `LocalSocket`, which extends it) satisfies this interface
+ * structurally; `RceSocket` implements it directly. The address fields and `timeout` are
+ * informational, carried over from `net.Socket` for logging; an RCE connection has no tcp-level
+ * address, so it reports `undefined` for those.
  */
 export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
     connect: (connectListener?: () => void) => this;
