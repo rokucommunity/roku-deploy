@@ -6775,7 +6775,20 @@ describe('RokuDeploy', () => {
                 await rd.getDeviceInfo({
                     device: 'bogus-device'
                 });
-            }, 'Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
+            }, `Device registry entry 'bogus-device' must specify exactly one targeting identifier: host, esn, id, or instanceUrl`);
+        });
+
+        it('throws when a registry entry has multiple identifiers', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'ambiguous-device': { host: '1.2.3.4', esn: 'ABC123' } as any
+                }
+            });
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({
+                    device: 'ambiguous-device'
+                });
+            }, `Device registry entry 'ambiguous-device' specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed`);
         });
 
         it('throws when the device name is not found in the registry', async () => {
@@ -6803,7 +6816,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.getDeviceInfo({
                     device: {} as any
                 });
-            }, 'Device must specify host, esn, id, or instanceUrl');
+            }, 'Device config must specify exactly one targeting identifier: host, esn, id, or instanceUrl');
         });
 
         it('throws when an inline device config has multiple identifiers', async () => {
@@ -6811,7 +6824,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.getDeviceInfo({
                     device: { host: '1.2.3.4', esn: 'ABC123' } as any
                 });
-            }, 'Device cannot specify multiple identifiers (host, esn, id, instanceUrl)');
+            }, 'Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
         });
     });
 

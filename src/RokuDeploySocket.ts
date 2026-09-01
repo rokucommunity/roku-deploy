@@ -2,7 +2,7 @@ import * as net from 'net';
 import * as stream from 'stream';
 import * as WebSocket from 'ws';
 import type { DeviceConfig, LocalDeviceConfig, RceDeviceConfig } from './DeviceConfig';
-import { isLocalDeviceConfig, isRceDeviceConfigById, isRceDeviceConfigByUrl, isRceDeviceConfig } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 
 /**
@@ -23,13 +23,12 @@ export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket
         throw new Error(`createRokuDeploySocket requires a valid port number (received ${String(options.port)})`);
     }
 
+    validateDeviceConfig(options.device);
+
     if (isLocalDeviceConfig(options.device)) {
         return new LocalSocket({ ...options, device: options.device });
     }
-    if (isRceDeviceConfig(options.device)) {
-        return new RceSocket({ ...options, device: options.device });
-    }
-    throw new Error('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
+    return new RceSocket({ ...options, device: options.device });
 }
 
 /**

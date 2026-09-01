@@ -26,7 +26,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
@@ -2321,42 +2321,18 @@ export class RokuDeploy {
             if (!entry) {
                 throw new Error(`Device '${device}' not found in devices registry`);
             }
-            return this.extractDeviceConfig(entry);
+            return this.extractDeviceConfig(entry, device);
         }
         // Object = inline config, validate and return
-        this.validateDeviceConfig(device);
+        validateDeviceConfig(device);
         return device;
-    }
-
-    /**
-     * Validate that a device config has exactly one identifier (host, esn, id, or instanceUrl).
-     */
-    private validateDeviceConfig(config: DeviceConfig): void {
-        const identifiers = [
-            isLocalDeviceConfig(config),
-            isRceDeviceConfigByEsn(config),
-            isRceDeviceConfigById(config),
-            isRceDeviceConfigByUrl(config)
-        ].filter(Boolean);
-
-        if (identifiers.length === 0) {
-            throw new InvalidOptionError(
-                'Device must specify host, esn, id, or instanceUrl',
-                { optionName: 'device' }
-            );
-        }
-        if (identifiers.length > 1) {
-            throw new InvalidOptionError(
-                'Device cannot specify multiple identifiers (host, esn, id, instanceUrl)',
-                { optionName: 'device' }
-            );
-        }
     }
 
     /**
      * Extract a DeviceConfig from a DeviceRegistryEntry.
      */
-    private extractDeviceConfig(entry: DeviceRegistryEntry): DeviceConfig {
+    private extractDeviceConfig(entry: DeviceRegistryEntry, name: string): DeviceConfig {
+        validateDeviceConfig(entry, `Device registry entry '${name}'`);
         if (isLocalDeviceConfig(entry)) {
             return { host: entry.host };
         }
@@ -2366,10 +2342,7 @@ export class RokuDeploy {
         if (isRceDeviceConfigById(entry)) {
             return { id: entry.id, rceToken: entry.rceToken };
         }
-        if (isRceDeviceConfigByUrl(entry)) {
-            return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
-        }
-        throw new Error('Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
+        return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
     }
 
     /**
