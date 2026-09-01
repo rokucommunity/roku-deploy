@@ -91,8 +91,8 @@ describe('device', function device() {
         //make sure the device is actually reachable before running the next test; catches the case where
         //the previous test (or a reboot) left the device still coming back online, so we don't immediately
         //trample a device that isn't ready yet
-        this.timeout(60_000);
-        await waitForDeviceOnline(HOST, 30_000, 2000, 0);
+        this.timeout(120_000);
+        await waitForDeviceOnline(HOST, 90_000, 2000, 0);
 
         //send a few home presses, just to make sure we've cleared any foreground stuff
         await rokuDeploy.keyPress({ device: { host: HOST }, key: 'Home' });
