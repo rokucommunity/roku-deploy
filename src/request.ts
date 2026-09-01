@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 import * as needle from 'needle';
 import * as urlModule from 'url';
 import type { ReadStream } from 'fs';
@@ -26,13 +25,10 @@ export class Request {
     public post(params: RequestOptions, callback: RequestCallback) {
         const { url, data, needleOptions } = this.translateOptions(params, 'POST');
         //Never let needle's own digest dance send a request body: needle sends the FULL body on the
-        //unauthenticated first leg, but the Roku answers that leg's 401 without reading the body and closes
-        //the socket. A body still being written at that moment dies with a raw `write EPIPE`, and needle
-        //fails the whole request before its 401 retry can run. (Bodies small enough to fit in the socket
-        //buffers finish writing before the close, which is why only large zips ever hit this.)
-        //`request`/`postman-request` never had this problem because they never sent the body
-        //unauthenticated: the first leg was a bodyless probe, and the body only went out WITH the
-        //Authorization header. Replicate that here for any authenticated POST that has a body.
+        //unauthenticated first leg, but the Roku answers the 401 without reading it and closes the socket —
+        //a body still mid-write dies with `write EPIPE` before needle's retry can run (only large zips hit
+        //this; smaller bodies fit in the socket buffers). `request` only ever sent the body WITH the
+        //Authorization header; replicate that for any authenticated POST that has a body.
         if (data && needleOptions.auth === 'digest') {
             return this.postWithDigestPreflight(url, data, needleOptions, callback);
         }
@@ -114,11 +110,10 @@ export class Request {
         //getToFile) listens on `'error'`, so bridge `'err'` -> `'error'` to preserve that behavior.
         stream.on('err', (err) => stream.emit('error', err));
 
-        //digest auth in streaming mode: needle issues the unauthenticated request, emits a `'response'`
-        //for the 401 challenge, and *then* transparently retries with the Authorization header (emitting
-        //a second `'response'`). `request`/`postman-request` only ever surfaced the final response, and
-        //roku-deploy's `getToFile` treats any non-200 `'response'` as a hard failure. So when we're doing
-        //digest auth, swallow the intermediate 401 `'response'` event and only forward the retried one.
+        //digest auth in streaming mode: needle emits a `'response'` for the 401 challenge and a second one
+        //for the authenticated retry. `request` only ever surfaced the final response, and roku-deploy's
+        //`getToFile` treats any non-200 `'response'` as a hard failure — so swallow the intermediate 401
+        //and forward only the retried response.
         if (needleOptions.auth && needleOptions.username !== undefined) {
             this.interceptIntermediate401(stream);
         }
@@ -134,32 +129,31 @@ export class Request {
 
         const needleOptions: needle.NeedleOptions = {
             //Roku responses are HTML/XML that roku-deploy parses by hand; never let needle auto-parse them
-            parse_response: false,
-            //`request` had a single `timeout` that governed how long to wait to establish the connection and
-            //receive a response. Map it to needle's `open_timeout` (connection) and `response_timeout` (time to
-            //first response byte). Deliberately do NOT set `read_timeout`: needle's read-timer is re-armed on
-            //every chunk and, in the digest-auth retry path, a read-timer can be left running after the request
-            //has already completed — it later fires `request.destroy()` and emits a spurious error, and (worse)
-            //keeps the Node event loop alive so a process that only made roku-deploy requests never exits.
-            open_timeout: params.timeout,
-            response_timeout: params.timeout,
+            'parse_response': false,
+            //never let needle charset-decode a response: a signed pkg served with a charset in its
+            //content-type (the RCE instance proxy does this) would get every non-utf8 byte replaced with
+            //U+FFFD, corrupting the binary. `request` never transcoded either; `coerceBody` handles the
+            //Buffer->string conversion for text paths.
+            'decode_response': false,
+            //map `request`'s single `timeout` onto needle's `open_timeout` (connection) and `response_timeout`
+            //(time to first byte). Deliberately do NOT set `read_timeout`: its per-chunk re-armed timer can be
+            //left running after a digest-auth retry completes — later firing a spurious `request.destroy()`
+            //error and keeping the Node event loop alive so the process never exits.
+            'open_timeout': params.timeout,
+            'response_timeout': params.timeout,
             headers: params.headers
         };
 
-        //`request` was configured with `agentOptions: { keepAlive: false }` so each exchange used a fresh
-        //socket that closed when done. needle does NOT honor `agentOptions`, and on modern Node it does not
-        //send `Connection: close` by default, so the socket to the Roku is left open (keep-alive) after the
-        //response. That lingering socket keeps the Node event loop alive, so a process that only made
-        //roku-deploy requests never exits. Translate the old keepAlive:false intent into needle's
-        //`connection: 'close'` so needle sends `Connection: close` and tears the socket down after each
-        //response. Only skip this if the caller explicitly asked to keep the connection alive.
+        //`request` used `agentOptions: { keepAlive: false }`: a fresh socket per exchange, closed when done.
+        //needle ignores `agentOptions` and does not send `Connection: close` on modern Node, so the socket
+        //to the Roku stays open after the response and keeps the Node event loop alive — a process that only
+        //made roku-deploy requests never exits. `connection: 'close'` restores the old intent (skipped only
+        //when the caller explicitly asked for keep-alive).
         //
-        //ALSO pass `agent: false`. needle defaults `agent` to null, which makes Node use `http.globalAgent`
-        //- a POOLING agent. The `Connection: close` header alone does NOT stop that pooling: the request
-        //immediately following an on-device delete could be handed a POOLED keep-alive socket that the Roku
-        //had already closed, producing an instant ECONNRESET ("socket hang up"). `agent: false` tells Node to
-        //create a brand-new, un-pooled socket for every request and destroy it afterward, so a dead socket
-        //can never be handed to the next request. The `Connection: close` header stays as belt-and-suspenders.
+        //ALSO pass `agent: false`: needle otherwise uses Node's POOLING `http.globalAgent`, and the header
+        //alone does not stop pooling — the request right after an on-device delete could be handed a pooled
+        //keep-alive socket the Roku had already closed, an instant ECONNRESET ("socket hang up").
+        //`agent: false` forces a fresh un-pooled socket per request, destroyed afterward.
         if (params.agentOptions?.keepAlive !== true) {
             needleOptions.connection = 'close';
             needleOptions.agent = false;
@@ -176,13 +170,18 @@ export class Request {
 
         let data: any = null;
         if (method === 'POST') {
-            const formData = this.translateFormData(params.formData);
-            //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
-            //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
-            //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
-            if (Object.keys(formData).length > 0) {
-                data = formData;
-                needleOptions.multipart = true;
+            //a raw body is written to the wire as-is (no multipart/urlencoding), for routes that read the raw request body
+            if (params.body !== undefined && params.body !== null) {
+                data = params.body;
+            } else {
+                const formData = this.translateFormData(params.formData);
+                //only send a multipart body when there's actually form data to send. Some POSTs (e.g. ECP
+                //keypress) have no body at all; needle's multipart builder throws "Empty multipart body" on an
+                //empty object, whereas `request` happily sent a bodyless POST. So fall back to a null body.
+                if (Object.keys(formData).length > 0) {
+                    data = formData;
+                    needleOptions.multipart = true;
+                }
             }
         }
 
@@ -239,7 +238,7 @@ export class Request {
                 const filePath = (value).path;
                 result[key] = {
                     file: filePath,
-                    content_type: 'application/octet-stream'
+                    'content_type': 'application/octet-stream'
                 };
             } else {
                 result[key] = value;
@@ -424,6 +423,9 @@ export interface RequestOptions {
 
     /** multipart/form-data fields (string values, or a readable stream for the zip/pkg archive). */
     formData?: Record<string, any>;
+
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Takes precedence over `formData`. */
+    body?: string | Buffer;
 
     /** Query-string object appended to the url. */
     qs?: Record<string, any>;

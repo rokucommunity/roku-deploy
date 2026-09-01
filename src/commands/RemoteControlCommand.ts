@@ -74,7 +74,7 @@ export class RemoteControlCommand {
                         rokuDeployKeyName = 'Info';
                     } else {
                         if (key.ctrl && key.name === 'c') {
-                            process.exit(); // We provide a way to exit the program
+                            process.exit();
                         }
 
                         let text = key.name;

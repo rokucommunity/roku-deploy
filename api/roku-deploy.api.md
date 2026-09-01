@@ -58,6 +58,7 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
 export interface CaptureScreenshotResult {
     buffer: Buffer;
     filePath?: string;
+    format: 'jpg' | 'png';
 }
 
 // @public (undocumented)
@@ -516,7 +517,9 @@ export class EcpNetworkAccessModeDisabledError extends DeviceError {
 
 // @public (undocumented)
 export interface EcpOptions {
+    body?: string | Buffer;
     ecpPort?: number;
+    headers?: Record<string, string>;
     method?: 'GET' | 'POST';
     timeout?: number;
     verify?: boolean;
@@ -525,7 +528,7 @@ export interface EcpOptions {
 // @public (undocumented)
 export interface EcpResult {
     body: string;
-    json: Record<string, any> | undefined;
+    headers: Record<string, string | string[]>;
     status: number | undefined;
 }
 
@@ -563,6 +566,17 @@ export type FileEntry = (string | {
 });
 
 // @public (undocumented)
+export type GetActiveAppOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export type GetAppsOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export interface GetAppStateOptions extends BaseEcpOptions {
+    appId: string;
+}
+
+// @public (undocumented)
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
@@ -585,6 +599,14 @@ export interface GetFilePathsOptions {
 
 // @public (undocumented)
 export type GetInstalledPackagesOptions = BaseRequestOptions;
+
+// @public (undocumented)
+export interface GetRegistryOptions extends BaseEcpOptions {
+    appId: string;
+}
+
+// @public (undocumented)
+export type GetRendezvousTrackingOptions = BaseEcpOptions;
 
 // Warning: (ae-internal-missing-underscore) The name "hasErrorCode" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -718,19 +740,19 @@ export function isUpdateCheckRequiredError(e: unknown): e is UpdateCheckRequired
 // @public (undocumented)
 export interface KeyDownOptions extends BaseEcpOptions {
     // (undocumented)
-    key: RemoteKeyText;
+    key: RemoteKeyText | string;
 }
 
 // @public (undocumented)
 export interface KeyPressOptions extends BaseEcpOptions {
     // (undocumented)
-    key: RemoteKeyText;
+    key: RemoteKeyText | string;
 }
 
 // @public (undocumented)
 export interface KeyUpOptions extends BaseEcpOptions {
     // (undocumented)
-    key: RemoteKeyText;
+    key: RemoteKeyText | string;
 }
 
 // @public (undocumented)
@@ -781,25 +803,6 @@ export interface PackageUploadOverridesOptions {
     // (undocumented)
     route?: string;
 }
-
-// @public (undocumented)
-export type QueryActiveAppOptions = BaseEcpOptions;
-
-// @public (undocumented)
-export type QueryAppsOptions = BaseEcpOptions;
-
-// @public (undocumented)
-export interface QueryAppStateOptions extends BaseEcpOptions {
-    appId: string;
-}
-
-// @public (undocumented)
-export interface QueryRegistryOptions extends BaseEcpOptions {
-    appId: string;
-}
-
-// @public (undocumented)
-export type QueryRendezvousOptions = BaseEcpOptions;
 
 // @public
 export type RceDeviceConfig = RceDeviceConfigByEsn | RceDeviceConfigById | RceDeviceConfigByUrl;
@@ -962,6 +965,9 @@ export class RokuDeploy {
     deleteDevChannel(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
     enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo;
     exitApp(options: ExitAppOptions): Promise<void>;
+    getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp>;
+    getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]>;
+    getAppState(options: GetAppStateOptions): Promise<RokuAppState>;
     getDeviceInfo(options?: GetDeviceInfoOptions & {
         enhance: true;
     }): Promise<DeviceInfo>;
@@ -971,28 +977,21 @@ export class RokuDeploy {
     // @internal
     getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode>;
     getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]>;
-    // (undocumented)
+    getRegistry(options: GetRegistryOptions): Promise<RokuRegistry>;
+    getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous>;
     keyDown(options: KeyDownOptions): Promise<EcpResult>;
-    // (undocumented)
     keyPress(options: KeyPressOptions): Promise<EcpResult>;
-    // (undocumented)
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
     loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
-    queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp>;
-    queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]>;
-    queryAppState(options: QueryAppStateOptions): Promise<RokuAppState>;
-    queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry>;
-    queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous>;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<HttpResponse>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
-    // (undocumented)
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
     sideload(options: SideloadOptions): Promise<{
@@ -1269,6 +1268,9 @@ export interface ValidateDeveloperPasswordOptions {
     timeout?: number;
     username?: string;
 }
+
+// @public
+export function validateDeviceConfig(config: DeviceConfigLike, subject?: string): asserts config is DeviceConfig;
 
 // @public (undocumented)
 export interface ZipOptions {

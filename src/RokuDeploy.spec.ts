@@ -817,23 +817,57 @@ describe('RokuDeploy', () => {
     });
 
     describe('sendEcpRequest', () => {
-        it('builds the LAN url from the host and ecp port, defaulting to GET, and parses the XML body', async () => {
+        it('builds the LAN url from the host and ecp port, defaulting to GET, and returns the raw body', async () => {
             const stub = mockDoGetRequest('<device-info><model-name>Roku</model-name></device-info>');
 
             const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/device-info');
             expect(result.status).to.equal(200);
-            expect(result.json).to.eql({ 'device-info': { 'model-name': 'Roku' } });
+            expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
+            expect(result.headers).to.eql({});
         });
 
-        it('sends POST requests with a custom ecp port and returns undefined json for an empty body', async () => {
+        it('returns the response headers so callers can pick a parser from the content-type', async () => {
+            sinon.stub(rokuDeploy as any, 'doGetRequest').callsFake(() => {
+                return Promise.resolve({
+                    response: { statusCode: 200, headers: { 'content-type': 'text/xml; charset="utf-8"' } },
+                    body: '<device-info />'
+                });
+            });
+
+            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(result.headers).to.eql({ 'content-type': 'text/xml; charset="utf-8"' });
+        });
+
+        it('sends POST requests with a custom ecp port', async () => {
             const stub = mockDoPostRequest();
 
-            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'keypress/Home', { method: 'POST', ecpPort: 9060 });
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'keypress/Home', { method: 'POST', ecpPort: 9060 });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:9060/keypress/Home');
-            expect(result.json).to.be.undefined;
+        });
+
+        it('threads a raw POST body through to the request layer', async () => {
+            const stub = mockDoPostRequest();
+            const body = Buffer.from('raw-body-bytes');
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', { method: 'POST', body: body });
+
+            expect(stub.getCall(0).args[0].body).to.equal(body);
+        });
+
+        it('merges caller headers onto the request', async () => {
+            const stub = mockDoPostRequest();
+
+            await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'some/route', {
+                method: 'POST',
+                body: 'raw',
+                headers: { 'Content-Type': 'application/octet-stream' }
+            });
+
+            expect(stub.getCall(0).args[0].headers).to.include({ 'Content-Type': 'application/octet-stream' });
         });
 
         it('routes an RCE device through the instance ecp1 proxy with the X-Authorization bearer header', async () => {
@@ -846,7 +880,7 @@ describe('RokuDeploy', () => {
 
             expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
-            expect(result.json.sgrendezvous.status).to.equal('OK');
+            expect(result.body).to.equal('<sgrendezvous><status>OK</status></sgrendezvous>');
         });
 
         it('falls back to the constructor default rceToken for an RCE device config without one', async () => {
@@ -879,7 +913,7 @@ describe('RokuDeploy', () => {
             //verification must be off by default so the raw ECP status body comes back
             expect(stub.getCall(0).args[1]).to.equal(false);
             expect(result.status).to.equal(202);
-            expect(result.json['plugin-registry'].error).to.equal('Device not keyed');
+            expect(result.body).to.include('<error>Device not keyed</error>');
         });
 
         it('passes verify through to the request layer when set', async () => {
@@ -893,7 +927,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[1]).to.equal(true);
         });
 
-        it('returns undefined json (with the body preserved) for a non-xml response', async () => {
+        it('returns a non-xml response body as-is', async () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
                 response: { statusCode: 404 },
                 body: 'no healthy upstream'
@@ -903,24 +937,22 @@ describe('RokuDeploy', () => {
 
             expect(result.status).to.equal(404);
             expect(result.body).to.equal('no healthy upstream');
-            expect(result.json).to.be.undefined;
         });
 
-        it('throws when a response that looks like xml cannot be parsed', async () => {
+        it('returns an unparsable xml body as-is without throwing', async () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves({
                 response: { statusCode: 200 },
                 body: '<device-info><unclosed'
             });
 
-            await expectThrowsAsync(async () => {
-                await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
-            }, 'Could not parse ECP response');
+            const result = await rokuDeploy.sendEcpRequest({ host: '1.1.1.1' }, 'query/device-info');
+
+            expect(result.body).to.equal('<device-info><unclosed');
         });
 
-        it('wraps a parse failure that carries no http response and a non-Error parse rejection', async () => {
-            //parseEcpXml's response argument is optional; the wrap must not blow up without it
+        it('parseEcpXml wraps a parse failure and a non-Error parse rejection', async () => {
             await expectThrowsAsync(async () => {
-                await rokuDeploy['parseEcpXml']('<device-info><unclosed');
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info><unclosed', headers: {} });
             }, 'Could not parse ECP response');
 
             //a non-Error rejection from the xml parser must not be attached as the cause
@@ -928,7 +960,7 @@ describe('RokuDeploy', () => {
             sinon.stub(xml2js, 'parseStringPromise').callsFake(() => Promise.reject('not an error instance'));
             let caughtError: errors.UnparsableDeviceResponseError;
             try {
-                await rokuDeploy['parseEcpXml']('<device-info></device-info>');
+                await rokuDeploy['parseEcpXml']({ status: 200, body: '<device-info></device-info>', headers: {} });
             } catch (e) {
                 caughtError = e as errors.UnparsableDeviceResponseError;
             }
@@ -944,7 +976,7 @@ describe('RokuDeploy', () => {
 
             const result = await rd.sendEcpRequest({ id: 123 }, 'query/device-info');
 
-            expect(result).to.eql({ status: undefined, body: undefined, json: undefined });
+            expect(result).to.eql({ status: undefined, headers: {}, body: undefined });
         });
 
         it('retries against a refreshed instance url when the mesh reports the cached instance gone', async () => {
@@ -969,7 +1001,7 @@ describe('RokuDeploy', () => {
             expect(stub.callCount).to.equal(2);
             expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/new/ecp1/query/device-info');
             expect(result.status).to.equal(200);
-            expect(result.json['device-info']['model-name']).to.equal('Roku');
+            expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
         });
 
         it('returns a 404 answered by a live instance as-is without retrying', async () => {
@@ -1013,11 +1045,11 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('queryRegistry', () => {
+    describe('getRegistry', () => {
         it('refines the registry response into sections keyed by name', async () => {
             const stub = mockDoGetRequest('<plugin-registry><registry><dev-id>12345</dev-id><plugins>dev</plugins><space-available>28000</space-available><sections><section><name>Section1</name><items><item><key>k1</key><value>v1</value></item><item><key>k2</key><value>v2</value></item></items></section></sections></registry><status>OK</status></plugin-registry>');
 
-            const registry = await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const registry = await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/registry/dev');
             expect(registry).to.eql({
@@ -1030,7 +1062,7 @@ describe('RokuDeploy', () => {
 
         it('uri-encodes the appId in the route', async () => {
             const stub = mockDoGetRequest('<plugin-registry><registry></registry><status>OK</status></plugin-registry>');
-            await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+            await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/registry/dev%20channel%2F1');
         });
@@ -1042,7 +1074,7 @@ describe('RokuDeploy', () => {
             });
 
             await expectThrowsAsync(async () => {
-                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+                await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
             }, 'Could not retrieve registry: Device not keyed');
         });
 
@@ -1053,7 +1085,7 @@ describe('RokuDeploy', () => {
             });
 
             await expectThrowsAsync(async () => {
-                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+                await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
             }, 'Could not retrieve registry: ECP command not allowed in Limited mode.');
         });
 
@@ -1064,7 +1096,7 @@ describe('RokuDeploy', () => {
             });
 
             await expectThrowsAsync(async () => {
-                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+                await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
             }, 'Could not retrieve registry: Unknown error');
         });
 
@@ -1075,14 +1107,14 @@ describe('RokuDeploy', () => {
             });
 
             await expectThrowsAsync(async () => {
-                await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+                await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
             }, 'Could not retrieve registry');
         });
 
         it('returns empty sections when the envelope has no registry block', async () => {
             mockDoGetRequest('<plugin-registry><status>OK</status></plugin-registry>');
 
-            const registry = await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const registry = await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(registry.sections).to.eql({});
         });
@@ -1090,17 +1122,17 @@ describe('RokuDeploy', () => {
         it('skips empty section and item elements, and tolerates a section with no items block', async () => {
             mockDoGetRequest('<plugin-registry><registry><sections><section></section><section><name>NoItems</name></section><section><name>Section1</name><items><item></item><item><key>k1</key><value>v1</value></item></items></section></sections></registry><status>OK</status></plugin-registry>');
 
-            const registry = await rokuDeploy.queryRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const registry = await rokuDeploy.getRegistry({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(registry.sections).to.eql({ Section1: { k1: 'v1' } });
         });
     });
 
-    describe('queryAppState', () => {
+    describe('getAppState', () => {
         it('refines the app-state response', async () => {
             const stub = mockDoGetRequest('<app-state><app-id>dev</app-id><app-title>My App</app-title><app-version>1.0.0</app-version><app-dev-id>12345</app-dev-id><state>active</state><status>OK</status></app-state>');
 
-            const appState = await rokuDeploy.queryAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const appState = await rokuDeploy.getAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/app-state/dev');
             expect(appState).to.eql({
@@ -1115,7 +1147,7 @@ describe('RokuDeploy', () => {
         it('maps an unrecognized state to unknown', async () => {
             mockDoGetRequest('<app-state><app-id>dev</app-id><state>hibernating</state><status>OK</status></app-state>');
 
-            const appState = await rokuDeploy.queryAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const appState = await rokuDeploy.getAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(appState.state).to.equal('unknown');
         });
@@ -1123,17 +1155,17 @@ describe('RokuDeploy', () => {
         it('maps a missing state element to unknown', async () => {
             mockDoGetRequest('<app-state><app-id>dev</app-id><status>OK</status></app-state>');
 
-            const appState = await rokuDeploy.queryAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            const appState = await rokuDeploy.getAppState({ device: { host: '1.1.1.1' }, appId: 'dev' });
 
             expect(appState.state).to.equal('unknown');
         });
     });
 
-    describe('queryRendezvous', () => {
+    describe('getRendezvousTracking', () => {
         it('refines tracking state and normalizes a single rendezvous item to an array', async () => {
             const stub = mockDoGetRequest('<sgrendezvous><data><tracking-enabled>true</tracking-enabled><item><id>1</id><start-tm>100</start-tm><end-tm>200</end-tm><line-number>5</line-number><file>pkg:/main.brs</file></item></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.queryRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/sgrendezvous');
             expect(rendezvous).to.eql({
@@ -1145,7 +1177,7 @@ describe('RokuDeploy', () => {
         it('returns no items and trackingEnabled false when tracking is off', async () => {
             mockDoGetRequest('<sgrendezvous><data><tracking-enabled>false</tracking-enabled></data><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.queryRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(rendezvous).to.eql({ trackingEnabled: false, items: [] });
         });
@@ -1153,7 +1185,7 @@ describe('RokuDeploy', () => {
         it('tolerates a response with no data block at all', async () => {
             mockDoGetRequest('<sgrendezvous><timestamp>1</timestamp><status>OK</status></sgrendezvous>');
 
-            const rendezvous = await rokuDeploy.queryRendezvous({ device: { host: '1.1.1.1' } });
+            const rendezvous = await rokuDeploy.getRendezvousTracking({ device: { host: '1.1.1.1' } });
 
             expect(rendezvous).to.eql({ trackingEnabled: false, items: [] });
         });
@@ -1179,7 +1211,7 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('queryApps', () => {
+    describe('getApps', () => {
         it('parses the installed app list from the local ECP query/apps response', async () => {
             const stub = mockDoGetRequest(`
                 <apps>
@@ -1187,7 +1219,7 @@ describe('RokuDeploy', () => {
                     <app id="11" type="appl" subtype="sdka" version="2.3.0">Netflix</app>
                 </apps>
             `);
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/apps');
             expect(apps).to.eql([
@@ -1202,7 +1234,7 @@ describe('RokuDeploy', () => {
                     <app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app>
                 </apps>
             `);
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(apps).to.eql([
                 { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
@@ -1211,7 +1243,7 @@ describe('RokuDeploy', () => {
 
         it('returns an empty array when no apps are installed', async () => {
             mockDoGetRequest('<apps></apps>');
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(apps).to.eql([]);
         });
@@ -1223,14 +1255,14 @@ describe('RokuDeploy', () => {
             });
 
             await expectThrowsAsync(async () => {
-                await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+                await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
             }, 'Invalid response code: 403: ECP command not allowed in Limited mode.');
         });
 
         it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
             const stub = mockDoGetRequest('<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>');
 
-            const apps = await rokuDeploy.queryApps({
+            const apps = await rokuDeploy.getApps({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
             });
 
@@ -1243,14 +1275,14 @@ describe('RokuDeploy', () => {
 
         it('returns an empty array when the response has no xml body at all', async () => {
             mockDoGetRequest('');
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(apps).to.eql([]);
         });
 
         it('defaults id and title to empty strings for an attribute-less app element', async () => {
             mockDoGetRequest('<apps><app>Bare Name</app></apps>');
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(apps).to.eql([
                 { id: '', title: 'Bare Name', type: undefined, subtype: undefined, version: undefined }
@@ -1261,7 +1293,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest('<apps><unclosed');
 
             await expectThrowsAsync(
-                rokuDeploy.queryApps({ device: { host: '1.1.1.1' } }),
+                rokuDeploy.getApps({ device: { host: '1.1.1.1' } }),
                 'Could not retrieve installed app list'
             );
         });
@@ -1270,7 +1302,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').resolves(undefined);
 
             await expectThrowsAsync(
-                rokuDeploy.queryApps({ device: { host: '1.1.1.1' } }),
+                rokuDeploy.getApps({ device: { host: '1.1.1.1' } }),
                 'Invalid response code: unknown'
             );
         });
@@ -1279,14 +1311,14 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').rejects(new Error('socket hang up'));
 
             await expectThrowsAsync(
-                rokuDeploy.queryApps({ device: { host: '1.1.1.1' } }),
+                rokuDeploy.getApps({ device: { host: '1.1.1.1' } }),
                 'socket hang up'
             );
         });
 
         it('defaults the title to an empty string for an app element with no text', async () => {
             mockDoGetRequest('<apps><app id="only-an-id"/></apps>');
-            const apps = await rokuDeploy.queryApps({ device: { host: '1.1.1.1' } });
+            const apps = await rokuDeploy.getApps({ device: { host: '1.1.1.1' } });
 
             expect(apps).to.eql([
                 { id: 'only-an-id', title: '', type: undefined, subtype: undefined, version: undefined }
@@ -1294,14 +1326,14 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('queryActiveApp', () => {
+    describe('getActiveApp', () => {
         it('parses the active app from the local ECP query/active-app response', async () => {
             const stub = mockDoGetRequest(`
                 <active-app>
                     <app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app>
                 </active-app>
             `);
-            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+            const activeApp = await rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } });
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/query/active-app');
             expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
@@ -1313,7 +1345,7 @@ describe('RokuDeploy', () => {
                     <app>Roku</app>
                 </active-app>
             `);
-            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+            const activeApp = await rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } });
 
             expect(activeApp.id).to.be.undefined;
             expect(activeApp.title).to.equal('Roku');
@@ -1321,7 +1353,7 @@ describe('RokuDeploy', () => {
 
         it('returns an empty object when there is no app element', async () => {
             mockDoGetRequest('<active-app></active-app>');
-            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+            const activeApp = await rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } });
 
             expect(activeApp).to.eql({});
         });
@@ -1329,7 +1361,7 @@ describe('RokuDeploy', () => {
         it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
             const stub = mockDoGetRequest('<active-app><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></active-app>');
 
-            const activeApp = await rokuDeploy.queryActiveApp({
+            const activeApp = await rokuDeploy.getActiveApp({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }
             });
 
@@ -1340,7 +1372,7 @@ describe('RokuDeploy', () => {
 
         it('returns an empty object when the response has no xml body at all', async () => {
             mockDoGetRequest('');
-            const activeApp = await rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } });
+            const activeApp = await rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } });
 
             expect(activeApp).to.eql({});
         });
@@ -1349,7 +1381,7 @@ describe('RokuDeploy', () => {
             mockDoGetRequest('<active-app><unclosed');
 
             await expectThrowsAsync(
-                rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } }),
+                rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } }),
                 'Could not retrieve active app'
             );
         });
@@ -1358,7 +1390,7 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'doGetRequest').rejects(new Error('socket hang up'));
 
             await expectThrowsAsync(
-                rokuDeploy.queryActiveApp({ device: { host: '1.1.1.1' } }),
+                rokuDeploy.getActiveApp({ device: { host: '1.1.1.1' } }),
                 'socket hang up'
             );
         });
@@ -2210,6 +2242,19 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a');
         });
 
+        it('sends a space character as a URI-encoded literal', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: ' ' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_%20');
+        });
+
+        it('sends one keypress per code point (not per UTF-16 code unit) for an astral character like an emoji', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.sendText({ device: rceDevice, text: '😀' });
+            expect(stub.callCount).to.equal(1);
+            expect(stub.getCall(0).args[0].url).to.equal(`https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/${encodeURIComponent('Lit_😀')}`);
+        });
+
         it('routes keydown and keyup through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
             await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
@@ -2254,7 +2299,7 @@ describe('RokuDeploy', () => {
         it('tolerates a transport layer that resolved no response at all', async () => {
             sinon.stub(rokuDeploy as any, 'doPostRequest').resolves(undefined);
             const result = await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
-            expect(result).to.eql({ status: undefined, body: undefined, json: undefined });
+            expect(result).to.eql({ status: undefined, body: undefined });
         });
 
         it('throws the ECP token-required error when an RCE device has no rceToken at all', async () => {
@@ -2290,6 +2335,24 @@ describe('RokuDeploy', () => {
 
             expect(result.status).to.equal(200);
             expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+        });
+
+        it('canonicalizes then URI-encodes a literal key on the instance-api route', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: rceDevice, key: 'lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Lit_%26');
+        });
+
+        it('URI-encodes a literal space key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_ ' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%20');
+        });
+
+        it('URI-encodes a literal ampersand key on the direct HTTP ECP path', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ response: { statusCode: 200 }, body: '' });
+            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Lit_&' });
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.2.3.4:8060/keypress/Lit_%26');
         });
     });
 
@@ -5348,6 +5411,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
             let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
+            expect(result.format).to.equal('png');
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.png');
             expect(fsExtra.existsSync(result.filePath));
@@ -5376,6 +5440,7 @@ describe('RokuDeploy', () => {
             mockDoPostRequest(body);
             let result = await rokuDeploy.captureScreenshot({ device: options.device, password: 'password', out: true });
             expect(result.buffer).to.be.instanceOf(Buffer);
+            expect(result.format).to.equal('jpg');
             expect(result.filePath).not.to.be.undefined;
             expect(path.extname(result.filePath)).to.equal('.jpg');
             expect(fsExtra.existsSync(result.filePath));
@@ -6710,7 +6775,20 @@ describe('RokuDeploy', () => {
                 await rd.getDeviceInfo({
                     device: 'bogus-device'
                 });
-            }, 'Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
+            }, `Device registry entry 'bogus-device' must specify exactly one targeting identifier: host, esn, id, or instanceUrl`);
+        });
+
+        it('throws when a registry entry has multiple identifiers', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'ambiguous-device': { host: '1.2.3.4', esn: 'ABC123' } as any
+                }
+            });
+            await expectThrowsAsync(async () => {
+                await rd.getDeviceInfo({
+                    device: 'ambiguous-device'
+                });
+            }, `Device registry entry 'ambiguous-device' specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed`);
         });
 
         it('throws when the device name is not found in the registry', async () => {
@@ -6738,7 +6816,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.getDeviceInfo({
                     device: {} as any
                 });
-            }, 'Device must specify host, esn, id, or instanceUrl');
+            }, 'Device config must specify exactly one targeting identifier: host, esn, id, or instanceUrl');
         });
 
         it('throws when an inline device config has multiple identifiers', async () => {
@@ -6746,7 +6824,7 @@ describe('RokuDeploy', () => {
                 await rokuDeploy.getDeviceInfo({
                     device: { host: '1.2.3.4', esn: 'ABC123' } as any
                 });
-            }, 'Device cannot specify multiple identifiers (host, esn, id, instanceUrl)');
+            }, 'Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
         });
     });
 

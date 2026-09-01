@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.5](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.4...v4.0.0-alpha.5) - 2026-08-28
+### Fixed
+ - Fix pkg download corruption on RCE devices ([#382](https://github.com/rokucommunity/roku-deploy/pull/382))
+
+
+
+## [4.0.0-alpha.4](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.3...v4.0.0-alpha.4) - 2026-08-27
+### Changed
+ - Tag RCE 502 upgrade rejections as ECONNREFUSED ([#376](https://github.com/rokucommunity/roku-deploy/pull/376))
+ - Encode remote keys when building ECP URLs ([#375](https://github.com/rokucommunity/roku-deploy/pull/375))
+ - Include response headers in EcpResult ([#373](https://github.com/rokucommunity/roku-deploy/pull/373))
+ - Support a raw POST body on sendEcpRequest ([#368](https://github.com/rokucommunity/roku-deploy/pull/368))
+ - Stop returning json from sendEcpRequest ([#367](https://github.com/rokucommunity/roku-deploy/pull/367))
+ - RokuDeploy method ordering ([#358](https://github.com/rokucommunity/roku-deploy/pull/358))
+ - Move constructor to the top of all classes ([83fc8f3](https://github.com/rokucommunity/roku-deploy/commit/83fc8f3))
+
+
+
 ## [4.0.0-alpha.3](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.2...v4.0.0-alpha.3) - 2026-08-07
 ### Added
  - Add cause to all thrown errors ([#329](https://github.com/rokucommunity/roku-deploy/pull/329))

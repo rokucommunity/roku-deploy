@@ -1,3 +1,5 @@
+import { InvalidOptionError } from './Errors';
+
 // === Local Device ===
 
 /**
@@ -109,4 +111,33 @@ export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDe
  */
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl {
     return !!config.instanceUrl;
+}
+
+/**
+ * Validate that a device config carries exactly one targeting identifier (host, esn, id, or instanceUrl).
+ * Throws an InvalidOptionError if zero or more than one are present; otherwise asserts config is a DeviceConfig.
+ * @param subject prefixes the error message, so callers with more context (e.g. a named registry entry) can identify what failed
+ * @public
+ */
+export function validateDeviceConfig(config: DeviceConfigLike, subject = 'Device config'): asserts config is DeviceConfig {
+    const presentNames: string[] = [];
+    if (config.host) {
+        presentNames.push('host');
+    }
+    if (config.esn) {
+        presentNames.push('esn');
+    }
+    if (config.id !== undefined) {
+        presentNames.push('id');
+    }
+    if (config.instanceUrl) {
+        presentNames.push('instanceUrl');
+    }
+
+    if (presentNames.length === 0) {
+        throw new InvalidOptionError(`${subject} must specify exactly one targeting identifier: host, esn, id, or instanceUrl`, { optionName: 'device' });
+    }
+    if (presentNames.length > 1) {
+        throw new InvalidOptionError(`${subject} specifies multiple targeting identifiers (${presentNames.join(', ')}); exactly one of host, esn, id, or instanceUrl is allowed`, { optionName: 'device' });
+    }
 }
