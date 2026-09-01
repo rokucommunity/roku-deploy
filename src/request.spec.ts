@@ -177,11 +177,11 @@ describe('request (http transport)', () => {
         it('issues a needle head request with the translated options', async () => {
             stubHead(null, { statusCode: 200, headers: {} }, Buffer.alloc(0));
             const { response } = await callHead({
-                url: 'http://1.2.3.4:80/plugin_install',
+                url: 'http://1.2.3.4:80/',
                 timeout: 3000,
                 auth: { username: 'rokudev', password: 'aaaa' }
             });
-            expect(headArgs.url).to.equal('http://1.2.3.4:80/plugin_install');
+            expect(headArgs.url).to.equal('http://1.2.3.4:80/');
             expect(headArgs.options.open_timeout).to.equal(3000);
             expect(headArgs.options.auth).to.equal('digest');
             expect(response.statusCode).to.equal(200);

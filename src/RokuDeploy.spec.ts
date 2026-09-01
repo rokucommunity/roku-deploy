@@ -7963,12 +7963,12 @@ describe('RokuDeploy', () => {
             expect((thrown as Error).message).to.include('500');
         });
 
-        it('uses default port 80, username rokudev, plugin_install path, and 3000ms timeout', async () => {
+        it('uses default port 80, username rokudev, root installer path, and 3000ms timeout', async () => {
             const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa' });
 
-            expect(headStub.firstCall.args[0].url).to.equal('http://device.local:80/plugin_install');
+            expect(headStub.firstCall.args[0].url).to.equal('http://device.local:80/');
             expect(headStub.firstCall.args[0].auth.username).to.equal('rokudev');
             expect(headStub.firstCall.args[0].timeout).to.equal(3000);
         });
@@ -7984,7 +7984,7 @@ describe('RokuDeploy', () => {
                 timeout: 20
             });
 
-            expect(headStub.firstCall.args[0].url).to.equal('http://device.local:8888/plugin_install');
+            expect(headStub.firstCall.args[0].url).to.equal('http://device.local:8888/');
             expect(headStub.firstCall.args[0].auth.username).to.equal('somebody');
             expect(headStub.firstCall.args[0].timeout).to.equal(20);
         });

@@ -836,7 +836,9 @@ export class RokuDeploy {
 
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
-            const url = `${baseUrl}/plugin_install`;
+            //probe the root page, not /plugin_install: same digest credentials, but /plugin_install
+            //answers a HEAD with a body, which Node's http parser rejects
+            const url = `${baseUrl}/`;
             displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
 
             let headResponse: HttpResponse;

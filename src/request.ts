@@ -39,7 +39,9 @@ export class Request {
     }
 
     /**
-     * HEAD a request. Useful for credential/status probes (the response body is always empty).
+     * HEAD a request. Useful for credential/status probes. CAUTION: only safe against routes served
+     * by the device's static-file handler (e.g. `/`). Dynamic routes like `/plugin_install` answer a
+     * HEAD with a response body — a protocol violation Node's http parser rejects mid-socket.
      */
     public async head(params: RequestOptions): Promise<HttpResponse> {
         const { url, needleOptions } = this.translateOptions(params, 'HEAD');
