@@ -165,9 +165,8 @@ export interface RokuDeployOptions {
     screenshotDir?: string;
 
     /**
-     * The request timeout duration in milliseconds. Defaults to 150000ms (2 minutes 30 seconds).
-     * This is mainly useful for preventing hang ups if the Roku loses power or restarts due to a firmware bug.
-     * This is applied per network request to the device and does not apply to the total time it takes to completely execute a call to roku-deploy.
+     * The timeout for each network request to the device, in milliseconds (not for the overall
+     * roku-deploy call). Defaults to 150000 (2 minutes 30 seconds).
      */
     timeout?: number;
 

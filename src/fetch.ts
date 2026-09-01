@@ -1,18 +1,13 @@
 import * as crypto from 'crypto';
 
-// Module seam for `fetch` so tests can stub it. On Node 18, `fetch` is a lazy
-// getter on `globalThis` (not an own property), so `sinon.stub(globalThis, 'fetch')`
-// fails there — routing calls through this object gives a regular, stubbable export.
+//seam so tests can stub `fetch` (sinon can't stub Node 18's lazy `globalThis.fetch` getter directly)
 export const httpClient = {
     fetch: globalThis.fetch?.bind(globalThis)
 };
 
 /**
- * Issue an HTTP request with digest authentication.
- * Performs the two-step challenge/response dance: the first request
- * collects the `WWW-Authenticate` challenge, the second sends a computed
- * `Authorization` header. Response bodies are not consumed — callers get
- * the raw `Response` and inspect status/headers only.
+ * Issue an HTTP request with digest authentication. Response bodies are not
+ * consumed — callers get the raw `Response` and inspect status/headers only.
  */
 export async function fetchWithDigest(
     url: string,
@@ -21,7 +16,6 @@ export async function fetchWithDigest(
     const { username, password, timeout, ...fetchInit } = init;
     const method = fetchInit.method.toUpperCase();
 
-    // Step 1 — issue the request unauthenticated to collect the challenge.
     const step1 = await fetchWithTimeout(url, fetchInit, timeout);
     if (step1.status !== 401) {
         return step1;
@@ -31,7 +25,6 @@ export async function fetchWithDigest(
         return step1;
     }
 
-    // Step 2 — compute the digest response and retry.
     const challenge = parseDigestChallenge(wwwAuth);
     const uri = new URL(url).pathname;
     const authorization = buildDigestAuthorization({
@@ -54,7 +47,7 @@ function fetchWithTimeout(url: string, init: RequestInit, timeout: number): Prom
         .finally(() => clearTimeout(timer));
 }
 
-//parse the comma-separated key/value pairs out of a `WWW-Authenticate: Digest ...` header. Values may be bare or double-quoted.
+/** Parse a `WWW-Authenticate: Digest ...` header into key/value pairs */
 export function parseDigestChallenge(header: string): Record<string, string> {
     const out: Record<string, string> = {};
     const body = header.replace(/^Digest\s+/i, '');
@@ -70,7 +63,7 @@ function md5(input: string): string {
     return crypto.createHash('md5').update(input).digest('hex');
 }
 
-//build an RFC 2617 `Authorization: Digest ...` header from a parsed challenge.
+/** Build an `Authorization: Digest ...` header from a parsed challenge */
 export function buildDigestAuthorization(params: {
     username: string;
     password: string;

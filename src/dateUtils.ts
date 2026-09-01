@@ -1,10 +1,5 @@
 /**
  * Dependency-free date/duration formatting helpers.
- *
- * These replace the `dateformat`, `dayjs`, `moment`, and `parse-ms` packages,
- * each of which was used at a single call site for trivial formatting. This is a
- * leaf module that imports nothing else from the project, so it is safe to consume
- * from low-level files (e.g. `Logger`, `Stopwatch`) without creating import cycles.
  */
 
 /** Left-pad a number with zeros to the given width. */
