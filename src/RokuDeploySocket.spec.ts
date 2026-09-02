@@ -103,7 +103,11 @@ describe('createRokuDeploySocket', () => {
     });
 
     it('throws when given a device config with no recognized identifier', () => {
-        expect(() => createRokuDeploySocket({ device: {} as any, port: 8085 })).to.throw('Unsupported device config: expected a local device (host) or an RCE device (esn, id, or instanceUrl)');
+        expect(() => createRokuDeploySocket({ device: {} as any, port: 8085 })).to.throw('Device config must specify exactly one targeting identifier: host, esn, id, or instanceUrl');
+    });
+
+    it('throws when given a device config with multiple identifiers', () => {
+        expect(() => createRokuDeploySocket({ device: { host: '1.2.3.4', esn: 'ABC123' } as any, port: 8085 })).to.throw('Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
     });
 
     describe('local device', () => {
@@ -416,6 +420,39 @@ describe('createRokuDeploySocket', () => {
 
             expect(emittedError?.message).to.contain('handshake failed');
             expect(emittedEventNames).to.eql(['error', 'close']);
+            expect((emittedError as NodeJS.ErrnoException).code).to.be.undefined;
+        });
+
+        it(`tags a 502 upgrade rejection with code 'ECONNREFUSED', matching the LAN retry signal (nothing on the device is listening yet)`, async () => {
+            const telnetSocket = createRceTelnetSocket();
+            let emittedError: NodeJS.ErrnoException | undefined;
+            telnetSocket.on('error', (error: NodeJS.ErrnoException) => {
+                emittedError = error;
+            });
+
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('error', new Error('Unexpected server response: 502'));
+            await flushMicrotasks();
+
+            expect(emittedError?.message).to.contain('Unexpected server response: 502');
+            expect(emittedError?.code).to.equal('ECONNREFUSED');
+        });
+
+        it('leaves a 404 upgrade rejection with no code, so it stays non-retryable (the port is not whitelisted)', async () => {
+            const telnetSocket = createRceTelnetSocket();
+            let emittedError: NodeJS.ErrnoException | undefined;
+            telnetSocket.on('error', (error: NodeJS.ErrnoException) => {
+                emittedError = error;
+            });
+
+            telnetSocket.connect();
+            await flushMicrotasks();
+            fakeWebSocket.emit('error', new Error('Unexpected server response: 404'));
+            await flushMicrotasks();
+
+            expect(emittedError?.message).to.contain('Unexpected server response: 404');
+            expect(emittedError?.code).to.be.undefined;
         });
 
         it('emits error then close when the instance url fails to resolve', async () => {

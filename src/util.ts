@@ -59,7 +59,7 @@ export class Util {
     }
 
     /**
-     * Normalize path and replace all directory separators with current OS separators
+     * Normalize path and replace all directory separators with forward slashes
      * @param thePath
      */
     public standardizePathPosix(thePath: string) {
@@ -128,9 +128,7 @@ export class Util {
             return false;
         }
 
-        //get a list of every file in the parent directory for this file
         const filesInDir = await fsExtra.readdir(parentDirPath);
-        //look at each file path until we find the one we're searching for
         for (let dirFile of filesInDir) {
             const dirFilePath = this.standardizePath(`${parentDirPath}/${dirFile}`);
             if (dirFilePath.toLowerCase() === lowerFilePath) {
@@ -149,12 +147,10 @@ export class Util {
         const isFileSystemCaseSensitive = await this.getIsFileSystemCaseSensitive(cwd);
 
         const globResults = patterns.map(async (pattern) => {
-            //Canonicalize separators so callers can use either style: convert every backslash
-            //to a forward slash EXCEPT `\[` and `\]`. This is the one rule that disambiguates
-            //the overloaded Windows backslash without guessing: literal-bracket escapes are the
-            //only glob escape with no backslash-free alternative (use `[*]`/`[?]` for a literal
-            //`*`/`?`), and `path.*` joins never emit `\[`/`\]` on their own. So a surviving
-            //backslash can only be an intentional bracket escape; everything else was a separator.
+            //canonicalize separators so callers can use either style: every backslash becomes a forward
+            //slash EXCEPT the literal-bracket escapes `\[` and `\]`, the only glob escapes with no
+            //backslash-free alternative (use `[*]`/`[?]` for a literal `*`/`?`). `path.*` joins never
+            //emit `\[`/`\]` on their own, so a surviving backslash can only be an intentional bracket escape
             pattern = pattern.replace(/\\(?![[\]])/g, '/');
             //skip negated patterns (we will use them to filter later on)
             if (pattern.startsWith('!')) {
@@ -272,21 +268,10 @@ export class Util {
     }
 
     /**
-     * Given an array of `FilesType`, normalize them each into a `StandardizedFileEntry`.
-     * Each entry in the array or inner `src` array will be extracted out into its own object.
-     * This makes it easier to reason about later on in the process.
-     * @param files
-     */
-    /**
-     * Standardize a glob `src` pattern from the `files` array. fast-glob/micromatch require
-     * forward slashes as separators (a backslash is an escape char to them), so we normalize
-     * to posix slashes rather than the OS separator. Callers may pass either separator style
-     * (e.g. the backslashes that `path.join` produces on Windows); both canonicalize the same.
-     * Preserves:
-     * - the leading `!` glob-negation prefix that `path.normalize` would otherwise consume
-     * - literal-bracket glob escapes (`\[`, `\]`), the one escape with no backslash-free
-     *   alternative, which `path.normalize` would otherwise collapse into path separators.
-     *   (To match a literal `*`/`?` in a filename, use the `[*]`/`[?]` char-class form instead.)
+     * Standardize a glob `src` pattern from the `files` array to posix separators (fast-glob/micromatch
+     * treat a backslash as an escape char), accepting either separator style from callers.
+     * Preserves the leading `!` negation prefix and the literal-bracket escapes `\[`/`\]` that
+     * `path.normalize` would otherwise mangle. (For a literal `*`/`?`, use `[*]`/`[?]` instead.)
      */
     public standardizeSrcPattern(pattern: string) {
         const isNegated = pattern.startsWith('!');

@@ -410,18 +410,19 @@ describe('Errors', () => {
 
     describe('extractHttpDetails', () => {
         it('extracts details from response object', () => {
+            const body = '<html>response body</html>';
             const response = {
                 statusCode: 200,
                 headers: { 'content-type': 'text/html' },
+                body: body,
                 request: {
-                    uri: { href: 'http://192.168.1.100/plugin_install' },
+                    url: 'http://192.168.1.100/plugin_install',
                     method: 'POST',
                     headers: { 'user-agent': 'test' }
                 }
             };
-            const body = '<html>response body</html>';
 
-            const details = extractHttpDetails(response, body);
+            const details = extractHttpDetails(response);
 
             expect(details).to.deep.equal({
                 request: {
@@ -438,14 +439,15 @@ describe('Errors', () => {
         });
 
         it('returns undefined for undefined response', () => {
-            expect(extractHttpDetails(undefined, 'body')).to.be.undefined;
+            expect(extractHttpDetails(undefined)).to.be.undefined;
         });
 
         it('handles partial response object', () => {
             const response = {
-                statusCode: 500
+                statusCode: 500,
+                body: 'error body'
             };
-            const details = extractHttpDetails(response, 'error body');
+            const details = extractHttpDetails(response);
 
             expect(details).to.deep.equal({
                 request: {

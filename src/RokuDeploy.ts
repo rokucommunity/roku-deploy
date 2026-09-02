@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, ReadStream } from 'fs-extra';
 import { request } from './request';
-import type { RequestOptions } from './request';
+import type { HttpResponse, RequestOptions } from './request';
 import * as JSZip from 'jszip';
 import {
     CompileError,
@@ -26,13 +26,12 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
+import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
-import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
 export class RokuDeploy {
@@ -43,7 +42,6 @@ export class RokuDeploy {
     constructor(options?: RokuDeployConstructorOptions) {
         this.options = options ?? {};
 
-        // Use custom logger if provided, otherwise use global logger
         this.logger = this.options.logger ?? logger;
     }
 
@@ -87,10 +85,9 @@ export class RokuDeploy {
     private readonly options: RokuDeployConstructorOptions;
 
     /**
-     * One resolved instance url per unique RCE device config, cached for the lifetime of this
-     * `RokuDeploy` instance, so a multi-request flow (for example sideload's closeChannel ->
-     * deleteDevChannel -> plugin_install) avoids re-resolving the instance url through the
-     * management api on every request. Failed resolutions are evicted so the next call retries.
+     * Resolved RCE instance urls, cached per device config for the lifetime of this instance so a
+     * multi-request flow avoids re-resolving through the management api on every request. Failed
+     * resolutions are evicted so the next call retries.
      */
     private readonly rceInstanceUrlsByCacheKey = new Map<string, Promise<string>>();
 
@@ -105,19 +102,14 @@ export class RokuDeploy {
         this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
 
-        // Set defaults and resolve paths
         const rootDir = path.resolve(cwd, options.rootDir ?? './');
         const files = options.files ?? [...DefaultFiles];
 
-        // Resolve output directory - use 'out' if provided, otherwise default to staging dir
         const out = options.out
             ? path.resolve(cwd, options.out)
             : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
 
-        //clean the staging directory
         await fsExtra.remove(out);
-
-        //make sure the staging folder exists
         await fsExtra.ensureDir(out);
 
         if (!await fsExtra.pathExists(rootDir)) {
@@ -125,11 +117,9 @@ export class RokuDeploy {
         }
 
         let fileObjects = await this.getFilePaths({ files: files, rootDir: rootDir });
-        //copy all of the files
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
-            //make sure the containing folder exists
             await fsExtra.ensureDir(path.dirname(destFilePath));
 
             //sometimes the copyfile action fails due to race conditions (normally to poorly constructed src;dest; objects with duplicate files in them
@@ -271,8 +261,7 @@ export class RokuDeploy {
 
                     //attach the remotedebug_connect_early if present
                     if (options.remoteDebugConnectEarly) {
-                        // eslint-disable-next-line camelcase
-                        requestOptions.formData.remotedebug_connect_early = '1';
+                        requestOptions.formData = { ...requestOptions.formData, 'remotedebug_connect_early': '1' };
                     }
 
                     //apply any supplied formData overrides
@@ -293,7 +282,7 @@ export class RokuDeploy {
                         if (this.isCompileError(replaceError.message) && failOnCompileError) {
                             const rokuMessages = this.getRokuMessagesFromResponseBody(replaceError.results?.body ?? '');
                             throw new CompileError('Compile error', {
-                                httpDetails: extractHttpDetails(replaceError.results?.response, replaceError.results?.body),
+                                httpDetails: extractHttpDetails(replaceError.results),
                                 rokuMessages: rokuMessages
                             }, replaceError);
                         } else if (this.isUpdateRequiredError(replaceError)) {
@@ -329,7 +318,7 @@ export class RokuDeploy {
             //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
             if (this.isUpdateCheckRequiredResponse(response.body)) {
                 throw new UpdateCheckRequiredError({
-                    httpDetails: extractHttpDetails(response.response, response.body)
+                    httpDetails: extractHttpDetails(response)
                 });
             }
 
@@ -345,13 +334,13 @@ export class RokuDeploy {
                 if (this.isCompileError(response.body)) {
                     const rokuMessages = this.getRokuMessagesFromResponseBody(response.body);
                     throw new CompileError('Compile error', {
-                        httpDetails: extractHttpDetails(response.response, response.body),
+                        httpDetails: extractHttpDetails(response),
                         rokuMessages: rokuMessages
                     });
                 }
             }
 
-            if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+            if (response.body.includes('Identical to previous version -- not replacing.')) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
             this.logger.info('Successful sideload');
@@ -415,7 +404,7 @@ export class RokuDeploy {
         }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new ConvertError('Squashfs conversion failed', {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -481,9 +470,9 @@ export class RokuDeploy {
         let results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let requestOptions = await this.generateBaseRequestOptions('plugin_package', deviceConfig, options, {
                 mysubmit: 'Package',
-                pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
+                'pkg_time': (new Date()).getTime(),
                 passwd: options.signingPassword,
-                app_name: appName //eslint-disable-line camelcase
+                'app_name': appName
             });
             return this.doPostRequest(requestOptions);
         });
@@ -491,7 +480,7 @@ export class RokuDeploy {
         let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
         if (failedSearchMatches) {
             throw new FailedDeviceResponseError(failedSearchMatches[1], {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -511,7 +500,7 @@ export class RokuDeploy {
         }
 
         throw new UnknownDeviceResponseError('Unknown error signing package', {
-            httpDetails: extractHttpDetails(results.response, results.body),
+            httpDetails: extractHttpDetails(results),
             rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
         });
     }
@@ -560,14 +549,14 @@ export class RokuDeploy {
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
             throw new UnparsableDeviceResponseError('Unknown Rekey Failure', {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
 
         if (resultTextSearch[1] !== 'Success.') {
             throw new FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1], {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -579,7 +568,7 @@ export class RokuDeploy {
                 throw new UnknownDeviceResponseError(
                     'Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"',
                     {
-                        httpDetails: extractHttpDetails(results.response, results.body)
+                        httpDetails: extractHttpDetails(results)
                     }
                 );
             }
@@ -715,7 +704,10 @@ export class RokuDeploy {
         // Always download to buffer
         const buffer = await this.downloadToBuffer(requestParams);
 
-        const result: CaptureScreenshotResult = { buffer: buffer };
+        const result: CaptureScreenshotResult = {
+            buffer: buffer,
+            format: deviceExt.slice(1).toLowerCase() as 'jpg' | 'png'
+        };
 
         // If out is provided, also save to disk
         if (options.out) {
@@ -843,15 +835,19 @@ export class RokuDeploy {
 
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
-            const url = `${baseUrl}/plugin_install`;
+            //probe the root page, not /plugin_install: same digest credentials, but /plugin_install
+            //answers a HEAD with a body, which Node's http parser rejects
+            const url = `${baseUrl}/`;
             displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
 
-            let fetchResponse: Response;
+            let headResponse: HttpResponse;
             try {
-                fetchResponse = await fetchWithDigest(url, {
-                    method: 'HEAD',
-                    username: username,
-                    password: options.password,
+                headResponse = await request.head({
+                    url: url,
+                    auth: {
+                        username: username,
+                        password: options.password
+                    },
                     timeout: timeout,
                     headers: headers
                 });
@@ -863,42 +859,34 @@ export class RokuDeploy {
                     err instanceof Error ? err : undefined
                 );
             }
-            //fetch does not throw on a status code, so surface a mesh-generated 404 (a stale
+            //the transport does not throw on a status code, so surface a mesh-generated 404 (a stale
             //instance url) to the retry wrapper as the error verification would have produced
-            const responseHeaders: Record<string, string> = {};
-            if (typeof fetchResponse.headers?.forEach === 'function') {
-                fetchResponse.headers.forEach((value, key) => {
-                    responseHeaders[key] = value;
-                });
-            } else {
-                Object.assign(responseHeaders, fetchResponse.headers ?? {});
-            }
-            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(fetchResponse.status, responseHeaders)) {
-                throw new InvalidDeviceResponseCodeError(`Unexpected status ${fetchResponse.status} from device at ${displayTarget}`, {
-                    httpDetails: { response: { statusCode: fetchResponse.status, headers: responseHeaders } }
+            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(headResponse.statusCode, headResponse.headers)) {
+                throw new InvalidDeviceResponseCodeError(`Unexpected status ${headResponse.statusCode} from device at ${displayTarget}`, {
+                    httpDetails: extractHttpDetails(headResponse)
                 });
             }
-            return fetchResponse;
+            return headResponse;
         });
 
-        if (response.status === 200) {
+        if (response.statusCode === 200) {
             return true;
         }
-        if (response.status === 401) {
+        if (response.statusCode === 401) {
             return false;
         }
-        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${displayTarget}`, response as any);
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.statusCode} from device at ${displayTarget}`, {
+            httpDetails: extractHttpDetails(response)
+        });
     }
 
     /**
      * Send a raw External Control Protocol (ECP) request to a device and return the raw response
      * (status code and body). This is the single ECP transport: every ECP convenience method
      * funnels through it, and it is public so any ECP route can be reached even when no dedicated
-     * wrapper exists for it yet.
-     *
-     * Local devices are addressed as `http://<host>:<ecpPort>/<route>`; Cloud Emulator devices go
-     * through their instance's `/ecp1/<route>` proxy (authenticated with the config's api token),
-     * so callers never branch on device kind.
+     * wrapper exists for it yet. Local devices are addressed as `http://<host>:<ecpPort>/<route>`;
+     * Cloud Emulator devices go through their instance's `/ecp1/<route>` proxy, so callers never
+     * branch on device kind.
      * @param device the device to send the request to
      * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
      * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
@@ -922,14 +910,19 @@ export class RokuDeploy {
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             instanceGoneResponse = undefined;
             const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
-            const requestOptions: RequestOptions = { url: `${baseUrl}/${route}`, timeout: timeout, headers: headers };
+            const requestOptions: RequestOptions = {
+                url: `${baseUrl}/${route}`,
+                timeout: timeout,
+                headers: { ...headers, ...options.headers },
+                body: options.body
+            };
             const result = options.method === 'POST'
                 ? await this.doPostRequest(requestOptions, verify)
                 : await this.doGetRequest(requestOptions, verify);
-            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.response?.statusCode, result?.response?.headers)) {
+            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.statusCode, result?.headers)) {
                 instanceGoneResponse = result;
-                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.response.statusCode}`, {
-                    httpDetails: extractHttpDetails(result.response, result.body)
+                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.statusCode}`, {
+                    httpDetails: extractHttpDetails(result)
                 });
             }
             return result;
@@ -941,11 +934,17 @@ export class RokuDeploy {
         });
 
         return {
-            status: response?.response?.statusCode,
-            body: response?.body
+            status: response?.statusCode,
+            body: response?.body,
+            headers: response?.headers ?? {}
         };
     }
 
+    /**
+     * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
+     * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
+     * double-encoded.
+     */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...options } as KeyPressOptions;
         return this.sendKeyEvent({
@@ -955,6 +954,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Press a remote-control key without releasing it (pair with `keyUp`). Pass the key raw -
+     * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...options } as KeyDownOptions;
         return this.sendKeyEvent({
@@ -963,6 +966,10 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Release a remote-control key held by `keyDown`. Pass the key raw - it is URI-encoded when
+     * the URL is built, so a pre-encoded value gets double-encoded.
+     */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...options } as KeyUpOptions;
         return this.sendKeyEvent({
@@ -971,25 +978,25 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * Type text on the device by sending each character as a `Lit_` keypress. Pass the text raw -
+     * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
+     */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['device', 'text']);
-        const chars = options.text.split('');
-        for (const char of chars) {
+        for (const char of options.text) {
             await this.sendKeyEvent({
                 ...options,
-                key: `lit_${encodeURIComponent(char)}`,
+                key: `lit_${char}`,
                 action: 'keypress'
             });
         }
     }
 
     /**
-     * Press a sequence of remote keys, in order. Each press rides the same transport as `keyPress`
-     * (LAN ECP for local devices; the RCE instance-api key route with the raw ecp1-proxy fallback
-     * for Cloud Emulator devices), waits for the previous press's response plus a small delay
-     * (keyDelayMs) so on-screen navigation keeps up, and the first failed press throws with the
-     * failing key and step.
+     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
+     * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...options } as SendKeySequenceOptions;
@@ -1013,11 +1020,10 @@ export class RokuDeploy {
     }
 
     /**
-     * Enter the developer-settings key combo on a Roku Cloud Emulator device through its instance
-     * api (the same combo a physical remote's key sequence would send). The device then shows the
-     * on-screen developer setup wizard for the user to complete; this call only triggers that
-     * screen, it does not finish the setup itself. Local devices are not supported - the combo
-     * endpoint only exists on the RCE instance api.
+     * Enter the developer-settings key combo on a Roku Cloud Emulator device, causing it to show
+     * the on-screen developer setup wizard for the user to complete (this call only triggers that
+     * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
+     * only exists on the RCE instance api.
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
@@ -1098,8 +1104,8 @@ export class RokuDeploy {
      * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
      * @param options
      */
-    public async queryApps(options: QueryAppsOptions): Promise<RokuAppDescriptor[]> {
-        options = { ...this.options, ...options } as QueryAppsOptions;
+    public async getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]> {
+        options = { ...this.options, ...options } as GetAppsOptions;
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1140,8 +1146,8 @@ export class RokuDeploy {
      * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
      * @param options
      */
-    public async queryActiveApp(options: QueryActiveAppOptions): Promise<RokuActiveApp> {
-        options = { ...this.options, ...options } as QueryActiveAppOptions;
+    public async getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp> {
+        options = { ...this.options, ...options } as GetActiveAppOptions;
         this.checkRequiredOptions(options, ['device']);
 
         let result: EcpResult;
@@ -1173,8 +1179,8 @@ export class RokuDeploy {
      * `Device not keyed`).
      * @param options
      */
-    public async queryRegistry(options: QueryRegistryOptions): Promise<RokuRegistry> {
-        options = { ...this.options, ...options } as QueryRegistryOptions;
+    public async getRegistry(options: GetRegistryOptions): Promise<RokuRegistry> {
+        options = { ...this.options, ...options } as GetRegistryOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
@@ -1211,8 +1217,8 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
      */
-    public async queryAppState(options: QueryAppStateOptions): Promise<RokuAppState> {
-        options = { ...this.options, ...options } as QueryAppStateOptions;
+    public async getAppState(options: GetAppStateOptions): Promise<RokuAppState> {
+        options = { ...this.options, ...options } as GetAppStateOptions;
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
@@ -1238,8 +1244,8 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
      */
-    public async queryRendezvous(options: QueryRendezvousOptions): Promise<RokuRendezvous> {
-        options = { ...this.options, ...options } as QueryRendezvousOptions;
+    public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
+        options = { ...this.options, ...options } as GetRendezvousTrackingOptions;
         this.checkRequiredOptions(options, ['device']);
 
         const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
@@ -1338,9 +1344,7 @@ export class RokuDeploy {
                 'app_type': 'dcl',
                 fileName: options.fileName
             };
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
+            deleteOptions.qs = { ...deleteOptions.qs, 'dcl_enabled': '1' };
             return this.doPostRequest(deleteOptions);
         });
     }
@@ -1373,9 +1377,7 @@ export class RokuDeploy {
 
         const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
-            deleteOptions.qs ??= {};
-            // eslint-disable-next-line camelcase
-            deleteOptions.qs.dcl_enabled = '1';
+            deleteOptions.qs = { ...deleteOptions.qs, 'dcl_enabled': '1' };
             return this.doGetRequest(deleteOptions);
         });
         const packages = this.getPackagesFromResponseBody(result.body);
@@ -1473,11 +1475,10 @@ export class RokuDeploy {
     }
 
     /**
-     * Enhance a raw device-info object into its normalized form. This camel-cases the property names and
-     * normalizes each value to its native format (boolean strings to booleans, number strings to numbers,
-     * decoding HtmlEntities, etc.). This is the same enhancement `getDeviceInfo` applies when called with
-     * `{ enhance: true }`, exposed separately so callers that already have a raw device-info object can
-     * enhance it without making another request to the device.
+     * Enhance a raw device-info object into its normalized form: camel-cases the property names and
+     * normalizes each value to its native format (booleans, numbers, decoded html entities, etc.).
+     * The same enhancement `getDeviceInfo` applies with `{ enhance: true }`, for callers that
+     * already have a raw device-info object and don't want another device request.
      * @param deviceInfo the raw device-info object to enhance
      */
     public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
@@ -1548,12 +1549,10 @@ export class RokuDeploy {
             timeout: timeout,
             headers: headers,
             auth: {
-                user: username,
-                pass: mergedOptions.password,
-                sendImmediately: false
+                username: username,
+                password: mergedOptions.password
             },
-            formData: formData,
-            agentOptions: { 'keepAlive': false }
+            formData: formData
         };
         return baseRequestOptions;
     }
@@ -1624,21 +1623,12 @@ export class RokuDeploy {
      */
     private async doPostRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling POST request to', params.url);
-        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-
-            this.setUserAgentIfMissing(params);
-
-            request.post(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        });
+        this.setUserAgentIfMissing(params);
+        const results = await request.post(params);
         if (verify) {
             this.checkRequest(results);
         }
-        return results as HttpResponse;
+        return results;
     }
 
     /**
@@ -1647,21 +1637,12 @@ export class RokuDeploy {
      */
     private async doGetRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling GET request to', params.url);
-        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-
-            this.setUserAgentIfMissing(params);
-
-            request.get(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        });
+        this.setUserAgentIfMissing(params);
+        const results = await request.get(params);
         if (verify) {
             this.checkRequest(results);
         }
-        return results as HttpResponse;
+        return results;
     }
 
     /**
@@ -1697,17 +1678,17 @@ export class RokuDeploy {
         return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
     }
 
-    private checkRequest(results: { response?: any; body?: any }) {
-        if (!results || !results.response || typeof results.body !== 'string') {
+    private checkRequest(results: HttpResponse) {
+        if (!results || typeof results.body !== 'string') {
             throw new UnparsableDeviceResponseError('Invalid response', {
-                httpDetails: extractHttpDetails(results?.response, results?.body)
+                httpDetails: extractHttpDetails(results)
             });
         }
 
-        const host = results.response.request?.host?.toString?.();
-        const httpDetails = extractHttpDetails(results.response, results.body);
+        const host = results.request?.host;
+        const httpDetails = extractHttpDetails(results);
 
-        if (results.response.statusCode === 401) {
+        if (results.statusCode === 401) {
             throw new UnauthorizedDeviceResponseError(
                 `Unauthorized. Please verify credentials for host '${host}'`,
                 {
@@ -1725,9 +1706,9 @@ export class RokuDeploy {
             });
         }
 
-        if (results.response.statusCode !== 200) {
+        if (results.statusCode !== 200) {
             throw new InvalidDeviceResponseCodeError(
-                'Invalid response code: ' + results.response.statusCode,
+                'Invalid response code: ' + results.statusCode,
                 {
                     httpDetails: httpDetails,
                     rokuMessages: rokuMessages
@@ -1756,7 +1737,7 @@ export class RokuDeploy {
                 reject(error);
             });
 
-            request.get(requestParams).on('error', (err) => {
+            request.getStream(requestParams).on('error', (err) => {
                 reject(err);
             }).on('response', (response) => {
                 if (response.statusCode !== 200) {
@@ -1774,7 +1755,7 @@ export class RokuDeploy {
     private downloadToBuffer(requestParams: any): Promise<Buffer> {
         return new Promise<Buffer>((resolve, reject) => {
             const chunks: Buffer[] = [];
-            request.get(requestParams)
+            request.getStream(requestParams)
                 .on('error', (err) => {
                     reject(err);
                 })
@@ -1999,14 +1980,14 @@ export class RokuDeploy {
                 if (!rceToken) {
                     throw new Error('An rceToken is required to reach ECP on an RCE device');
                 }
-                const key = this.toCanonicalRemoteKey(options.key);
+                const canonicalKey = this.toCanonicalRemoteKey(options.key);
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${key}`;
+                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${encodeURIComponent(canonicalKey)}`;
                     return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
-                    status: response?.response?.statusCode,
+                    status: response?.statusCode,
                     body: response?.body
                 } as EcpResult;
             } catch (e) {
@@ -2014,7 +1995,7 @@ export class RokuDeploy {
             }
         }
 
-        return this.sendEcpRequest(options.device, `${options.action}/${options.key}`, {
+        return this.sendEcpRequest(options.device, `${options.action}/${encodeURIComponent(options.key)}`, {
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -2072,9 +2053,8 @@ export class RokuDeploy {
     }
 
     /**
-     * Build the HttpDetails carried by ECP wrapper errors. `sendEcpRequest()` does not retain the raw
-     * HttpResponse, so this carries what it does keep - the status code and body - which is what a
-     * caller needs to see what the device actually said.
+     * Build the HttpDetails carried by ECP wrapper errors from what `sendEcpRequest()` retains:
+     * the status code and body.
      */
     private buildEcpHttpDetails(result: EcpResult): HttpDetails {
         return {
@@ -2109,10 +2089,9 @@ export class RokuDeploy {
     }
 
     /**
-     * Unwrap a standard ECP response envelope: return the root element of the parsed body, throwing
-     * a FailedDeviceResponseError (with the device's own error message) when the element carries a
-     * non-OK `<status>` - which ECP reports with a 202 rather than an error status code - and an
-     * UnparsableDeviceResponseError when the expected root element is missing entirely.
+     * Unwrap a standard ECP response envelope: return the root element of the parsed body. Throws
+     * FailedDeviceResponseError on a non-OK `<status>` (which ECP reports with a 202 rather than an
+     * error status code) and UnparsableDeviceResponseError when the root element is missing.
      */
     private async getEcpEnvelope(result: EcpResult, rootKey: string, failureMessage: string): Promise<Record<string, any>> {
         const root = (await this.parseEcpXml(result))?.[rootKey];
@@ -2314,42 +2293,18 @@ export class RokuDeploy {
             if (!entry) {
                 throw new Error(`Device '${device}' not found in devices registry`);
             }
-            return this.extractDeviceConfig(entry);
+            return this.extractDeviceConfig(entry, device);
         }
         // Object = inline config, validate and return
-        this.validateDeviceConfig(device);
+        validateDeviceConfig(device);
         return device;
-    }
-
-    /**
-     * Validate that a device config has exactly one identifier (host, esn, id, or instanceUrl).
-     */
-    private validateDeviceConfig(config: DeviceConfig): void {
-        const identifiers = [
-            isLocalDeviceConfig(config),
-            isRceDeviceConfigByEsn(config),
-            isRceDeviceConfigById(config),
-            isRceDeviceConfigByUrl(config)
-        ].filter(Boolean);
-
-        if (identifiers.length === 0) {
-            throw new InvalidOptionError(
-                'Device must specify host, esn, id, or instanceUrl',
-                { optionName: 'device' }
-            );
-        }
-        if (identifiers.length > 1) {
-            throw new InvalidOptionError(
-                'Device cannot specify multiple identifiers (host, esn, id, instanceUrl)',
-                { optionName: 'device' }
-            );
-        }
     }
 
     /**
      * Extract a DeviceConfig from a DeviceRegistryEntry.
      */
-    private extractDeviceConfig(entry: DeviceRegistryEntry): DeviceConfig {
+    private extractDeviceConfig(entry: DeviceRegistryEntry, name: string): DeviceConfig {
+        validateDeviceConfig(entry, `Device registry entry '${name}'`);
         if (isLocalDeviceConfig(entry)) {
             return { host: entry.host };
         }
@@ -2359,10 +2314,7 @@ export class RokuDeploy {
         if (isRceDeviceConfigById(entry)) {
             return { id: entry.id, rceToken: entry.rceToken };
         }
-        if (isRceDeviceConfigByUrl(entry)) {
-            return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
-        }
-        throw new Error('Device registry entry has no valid identifier (host, esn, id, or instanceUrl)');
+        return { instanceUrl: entry.instanceUrl, rceToken: entry.rceToken };
     }
 
     /**
@@ -2426,12 +2378,10 @@ export class RokuDeploy {
      * @param deviceInfo
      */
     private normalizeDeviceInfoFieldValue(value: any) {
-        // non-string values have nothing to normalize; return them unchanged
         if (typeof value !== 'string') {
             return value;
         }
         let num: number;
-        // convert 'true' and 'false' string values to boolean
         if (value === 'true') {
             return true;
         } else if (value === 'false') {
@@ -2524,10 +2474,6 @@ export const DefaultFiles = [
     '!**/*.{md,DS_Store,db}'
 ];
 
-export interface HttpResponse {
-    response: any;
-    body: any;
-}
 
 export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
@@ -2565,6 +2511,10 @@ export interface CaptureScreenshotResult {
      */
     buffer: Buffer;
     /**
+     * The image format of the buffer, as reported by the device
+     */
+    format: 'jpg' | 'png';
+    /**
      * The file path where the screenshot was saved (only present when `out` option was provided)
      */
     filePath?: string;
@@ -2578,9 +2528,9 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
 
-export type QueryAppsOptions = BaseEcpOptions;
+export type GetAppsOptions = BaseEcpOptions;
 
-export type QueryActiveAppOptions = BaseEcpOptions;
+export type GetActiveAppOptions = BaseEcpOptions;
 
 export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
@@ -2595,15 +2545,13 @@ export interface ValidateDeveloperPasswordOptions {
     /** Defaults to `80` (the developer web-server port) */
     port?: number;
 
-    /** Milliseconds to wait for each HTTP round-trip. Defaults to `3000`. */
+    /** Defaults to `3000` (milliseconds per HTTP round-trip) */
     timeout?: number;
 }
 
 /**
- * The remote-control keys a Roku understands, in the canonical casing the device expects. Exposed
- * for convenience and discoverability: pass a `RemoteKey` value and you get the casing right without
- * thinking about it. It is NOT an enforced list - every key option also accepts a raw string, so a
- * key without a member here (or a `Lit_<char>` literal) can still be sent.
+ * The remote-control keys a Roku understands, in the canonical casing the device expects. Not an
+ * enforced list — key options also accept raw strings (e.g. a `Lit_<char>` literal).
  */
 export enum RemoteKey {
     Back = 'Back',
@@ -2650,15 +2598,18 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
 }
 
 export interface KeyUpOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyDownOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface KeyPressOptions extends BaseEcpOptions {
-    key: RemoteKeyText;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+    key: RemoteKeyText | string;
 }
 
 export interface SendTextOptions extends BaseEcpOptions {
@@ -2771,6 +2722,10 @@ export interface BaseEcpOptions {
 export interface EcpOptions {
     /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
     method?: 'GET' | 'POST';
+    /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Ignored for GET requests. */
+    body?: string | Buffer;
+    /** Extra request headers to merge onto the request. */
+    headers?: Record<string, string>;
     /**
      * Run the standard response verification (throw on non-200 statuses and error bodies).
      * Defaults to false so raw ECP status bodies (a 202 `FAILED` registry response, for example)
@@ -2788,9 +2743,14 @@ export interface EcpResult {
     status: number | undefined;
     /** The raw response body (usually XML, empty for command routes like keypress) */
     body: string;
+    /**
+     * The response headers (lowercased names), so callers can pick a parser from the content-type. Empty when the transport produced no response
+     * @see {@link https://nodejs.org/api/http.html#messageheaders | message.headers docs}
+     */
+    headers: Record<string, string | string[]>;
 }
 
-export interface QueryRegistryOptions extends BaseEcpOptions {
+export interface GetRegistryOptions extends BaseEcpOptions {
     /** The app whose registry to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
@@ -2806,7 +2766,7 @@ export interface RokuRegistry {
     sections: Record<string, Record<string, string>>;
 }
 
-export interface QueryAppStateOptions extends BaseEcpOptions {
+export interface GetAppStateOptions extends BaseEcpOptions {
     /** The app whose state to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
@@ -2821,7 +2781,7 @@ export interface RokuAppState {
     state: RokuAppStateValue;
 }
 
-export type QueryRendezvousOptions = BaseEcpOptions;
+export type GetRendezvousTrackingOptions = BaseEcpOptions;
 
 export interface RokuRendezvous {
     trackingEnabled: boolean;

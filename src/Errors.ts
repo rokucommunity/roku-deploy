@@ -22,8 +22,8 @@ export enum RokuDeployErrorCode {
 }
 
 /**
- * Abstracted HTTP request details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP request details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpRequestDetails {
     url?: string;
@@ -33,8 +33,8 @@ export interface HttpRequestDetails {
 }
 
 /**
- * Abstracted HTTP response details - NOT tied to request library.
- * This allows switching from postman-request to native fetch later.
+ * HTTP response details, abstracted from the underlying HTTP library so it can be swapped without
+ * breaking consumers
  */
 export interface HttpResponseDetails {
     statusCode?: number;
@@ -435,26 +435,24 @@ export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedF
 // ============================================================================
 
 /**
- * Extract HttpDetails from a request library response.
- * This abstracts the response format so we can switch HTTP libraries later.
+ * Extract HttpDetails from an `HttpResponse` (or anything response-shaped).
  */
 export function extractHttpDetails(
-    response: { statusCode?: number; headers?: Record<string, string>; request?: { uri?: { href?: string }; method?: string; headers?: Record<string, string> } } | undefined,
-    body?: string | Buffer
+    response: { statusCode?: number; headers?: Record<string, any>; body?: string | Buffer; request?: { url?: string; method?: string; headers?: Record<string, any> } } | undefined
 ): HttpDetails | undefined {
     if (!response) {
         return undefined;
     }
     return {
         request: {
-            url: response.request?.uri?.href,
+            url: response.request?.url,
             method: response.request?.method,
             headers: response.request?.headers
         },
         response: {
             statusCode: response.statusCode,
             headers: response.headers,
-            body: body
+            body: response.body
         }
     };
 }
