@@ -70,12 +70,12 @@ export function rceDeviceToTableObject(device: RceDevice): Record<string, any> {
     const result: Record<string, any> = {
         id: device.id,
         name: device.name,
-        deviceType: device.device_type,
+        deviceType: device.deviceType,
         status: device.status,
-        snapshotId: device.running_device?.snapshot_id,
-        firmwareVersionId: device.running_device?.firmware_version_id,
-        maxRuntime: device.running_device?.max_runtime,
-        instanceApiUrl: device.running_device?.instance_api_url
+        snapshotId: device.runningDevice?.snapshotId,
+        firmwareVersionId: device.runningDevice?.firmwareVersionId,
+        maxRuntime: device.runningDevice?.maxRuntime,
+        instanceApiUrl: device.runningDevice?.instanceApiUrl
     };
     for (const key of Object.keys(result)) {
         if (result[key] === undefined || result[key] === null) {

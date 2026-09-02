@@ -15,8 +15,8 @@ import { KeyPressCommand } from './commands/KeyPressCommand';
 import { KeyUpCommand } from './commands/KeyUpCommand';
 import { KeyDownCommand } from './commands/KeyDownCommand';
 import { RemoteControlCommand } from './commands/RemoteControlCommand';
-import { RceStartDeviceCommand } from './commands/RceStartDeviceCommand';
-import { RceStopDeviceCommand } from './commands/RceStopDeviceCommand';
+import { RceStartCommand } from './commands/RceStartCommand';
+import { RceStopCommand } from './commands/RceStopCommand';
 
 void yargs
 
@@ -168,32 +168,34 @@ void yargs
 
     .command('rce', 'Manage Roku Cloud Emulator (RCE) devices', (rceBuilder) => {
         return rceBuilder
-            .command('startDevice', 'Boot an RCE device from a snapshot', (builder) => {
+            .command('start', 'Boot an RCE device from a snapshot', (builder) => {
                 return builder
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
                     .option('esn', { type: 'string', description: 'The serial number (ESN) of the RCE device (instead of a deviceId)', demandOption: false })
-                    .option('snapshotId', { type: 'number', description: 'The snapshot to boot from. Defaults to the device\'s live snapshot, then its last snapshot', demandOption: false })
+                    .option('snapshot', { type: 'string', description: 'The name of the snapshot to boot from (\'live\' selects the live snapshot). Defaults to the live snapshot', demandOption: false })
+                    .option('snapshotId', { type: 'number', description: 'The id of the snapshot to boot from (instead of a snapshot name)', demandOption: false })
                     .option('firmwareVersionId', { type: 'string', description: 'The firmware to boot with. Defaults to the snapshot\'s firmware, then the device\'s, then the first available for the device type', demandOption: false })
                     .option('maxRuntime', { type: 'number', description: 'The maximum runtime for the device instance, in seconds', demandOption: false, default: 3600 })
                     .option('wait', { type: 'boolean', description: 'Wait for the device to reach the \'running\' status before exiting', demandOption: false })
-                    .option('waitTimeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
+                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
                     .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-                    .conflicts('deviceId', 'esn');
+                    .conflicts('deviceId', 'esn')
+                    .conflicts('snapshot', 'snapshotId');
             }, (args: any) => {
-                return new RceStartDeviceCommand().run(args);
+                return new RceStartCommand().run(args);
             })
-            .command('stopDevice', 'Shut down a running RCE device', (builder) => {
+            .command('stop', 'Shut down a running RCE device', (builder) => {
                 return builder
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
                     .option('esn', { type: 'string', description: 'The serial number (ESN) of the RCE device (instead of a deviceId)', demandOption: false })
                     .option('wait', { type: 'boolean', description: 'Wait for the device to reach the \'shutdown\' status before exiting', demandOption: false })
-                    .option('waitTimeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
+                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
                     .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
                     .conflicts('deviceId', 'esn');
             }, (args: any) => {
-                return new RceStopDeviceCommand().run(args);
+                return new RceStopCommand().run(args);
             })
             .demandCommand(1, 'Please specify an rce command');
     })
