@@ -9,10 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.18.4](https://github.com/rokucommunity/roku-deploy/compare/3.18.3...v3.18.4) - 2026-09-02
 ### Changed
  - upgrade to [@rokucommunity/logger@0.4.2](https://github.com/rokucommunity/logger/blob/master/CHANGELOG.md#042---2026-09-02). Notable changes since 0.4.1:
-     - Security enhancements ([#39](https://github.com/rokucommunity/logger/pull/39))
-     - Security enhancements ([#38](https://github.com/rokucommunity/logger/pull/38))
-     - chore: Simplify create-vsix inputs and improve branch resolution ([#36](https://github.com/rokucommunity/logger/pull/36))
-     - chore: Give fork PRs a clear create-vsix failure message ([#35](https://github.com/rokucommunity/logger/pull/35))
+     - Security enhancements ([#38](https://github.com/rokucommunity/logger/pull/38), [#39](https://github.com/rokucommunity/logger/pull/39)) 
 
 
 
