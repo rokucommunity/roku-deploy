@@ -20,6 +20,8 @@ import { RceStopCommand } from './commands/RceStopCommand';
 
 void yargs
 
+    .option('config', { type: 'string', description: 'Path to the config file. Defaults to rokudeploy.json in cwd', global: true })
+
     .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
@@ -57,7 +59,7 @@ void yargs
 
     .command('keyPress', 'send keypress command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -67,7 +69,7 @@ void yargs
 
     .command('keyUp', 'send keyup command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -77,7 +79,7 @@ void yargs
 
     .command('keyDown', 'send keydown command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -87,7 +89,7 @@ void yargs
 
     .command('sendText', 'Send text command', (builder) => {
         return builder
-            .option('text', { type: 'string', description: 'The text to send', demandOption: true })
+            .option('text', { type: 'string', description: 'The text to send', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -146,7 +148,7 @@ void yargs
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('out', { type: 'string', description: 'The location where the screenshot will be saved relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.jpg' })
-            .option('autoExtension', { type: 'boolean', description: 'Automatically handle file extension based on device response. When false (default), filename is used exactly as provided.', demandOption: false, default: false })
+            .option('autoExtension', { type: 'boolean', description: 'Automatically handle file extension based on device response. When false (default), filename is used exactly as provided.', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new CaptureScreenshotCommand().run(args);
@@ -171,16 +173,19 @@ void yargs
             .command('start', 'Boot an RCE device from a snapshot', (builder) => {
                 return builder
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
+                    .option('device', { type: 'string', description: 'A named device from the config devices registry (must carry an id or esn)', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
                     .option('esn', { type: 'string', description: 'The serial number (ESN) of the RCE device (instead of a deviceId)', demandOption: false })
                     .option('snapshot', { type: 'string', description: 'The name of the snapshot to boot from (\'live\' selects the live snapshot). Defaults to the live snapshot', demandOption: false })
                     .option('snapshotId', { type: 'number', description: 'The id of the snapshot to boot from (instead of a snapshot name)', demandOption: false })
                     .option('firmwareVersionId', { type: 'string', description: 'The firmware to boot with. Defaults to the snapshot\'s firmware, then the device\'s, then the first available for the device type', demandOption: false })
-                    .option('maxRuntime', { type: 'number', description: 'The maximum runtime for the device instance, in seconds', demandOption: false, default: 3600 })
+                    .option('maxRuntime', { type: 'number', description: 'The maximum runtime for the device instance, in seconds', demandOption: false, defaultDescription: '3600' })
                     .option('wait', { type: 'boolean', description: 'Wait for the device to reach the \'running\' status before exiting', demandOption: false })
-                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
+                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, defaultDescription: '600' })
                     .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
                     .conflicts('deviceId', 'esn')
+                    .conflicts('device', 'deviceId')
+                    .conflicts('device', 'esn')
                     .conflicts('snapshot', 'snapshotId');
             }, (args: any) => {
                 return new RceStartCommand().run(args);
@@ -188,12 +193,15 @@ void yargs
             .command('stop', 'Shut down a running RCE device', (builder) => {
                 return builder
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
+                    .option('device', { type: 'string', description: 'A named device from the config devices registry (must carry an id or esn)', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
                     .option('esn', { type: 'string', description: 'The serial number (ESN) of the RCE device (instead of a deviceId)', demandOption: false })
                     .option('wait', { type: 'boolean', description: 'Wait for the device to reach the \'shutdown\' status before exiting', demandOption: false })
-                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, default: 600 })
+                    .option('timeout', { type: 'number', description: 'How long --wait polls before giving up, in seconds', demandOption: false, defaultDescription: '600' })
                     .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-                    .conflicts('deviceId', 'esn');
+                    .conflicts('deviceId', 'esn')
+                    .conflicts('device', 'deviceId')
+                    .conflicts('device', 'esn');
             }, (args: any) => {
                 return new RceStopCommand().run(args);
             })
@@ -202,7 +210,7 @@ void yargs
 
     .command('zip', 'Zip a folder into a package', (builder) => {
         return builder
-            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: true })
+            .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
             .option('files', { type: 'array', description: 'Optional file patterns to filter which files are included (defaults to all files)', demandOption: false })
             .option('out', { type: 'string', description: 'The path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });

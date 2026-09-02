@@ -25,7 +25,9 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { ConfigSectionName, RokuDeployConfig } from './RokuDeployConfig';
+import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -1385,34 +1387,91 @@ export class RokuDeploy {
     }
 
     /**
-     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed).
+     * Resolves `${VAR}` environment-variable references in string values and warns about invalid
+     * device-registry entries. The library never loads config implicitly — the CLI calls this for
+     * every command; library consumers call it explicitly when they want file config.
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
-        if (fsExtra.existsSync(configPath)) {
-            const configFileText = fsExtra.readFileSync(configPath).toString();
-            const parseErrors: ParseError[] = [];
-            const fileOptions = parseJsonc(configFileText, parseErrors, {
-                allowEmptyContent: true,
-                allowTrailingComma: true,
-                disallowComments: false
-            });
-            if (parseErrors.length > 0) {
-                throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
-                    parseErrors.map(x => {
-                        return {
-                            message: printParseErrorCode(x.error),
-                            offset: x.offset,
-                            length: x.length
-                        };
-                    })
-                ));
-            }
-            return fileOptions;
+        if (!fsExtra.existsSync(configPath)) {
+            return {};
         }
-        return {};
+        const configFileText = fsExtra.readFileSync(configPath).toString();
+        const parseErrors: ParseError[] = [];
+        const config = parseJsonc(configFileText, parseErrors, {
+            allowEmptyContent: true,
+            allowTrailingComma: true,
+            disallowComments: false
+        });
+        if (parseErrors.length > 0) {
+            throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
+                parseErrors.map(x => {
+                    return {
+                        message: printParseErrorCode(x.error),
+                        offset: x.offset,
+                        length: x.length
+                    };
+                })
+            ));
+        }
+        //empty file (or a bare comment) parses to undefined
+        if (!config) {
+            return {};
+        }
+        this.interpolateEnvVars(config, configPath, []);
+        //surface broken registry entries early (but only warn: an unused bad entry shouldn't
+        //break every command — resolveDevice() still hard-fails when the entry is actually used)
+        for (const name in config.devices ?? {}) {
+            try {
+                validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
+            } catch (e) {
+                this.logger.warn(`${configPath}: ${(e as Error).message}`);
+            }
+        }
+        return config;
+    }
+
+    /**
+     * Flatten a loaded config down to the options for one command: root-level common values
+     * overlaid with that command's section (section wins on collision). Section keys for OTHER
+     * commands are stripped. CLI args are merged on top by the caller.
+     */
+    public resolveCommandOptions<T extends Record<string, any> = Record<string, any>>(config: RokuDeployConfig, command: ConfigSectionName): T {
+        const result: Record<string, any> = {};
+        for (const key in config) {
+            if (!configSectionNames.includes(key as ConfigSectionName)) {
+                result[key] = config[key];
+            }
+        }
+        Object.assign(result, config[command]);
+        return result as T;
+    }
+
+    /**
+     * Recursively resolve `${VAR}` environment-variable references in every string value.
+     * Throws if a referenced variable is not set, naming the variable and where it was used.
+     */
+    private interpolateEnvVars(node: Record<string, any>, configPath: string, jsonPath: string[]) {
+        for (const key in node) {
+            const value = node[key];
+            if (typeof value === 'string') {
+                node[key] = value.replace(/\$\{(\w+)\}/g, (match, varName: string) => {
+                    const envValue = process.env[varName];
+                    if (envValue === undefined) {
+                        throw new Error(
+                            `Environment variable '${varName}' referenced at "${[...jsonPath, key].join('.')}" in "${path.resolve(configPath)}" is not set`
+                        );
+                    }
+                    return envValue;
+                });
+            } else if (value && typeof value === 'object') {
+                //arrays included: for-in walks indices, so entries recurse like object values
+                this.interpolateEnvVars(value, configPath, [...jsonPath, key]);
+            }
+        }
     }
 
     /**

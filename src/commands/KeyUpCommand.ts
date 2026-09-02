@@ -1,11 +1,9 @@
 import { rokuDeploy } from '../index';
+import { loadCommandOptions } from './commandUtils';
 
 export class KeyUpCommand {
     async run(args) {
-        let options = {
-            ...rokuDeploy.loadConfigFile(args),
-            ...args
-        };
+        let options = loadCommandOptions(args, 'keyUp');
         await rokuDeploy.keyUp(options);
     }
 }
