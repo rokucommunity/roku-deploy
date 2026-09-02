@@ -171,7 +171,7 @@ describe('cli', function cli() {
 
     it('Deletes an installed channel', async () => {
         const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
-            return Promise.resolve({ response: {}, body: {} });
+            return Promise.resolve({ statusCode: 200, headers: {}, body: '', request: { url: '', method: 'POST' } });
         });
 
         const command = new DeleteDevChannelCommand();

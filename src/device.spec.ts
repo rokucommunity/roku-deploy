@@ -6,14 +6,14 @@ import * as http from 'http';
 import * as path from 'path';
 import * as semver from 'semver';
 import * as dotenv from 'dotenv';
-import * as rokuDeploy from './index';
-import { RokuDeploy } from './RokuDeploy';
+import { RokuDeploy, rokuDeploy } from './RokuDeploy';
 import * as errors from './Errors';
 import { expect } from 'chai';
 import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import undent from 'undent';
 import { standardizePath as s, util } from './util';
 import { powerCycleRokuDevice } from './smartSwitchManagement.spec';
+import type { RokuDeployOptions } from './RokuDeployOptions';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
 //pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
@@ -50,7 +50,7 @@ describe('device', function device() {
     //device/password are required by every v4 device method; the `before` hook guarantees they're set,
     //so narrow the type here (they're optional on the base RokuDeployOptions) to avoid
     //spreading an optional device/password into methods that require them.
-    let options: rokuDeploy.RokuDeployOptions & { device: { host: string }; password: string };
+    let options: RokuDeployOptions & { device: { host: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
     //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
@@ -91,8 +91,14 @@ describe('device', function device() {
         //make sure the device is actually reachable before running the next test; catches the case where
         //the previous test (or a reboot) left the device still coming back online, so we don't immediately
         //trample a device that isn't ready yet
-        this.timeout(60_000);
-        await waitForDeviceOnline(HOST, 30_000, 2000, 0);
+        this.timeout(120_000);
+        await waitForDeviceOnline(HOST, 90_000, 2000, 0);
+
+        //send a few home presses, just to make sure we've cleared any foreground stuff
+        await rokuDeploy.keyPress({ device: { host: HOST }, key: 'Home' });
+        await util.sleep(100);
+        await rokuDeploy.keyPress({ device: { host: HOST }, key: 'Home' });
+        await util.sleep(100);
 
         fsExtra.emptyDirSync(tempDir);
         fsExtra.ensureDirSync(rootDir);
@@ -281,7 +287,8 @@ describe('device', function device() {
     });
 
     describe('publish', () => {
-        it('works', async () => {
+        it('works', async function works() {
+            this.timeout(30_000);
             const { stagingDir: staged } = await rd.stage({ rootDir: rootDir, files: options.files, out: stagingDir });
             const zipPath = `${outDir}/roku-deploy.zip`;
             await rd.zip({ dir: staged, out: zipPath, files: options.files });
@@ -668,7 +675,7 @@ describe('device', function device() {
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
         //~2x the slowest observed case in this block (~5.6s).
         this.timeout(12_000);
-        const BOUNDARY = rokuDeploy.RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
+        const BOUNDARY = RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
         //exact zip size (a repeated char would compress away and give us no size control).
@@ -1263,6 +1270,7 @@ async function waitForDeviceOnline(host: string, timeoutMs = 120_000, intervalMs
                 console.log('Device is online, but waiting a few more seconds to ensure it is fully ready...');
                 await util.sleep(5_000);
             }
+            console.log(`Device ${host} is back online after ${Date.now() - startTime}ms`);
             return;
         } catch (e) {
             lastError = e as Error;
