@@ -97,7 +97,7 @@ const REQUEST_TIMEOUT = 30_000;
                 `"npx mocha src/rce-device.spec.ts".`
             );
         }
-        resolvedInstanceHost = new URL(device.running_device.instance_api_url).host;
+        resolvedInstanceHost = new URL(device.runningDevice.instanceApiUrl).host;
     });
 
     beforeEach(() => {

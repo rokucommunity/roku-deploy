@@ -1,4 +1,3 @@
-/* eslint-disable camelcase -- the Janus wire protocol uses snake_case fields */
 import { EventEmitter } from 'events';
 import * as WebSocket from 'ws';
 import type { IceServer } from './RceManagementClient';
@@ -151,15 +150,15 @@ export class RceVideoSignalingClient extends EventEmitter {
 
         const attachResponse = await this.sendRequest({
             janus: 'attach',
-            session_id: this.sessionId,
+            'session_id': this.sessionId,
             plugin: 'janus.plugin.streaming'
         });
         this.handleId = attachResponse.data?.id;
 
         const watchResponse = await this.sendRequest({
             janus: 'message',
-            session_id: this.sessionId,
-            handle_id: this.handleId,
+            'session_id': this.sessionId,
+            'handle_id': this.handleId,
             body: {
                 request: 'watch',
                 id: this.config.streamId,
@@ -184,8 +183,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     public async sendAnswer(jsep: RceVideoJsep): Promise<void> {
         await this.sendRequest({
             janus: 'message',
-            session_id: this.sessionId,
-            handle_id: this.handleId,
+            'session_id': this.sessionId,
+            'handle_id': this.handleId,
             body: { request: 'start' },
             jsep: jsep
         });
@@ -197,8 +196,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     public sendCandidate(candidate: unknown): void {
         this.sendFireAndForget({
             janus: 'trickle',
-            session_id: this.sessionId,
-            handle_id: this.handleId,
+            'session_id': this.sessionId,
+            'handle_id': this.handleId,
             candidate: candidate
         });
     }
@@ -209,8 +208,8 @@ export class RceVideoSignalingClient extends EventEmitter {
     public sendCandidatesComplete(): void {
         this.sendFireAndForget({
             janus: 'trickle',
-            session_id: this.sessionId,
-            handle_id: this.handleId,
+            'session_id': this.sessionId,
+            'handle_id': this.handleId,
             candidate: { completed: true }
         });
     }
@@ -228,7 +227,7 @@ export class RceVideoSignalingClient extends EventEmitter {
         this.rejectConnected = undefined;
 
         if (this.sessionId !== undefined) {
-            this.sendFireAndForget({ janus: 'destroy', session_id: this.sessionId });
+            this.sendFireAndForget({ janus: 'destroy', 'session_id': this.sessionId });
         }
 
         if (this.webSocket) {
@@ -369,7 +368,7 @@ export class RceVideoSignalingClient extends EventEmitter {
         return {
             ...request,
             transaction: transaction,
-            //the RCE Janus gateway uses API-secret auth: the janus_token value must be sent as
+            //the RCE Janus gateway uses API-secret auth: the janusToken value must be sent as
             //apisecret on every request, not as token (a stored-token auth field Janus also supports,
             //but this gateway does not accept - it 403s "Unauthorized request" on create with token)
             ...(this.config.janusToken !== undefined ? { apisecret: this.config.janusToken } : {})
@@ -386,7 +385,7 @@ export class RceVideoSignalingClient extends EventEmitter {
         this.stopKeepalive();
         this.keepaliveTimerId = setInterval(() => {
             if (this.sessionId !== undefined) {
-                this.sendFireAndForget({ janus: 'keepalive', session_id: this.sessionId });
+                this.sendFireAndForget({ janus: 'keepalive', 'session_id': this.sessionId });
             }
         }, this.keepaliveIntervalMs);
     }
@@ -401,14 +400,14 @@ export class RceVideoSignalingClient extends EventEmitter {
 
 /**
  * Everything needed to negotiate a stream from a running RCE device's Janus gateway (built from the
- * device's `running_device` Janus fields).
+ * device's `runningDevice` Janus fields).
  */
 export interface RceVideoSignalingConfig {
     websocketUrl: string;
     streamId: number;
     pin?: string;
     /**
-     * The management api's `janus_token` device field, sent as the `apisecret` field on every Janus
+     * The management api's `janusToken` device field, sent as the `apisecret` field on every Janus
      * request (NOT `token`, a stored-token auth field Janus also supports but this gateway rejects
      * with a 403 on create). Distinct from `apiToken`, which authenticates the WebSocket handshake itself.
      */
@@ -467,7 +466,7 @@ interface JanusIncomingMessage {
     plugindata?: {
         data?: {
             error?: string;
-            error_code?: number;
+            'error_code'?: number;
         };
     };
 }

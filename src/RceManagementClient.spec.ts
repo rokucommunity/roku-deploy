@@ -163,10 +163,11 @@ describe('RceManagementClient', () => {
 
         it('resolves an id-addressed config to its running instance url through the management api', async () => {
             const client = new RceManagementClient({ token: 'secret' });
+            //send() resolves already-camelCased responses, so direct stubs use the camel shape
             const sendStub = sinon.stub(client as any, 'send').resolves({
                 id: 123,
                 status: 'running',
-                running_device: { instance_api_url: 'https://device.rce.roku.com/instance/abc/' }
+                runningDevice: { instanceApiUrl: 'https://device.rce.roku.com/instance/abc/' }
             });
 
             const instanceUrl = await client.getInstanceUrl({ device: { id: 123 } });
@@ -179,13 +180,13 @@ describe('RceManagementClient', () => {
             const client = new RceManagementClient({ token: 'secret' });
             const sendStub = sinon.stub(client as any, 'send');
             sendStub.onFirstCall().resolves([
-                { id: 41, serial_number: 'OTHER' },
-                { id: 42, serial_number: 'XY123' }
+                { id: 41, serialNumber: 'OTHER' },
+                { id: 42, serialNumber: 'XY123' }
             ]);
             sendStub.onSecondCall().resolves({
                 id: 42,
                 status: 'running',
-                running_device: { instance_api_url: 'https://device.rce.roku.com/instance/xyz' }
+                runningDevice: { instanceApiUrl: 'https://device.rce.roku.com/instance/xyz' }
             });
 
             const instanceUrl = await client.getInstanceUrl({ device: { esn: 'XY123' } });
@@ -200,7 +201,7 @@ describe('RceManagementClient', () => {
             const sendStub = sinon.stub(client as any, 'send').resolves({
                 id: 123,
                 status: 'running',
-                running_device: { instance_api_url: 'https://device.rce.roku.com/instance/abc' }
+                runningDevice: { instanceApiUrl: 'https://device.rce.roku.com/instance/abc' }
             });
 
             await client.getInstanceUrl({ device: { id: '123' } as any });
@@ -251,9 +252,9 @@ describe('RceManagementClient', () => {
             const requests = stubNeedle();
             const client = new RceManagementClient({ token: 'secret' });
 
-            await client.createDevice({ device: { name: 'new-device', device_type: 'tv' } });
+            await client.createDevice({ device: { name: 'new-device', deviceType: 'tv' } });
             await client.updateDevice({ deviceId: 42, update: { name: 'renamed' } });
-            await client.startDevice({ deviceId: 42, start: { snapshot_id: 7, firmware_version_id: 'rce-fw:15.2.4-tv_prod', max_runtime: 3600 } });
+            await client.startDevice({ deviceId: 42, start: { snapshotId: 7, firmwareVersionId: 'rce-fw:15.2.4-tv_prod', maxRuntime: 3600 } });
             await client.stopDevice({ deviceId: 42 });
             await client.getDeviceRuns({ deviceId: 42 });
             await client.readLogs({ deviceId: 42, instanceId: 397 });
@@ -266,6 +267,7 @@ describe('RceManagementClient', () => {
                 ['get', 'https://api.rce.roku.com/api/v1/devices/42/runs'],
                 ['get', 'https://api.rce.roku.com/api/v1/devices/42/logs/397']
             ]);
+            //the wire bodies are snake_case: the client converts camelCase input on the way out
             expect(requests[0].data).to.eql({ name: 'new-device', device_type: 'tv' });
             expect(requests[1].data).to.eql({ name: 'renamed' });
             expect(requests[2].data).to.eql({ snapshot_id: 7, firmware_version_id: 'rce-fw:15.2.4-tv_prod', max_runtime: 3600 });
@@ -288,6 +290,70 @@ describe('RceManagementClient', () => {
             ]);
             expect(requests[0].data).to.eql({ name: 'before-test' });
             expect(requests[2].data).to.eql({ name: 'after-test' });
+        });
+    });
+
+    describe('wire casing conversion', () => {
+        it('converts snake_case response keys (nested and in arrays) to camelCase', async () => {
+            stubNeedle({
+                id: 42,
+                device_type: 'tv',
+                serial_number: 'XY123',
+                created_at: '2026-01-01',
+                running_device: {
+                    instance_api_url: 'https://device.rce.roku.com/instance/abc',
+                    janus_ice_servers: [{ urls: ['stun:example.com'], username: null }]
+                }
+            });
+            const client = new RceManagementClient({ token: 'secret' });
+
+            const device = await client.getDevice({ deviceId: 42 });
+
+            expect(device).to.eql({
+                id: 42,
+                deviceType: 'tv',
+                serialNumber: 'XY123',
+                createdAt: '2026-01-01',
+                runningDevice: {
+                    instanceApiUrl: 'https://device.rce.roku.com/instance/abc',
+                    janusIceServers: [{ urls: ['stun:example.com'], username: null }]
+                }
+            });
+        });
+
+        it('passes the caller-defined `properties` bag through untouched in both directions', async () => {
+            const requests = stubNeedle({
+                id: 42,
+                device_type: 'tv',
+                properties: { my_custom_key: 'as-i-wrote-it', 'kebab-key': 1 }
+            });
+            const client = new RceManagementClient({ token: 'secret' });
+
+            const device = await client.createDevice({
+                device: { name: 'new-device', deviceType: 'tv', properties: { my_custom_key: 'as-i-wrote-it', 'kebab-key': 1 } }
+            });
+
+            //outbound: schema keys converted to snake, properties contents untouched
+            expect(requests[0].data).to.eql({
+                name: 'new-device',
+                device_type: 'tv',
+                properties: { my_custom_key: 'as-i-wrote-it', 'kebab-key': 1 }
+            });
+            //inbound: schema keys camelCased, properties contents untouched
+            expect(device).to.eql({
+                id: 42,
+                deviceType: 'tv',
+                properties: { my_custom_key: 'as-i-wrote-it', 'kebab-key': 1 }
+            });
+        });
+
+        it('passes non-object response bodies (device logs) through unchanged', async () => {
+            stubNeedle('log line one\nlog_line_two');
+            const client = new RceManagementClient({ token: 'secret' });
+
+            const logs = await client.readLogs({ deviceId: 42, instanceId: 397 });
+
+            expect(logs).to.equal('log line one\nlog_line_two');
         });
     });
 
