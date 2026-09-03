@@ -116,7 +116,7 @@ export class RokuDeploy {
             throw new Error(`rootDir does not exist at "${rootDir}"`);
         }
 
-        let fileObjects = await this.getFilePaths({ files: files, rootDir: rootDir });
+        let fileObjects = await this.resolveFilesArray({ files: files, rootDir: rootDir });
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
@@ -165,7 +165,7 @@ export class RokuDeploy {
         const files = options.files ?? ['**/*'];
 
         // Check that manifest will be included
-        const filePaths = await this.getFilePaths({ files: files, rootDir: dir });
+        const filePaths = await this.resolveFilesArray({ files: files, rootDir: dir });
         const hasManifest = filePaths.some(f => f.dest.toLowerCase() === 'manifest');
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
@@ -1416,10 +1416,12 @@ export class RokuDeploy {
     }
 
     /**
-    * Get all file paths for the specified options
-    */
-    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
-        options = { ...this.options, ...options } as GetFilePathsOptions;
+     * Resolve the `files` array into the concrete list of `{src, dest}` file mappings used to
+     * build the staging folder: globs expanded against `rootDir`, each match paired with its
+     * destination path inside the package.
+     */
+    public async resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]> {
+        options = { ...this.options, ...options } as ResolveFilesArrayOptions;
         let rootDir = options.rootDir;
         const files = options.files;
 
@@ -1505,7 +1507,7 @@ export class RokuDeploy {
      * @param files a files array used to filter the files from `srcFolder`
      */
     private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
-        const filePaths = await this.getFilePaths({ files: files, rootDir: srcFolder });
+        const filePaths = await this.resolveFilesArray({ files: files, rootDir: srcFolder });
 
         const zip = new JSZip();
         // Allows us to wait until all are done before we build the zip
@@ -2651,7 +2653,7 @@ export interface ExitAppOptions extends BaseEcpOptions {
     force?: boolean;
 }
 
-export interface GetFilePathsOptions {
+export interface ResolveFilesArrayOptions {
     files: FileEntry[];
     rootDir: string;
 }
