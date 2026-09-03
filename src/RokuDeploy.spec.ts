@@ -4527,6 +4527,27 @@ describe('RokuDeploy', () => {
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
 
+        it('should support external folders with globstar (#77)', async () => {
+            //write a file outside of rootDir
+            fsExtra.outputFileSync(`${tempDir}/thirdPartySDK/alpha/beta/charlie.brs`, '');
+            writeFiles(rootDir, [
+                'manifest',
+                'source/main.brs'
+            ]);
+            await rokuDeploy.stage({
+                rootDir: rootDir,
+                out: stagingDir,
+                files: [
+                    '../thirdPartySDK/**/*',
+                    '**/*'
+                ]
+            });
+            expectPathExists(`${stagingDir}/manifest`);
+            expectPathExists(`${stagingDir}/source/main.brs`);
+            //the external file lands at its globstar-relative path
+            expectPathExists(`${stagingDir}/alpha/beta/charlie.brs`);
+        });
+
         it('handles copying a simple directory by name using src;dest;', async () => {
             writeFiles(rootDir, [
                 'manifest',
@@ -5952,13 +5973,43 @@ describe('RokuDeploy', () => {
                 ])).to.eql([]);
             });
 
-            it('throws when using top-level string referencing file outside the root dir', async () => {
+            it('supports top-level strings to external dirs when they contain a globstar (#77)', async () => {
+                writeFiles(rootDir, [`../thirdPartySDK/source/sdk.brs`]);
+                expect(await resolveFilesArray([
+                    '../thirdPartySDK/**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/../thirdPartySDK/source/sdk.brs`,
+                    dest: s`source/sdk.brs`
+                }]);
+            });
+
+            it('uses the FIRST globstar as the start of the dest-relative path', async () => {
+                writeFiles(rootDir, [`../sdk/alpha/beta/charlie.brs`]);
+                expect(await resolveFilesArray([
+                    '../sdk/**/beta/**/*'
+                ])).to.eql([{
+                    src: s`${rootDir}/../sdk/alpha/beta/charlie.brs`,
+                    //dest starts at the first globstar: everything under ../sdk/
+                    dest: s`alpha/beta/charlie.brs`
+                }]);
+            });
+
+            it('still throws for an external top-level string without a globstar', async () => {
                 writeFiles(rootDir, [`../source/main.brs`]);
                 await expectThrowsAsync(async () => {
                     await resolveFilesArray([
-                        '../source/**/*'
+                        '../source/main.brs'
                     ]);
-                }, 'Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+                }, 'Cannot reference a file outside of rootDir when using a top-level string without a globstar (**). Please use a globstar or a src;dest; object instead');
+            });
+
+            it('still throws for an external top-level single-star glob (no globstar)', async () => {
+                writeFiles(rootDir, [`../source/main.brs`]);
+                await expectThrowsAsync(async () => {
+                    await resolveFilesArray([
+                        '../source/*.brs'
+                    ]);
+                }, 'Cannot reference a file outside of rootDir when using a top-level string without a globstar (**). Please use a globstar or a src;dest; object instead');
             });
 
             it('works for brighterscript files', async () => {
@@ -6106,15 +6157,16 @@ describe('RokuDeploy', () => {
                 }]);
             });
 
-            it('throws exception when top-level strings reference files not under rootDir', async () => {
+            it('resolves top-level strings referencing files not under rootDir via their globstar (#77)', async () => {
                 writeFiles(otherProjectDir, [
                     'manifest'
                 ]);
-                await expectThrowsAsync(
-                    resolveFilesArray([
-                        `../${otherProjectName}/**/*`
-                    ])
-                );
+                expect(await resolveFilesArray([
+                    `../${otherProjectName}/**/*`
+                ])).to.eql([{
+                    src: s`${otherProjectDir}/manifest`,
+                    dest: s`manifest`
+                }]);
             });
 
             it('applies negated patterns', async () => {
