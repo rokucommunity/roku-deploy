@@ -629,7 +629,7 @@ describe('util', () => {
             expect(s`${destPath}`).to.equal(s`source/main.bs`);
         });
 
-        it('resolves a file found outside the root dir via its globstar (#77)', () => {
+        it('resolves a file found outside the root dir via its globstar', () => {
             expect(
                 util.getDestPath(
                     s`${rootDir}/../source/main.brs`,

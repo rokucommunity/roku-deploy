@@ -4527,7 +4527,7 @@ describe('RokuDeploy', () => {
             expectPathExists(`${stagingDir}/source/main.brs`);
         });
 
-        it('should support external folders with globstar (#77)', async () => {
+        it('should support external folders with globstar', async () => {
             //write a file outside of rootDir
             fsExtra.outputFileSync(`${tempDir}/thirdPartySDK/alpha/beta/charlie.brs`, '');
             writeFiles(rootDir, [
@@ -5973,7 +5973,7 @@ describe('RokuDeploy', () => {
                 ])).to.eql([]);
             });
 
-            it('supports top-level strings to external dirs when they contain a globstar (#77)', async () => {
+            it('supports top-level strings to external dirs when they contain a globstar', async () => {
                 writeFiles(rootDir, [`../thirdPartySDK/source/sdk.brs`]);
                 expect(await resolveFilesArray([
                     '../thirdPartySDK/**/*'
@@ -6157,7 +6157,7 @@ describe('RokuDeploy', () => {
                 }]);
             });
 
-            it('resolves top-level strings referencing files not under rootDir via their globstar (#77)', async () => {
+            it('resolves top-level strings referencing files not under rootDir via their globstar', async () => {
                 writeFiles(otherProjectDir, [
                     'manifest'
                 ]);
