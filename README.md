@@ -328,7 +328,7 @@ Can't find what you need? We offer a variety of functions available in the [Roku
 - `stage()`
 - `zip()`
 - `sideload()`
-- `getFilePaths()`
+- `resolveFilesArray()`
 - `keyPress()`
 - `keyUp()`
 - `keyDown()`

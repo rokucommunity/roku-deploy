@@ -439,9 +439,13 @@ export class Util {
             if (util.isParentOfPath(rootDir, srcPath, false)) {
                 //files that are actually relative to rootDir
                 result = util.stringReplaceInsensitive(srcPath, rootDir, '');
+            } else if ((globstarIdx = entry.indexOf('**')) > -1) {
+                //file outside rootDir reached through a globstar: the FIRST globstar marks where
+                //the dest-relative portion of the path begins (same rule as src;dest; entries)
+                const rootGlobstarPath = path.resolve(rootDir, entry.substring(0, globstarIdx)) + path.sep;
+                result = util.stringReplaceInsensitive(srcPath, rootGlobstarPath, '');
             } else {
-                // result = util.stringReplaceInsensitive(srcPath, rootDir, '');
-                throw new Error('Cannot reference a file outside of rootDir when using a top-level string. Please use a src;des; object instead');
+                throw new Error('Cannot reference a file outside of rootDir when using a top-level string without a globstar (**). Please use a globstar or a src;dest; object instead');
             }
 
             //non-glob-pattern explicit file reference

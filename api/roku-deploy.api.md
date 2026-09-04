@@ -543,15 +543,14 @@ export interface ExitAppOptions extends BaseEcpOptions {
 // @internal
 export function extractHttpDetails(response: {
     statusCode?: number;
-    headers?: Record<string, string>;
+    headers?: Record<string, any>;
+    body?: string | Buffer;
     request?: {
-        uri?: {
-            href?: string;
-        };
+        url?: string;
         method?: string;
-        headers?: Record<string, string>;
+        headers?: Record<string, any>;
     };
-} | undefined, body?: string | Buffer): HttpDetails | undefined;
+} | undefined): HttpDetails | undefined;
 
 // @public
 export class FailedDeviceResponseError extends DeviceError {
@@ -590,14 +589,6 @@ export interface GetDevIdResult {
 }
 
 // @public (undocumented)
-export interface GetFilePathsOptions {
-    // (undocumented)
-    files: FileEntry[];
-    // (undocumented)
-    rootDir: string;
-}
-
-// @public (undocumented)
 export type GetInstalledPackagesOptions = BaseRequestOptions;
 
 // @public (undocumented)
@@ -633,14 +624,6 @@ export interface HttpRequestDetails {
     method?: string;
     // (undocumented)
     url?: string;
-}
-
-// @public (undocumented)
-export interface HttpResponse {
-    // (undocumented)
-    body: any;
-    // (undocumented)
-    response: any;
 }
 
 // @public
@@ -915,6 +898,14 @@ export enum RemoteKey {
 export type RemoteKeyText = keyof typeof RemoteKey;
 
 // @public (undocumented)
+export interface ResolveFilesArrayOptions {
+    // (undocumented)
+    files: FileEntry[];
+    // (undocumented)
+    rootDir: string;
+}
+
+// @public (undocumented)
 export interface RokuActiveApp {
     id?: string;
     subtype?: string;
@@ -952,6 +943,7 @@ export type RokuAppStateValue = 'active' | 'background' | 'inactive' | 'unknown'
 // @public (undocumented)
 export class RokuDeploy {
     constructor(options?: RokuDeployConstructorOptions);
+    // (undocumented)
     captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult>;
     // (undocumented)
     checkForUpdate(options: CheckForUpdateOptions): Promise<HttpResponse>;
@@ -974,9 +966,7 @@ export class RokuDeploy {
     // (undocumented)
     getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
     getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult>;
-    // @internal
     getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode>;
-    getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]>;
     getRegistry(options: GetRegistryOptions): Promise<RokuRegistry>;
     getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous>;
     keyDown(options: KeyDownOptions): Promise<EcpResult>;
@@ -986,9 +976,12 @@ export class RokuDeploy {
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
     loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
+    // Warning: (ae-forgotten-export) The symbol "HttpResponse" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<HttpResponse>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
+    resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;

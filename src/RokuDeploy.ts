@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import type { WriteStream, ReadStream } from 'fs-extra';
 import { request } from './request';
-import type { RequestOptions } from './request';
+import type { HttpResponse, RequestOptions } from './request';
 import * as JSZip from 'jszip';
 import {
     CompileError,
@@ -32,7 +32,6 @@ import { RceManagementClient } from './RceManagementClient';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
-import { fetchWithDigest } from './fetch';
 import { formatTimestampForScreenshot } from './dateUtils';
 
 /**
@@ -120,7 +119,7 @@ export class RokuDeploy {
             throw new Error(`rootDir does not exist at "${rootDir}"`);
         }
 
-        let fileObjects = await this.getFilePaths({ files: files, rootDir: rootDir });
+        let fileObjects = await this.resolveFilesArray({ files: files, rootDir: rootDir });
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
@@ -169,7 +168,7 @@ export class RokuDeploy {
         const files = options.files ?? ['**/*'];
 
         // Check that manifest will be included
-        const filePaths = await this.getFilePaths({ files: files, rootDir: dir });
+        const filePaths = await this.resolveFilesArray({ files: files, rootDir: dir });
         const hasManifest = filePaths.some(f => f.dest.toLowerCase() === 'manifest');
         if (!hasManifest) {
             throw new Error(`Cannot zip package: missing manifest file in "${dir}"`);
@@ -286,7 +285,7 @@ export class RokuDeploy {
                         if (this.isCompileError(replaceError.message) && failOnCompileError) {
                             const rokuMessages = this.getRokuMessagesFromResponseBody(replaceError.results?.body ?? '');
                             throw new CompileError('Compile error', {
-                                httpDetails: extractHttpDetails(replaceError.results?.response, replaceError.results?.body),
+                                httpDetails: extractHttpDetails(replaceError.results),
                                 rokuMessages: rokuMessages
                             }, replaceError);
                         } else if (this.isUpdateRequiredError(replaceError)) {
@@ -322,7 +321,7 @@ export class RokuDeploy {
             //if we got a non-error status code, but the body includes a message about needing to update, throw a special error
             if (this.isUpdateCheckRequiredResponse(response.body)) {
                 throw new UpdateCheckRequiredError({
-                    httpDetails: extractHttpDetails(response.response, response.body)
+                    httpDetails: extractHttpDetails(response)
                 });
             }
 
@@ -338,13 +337,13 @@ export class RokuDeploy {
                 if (this.isCompileError(response.body)) {
                     const rokuMessages = this.getRokuMessagesFromResponseBody(response.body);
                     throw new CompileError('Compile error', {
-                        httpDetails: extractHttpDetails(response.response, response.body),
+                        httpDetails: extractHttpDetails(response),
                         rokuMessages: rokuMessages
                     });
                 }
             }
 
-            if (response.body.indexOf('Identical to previous version -- not replacing.') > -1) {
+            if (response.body.includes('Identical to previous version -- not replacing.')) {
                 return { message: 'Identical to previous version -- not replacing', results: response };
             }
             this.logger.info('Successful sideload');
@@ -408,7 +407,7 @@ export class RokuDeploy {
         }
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new ConvertError('Squashfs conversion failed', {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -484,7 +483,7 @@ export class RokuDeploy {
         let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
         if (failedSearchMatches) {
             throw new FailedDeviceResponseError(failedSearchMatches[1], {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -504,7 +503,7 @@ export class RokuDeploy {
         }
 
         throw new UnknownDeviceResponseError('Unknown error signing package', {
-            httpDetails: extractHttpDetails(results.response, results.body),
+            httpDetails: extractHttpDetails(results),
             rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
         });
     }
@@ -553,14 +552,14 @@ export class RokuDeploy {
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
             throw new UnparsableDeviceResponseError('Unknown Rekey Failure', {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
 
         if (resultTextSearch[1] !== 'Success.') {
             throw new FailedDeviceResponseError('Rekey Failure: ' + resultTextSearch[1], {
-                httpDetails: extractHttpDetails(results.response, results.body),
+                httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
@@ -572,7 +571,7 @@ export class RokuDeploy {
                 throw new UnknownDeviceResponseError(
                     'Rekey was successful but resulting Dev ID "' + devId + '" did not match expected value of "' + options.devId + '"',
                     {
-                        httpDetails: extractHttpDetails(results.response, results.body)
+                        httpDetails: extractHttpDetails(results)
                     }
                 );
             }
@@ -840,15 +839,19 @@ export class RokuDeploy {
 
         const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, port);
-            const url = `${baseUrl}/plugin_install`;
+            //probe the root page, not /plugin_install: same digest credentials, but /plugin_install
+            //answers a HEAD with a body, which Node's http parser rejects
+            const url = `${baseUrl}/`;
             displayTarget = isRceDeviceConfig(deviceConfig) ? baseUrl : deviceConfig.host;
 
-            let fetchResponse: Response;
+            let headResponse: HttpResponse;
             try {
-                fetchResponse = await fetchWithDigest(url, {
-                    method: 'HEAD',
-                    username: username,
-                    password: options.password,
+                headResponse = await request.head({
+                    url: url,
+                    auth: {
+                        username: username,
+                        password: options.password
+                    },
                     timeout: timeout,
                     headers: headers
                 });
@@ -860,31 +863,25 @@ export class RokuDeploy {
                     err instanceof Error ? err : undefined
                 );
             }
-            //fetch does not throw on a status code, so surface a mesh-generated 404 (a stale
+            //the transport does not throw on a status code, so surface a mesh-generated 404 (a stale
             //instance url) to the retry wrapper as the error verification would have produced
-            const responseHeaders: Record<string, string> = {};
-            if (typeof fetchResponse.headers?.forEach === 'function') {
-                fetchResponse.headers.forEach((value, key) => {
-                    responseHeaders[key] = value;
-                });
-            } else {
-                Object.assign(responseHeaders, fetchResponse.headers ?? {});
-            }
-            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(fetchResponse.status, responseHeaders)) {
-                throw new InvalidDeviceResponseCodeError(`Unexpected status ${fetchResponse.status} from device at ${displayTarget}`, {
-                    httpDetails: { response: { statusCode: fetchResponse.status, headers: responseHeaders } }
+            if (isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(headResponse.statusCode, headResponse.headers)) {
+                throw new InvalidDeviceResponseCodeError(`Unexpected status ${headResponse.statusCode} from device at ${displayTarget}`, {
+                    httpDetails: extractHttpDetails(headResponse)
                 });
             }
-            return fetchResponse;
+            return headResponse;
         });
 
-        if (response.status === 200) {
+        if (response.statusCode === 200) {
             return true;
         }
-        if (response.status === 401) {
+        if (response.statusCode === 401) {
             return false;
         }
-        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.status} from device at ${displayTarget}`, response as any);
+        throw new InvalidDeviceResponseCodeError(`Unexpected status ${response.statusCode} from device at ${displayTarget}`, {
+            httpDetails: extractHttpDetails(response)
+        });
     }
 
     /**
@@ -926,10 +923,10 @@ export class RokuDeploy {
             const result = options.method === 'POST'
                 ? await this.doPostRequest(requestOptions, verify)
                 : await this.doGetRequest(requestOptions, verify);
-            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.response?.statusCode, result?.response?.headers)) {
+            if (!verify && isRceDeviceConfig(deviceConfig) && this.isRceInstanceGoneResponse(result?.statusCode, result?.headers)) {
                 instanceGoneResponse = result;
-                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.response.statusCode}`, {
-                    httpDetails: extractHttpDetails(result.response, result.body)
+                throw new InvalidDeviceResponseCodeError(`Invalid response code: ${result.statusCode}`, {
+                    httpDetails: extractHttpDetails(result)
                 });
             }
             return result;
@@ -941,9 +938,9 @@ export class RokuDeploy {
         });
 
         return {
-            status: response?.response?.statusCode,
+            status: response?.statusCode,
             body: response?.body,
-            headers: response?.response?.headers ?? {}
+            headers: response?.headers ?? {}
         };
     }
 
@@ -1423,10 +1420,12 @@ export class RokuDeploy {
     }
 
     /**
-    * Get all file paths for the specified options
-    */
-    public async getFilePaths(options: GetFilePathsOptions): Promise<StandardizedFileEntry[]> {
-        options = { ...this.options, ...options } as GetFilePathsOptions;
+     * Resolve the `files` array into the concrete list of `{src, dest}` file mappings used to
+     * build the staging folder: globs expanded against `rootDir`, each match paired with its
+     * destination path inside the package.
+     */
+    public async resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]> {
+        options = { ...this.options, ...options } as ResolveFilesArrayOptions;
         let rootDir = options.rootDir;
         const files = options.files;
 
@@ -1512,7 +1511,7 @@ export class RokuDeploy {
      * @param files a files array used to filter the files from `srcFolder`
      */
     private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
-        const filePaths = await this.getFilePaths({ files: files, rootDir: srcFolder });
+        const filePaths = await this.resolveFilesArray({ files: files, rootDir: srcFolder });
 
         const zip = new JSZip();
         // Allows us to wait until all are done before we build the zip
@@ -1556,12 +1555,10 @@ export class RokuDeploy {
             timeout: timeout,
             headers: headers,
             auth: {
-                user: username,
-                pass: mergedOptions.password,
-                sendImmediately: false
+                username: username,
+                password: mergedOptions.password
             },
-            formData: formData,
-            agentOptions: { 'keepAlive': false }
+            formData: formData
         };
         return baseRequestOptions;
     }
@@ -1632,21 +1629,12 @@ export class RokuDeploy {
      */
     private async doPostRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling POST request to', params.url);
-        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-
-            this.setUserAgentIfMissing(params);
-
-            request.post(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        });
+        this.setUserAgentIfMissing(params);
+        const results = await request.post(params);
         if (verify) {
             this.checkRequest(results);
         }
-        return results as HttpResponse;
+        return results;
     }
 
     /**
@@ -1655,21 +1643,12 @@ export class RokuDeploy {
      */
     private async doGetRequest(params: RequestOptions, verify = true) {
         this.logger.info('handling GET request to', params.url);
-        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-
-            this.setUserAgentIfMissing(params);
-
-            request.get(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
-            });
-        });
+        this.setUserAgentIfMissing(params);
+        const results = await request.get(params);
         if (verify) {
             this.checkRequest(results);
         }
-        return results as HttpResponse;
+        return results;
     }
 
     /**
@@ -1705,17 +1684,17 @@ export class RokuDeploy {
         return `roku-deploy/${this._packageVersion ?? 'unknown'}`;
     }
 
-    private checkRequest(results: { response?: any; body?: any }) {
-        if (!results || !results.response || typeof results.body !== 'string') {
+    private checkRequest(results: HttpResponse) {
+        if (!results || typeof results.body !== 'string') {
             throw new UnparsableDeviceResponseError('Invalid response', {
-                httpDetails: extractHttpDetails(results?.response, results?.body)
+                httpDetails: extractHttpDetails(results)
             });
         }
 
-        const host = results.response.request?.host?.toString?.();
-        const httpDetails = extractHttpDetails(results.response, results.body);
+        const host = results.request?.host;
+        const httpDetails = extractHttpDetails(results);
 
-        if (results.response.statusCode === 401) {
+        if (results.statusCode === 401) {
             throw new UnauthorizedDeviceResponseError(
                 `Unauthorized. Please verify credentials for host '${host}'`,
                 {
@@ -1733,9 +1712,9 @@ export class RokuDeploy {
             });
         }
 
-        if (results.response.statusCode !== 200) {
+        if (results.statusCode !== 200) {
             throw new InvalidDeviceResponseCodeError(
-                'Invalid response code: ' + results.response.statusCode,
+                'Invalid response code: ' + results.statusCode,
                 {
                     httpDetails: httpDetails,
                     rokuMessages: rokuMessages
@@ -1764,7 +1743,7 @@ export class RokuDeploy {
                 reject(error);
             });
 
-            request.get(requestParams).on('error', (err) => {
+            request.getStream(requestParams).on('error', (err) => {
                 reject(err);
             }).on('response', (response) => {
                 if (response.statusCode !== 200) {
@@ -1782,7 +1761,7 @@ export class RokuDeploy {
     private downloadToBuffer(requestParams: any): Promise<Buffer> {
         return new Promise<Buffer>((resolve, reject) => {
             const chunks: Buffer[] = [];
-            request.get(requestParams)
+            request.getStream(requestParams)
                 .on('error', (err) => {
                     reject(err);
                 })
@@ -2014,7 +1993,7 @@ export class RokuDeploy {
                     return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
-                    status: response?.response?.statusCode,
+                    status: response?.statusCode,
                     body: response?.body
                 } as EcpResult;
             } catch (e) {
@@ -2517,13 +2496,6 @@ export const DefaultFiles = [
     '!**/*.{md,DS_Store,db}'
 ];
 
-/**
- * @public
- */
-export interface HttpResponse {
-    response: any;
-    body: any;
-}
 
 /**
  * @public
@@ -2756,7 +2728,7 @@ export interface ExitAppOptions extends BaseEcpOptions {
 /**
  * @public
  */
-export interface GetFilePathsOptions {
+export interface ResolveFilesArrayOptions {
     files: FileEntry[];
     rootDir: string;
 }
