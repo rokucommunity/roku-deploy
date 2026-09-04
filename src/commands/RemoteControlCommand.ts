@@ -9,7 +9,9 @@ export class RemoteControlCommand {
             ...args
         };
 
-        rokuDeploy.checkRequiredOptions(options, ['host']);
+        //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        rokuDeploy['checkRequiredOptions'](options, ['host']);
 
         readline.emitKeypressEvents(process.stdin);
         process.stdin.setRawMode(true);

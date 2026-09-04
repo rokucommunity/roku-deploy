@@ -4,7 +4,9 @@
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
-        "build": "npm run clean && tsc",
+        "build": "npm run clean && tsc && npm run api:build-and-validate",
+        "api:build-and-validate": "api-extractor run --config api-extractor.jsonc",
+        "api:build-and-update": "api-extractor run --local --config api-extractor.jsonc",
         "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
         "preversion": "npm run build && npm run lint && npm run test",
         "prepublishOnly": "npm run build",
@@ -36,6 +38,7 @@
         "yargs": "^17.7.2"
     },
     "devDependencies": {
+        "@microsoft/api-extractor": "^7.58.12",
         "@types/chai": "^4.2.22",
         "@types/fs-extra": "^5.0.1",
         "@types/is-glob": "^4.0.2",
@@ -64,7 +67,7 @@
         "source-map-support": "^0.5.21",
         "ts-node": "^10.9.2",
         "tuyapi": "^7.7.1",
-        "typescript": "^5.4.3",
+        "typescript": "~5.4.3",
         "typescript-eslint": "^7.4.0",
         "undent": "^1.0.0"
     },
@@ -79,6 +82,11 @@
         "browserslist": "^4.28.8"
     },
     "typings": "dist/index.d.ts",
+    "files": [
+        "dist/**/*.js",
+        "dist/**/*.js.map",
+        "dist/index.d.ts"
+    ],
     "bin": {
         "roku-deploy": "dist/cli.js"
     },

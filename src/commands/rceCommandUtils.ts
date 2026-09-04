@@ -1,4 +1,5 @@
-import { rokuDeploy, util } from '../index';
+import { rokuDeploy } from '../index';
+import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 

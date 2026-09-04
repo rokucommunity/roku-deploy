@@ -3628,7 +3628,7 @@ describe('RokuDeploy', () => {
                 await expectThrowsAsync(
                     rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false }),
                     `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. ` +
-                    `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`
+                    `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']} bytes often cause this.`
                 );
             });
 
@@ -3666,7 +3666,7 @@ describe('RokuDeploy', () => {
             });
 
             it('does NOT append a hint to a thrown corrupt-zip error when the zip is large enough', async () => {
-                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']));
                 sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
                     return Promise.reject(new Error('Install Failure: Unzip failed. Invalid or corrupt zip archive.'));
                 });
@@ -3697,7 +3697,7 @@ describe('RokuDeploy', () => {
 
             it('does NOT append a hint when a corrupt-zip response comes from a large-enough zip', async () => {
                 //overwrite the dummy zip with one at/above the minimum installable size
-                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']));
                 mockDoPostRequest('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
 
                 //no hint => the corrupt-zip body is not turned into a thrown error, so sideload resolves normally

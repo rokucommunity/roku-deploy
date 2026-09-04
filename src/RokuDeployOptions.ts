@@ -4,6 +4,7 @@ import type { DeviceOption } from './DeviceConfig';
 /**
  * A device entry in the devices registry.
  * Contains device addressing info plus optional per-device settings.
+ * @public
  */
 export interface DeviceRegistryEntry {
     // One of these identifies the device
@@ -27,6 +28,7 @@ export interface DeviceRegistryEntry {
 /**
  * Options that can be passed to the RokuDeploy constructor to set defaults
  * that will be merged into every method call.
+ * @public
  */
 export interface RokuDeployConstructorOptions {
     /**
@@ -73,6 +75,9 @@ export interface RokuDeployConstructorOptions {
     rceToken?: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuDeployOptions {
     /**
      * A custom logger instance. If not provided, the global logger will be used.
@@ -230,4 +235,7 @@ export interface RokuDeployOptions {
     };
 }
 
+/**
+ * @public
+ */
 export type FileEntry = (string | { src: string[] | string; dest?: string });
