@@ -1,6 +1,7 @@
 export * from './RokuDeploy';
 export * from './util';
 export * from './RokuDeployOptions';
+export * from './RokuDeployConfig';
 export * from './Errors';
 export * from './DeviceInfo';
 export * from './DeviceConfig';

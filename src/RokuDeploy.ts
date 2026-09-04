@@ -25,7 +25,9 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { ConfigSectionName, RokuDeployConfig } from './RokuDeployConfig';
+import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -1385,20 +1387,30 @@ export class RokuDeploy {
     }
 
     /**
-     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed).
+     * Resolves `${VAR}` environment-variable references in string values and warns about invalid
+     * device-registry entries. With no `section`, returns the full config. With a `section`, returns
+     * the flattened options for that section: root-level values overlaid with the section's values
+     * (section wins on collision), all other sections stripped; `section: null` flattens the same
+     * way for a consumer with no section of its own. The library never loads config implicitly —
+     * the CLI calls this for every command; library consumers call it explicitly.
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
+    public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
+        let config: RokuDeployConfig = {};
         if (fsExtra.existsSync(configPath)) {
             const configFileText = fsExtra.readFileSync(configPath).toString();
             const parseErrors: ParseError[] = [];
-            const fileOptions = parseJsonc(configFileText, parseErrors, {
+            //empty file (or a bare comment) parses to undefined
+            config = parseJsonc(configFileText, parseErrors, {
                 allowEmptyContent: true,
                 allowTrailingComma: true,
                 disallowComments: false
-            });
+            }) ?? {};
             if (parseErrors.length > 0) {
                 throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
                     parseErrors.map(x => {
@@ -1410,9 +1422,32 @@ export class RokuDeploy {
                     })
                 ));
             }
-            return fileOptions;
+            util.interpolateEnvVars(config, configPath);
+            //surface broken registry entries early (but only warn: an unused bad entry shouldn't
+            //break every command — resolveDevice() still hard-fails when the entry is actually used)
+            for (const name in config.devices ?? {}) {
+                try {
+                    validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
+                } catch (e) {
+                    this.logger.warn(`${configPath}: ${(e as Error).message}`);
+                }
+            }
         }
-        return {};
+        //no section requested: hand back the whole config
+        if (options?.section === undefined) {
+            return config;
+        }
+        //flatten for one section: root values with the section overlaid, other sections stripped
+        const result: Record<string, any> = {};
+        for (const key in config) {
+            if (!configSectionNames.includes(key as ConfigSectionName)) {
+                result[key] = config[key];
+            }
+        }
+        if (options.section !== null) {
+            Object.assign(result, config[options.section]);
+        }
+        return result;
     }
 
     /**

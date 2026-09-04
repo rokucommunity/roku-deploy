@@ -1,14 +1,10 @@
 import { rokuDeploy, util } from '../index';
 import * as path from 'path';
+import { loadCommandOptions } from './commandUtils';
 
 export class RekeyDeviceCommand {
     async run(args) {
-        args.cwd ??= process.cwd();
-
-        let options = {
-            ...rokuDeploy.loadConfigFile(args),
-            ...args
-        };
+        let options = loadCommandOptions(args, 'rekey');
         if (args.pkg) {
             options.pkg = util.standardizePath(
                 path.resolve(args.cwd, args.pkg)

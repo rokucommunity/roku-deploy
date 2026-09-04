@@ -1,13 +1,11 @@
 import * as readline from 'readline';
 import { rokuDeploy } from '../index';
 import type { RemoteKeyText } from '../index';
+import { loadCommandOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = {
-            ...rokuDeploy.loadConfigFile(args),
-            ...args
-        };
+        let options = loadCommandOptions(args, null);
 
         rokuDeploy.checkRequiredOptions(options, ['host']);
 
