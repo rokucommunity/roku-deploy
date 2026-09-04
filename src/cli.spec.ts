@@ -849,7 +849,7 @@ describe('cli', function cli() {
                 host: '1.2.3.4'
             });
 
-            expect(consoleOutput).to.include(`Using config: ${tempDir}/rokudeploy.json`);
+            expect(consoleOutput).to.include(`Using config: ${s`${tempDir}/rokudeploy.json`}`);
         });
 
         it('stays silent when no config file exists', async () => {
