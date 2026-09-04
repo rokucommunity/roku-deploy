@@ -20,7 +20,7 @@ import { RceStopCommand } from './commands/RceStopCommand';
 
 void yargs
 
-    .option('config', { type: 'string', description: 'Path to the config file. Defaults to rokudeploy.json in cwd', global: true })
+    .option('config', { type: 'string', description: 'Path to the config file (defaults to rokudeploy.json in cwd). Pass --no-config to skip loading any config file', global: true })
 
     .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder
@@ -59,7 +59,7 @@ void yargs
 
     .command('keyPress', 'send keypress command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -69,7 +69,7 @@ void yargs
 
     .command('keyUp', 'send keyup command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -79,7 +79,7 @@ void yargs
 
     .command('keyDown', 'send keydown command', (builder) => {
         return builder
-            .option('key', { type: 'string', description: 'The key to send', demandOption: false })
+            .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });
@@ -89,7 +89,7 @@ void yargs
 
     .command('sendText', 'Send text command', (builder) => {
         return builder
-            .option('text', { type: 'string', description: 'The text to send', demandOption: false })
+            .option('text', { type: 'string', description: 'The text to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands like remote key presses', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false });

@@ -7795,16 +7795,16 @@ describe('RokuDeploy', () => {
             });
         });
 
-        describe('resolveCommandOptions', () => {
-            it('overlays the command section onto root values and strips other sections', () => {
-                const resolved = rokuDeploy.resolveCommandOptions({
+        describe('loadConfigFile with a section', () => {
+            it('overlays the section onto root values and strips other sections', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
                     device: 'living-room',
                     password: 'aaaa',
                     rootDir: './everywhere',
                     stage: { rootDir: './stage-only', out: './staging' },
                     zip: { out: './app.zip' }
-                }, 'stage');
-                expect(resolved).to.eql({
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' })).to.eql({
                     device: 'living-room',
                     password: 'aaaa',
                     //section wins over root
@@ -7814,21 +7814,33 @@ describe('RokuDeploy', () => {
             });
 
             it('lets colliding option names coexist across sections (the motivating case)', () => {
-                const config = {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
                     stage: { out: '.roku-deploy-staging' },
                     zip: { dir: '.roku-deploy-staging', out: './out/app.zip' }
-                };
-                expect(rokuDeploy.resolveCommandOptions(config, 'stage').out).to.equal('.roku-deploy-staging');
-                expect(rokuDeploy.resolveCommandOptions(config, 'zip').out).to.equal('./out/app.zip');
-                expect(rokuDeploy.resolveCommandOptions(config, 'zip').dir).to.equal('.roku-deploy-staging');
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' }).out).to.equal('.roku-deploy-staging');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).out).to.equal('./out/app.zip');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).dir).to.equal('.roku-deploy-staging');
             });
 
-            it('returns just the root values when the command has no section', () => {
-                const resolved = rokuDeploy.resolveCommandOptions({
+            it('returns just the root values for a section the file does not configure', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
                     password: 'aaaa',
                     zip: { out: './app.zip' }
-                }, 'sideload');
-                expect(resolved).to.eql({ password: 'aaaa' });
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'sideload' })).to.eql({ password: 'aaaa' });
+            });
+
+            it('section null returns root values with all sections stripped', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    password: 'aaaa',
+                    ecpPort: 8060,
+                    zip: { out: './app.zip' }
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: null })).to.eql({
+                    password: 'aaaa',
+                    ecpPort: 8060
+                });
             });
         });
 

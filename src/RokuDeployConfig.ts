@@ -6,13 +6,7 @@ import type {
     ConvertToSquashfsOptions,
     CreateSignedPackageOptions,
     DeleteDevChannelOptions,
-    GetDeviceInfoOptions,
-    GetDevIdOptions,
-    KeyDownOptions,
-    KeyPressOptions,
-    KeyUpOptions,
     RekeyDeviceOptions,
-    SendTextOptions,
     SideloadOptions,
     StageOptions,
     ZipOptions
@@ -42,14 +36,14 @@ export interface RokuDeployConfig {
      */
     devices?: Record<string, DeviceRegistryEntry>;
     /**
-     * The password for logging in to the developer portal on the target Roku device
-     */
-    password?: string;
-    /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
      */
     username?: string;
+    /**
+     * The password for logging in to the developer portal on the target Roku device
+     */
+    password?: string;
     /**
      * The port that should be used when installing the package. Defaults to 80.
      */
@@ -85,6 +79,8 @@ export interface RokuDeployConfig {
     logLevel?: LogLevel | LogLevelNumeric;
 
     //---- per-command sections (keyed by CLI command name), override root on collision ----
+    //only commands whose options are worth persisting get a section; per-invocation values
+    //(key presses, text) and interactive commands deliberately have none
 
     /** Options applied only to the `sideload` command */
     sideload?: Partial<SideloadOptions>;
@@ -102,23 +98,6 @@ export interface RokuDeployConfig {
     deleteDevChannel?: Partial<DeleteDevChannelOptions>;
     /** Options applied only to the `screenshot` command */
     screenshot?: Partial<CaptureScreenshotOptions>;
-    /** Options applied only to the `getDeviceInfo` command */
-    getDeviceInfo?: Partial<GetDeviceInfoOptions>;
-    /** Options applied only to the `getDevId` command */
-    getDevId?: Partial<GetDevIdOptions>;
-    /** Options applied only to the `keyPress` command */
-    keyPress?: Partial<KeyPressOptions>;
-    /** Options applied only to the `keyUp` command */
-    keyUp?: Partial<KeyUpOptions>;
-    /** Options applied only to the `keyDown` command */
-    keyDown?: Partial<KeyDownOptions>;
-    /** Options applied only to the `sendText` command */
-    sendText?: Partial<SendTextOptions>;
-    /** Options applied only to the `remote-control` command */
-    'remote-control'?: {
-        host?: string;
-        ecpPort?: number;
-    };
     /** Options applied only to the `rce start` command */
     'rce.start'?: RceStartConfig;
     /** Options applied only to the `rce stop` command */
@@ -181,13 +160,6 @@ export const configSectionNames = [
     'package',
     'deleteDevChannel',
     'screenshot',
-    'getDeviceInfo',
-    'getDevId',
-    'keyPress',
-    'keyUp',
-    'keyDown',
-    'sendText',
-    'remote-control',
     'rce.start',
     'rce.stop'
 ] as const;

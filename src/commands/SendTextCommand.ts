@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class SendTextCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'sendText');
+        let options = loadCommandOptions(args, null);
         await rokuDeploy.sendText(options);
     }
 }

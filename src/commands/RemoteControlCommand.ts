@@ -5,7 +5,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = loadCommandOptions(args, 'remote-control');
+        let options = loadCommandOptions(args, null);
 
         rokuDeploy.checkRequiredOptions(options, ['host']);
 

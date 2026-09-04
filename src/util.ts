@@ -507,6 +507,31 @@ export class Util {
         }
     }
 
+    /**
+     * Recursively resolve `${VAR}` environment-variable references in every string value of the
+     * given object (arrays included). Mutates in place. Throws if a referenced variable is not
+     * set, naming the variable and where it was used.
+     */
+    public interpolateEnvVars(node: Record<string, any>, configPath: string, jsonPath: string[] = []) {
+        for (const key in node) {
+            const value = node[key];
+            if (typeof value === 'string') {
+                node[key] = value.replace(/\$\{(\w+)\}/g, (match, varName: string) => {
+                    const envValue = process.env[varName];
+                    if (envValue === undefined) {
+                        throw new Error(
+                            `Environment variable '${varName}' referenced at "${[...jsonPath, key].join('.')}" in "${path.resolve(configPath)}" is not set`
+                        );
+                    }
+                    return envValue;
+                });
+            } else if (value && typeof value === 'object') {
+                //arrays included: for-in walks indices, so entries recurse like object values
+                this.interpolateEnvVars(value, configPath, [...jsonPath, key]);
+            }
+        }
+    }
+
     public objectToTableString(deviceInfo: Record<string, any>) {
         const margin = 5;
         const keyWidth = Math.max(...Object.keys(deviceInfo).map(x => x.length)) + margin;

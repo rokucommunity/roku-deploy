@@ -817,6 +817,56 @@ describe('cli', function cli() {
             expect((stub.getCall(0).args[0] as any).out).to.equal('./cli-wins');
         });
 
+        it('--no-config bypasses the config file entirely', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                password: 'from-root',
+                screenshot: { out: './shots' }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            //yargs turns --no-config into config: false
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                config: false,
+                host: '1.2.3.4'
+            });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.password).to.be.undefined;
+            expect(options.out).to.be.undefined;
+        });
+
+        it('announces which config file was loaded', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'from-root' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+            sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4'
+            });
+
+            expect(consoleOutput).to.include(`Using config: ${tempDir}/rokudeploy.json`);
+        });
+
+        it('stays silent when no config file exists', async () => {
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+            sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4'
+            });
+
+            expect(consoleOutput).to.not.include('Using config');
+        });
+
         it('loads the file named by --config instead of cwd/rokudeploy.json', async () => {
             fsExtra.outputJsonSync(`${tempDir}/elsewhere/deploy-config.json`, {
                 password: 'from-custom'

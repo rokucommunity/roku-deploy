@@ -1,6 +1,6 @@
 import { util } from '../index';
 import type { RceDevice, Snapshot } from '../RceManagementClient';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './rceCommandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStartCommand {
     async run(args: any) {

@@ -1,5 +1,5 @@
 import { util } from '../index';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './rceCommandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStopCommand {
     async run(args: any) {
