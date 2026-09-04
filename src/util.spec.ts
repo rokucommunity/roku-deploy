@@ -629,12 +629,24 @@ describe('util', () => {
             expect(s`${destPath}`).to.equal(s`source/main.bs`);
         });
 
-        it('excludes a file found outside the root dir', () => {
+        it('resolves a file found outside the root dir via its globstar', () => {
             expect(
                 util.getDestPath(
                     s`${rootDir}/../source/main.brs`,
                     [
                         '../source/**/*'
+                    ],
+                    rootDir
+                )
+            ).to.eql(s`main.brs`);
+        });
+
+        it('excludes a file outside the root dir when the pattern has no globstar', () => {
+            expect(
+                util.getDestPath(
+                    s`${rootDir}/../source/main.brs`,
+                    [
+                        '../source/*.brs'
                     ],
                     rootDir
                 )
