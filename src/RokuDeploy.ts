@@ -57,6 +57,7 @@ export class RokuDeploy {
 
     /**
      * The logger instance for this RokuDeploy instance
+     * @public
      */
     public readonly logger: typeof logger;
 
@@ -99,6 +100,7 @@ export class RokuDeploy {
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
+     * @public
      */
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
@@ -141,6 +143,7 @@ export class RokuDeploy {
     /**
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
+     * @public
      */
     public async zip(options: ZipOptions): Promise<ZipResult> {
         options = { ...this.options, ...options };
@@ -184,6 +187,7 @@ export class RokuDeploy {
      * Sideload a zip to a remote Roku. Either `zip` (path to a pre-built zip) or `dir` (directory
      * to zip on-the-fly) must be provided.
      * @param options
+     * @public
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
         options = { ...this.options, ...options } as SideloadOptions;
@@ -365,6 +369,7 @@ export class RokuDeploy {
     /**
      * Converts the currently sideloaded dev app to squashfs for faster loading packages
      * @param options
+     * @public
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = { ...this.options, ...options } as ConvertToSquashfsOptions;
@@ -416,6 +421,7 @@ export class RokuDeploy {
     /**
      * Sign a pre-existing package using Roku and return path to it locally
      * @param options
+     * @public
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
         options = { ...this.options, ...options } as CreateSignedPackageOptions;
@@ -511,6 +517,7 @@ export class RokuDeploy {
     /**
      * resign Roku Device with a supplied signed pkg and
      * @param options
+     * @public
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...options } as RekeyDeviceOptions;
@@ -582,9 +589,16 @@ export class RokuDeploy {
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
+     * @public
      */
     public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    /**
+     * @public
+     */
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
+    /**
+     * @public
+     */
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
         this.checkRequiredOptions(options, ['device']);
@@ -644,7 +658,7 @@ export class RokuDeploy {
      *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
      *   - 'limited': Restricted functionality, text and movement commands only
      *   - 'permissive': Full access for internal networks
-     * @internal
+     * @public
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
@@ -663,6 +677,7 @@ export class RokuDeploy {
      * Get the developer ID from the device-info response
      * @param options
      * @returns
+     * @public
      */
     public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
         options = { ...this.options, ...options } as GetDevIdOptions;
@@ -677,6 +692,9 @@ export class RokuDeploy {
      * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
      */
 
+    /**
+     * @public
+     */
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -752,6 +770,9 @@ export class RokuDeploy {
         return result;
     }
 
+    /**
+     * @public
+     */
     public async rebootDevice(options: RebootDeviceOptions) {
         options = { ...this.options, ...options } as RebootDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -785,6 +806,9 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * @public
+     */
     public async checkForUpdate(options: CheckForUpdateOptions) {
         options = { ...this.options, ...options } as CheckForUpdateOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -822,6 +846,7 @@ export class RokuDeploy {
      * Check whether the given developer password is accepted by a Roku device.
      * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
      * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     * @public
      */
     public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
@@ -896,6 +921,7 @@ export class RokuDeploy {
      * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
      *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
      *                chanperf response, for example) come back to the caller instead of throwing.
+     * @public
      */
     public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
         options = { ...this.options, ...options } as EcpOptions;
@@ -948,6 +974,7 @@ export class RokuDeploy {
      * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
      * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
      * double-encoded.
+     * @public
      */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...options } as KeyPressOptions;
@@ -961,6 +988,7 @@ export class RokuDeploy {
     /**
      * Press a remote-control key without releasing it (pair with `keyUp`). Pass the key raw -
      * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
+     * @public
      */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...options } as KeyDownOptions;
@@ -973,6 +1001,7 @@ export class RokuDeploy {
     /**
      * Release a remote-control key held by `keyDown`. Pass the key raw - it is URI-encoded when
      * the URL is built, so a pre-encoded value gets double-encoded.
+     * @public
      */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...options } as KeyUpOptions;
@@ -985,6 +1014,7 @@ export class RokuDeploy {
     /**
      * Type text on the device by sending each character as a `Lit_` keypress. Pass the text raw -
      * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
+     * @public
      */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
@@ -1001,6 +1031,7 @@ export class RokuDeploy {
     /**
      * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
      * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
+     * @public
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...options } as SendKeySequenceOptions;
@@ -1028,6 +1059,7 @@ export class RokuDeploy {
      * the on-screen developer setup wizard for the user to complete (this call only triggers that
      * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
      * only exists on the RCE instance api.
+     * @public
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
@@ -1053,6 +1085,7 @@ export class RokuDeploy {
     /**
      * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
      * @param options
+     * @public
      */
     public async launchApp(options: LaunchAppOptions): Promise<void> {
         options = { ...this.options, ...options } as LaunchAppOptions;
@@ -1070,6 +1103,7 @@ export class RokuDeploy {
     /**
      * Exit a running channel on the device (the ECP `exit-app/{appId}` endpoint).
      * @param options
+     * @public
      */
     public async exitApp(options: ExitAppOptions): Promise<void> {
         options = { ...this.options, ...options } as ExitAppOptions;
@@ -1094,6 +1128,9 @@ export class RokuDeploy {
         }
     }
 
+    /**
+     * @public
+     */
     public async closeChannel(options: CloseChannelOptions) {
         options = { ...this.options, ...options } as CloseChannelOptions;
         // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
@@ -1107,6 +1144,7 @@ export class RokuDeploy {
     /**
      * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
      * @param options
+     * @public
      */
     public async getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]> {
         options = { ...this.options, ...options } as GetAppsOptions;
@@ -1149,6 +1187,7 @@ export class RokuDeploy {
      * Query the currently active app on the device (the ECP `query/active-app` endpoint). The active
      * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
      * @param options
+     * @public
      */
     public async getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp> {
         options = { ...this.options, ...options } as GetActiveAppOptions;
@@ -1182,6 +1221,7 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure (for example
      * `Device not keyed`).
      * @param options
+     * @public
      */
     public async getRegistry(options: GetRegistryOptions): Promise<RokuRegistry> {
         options = { ...this.options, ...options } as GetRegistryOptions;
@@ -1220,6 +1260,7 @@ export class RokuDeploy {
      * Query the state of an app on the device (the ECP `query/app-state/{appId}` endpoint).
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async getAppState(options: GetAppStateOptions): Promise<RokuAppState> {
         options = { ...this.options, ...options } as GetAppStateOptions;
@@ -1247,6 +1288,7 @@ export class RokuDeploy {
      * is enabled, plus any rendezvous events recorded since the last query.
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
         options = { ...this.options, ...options } as GetRendezvousTrackingOptions;
@@ -1275,6 +1317,7 @@ export class RokuDeploy {
      * endpoint) and return the tracking state the device reports afterwards.
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
         options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
@@ -1292,6 +1335,7 @@ export class RokuDeploy {
     /**
      * Deletes any installed dev channel on the target Roku device
      * @param options
+     * @public
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
@@ -1315,6 +1359,7 @@ export class RokuDeploy {
     /**
      * Deletes any installed dev channel, and any installed component libraries on the target Roku device
      * @param options
+     * @public
      */
     public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
@@ -1334,6 +1379,7 @@ export class RokuDeploy {
 
     /**
      * Delete the component library with the specified filename from the device
+     * @public
      */
     public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
         options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
@@ -1355,6 +1401,7 @@ export class RokuDeploy {
 
     /**
      * Delete all component libraries from the device
+     * @public
      */
     public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
         options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
@@ -1372,6 +1419,7 @@ export class RokuDeploy {
     /**
      * Fetch the full list of installed plugins (side-loaded packages) from the device. Useful for finding the
      * file names of installed component libraries or the dev channel.
+     * @public
      */
     public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
         options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
@@ -1390,6 +1438,7 @@ export class RokuDeploy {
 
     /**
      * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     * @public
      */
     public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
         const cwd = options?.cwd ?? process.cwd();
@@ -1423,6 +1472,7 @@ export class RokuDeploy {
      * Resolve the `files` array into the concrete list of `{src, dest}` file mappings used to
      * build the staging folder: globs expanded against `rootDir`, each match paired with its
      * destination path inside the package.
+     * @public
      */
     public async resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]> {
         options = { ...this.options, ...options } as ResolveFilesArrayOptions;
@@ -1472,6 +1522,7 @@ export class RokuDeploy {
      * use this to pin a config to an ip up front). Only local devices are addressed by host; any
      * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
      * lookup throws so the caller decides how to handle an unreachable host.
+     * @public
      */
     public async withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T> {
         if (device && isLocalDeviceConfig(device)) {
@@ -1486,6 +1537,7 @@ export class RokuDeploy {
      * The same enhancement `getDeviceInfo` applies with `{ enhance: true }`, for callers that
      * already have a raw device-info object and don't want another device request.
      * @param deviceInfo the raw device-info object to enhance
+     * @public
      */
     public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
         const result = {} as DeviceInfo;
