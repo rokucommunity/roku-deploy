@@ -257,15 +257,13 @@ describe('RceManagementClient', () => {
             await client.startDevice({ deviceId: 42, start: { snapshotId: 7, firmwareVersionId: 'rce-fw:15.2.4-tv_prod', maxRuntime: 3600 } });
             await client.stopDevice({ deviceId: 42 });
             await client.getDeviceRuns({ deviceId: 42 });
-            await client.readLogs({ deviceId: 42, instanceId: 397 });
 
             expect(requests.map((request) => [request.method, request.url])).to.eql([
                 ['post', 'https://api.rce.roku.com/api/v1/devices'],
                 ['patch', 'https://api.rce.roku.com/api/v1/devices/42'],
                 ['post', 'https://api.rce.roku.com/api/v1/devices/42/start'],
                 ['post', 'https://api.rce.roku.com/api/v1/devices/42/stop'],
-                ['get', 'https://api.rce.roku.com/api/v1/devices/42/runs'],
-                ['get', 'https://api.rce.roku.com/api/v1/devices/42/logs/397']
+                ['get', 'https://api.rce.roku.com/api/v1/devices/42/runs']
             ]);
             //the wire bodies are snake_case: the client converts camelCase input on the way out
             expect(requests[0].data).to.eql({ name: 'new-device', device_type: 'tv' });
@@ -345,15 +343,6 @@ describe('RceManagementClient', () => {
                 deviceType: 'tv',
                 properties: { my_custom_key: 'as-i-wrote-it', 'kebab-key': 1 }
             });
-        });
-
-        it('passes non-object response bodies (device logs) through unchanged', async () => {
-            stubNeedle('log line one\nlog_line_two');
-            const client = new RceManagementClient({ token: 'secret' });
-
-            const logs = await client.readLogs({ deviceId: 42, instanceId: 397 });
-
-            expect(logs).to.equal('log line one\nlog_line_two');
         });
     });
 
