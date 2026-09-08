@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.6](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.5...v4.0.0-alpha.6) - 2026-09-08
+### Added
+ - Add rce startDevice/stopDevice CLI commands ([#372](https://github.com/rokucommunity/roku-deploy/pull/372))
+ - Add format property to CaptureScreenshotResult ([#386](https://github.com/rokucommunity/roku-deploy/pull/386))
+### Changed
+ - Migrate RCE routes to /api/v0/input and the 8060 port proxy ([#396](https://github.com/rokucommunity/roku-deploy/pull/396))
+ - Support top-level patterns to external dirs using globstar ([#394](https://github.com/rokucommunity/roku-deploy/pull/394))
+ - Rename getFilePaths to resolveFilesArray ([#393](https://github.com/rokucommunity/roku-deploy/pull/393))
+ - Replace postman-request shims and fetch ([#390](https://github.com/rokucommunity/roku-deploy/pull/390))
+ - Align on camelCase convention ([#369](https://github.com/rokucommunity/roku-deploy/pull/369))
+ - Validate device configs specify exactly one targeting identifier ([#388](https://github.com/rokucommunity/roku-deploy/pull/388))
+ - Refine comments ([#371](https://github.com/rokucommunity/roku-deploy/pull/371))
+ - Rename query* ECP methods to get* ([#385](https://github.com/rokucommunity/roku-deploy/pull/385))
+ - upgrade to [@rokucommunity/logger@0.4.2](https://github.com/rokucommunity/logger/blob/master/CHANGELOG.md#042---2026-09-02). Notable changes since 0.4.1:
+     - Security enhancements ([#38](https://github.com/rokucommunity/logger/pull/38), [#39](https://github.com/rokucommunity/logger/pull/39))
+     - chore: Simplify create-vsix inputs and improve branch resolution ([#36](https://github.com/rokucommunity/logger/pull/36))
+     - chore: Give fork PRs a clear create-vsix failure message ([#35](https://github.com/rokucommunity/logger/pull/35))
+### Removed
+ - Remove all @deprecated items ([#389](https://github.com/rokucommunity/roku-deploy/pull/389))
+
+
+
 ## [4.0.0-alpha.5](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.4...v4.0.0-alpha.5) - 2026-08-28
 ### Fixed
  - Fix pkg download corruption on RCE devices ([#382](https://github.com/rokucommunity/roku-deploy/pull/382))
