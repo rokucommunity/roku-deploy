@@ -867,6 +867,23 @@ describe('cli', function cli() {
             expect(consoleOutput).to.not.include('Using config');
         });
 
+        it('resolves a registry device name from the config file (the CLI has no constructor registry)', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                device: 'office-tv',
+                password: 'aaaa',
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({ cwd: tempDir });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.device).to.equal('office-tv');
+            expect(options.devices['office-tv']).to.eql({ host: '1.2.3.4' });
+        });
+
         it('loads the file named by --config instead of cwd/rokudeploy.json', async () => {
             fsExtra.outputJsonSync(`${tempDir}/elsewhere/deploy-config.json`, {
                 password: 'from-custom'

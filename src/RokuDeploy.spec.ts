@@ -6714,6 +6714,30 @@ describe('RokuDeploy', () => {
     });
 
     describe('resolveDevice', () => {
+        it('resolves a name from a per-call devices registry (how the CLI passes config-file registries)', async () => {
+            //no constructor registry at all — the registry arrives with the call, like CLI config flow
+            const rd = new RokuDeploy();
+            sinon.stub(rd as any, 'doGetRequest').callsFake(() => {
+                let results = fakeHttpResponse(200, '<device-info><serial-number>SN123</serial-number></device-info>');
+                rd['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+            const deviceInfo = await rd.getDeviceInfo({
+                device: 'office-tv',
+                devices: { 'office-tv': { host: '1.2.3.4' } }
+            });
+            expect(deviceInfo['serial-number']).to.eql('SN123');
+        });
+
+        it('per-call registry wins over the constructor registry; constructor is the fallback', () => {
+            const rd = new RokuDeploy({
+                devices: { tv: { host: '9.9.9.9' }, den: { host: '8.8.8.8' } }
+            });
+            expect(rd['resolveDevice']('tv', { tv: { host: '1.1.1.1' } })).to.eql({ host: '1.1.1.1' });
+            //name missing from the per-call registry falls back to the constructor's
+            expect(rd['resolveDevice']('den', { tv: { host: '1.1.1.1' } })).to.eql({ host: '8.8.8.8' });
+        });
+
         it('resolves a device from the devices registry by host', async () => {
             const rd = new RokuDeploy({
                 devices: {
