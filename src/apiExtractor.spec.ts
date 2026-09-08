@@ -71,7 +71,7 @@ describe('public API surface (api-extractor)', function apiExtractorSuite() {
         const lines = source.split('\n');
         const untagged: string[] = [];
         for (let i = 0; i < lines.length; i++) {
-            const member = /^    public (?:async )?(?:get |static )?(\w+)/.exec(lines[i]);
+            const member = /^ {4}public (?:async )?(?:get |static )?(\w+)/.exec(lines[i]);
             if (!member) {
                 continue;
             }
