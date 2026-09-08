@@ -26,7 +26,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
-import type { ConfigSectionName, RokuDeployConfig } from './RokuDeployConfig';
+import type { ConfigSectionName, ResolvedSectionOptions, RokuDeployConfig, RootConfigOptions } from './RokuDeployConfig';
 import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
@@ -1405,6 +1405,8 @@ export class RokuDeploy {
      * the CLI calls this for every command; library consumers call it explicitly.
      */
     public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
+    public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
+    public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
     public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
     public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
         const cwd = options?.cwd ?? process.cwd();

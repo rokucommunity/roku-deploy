@@ -169,3 +169,17 @@ export const configSectionNames = [
  * @public
  */
 export type ConfigSectionName = typeof configSectionNames[number];
+
+/**
+ * The root-level common values of a `rokudeploy.json` config — everything except the per-command
+ * sections. What `loadConfigFile({ section: null })` returns.
+ * @public
+ */
+export type RootConfigOptions = Omit<RokuDeployConfig, ConfigSectionName>;
+
+/**
+ * The flattened options for one config section: the root-level common values overlaid with that
+ * section's own options. What `loadConfigFile({ section: '<name>' })` returns.
+ * @public
+ */
+export type ResolvedSectionOptions<T extends ConfigSectionName> = RootConfigOptions & NonNullable<RokuDeployConfig[T]>;
