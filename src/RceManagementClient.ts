@@ -95,13 +95,6 @@ export class RceManagementClient {
         return this.send('get', `/devices/${options.deviceId}/runs`, { token: options.token });
     }
 
-    /**
-     * Read the logs captured for a specific instance run of a device.
-     */
-    public readLogs(options: ReadLogsOptions): Promise<string> {
-        return this.send('get', `/devices/${options.deviceId}/logs/${options.instanceId}`, { token: options.token });
-    }
-
     public listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]> {
         return this.send('get', `/devices/${options.deviceId}/snapshots`, { query: { items: options.items, page: options.page }, token: options.token });
     }
@@ -344,11 +337,6 @@ export interface StopDeviceOptions extends RceManagementRequestOptions {
 
 export interface GetDeviceRunsOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
-}
-
-export interface ReadLogsOptions extends RceManagementRequestOptions {
-    deviceId: DeviceId;
-    instanceId: number;
 }
 
 export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceManagementPagingOptions {

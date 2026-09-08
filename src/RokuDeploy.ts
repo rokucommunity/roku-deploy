@@ -914,8 +914,8 @@ export class RokuDeploy {
      * (status code and body). This is the single ECP transport: every ECP convenience method
      * funnels through it, and it is public so any ECP route can be reached even when no dedicated
      * wrapper exists for it yet. Local devices are addressed as `http://<host>:<ecpPort>/<route>`;
-     * Cloud Emulator devices go through their instance's `/ecp1/<route>` proxy, so callers never
-     * branch on device kind.
+     * Cloud Emulator devices go through their instance's `/api/v0/ports/<ecpPort>/http/<route>` proxy, so callers
+     * never branch on device kind.
      * @param device the device to send the request to
      * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
      * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
@@ -1646,8 +1646,8 @@ export class RokuDeploy {
     /**
      * Resolve the request base (base url + headers that must be sent with every request) for reaching a
      * device's ECP server. Local devices hit the HTTP ECP port directly; RCE devices are reached through
-     * the instance's raw `/ecp1` proxy, which forwards to the emulated device's ECP port and
-     * authenticates via the `X-Authorization` bearer header (the same service-mesh auth carrier the
+     * the instance's raw `/api/v0/ports/<ecpPort>/http` proxy, which forwards to the emulated device's ECP port
+     * and authenticates via the `X-Authorization` bearer header (the same service-mesh auth carrier the
      * installer proxy uses).
      */
     private async getEcpRequestBase(deviceConfig: DeviceConfig, ecpPort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
@@ -1670,7 +1670,7 @@ export class RokuDeploy {
         }
         const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
         return {
-            baseUrl: `${instanceUrl}/ecp1`,
+            baseUrl: `${instanceUrl}/api/v0/ports/${ecpPort}/http`,
             headers: this.buildRceAuthHeaders(rceToken)
         };
     }
@@ -2020,8 +2020,8 @@ export class RokuDeploy {
     /**
      * Send a single key event (keypress/keydown/keyup) to a device.
      *
-     * For an RCE device the instance-api key-input route (`/api/v0/ecp1/<action>/<key>`) is tried
-     * first: unlike the raw `/ecp1` proxy the generic sendEcpRequest() transport uses, it keeps working when
+     * For an RCE device the instance-api key-input route (`/api/v0/input/<action>/<key>`) is tried
+     * first: unlike the raw ECP port proxy the generic sendEcpRequest() transport uses, it keeps working when
      * the device is in limited ECP mode (which 403s every raw-proxy key press). Any failure - a
      * non-2xx response (verify throws), or a future rename of that path - falls through to the
      * normal sendEcpRequest() transport below, so RCE devices in normal mode and LAN devices are unaffected.
@@ -2041,7 +2041,7 @@ export class RokuDeploy {
                 const canonicalKey = this.toCanonicalRemoteKey(options.key);
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                    const url = `${instanceUrl}/api/v0/ecp1/${options.action}/${encodeURIComponent(canonicalKey)}`;
+                    const url = `${instanceUrl}/api/v0/input/${options.action}/${encodeURIComponent(canonicalKey)}`;
                     return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
@@ -2049,7 +2049,7 @@ export class RokuDeploy {
                     body: response?.body
                 } as EcpResult;
             } catch (e) {
-                this.logger.warn('RCE instance-api key route failed; falling back to the ecp1 proxy', (e as Error)?.message ?? '');
+                this.logger.warn('RCE instance-api key route failed; falling back to the ECP port proxy', (e as Error)?.message ?? '');
             }
         }
 
