@@ -852,7 +852,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].headers).to.include({ 'Content-Type': 'application/octet-stream' });
         });
 
-        it('routes an RCE device through the instance ecp1 proxy with the X-Authorization bearer header', async () => {
+        it('routes an RCE device through the instance ECP port proxy with the X-Authorization bearer header', async () => {
             const stub = mockDoGetRequest('<sgrendezvous><status>OK</status></sgrendezvous>');
 
             const result = await rokuDeploy.sendEcpRequest(
@@ -860,7 +860,7 @@ describe('RokuDeploy', () => {
                 'query/sgrendezvous'
             );
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/sgrendezvous');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/query/sgrendezvous');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
             expect(result.body).to.equal('<sgrendezvous><status>OK</status></sgrendezvous>');
         });
@@ -871,7 +871,7 @@ describe('RokuDeploy', () => {
 
             await rd.sendEcpRequest({ instanceUrl: 'https://device.rce.roku.com/instance/abc' }, 'query/device-info');
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/device-info');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/query/device-info');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer default-token' });
         });
 
@@ -981,7 +981,7 @@ describe('RokuDeploy', () => {
             const result = await rd.sendEcpRequest({ id: 123 }, 'query/device-info');
 
             expect(stub.callCount).to.equal(2);
-            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/new/ecp1/query/device-info');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/new/api/v0/ports/8060/http/query/device-info');
             expect(result.status).to.equal(200);
             expect(result.body).to.equal('<device-info><model-name>Roku</model-name></device-info>');
         });
@@ -1241,7 +1241,7 @@ describe('RokuDeploy', () => {
             }, 'Invalid response code: 403: ECP command not allowed in Limited mode.');
         });
 
-        it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
+        it('routes an RCE device through the instance ECP port proxy instead of the LAN ECP port', async () => {
             const stub = mockDoGetRequest('<apps><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></apps>');
 
             const apps = await rokuDeploy.getApps({
@@ -1251,7 +1251,7 @@ describe('RokuDeploy', () => {
             expect(apps).to.eql([
                 { id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' }
             ]);
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/apps');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/query/apps');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
@@ -1340,7 +1340,7 @@ describe('RokuDeploy', () => {
             expect(activeApp).to.eql({});
         });
 
-        it('routes an RCE device through the instance ecp1 proxy instead of the LAN ECP port', async () => {
+        it('routes an RCE device through the instance ECP port proxy instead of the LAN ECP port', async () => {
             const stub = mockDoGetRequest('<active-app><app id="dev" type="appl" subtype="sdka" version="1.0.0">Dev Channel</app></active-app>');
 
             const activeApp = await rokuDeploy.getActiveApp({
@@ -1348,7 +1348,7 @@ describe('RokuDeploy', () => {
             });
 
             expect(activeApp).to.eql({ id: 'dev', title: 'Dev Channel', type: 'appl', subtype: 'sdka', version: '1.0.0' });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/query/active-app');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/query/active-app');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
@@ -2211,40 +2211,40 @@ describe('RokuDeploy', () => {
         it('routes an RCE key press through the instance-api key route with a canonical key name', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Home');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/input/keypress/Home');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
         it('sends literal text as Lit_<char> through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.sendText({ device: rceDevice, text: 'a' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_a');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Lit_a');
         });
 
         it('sends a space character as a URI-encoded literal', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.sendText({ device: rceDevice, text: ' ' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Lit_%20');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Lit_%20');
         });
 
         it('sends one keypress per code point (not per UTF-16 code unit) for an astral character like an emoji', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.sendText({ device: rceDevice, text: '😀' });
             expect(stub.callCount).to.equal(1);
-            expect(stub.getCall(0).args[0].url).to.equal(`https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/${encodeURIComponent('Lit_😀')}`);
+            expect(stub.getCall(0).args[0].url).to.equal(`https://device.rce.roku.com/instance/abc/api/v0/input/keypress/${encodeURIComponent('Lit_😀')}`);
         });
 
         it('routes keydown and keyup through the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.keyDown({ device: rceDevice, key: 'Down' });
             await rokuDeploy.keyUp({ device: rceDevice, key: 'Down' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keydown/Down');
-            expect(stub.getCall(1).args[0].url).to.contain('/api/v0/ecp1/keyup/Down');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keydown/Down');
+            expect(stub.getCall(1).args[0].url).to.contain('/api/v0/input/keyup/Down');
         });
 
-        it('falls back to the raw ecp1 proxy (original-case key) when the instance-api route fails', async () => {
+        it('falls back to the raw ECP port proxy (original-case key) when the instance-api route fails', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
-                if (params.url.includes('/api/v0/')) {
+                if (params.url.includes('/api/v0/input/')) {
                     return Promise.reject(new Error('403'));
                 }
                 return Promise.resolve({ statusCode: 200, headers: {}, body: '' });
@@ -2252,8 +2252,8 @@ describe('RokuDeploy', () => {
             await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
 
             expect(stub.callCount).to.equal(2);
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/Home');
-            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Home');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/keypress/Home');
             expect(stub.getCall(1).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
@@ -2266,7 +2266,7 @@ describe('RokuDeploy', () => {
         it('sends an unknown key as-is (no canonical RemoteKey casing to apply)', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.keyPress({ device: rceDevice, key: 'SomeFutureKey' as any });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/ecp1/keypress/SomeFutureKey');
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/SomeFutureKey');
         });
 
         it('honors an explicit timeout on the instance-api route', async () => {
@@ -2288,9 +2288,9 @@ describe('RokuDeploy', () => {
             );
         });
 
-        it('falls back to the raw ecp1 proxy even when the instance-api failure is not an Error instance', async () => {
+        it('falls back to the raw ECP port proxy even when the instance-api failure is not an Error instance', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
-                if (params.url.includes('/api/v0/')) {
+                if (params.url.includes('/api/v0/input/')) {
                     //eslint-disable-next-line prefer-promise-reject-errors
                     return Promise.reject('rejected with a plain string');
                 }
@@ -2299,12 +2299,12 @@ describe('RokuDeploy', () => {
             const result = await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
 
             expect(result.status).to.equal(200);
-            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/keypress/Home');
         });
 
-        it('falls back to the raw ecp1 proxy even when the instance-api failure is nullish', async () => {
+        it('falls back to the raw ECP port proxy even when the instance-api failure is nullish', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((params: any) => {
-                if (params.url.includes('/api/v0/')) {
+                if (params.url.includes('/api/v0/input/')) {
                     //eslint-disable-next-line prefer-promise-reject-errors
                     return Promise.reject(undefined);
                 }
@@ -2313,13 +2313,13 @@ describe('RokuDeploy', () => {
             const result = await rokuDeploy.keyPress({ device: rceDevice, key: 'Home' });
 
             expect(result.status).to.equal(200);
-            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/keypress/Home');
+            expect(stub.getCall(1).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/keypress/Home');
         });
 
         it('canonicalizes then URI-encodes a literal key on the instance-api route', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             await rokuDeploy.keyPress({ device: rceDevice, key: 'lit_&' });
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Lit_%26');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/input/keypress/Lit_%26');
         });
 
         it('URI-encodes a literal space key on the direct HTTP ECP path', async () => {
@@ -2358,8 +2358,8 @@ describe('RokuDeploy', () => {
             });
 
             expect(stub.getCalls().map((call) => call.args[0].url)).to.eql([
-                'https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Home',
-                'https://device.rce.roku.com/instance/abc/api/v0/ecp1/keypress/Up'
+                'https://device.rce.roku.com/instance/abc/api/v0/input/keypress/Home',
+                'https://device.rce.roku.com/instance/abc/api/v0/input/keypress/Up'
             ]);
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
@@ -2508,7 +2508,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/launch/dev?foo=bar');
         });
 
-        it('routes an RCE device through the instance ecp1 proxy, forwarding deep-link params', async () => {
+        it('routes an RCE device through the instance ECP port proxy, forwarding deep-link params', async () => {
             const stub = mockDoPostRequest();
 
             await rokuDeploy.launchApp({
@@ -2517,7 +2517,7 @@ describe('RokuDeploy', () => {
                 contentId: '123'
             });
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/launch/dev?contentId=123');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/launch/dev?contentId=123');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
     });
@@ -2543,7 +2543,7 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/exit-app/dev/true');
         });
 
-        it('routes an RCE device through the instance ecp1 proxy, keeping the force segment', async () => {
+        it('routes an RCE device through the instance ECP port proxy, keeping the force segment', async () => {
             const stub = mockDoPostRequest();
 
             await rokuDeploy.exitApp({
@@ -2552,7 +2552,7 @@ describe('RokuDeploy', () => {
                 force: true
             });
 
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/ecp1/exit-app/dev/true');
+            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/exit-app/dev/true');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
