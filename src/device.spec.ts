@@ -683,10 +683,10 @@ describe('device', function device() {
         //Roku firmware rejects sideloaded zips below a hard minimum size (512 bytes on firmware 15.x, for
         //both channels and complibs) with "Unzip failed. Invalid or corrupt zip archive." Each test builds
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
-        //Healthy runs take ~5.6s, but these sideload complibs and clear plugins between cases, so leave
-        //room for a device reboot (~120s to recover) rather than sizing off the observed runtime alone.
+        //~3x the slowest observed case in this block (~10s on a fast machine; the CI Raspberry Pi
+        //runners are slower still — 12s flaked there and locally when the suite runs back-to-back)
         this.timeout(140_000);
-        const BOUNDARY = RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
+        const BOUNDARY = RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE'];
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
         //exact zip size (a repeated char would compress away and give us no size control).

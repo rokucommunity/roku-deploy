@@ -2,6 +2,9 @@
 
 import type { EcpNetworkAccessMode } from './RokuDeploy';
 
+/**
+ * @public
+ */
 export interface DeviceInfo {
     udn?: string;
     serialNumber?: string;
@@ -76,6 +79,9 @@ export interface DeviceInfo {
     brightscriptDebuggerVersion?: string;
 }
 
+/**
+ * @public
+ */
 export interface DeviceInfoRaw {
     'udn'?: string;
     'serial-number'?: string;

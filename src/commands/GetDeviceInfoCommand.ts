@@ -1,4 +1,5 @@
-import { rokuDeploy, util } from '../index';
+import { rokuDeploy } from '../index';
+import { util } from '../util';
 
 export class GetDeviceInfoCommand {
     async run(args) {

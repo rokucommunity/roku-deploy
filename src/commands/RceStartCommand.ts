@@ -1,4 +1,4 @@
-import { util } from '../index';
+import { util } from '../util';
 import type { RceDevice, Snapshot } from '../RceManagementClient';
 import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './rceCommandUtils';
 

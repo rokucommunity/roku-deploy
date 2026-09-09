@@ -3,6 +3,7 @@ dist
 out
 .DS_Store
 .tmp
+temp
 .roku-deploy-staging
 coverage
 .nyc_output
