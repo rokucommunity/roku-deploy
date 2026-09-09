@@ -220,6 +220,8 @@ describe('device', function device() {
             zip: `${outDir}/${name}.zip`,
             appType: 'dcl'
         });
+        //installing a complib can reboot the device; don't return until it's back
+        await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
     }
 
     /**
@@ -299,8 +301,9 @@ describe('device', function device() {
 
     describe('large zip uploads', function largeZipUploads() {
         //a large upload takes several seconds per digest-auth leg on wifi, and publish() may attempt
-        //Replace + Install; keep this generous
-        this.timeout(120_000);
+        //Replace + Install; keep this generous. The complib test in here can also reboot the device,
+        //which costs up to ~120s to recover from.
+        this.timeout(240_000);
 
         //Large enough that the multipart body cannot fit in the OS socket buffers, so the upload is
         //still mid-write when the device responds to the request. Random bytes are incompressible, so
@@ -566,9 +569,10 @@ describe('device', function device() {
     });
 
     describe('deleteAllSideloadedPlugins', function deleteAllTests() {
-        //these tests do several device round-trips (install + verify + delete). ~2x the slowest
-        //observed case in this block (the multi-library delete, ~10s).
-        this.timeout(20_000);
+        //these tests do several device round-trips (install + verify + delete). Complib installs/deletes
+        //can reboot the device, and each recovery costs up to ~120s, so budget for one on top of the
+        //~20s happy path instead of sizing off the observed runtime alone.
+        this.timeout(150_000);
 
         it('deletes a single channel', async () => {
             //start clean
@@ -601,6 +605,8 @@ describe('device', function device() {
             });
 
             await rd.deleteAllSideloadedPlugins(options);
+            //deleting a complib can reboot the device; wait it out before asserting
+            await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
 
             //nothing should be installed anymore
             expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
@@ -620,6 +626,8 @@ describe('device', function device() {
             });
 
             await rd.deleteAllSideloadedPlugins(options);
+            //deleting a complib can reboot the device; wait it out before asserting
+            await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
 
             //nothing should be installed anymore
             expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
@@ -640,6 +648,8 @@ describe('device', function device() {
             });
 
             await rd.deleteAllSideloadedPlugins(options);
+            //deleting a complib can reboot the device; wait it out before asserting
+            await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
 
             //nothing should be installed anymore
             expect(await rd.listSideloadedPlugins({ device: options.device, password: options.password })).to.eql([]);
@@ -675,7 +685,7 @@ describe('device', function device() {
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter installs.
         //~3x the slowest observed case in this block (~10s on a fast machine; the CI Raspberry Pi
         //runners are slower still — 12s flaked there and locally when the suite runs back-to-back)
-        this.timeout(30_000);
+        this.timeout(140_000);
         const BOUNDARY = RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE'];
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
@@ -1027,9 +1037,10 @@ describe('device', function device() {
     });
 
     describe('deleteComponentLibrary', function deleteComponentLibraryTests() {
-        //these tests install several complibs and then delete them one at a time. ~2x the slowest
-        //observed case in this block (~13s).
-        this.timeout(30_000);
+        //these tests install several complibs and then delete them one at a time. Deleting a complib is
+        //the most reboot-prone thing in this suite and each recovery costs up to ~120s; with up to three
+        //deletes per test, leave room for a couple of recoveries on top of the ~30s happy path.
+        this.timeout(300_000);
 
         it('deletes several component libraries one by one', async () => {
             //start clean
@@ -1053,6 +1064,8 @@ describe('device', function device() {
                     fileName: target
                 });
                 expectedRemaining--;
+                //deleting a complib can reboot the device; wait it out before asserting
+                await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
 
                 const afterDelete = await getInstalledComponentLibraryFileNames();
                 //the deleted complib should no longer be present...
@@ -1082,6 +1095,8 @@ describe('device', function device() {
                 password: options.password,
                 fileName: toDelete
             });
+            //deleting a complib can reboot the device; wait it out before asserting
+            await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
 
             //only the second complib should remain
             expect(await getInstalledComponentLibraryFileNames()).to.eql([toKeep]);
@@ -1112,6 +1127,8 @@ describe('device', function device() {
                     password: options.password,
                     fileName: fileName
                 });
+                //deleting a complib can reboot the device; wait it out before the next one
+                await waitForDeviceOnline(options.device.host, 120_000, 3000, 0);
             }
 
             //all complibs gone, but the channel should still be installed
