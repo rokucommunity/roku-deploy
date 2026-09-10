@@ -3247,7 +3247,7 @@ describe('RokuDeploy', () => {
                 failOnCompileError: false,
                 close: false
             }).then((result) => {
-                expect(result.results.body).to.equal(body);
+                expect(result.message).to.equal('Identical to previous version -- not replacing');
             }, () => {
                 assert.fail('Should have resolved promise');
             });
@@ -3739,12 +3739,13 @@ describe('RokuDeploy', () => {
     });
 
     describe('squash', () => {
-        it('should not return an error if successful', async () => {
+        it('resolves with a result object when conversion succeeds', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
-            await rokuDeploy.convertToSquashfs({
+            const result = await rokuDeploy.convertToSquashfs({
                 device: options.device,
                 password: 'password'
             });
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
         });
 
         it('should return ConvertError if converting failed', async () => {
@@ -5121,7 +5122,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.args[0][0].url).to.include(`/plugin_swup`);
             expect(stub.args[0][0].formData.mysubmit).to.include('Reboot');
         });
@@ -5133,7 +5134,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.args[0][0].url).to.include(`/plugin_swup`);
             expect(stub.args[0][0].formData.mysubmit).to.include('CheckUpdate');
         });
@@ -5251,7 +5252,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
         });
 
         it('routes an RCE device through the instance sideload proxy with the X-Authorization bearer header', async () => {
@@ -7361,7 +7362,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             let result = await rokuDeploy.deleteAllSideloadedPlugins({ ...options, device: { host: 'localhost' }, password: 'password' });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.getCall(0).args[0].formData).to.include({
                 mysubmit: 'DeleteAll'
             });

@@ -62,7 +62,7 @@ describe('cli', function cli() {
 
     it('Converts to squashfs', async () => {
         const stub = sinon.stub(rokuDeploy, 'convertToSquashfs').callsFake(async () => {
-            return Promise.resolve();
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new ConvertToSquashfsCommand();
@@ -174,7 +174,7 @@ describe('cli', function cli() {
 
     it('Deletes an installed channel', async () => {
         const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
-            return Promise.resolve({ statusCode: 200, headers: {}, body: '', request: { url: '', method: 'POST' } });
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new DeleteDevChannelCommand();
