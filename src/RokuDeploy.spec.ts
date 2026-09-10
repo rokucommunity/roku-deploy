@@ -41,7 +41,6 @@ describe('RokuDeploy', () => {
 
         options = {
             rootDir: rootDir,
-            stagingDir: stagingDir,
             devId: 'abcde',
             out: `${outDir}/roku-deploy.zip`,
             signingPassword: '12345',
@@ -1579,7 +1578,7 @@ describe('RokuDeploy', () => {
         it('should throw error when manifest is missing', async () => {
             let err;
             try {
-                fsExtra.ensureDirSync(options.stagingDir);
+                fsExtra.ensureDirSync(stagingDir);
                 await rokuDeploy.zip({
                     dir: s`${tempDir}/path/to/nowhere`,
                     out: `${outDir}/roku-deploy.zip`
@@ -7741,19 +7740,6 @@ describe('RokuDeploy', () => {
                 expect(ex).to.exist;
                 expect(ex.message.startsWith('Error parsing')).to.be.true;
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
-            });
-
-            it('works when loading stagingDir from rokudeploy.json', () => {
-                sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
-                    return true;
-                });
-                sinon.stub(fsExtra, 'readFileSync').returns(`
-                    {
-                        "stagingDir": "./staging-dir"
-                    }
-                `);
-                let loadedOptions = rokuDeploy.loadConfigFile();
-                expect(loadedOptions.stagingDir.endsWith('staging-dir')).to.be.true;
             });
 
             it('supports jsonc for rokudeploy.json', () => {
