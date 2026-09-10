@@ -2864,8 +2864,6 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
 
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
 
-export type GetInstalledPackagesOptions = BaseRequestOptions;
-
 export interface LoadConfigFileOptions {
     /**
      * The current working directory to use for relative paths
