@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as dns from 'dns';
 import * as crypto from 'crypto';
-import * as micromatch from 'micromatch';
+import * as picomatch from 'picomatch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fastGlob = require('fast-glob');
 
@@ -215,7 +215,8 @@ export class Util {
     private filterPaths(pattern: string, filesByIndex: string[][], cwd: string, stopIndex: number) {
         //move the ! to the start of the string to negate the absolute path, replace windows slashes with unix ones
         let negatedPatternAbsolute = '!' + path.resolve(cwd, pattern.replace(/^!/, '')).replace(/\\/g, '/');
-        let filter = micromatch.matcher(negatedPatternAbsolute);
+        //micromatch.matcher() is a direct passthrough to picomatch(), so this is an exact swap
+        let filter = picomatch(negatedPatternAbsolute);
         for (let i = 0; i <= stopIndex; i++) {
             if (filesByIndex[i]) {
                 //filter all matches by the specified pattern
