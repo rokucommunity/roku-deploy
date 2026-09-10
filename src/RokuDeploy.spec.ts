@@ -17,6 +17,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
+import { logger, LogLevelNumeric } from '@rokucommunity/logger';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
 
@@ -7723,6 +7724,38 @@ describe('RokuDeploy', () => {
                     const rd = new RokuDeploy();
                     rd.logger.logLevel = 'debug';
                     expect(rd.logger.logLevel).to.equal('debug');
+                });
+            });
+
+            describe('logLevel option', () => {
+                it('sets the logger level without mutating the global logger', () => {
+                    const globalLogLevel = logger.logLevel;
+                    const rd = new RokuDeploy({ logLevel: 'debug' });
+                    expect(rd.logger.logLevel).to.equal('debug');
+                    expect(rd.logger).to.not.equal(logger);
+                    expect(logger.logLevel).to.equal(globalLogLevel);
+                });
+
+                it('supports numeric log levels', () => {
+                    const rd = new RokuDeploy({ logLevel: LogLevelNumeric.trace });
+                    expect(rd.logger.logLevel).to.equal(LogLevelNumeric.trace);
+                });
+
+                it('applies the level to a custom logger', () => {
+                    const customLogger = logger.createLogger();
+                    const rd = new RokuDeploy({ logger: customLogger, logLevel: 'error' });
+                    expect(rd.logger).to.equal(customLogger);
+                    expect(customLogger.logLevel).to.equal('error');
+                });
+
+                it('throws for an invalid log level', () => {
+                    try {
+                        // eslint-disable-next-line no-new
+                        new RokuDeploy({ logLevel: 'verbose' as any });
+                        assert.fail('Should have thrown');
+                    } catch (e) {
+                        expect((e as Error).message).to.include('Invalid logLevel');
+                    }
                 });
             });
 

@@ -36,6 +36,11 @@ export interface RokuDeployConstructorOptions {
      */
     logger?: Logger;
     /**
+     * The log level applied to this instance's logger.
+     * @default 'log'
+     */
+    logLevel?: LogLevel | LogLevelNumeric;
+    /**
      * The target device. Can be a registry name (string) or an inline device config.
      * @example 'living-room'
      * @example { host: '192.168.1.21' }
@@ -197,8 +202,8 @@ export interface RokuDeployOptions {
     failOnCompileError?: boolean;
 
     /**
-     * The log level.
-     * @default LogLevel.log
+     * The log level applied to the logger.
+     * @default 'log'
      */
     logLevel?: LogLevel | LogLevelNumeric;
 

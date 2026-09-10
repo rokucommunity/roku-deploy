@@ -16,6 +16,7 @@ import { RceStopCommand } from './commands/RceStopCommand';
 import type { RceDevice } from './RceManagementClient';
 import { RceManagementClient } from './RceManagementClient';
 import { standardizePath as s, util } from './util';
+import { applyLogLevel } from './commands/commandUtils';
 
 const sinon = createSandbox();
 
@@ -58,6 +59,23 @@ describe('cli', function cli() {
         execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
+    });
+
+    it('applies --logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --logLevel info`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
+    });
+
+    it('applies the config file logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
     });
 
     it('Converts to squashfs', async () => {
@@ -777,6 +795,54 @@ describe('cli', function cli() {
             });
 
             expect(startStub.getCall(0).args[0].start.maxRuntime).to.equal(120);
+        });
+    });
+
+    describe('applyLogLevel', () => {
+        let originalLogLevel: typeof rokuDeploy.logger.logLevel;
+        beforeEach(() => {
+            originalLogLevel = rokuDeploy.logger.logLevel;
+        });
+        afterEach(() => {
+            rokuDeploy.logger.logLevel = originalLogLevel;
+        });
+
+        it('applies the --logLevel flag', () => {
+            applyLogLevel({ cwd: tempDir, logLevel: 'debug' });
+            expect(rokuDeploy.logger.logLevel).to.equal('debug');
+        });
+
+        it('falls back to the config file logLevel', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            applyLogLevel({ cwd: tempDir });
+            expect(rokuDeploy.logger.logLevel).to.equal('trace');
+        });
+
+        it('prefers the --logLevel flag over the config file', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            applyLogLevel({ cwd: tempDir, logLevel: 'warn' });
+            expect(rokuDeploy.logger.logLevel).to.equal('warn');
+        });
+
+        it('leaves the logger untouched when no logLevel is set', () => {
+            applyLogLevel({ cwd: tempDir });
+            expect(rokuDeploy.logger.logLevel).to.equal(originalLogLevel);
+        });
+
+        it('ignores the config file logLevel with --no-config', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            applyLogLevel({ cwd: tempDir, config: false });
+            expect(rokuDeploy.logger.logLevel).to.equal(originalLogLevel);
+        });
+
+        it('does not announce the config file (the command does that)', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+            applyLogLevel({ cwd: tempDir });
+            expect(consoleOutput).to.not.include('Using config');
         });
     });
 
