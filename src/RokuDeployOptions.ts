@@ -16,7 +16,8 @@ export interface DeviceRegistryEntry {
     // Optional RCE token (can be injected at runtime)
     rceToken?: string;
 
-    // Optional per-device settings
+    // Optional per-device settings, applied whenever this entry is targeted by name.
+    // Precedence: explicit per-call options > these entry settings > constructor options.
     password?: string;
     username?: string;
     packagePort?: number;
