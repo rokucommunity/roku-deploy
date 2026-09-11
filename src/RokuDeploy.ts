@@ -588,7 +588,9 @@ export class RokuDeploy {
 
         let result: EcpResult;
         try {
-            result = await this.sendEcpRequest(options.device, 'query/device-info', {
+            result = await this.sendEcpRequest({
+                device: options.device,
+                route: 'query/device-info',
                 verify: true,
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -887,18 +889,16 @@ export class RokuDeploy {
      * wrapper exists for it yet. Local devices are addressed as `http://<host>:<ecpPort>/<route>`;
      * Cloud Emulator devices go through their instance's `/api/v0/ports/<ecpPort>/http/<route>` proxy, so callers
      * never branch on device kind.
-     * @param device the device to send the request to
-     * @param route the ECP route without a leading slash (for example `query/device-info`, `keypress/Home`)
-     * @param options `method` defaults to 'GET' (queries); commands like keypress and launch are POSTs.
-     *                `verify` defaults to false so raw ECP status bodies (a 202 `FAILED` registry or
-     *                chanperf response, for example) come back to the caller instead of throwing.
+     * @param options
      */
-    public async sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult> {
+    public async sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult> {
         options = this.mergeOptions(options);
+        this.checkRequiredOptions(options, ['device', 'route']);
+
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(device);
+        const deviceConfig = this.resolveDevice(options.device);
         const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
@@ -911,7 +911,7 @@ export class RokuDeploy {
             instanceGoneResponse = undefined;
             const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
             const requestOptions: RequestOptions = {
-                url: `${baseUrl}/${route}`,
+                url: `${baseUrl}/${options.route}`,
                 timeout: timeout,
                 headers: { ...headers, ...options.headers },
                 body: options.body
@@ -1055,7 +1055,9 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const queryString = this.buildLaunchQueryString(options);
-        await this.sendEcpRequest(options.device, `launch/${encodeURIComponent(options.appId)}${queryString}`, {
+        await this.sendEcpRequest({
+            device: options.device,
+            route: `launch/${encodeURIComponent(options.appId)}${queryString}`,
             method: 'POST',
             verify: true,
             ecpPort: options.ecpPort,
@@ -1072,7 +1074,9 @@ export class RokuDeploy {
         this.checkRequiredOptions(options, ['device', 'appId']);
 
         const forceSegment = options.force ? '/true' : '';
-        const result = await this.sendEcpRequest(options.device, `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`, {
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`,
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1111,7 +1115,9 @@ export class RokuDeploy {
         let result: EcpResult;
         let json: Record<string, any> | undefined;
         try {
-            result = await this.sendEcpRequest(options.device, 'query/apps', {
+            result = await this.sendEcpRequest({
+                device: options.device,
+                route: 'query/apps',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -1153,7 +1159,9 @@ export class RokuDeploy {
         let result: EcpResult;
         let json: Record<string, any> | undefined;
         try {
-            result = await this.sendEcpRequest(options.device, 'query/active-app', {
+            result = await this.sendEcpRequest({
+                device: options.device,
+                route: 'query/active-app',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -1183,7 +1191,9 @@ export class RokuDeploy {
         options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.sendEcpRequest(options.device, `query/registry/${encodeURIComponent(options.appId)}`, {
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `query/registry/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1221,7 +1231,9 @@ export class RokuDeploy {
         options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'appId']);
 
-        const result = await this.sendEcpRequest(options.device, `query/app-state/${encodeURIComponent(options.appId)}`, {
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `query/app-state/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1248,7 +1260,9 @@ export class RokuDeploy {
         options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device']);
 
-        const result = await this.sendEcpRequest(options.device, 'query/sgrendezvous', {
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: 'query/sgrendezvous',
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1276,7 +1290,9 @@ export class RokuDeploy {
         options = this.mergeOptions(options);
         this.checkRequiredOptions(options, ['device', 'enabled']);
 
-        const result = await this.sendEcpRequest(options.device, `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`, {
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`,
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1997,7 +2013,9 @@ export class RokuDeploy {
             }
         }
 
-        return this.sendEcpRequest(options.device, `${options.action}/${encodeURIComponent(options.key)}`, {
+        return this.sendEcpRequest({
+            device: options.device,
+            route: `${options.action}/${encodeURIComponent(options.key)}`,
             method: 'POST',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -2745,7 +2763,9 @@ export interface BaseEcpOptions {
     timeout?: number;
 }
 
-export interface EcpOptions {
+export interface SendEcpRequestOptions extends BaseEcpOptions {
+    /** The ECP route without a leading slash (for example `query/device-info`, `keypress/Home`) */
+    route: string;
     /** The http method for the route; queries are GETs (the default), commands like keypress and launch are POSTs */
     method?: 'GET' | 'POST';
     /** Raw POST body (string or Buffer), sent verbatim with no multipart framing. Ignored for GET requests. */
@@ -2758,10 +2778,6 @@ export interface EcpOptions {
      * come back to the caller instead of throwing.
      */
     verify?: boolean;
-    /** The ECP port for local devices (defaults to 8060); not used for Cloud Emulator devices */
-    ecpPort?: number;
-    /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
-    timeout?: number;
 }
 
 export interface EcpResult {
@@ -2887,8 +2903,6 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
 }
 
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
-
-export type GetInstalledPackagesOptions = BaseRequestOptions;
 
 export interface LoadConfigFileOptions {
     /**
