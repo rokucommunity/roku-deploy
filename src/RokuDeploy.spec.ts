@@ -6850,6 +6850,171 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('devices registry per-device settings', () => {
+        it('uses the registry entry password when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
+        });
+
+        it('call password overrides the registry entry password', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv', password: 'call-pass' });
+            expect(stub.getCall(0).args[0].auth.password).to.equal('call-pass');
+        });
+
+        it('falls back to the constructor password when the registry entry has none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
+        });
+
+        it('uses the registry entry username and packagePort when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                packagePort: 8080,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', username: 'entry-user', packagePort: 8081 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.username).to.equal('entry-user');
+            expect(stub.getCall(0).args[0].url).to.include(':8081/');
+        });
+
+        it('uses the registry entry ecpPort when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                ecpPort: 9000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.include(':9001/');
+        });
+
+        it('call ecpPort overrides the registry entry ecpPort', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home', ecpPort: 9999 });
+            expect(stub.getCall(0).args[0].url).to.include(':9999/');
+        });
+
+        it('falls back to the constructor ecpPort when the registry entry has none', async () => {
+            const rd = new RokuDeploy({
+                ecpPort: 9000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.include(':9000/');
+        });
+
+        it('uses the registry entry timeout when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                timeout: 5000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+        });
+
+        it('call timeout overrides the registry entry timeout', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv', timeout: 4321 } as any);
+            expect(stub.getCall(0).args[0].timeout).to.equal(4321);
+        });
+
+        it('applies registry entry settings when the device name comes from the constructor', async () => {
+            const rd = new RokuDeploy({
+                device: 'office-tv',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel();
+            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
+        });
+
+        it('uses constructor settings unchanged for an entry with only targeting fields', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                username: 'root-user',
+                packagePort: 8080,
+                timeout: 5000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
+            expect(stub.getCall(0).args[0].url).to.include(':8080/');
+            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
+        });
+
+        it('does not apply registry settings to an inline device config', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: { host: '1.2.3.4' } } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
+        });
+
+        it('still honors the registry entry rceToken alongside per-device settings', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'cloud-device': { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'cloud-device', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Home');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+        });
+    });
+
     describe('option validation', () => {
         beforeEach(() => {
             //make a dummy output file for tests that need a valid zip
