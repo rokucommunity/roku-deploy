@@ -1,13 +1,9 @@
 import { rokuDeploy } from '../index';
+import { loadCommandOptions } from './commandUtils';
 
 export class SideloadCommand {
     async run(args) {
-        args.cwd ??= process.cwd();
-
-        let options = {
-            ...rokuDeploy.loadConfigFile(args),
-            ...args
-        };
+        let options = loadCommandOptions(args, 'sideload');
 
         await rokuDeploy.sideload(options);
     }

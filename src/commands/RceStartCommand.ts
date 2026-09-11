@@ -1,10 +1,10 @@
 import { util } from '../index';
 import type { RceDevice, Snapshot } from '../RceManagementClient';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './rceCommandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStartCommand {
     async run(args: any) {
-        const { options, client } = buildRceCommandContext(args);
+        const { options, client } = buildRceCommandContext(args, 'rce.start');
         const device = await resolveRceDevice(client, options);
 
         let snapshots: Snapshot[] | undefined;

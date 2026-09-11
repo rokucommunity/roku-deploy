@@ -1,9 +1,9 @@
 import { util } from '../index';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './rceCommandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStopCommand {
     async run(args: any) {
-        const { options, client } = buildRceCommandContext(args);
+        const { options, client } = buildRceCommandContext(args, 'rce.stop');
         const device = await resolveRceDevice(client, options);
 
         let result = await client.stopDevice({ deviceId: device.id });
