@@ -25,7 +25,7 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -2285,9 +2285,9 @@ export class RokuDeploy {
     }
 
     /**
-     * The per-device settings a devices registry entry may override.
+     * Every key of DeviceRegistrySettings, as a record so TypeScript errors if the two ever drift apart.
      */
-    private static readonly deviceRegistrySettingsKeys = ['password', 'username', 'packagePort', 'ecpPort', 'timeout'] as const;
+    private static readonly deviceRegistrySettings: Record<keyof DeviceRegistrySettings, true> = { password: true, username: true, packagePort: true, ecpPort: true, timeout: true };
 
     /**
      * Merge per-call options over constructor options, layering in any per-device settings from
@@ -2295,10 +2295,10 @@ export class RokuDeploy {
      */
     private mergeOptions<T>(options: T): T {
         const device = (options as { device?: DeviceOption })?.device ?? this.options.device;
-        let deviceSettings: Partial<DeviceRegistryEntry>;
+        let deviceSettings: Partial<DeviceRegistrySettings>;
         if (typeof device === 'string') {
             const entry = this.options.devices?.[device];
-            for (const key of RokuDeploy.deviceRegistrySettingsKeys) {
+            for (const key of Object.keys(RokuDeploy.deviceRegistrySettings) as (keyof DeviceRegistrySettings)[]) {
                 if (entry?.[key] !== undefined) {
                     deviceSettings ??= {};
                     (deviceSettings[key] as unknown) = entry[key];

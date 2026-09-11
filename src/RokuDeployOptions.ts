@@ -2,10 +2,22 @@ import type { Logger, LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceOption } from './DeviceConfig';
 
 /**
+ * The per-device settings a devices registry entry may override, applied whenever the entry is targeted by name.
+ * Precedence: explicit per-call options > these entry settings > constructor options.
+ */
+export interface DeviceRegistrySettings {
+    password?: string;
+    username?: string;
+    packagePort?: number;
+    ecpPort?: number;
+    timeout?: number;
+}
+
+/**
  * A device entry in the devices registry.
  * Contains device addressing info plus optional per-device settings.
  */
-export interface DeviceRegistryEntry {
+export interface DeviceRegistryEntry extends DeviceRegistrySettings {
     // One of these identifies the device
     host?: string;
     esn?: string;
@@ -15,14 +27,6 @@ export interface DeviceRegistryEntry {
 
     // Optional RCE token (can be injected at runtime)
     rceToken?: string;
-
-    // Optional per-device settings, applied whenever this entry is targeted by name.
-    // Precedence: explicit per-call options > these entry settings > constructor options.
-    password?: string;
-    username?: string;
-    packagePort?: number;
-    ecpPort?: number;
-    timeout?: number;
 }
 
 /**
