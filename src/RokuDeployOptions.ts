@@ -110,11 +110,6 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
 
     /**
-     * The path where roku-deploy should stage all of the files right before being zipped. defaults to ${outDir}/.roku-deploy-staging
-     */
-    stagingDir?: string;
-
-    /**
      * The target device. Can be a registry name (string) or an inline device config.
      * @example 'living-room'
      * @example { host: '192.168.1.21' }
@@ -145,12 +140,6 @@ export interface RokuDeployOptions {
      * will be trying to attach to the debug protocol control port to consume those compile errors. This must be used in conjuction with the `remoteDebug` option
      */
     remoteDebugConnectEarly?: boolean;
-
-    /**
-     * When publishing a sideloaded channel, set this to `false` to prevent the Roku device from auto-launching the channel after install.
-     * When omitted (the default), the device's normal auto-launch behavior is used.
-     */
-    autoLaunch?: boolean;
 
     /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
