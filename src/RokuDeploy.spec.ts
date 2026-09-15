@@ -7787,12 +7787,14 @@ describe('RokuDeploy', () => {
                     //leading comment
                     {
                         //inner comment
-                        "rootDir": "src" //trailing comment
+                        "stage": {
+                            "rootDir": "src" //trailing comment
+                        }
                     }
                     //trailing comment
                 `);
                 let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(loadedOptions.rootDir).to.equal('src');
+                expect(loadedOptions.stage.rootDir).to.equal('src');
             });
 
             it('returns empty object when config file does not exist', () => {
@@ -7832,15 +7834,15 @@ describe('RokuDeploy', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
                     device: 'living-room',
                     password: 'aaaa',
-                    rootDir: './everywhere',
-                    stage: { rootDir: './stage-only', out: './staging' },
+                    cwd: './everywhere',
+                    stage: { cwd: './stage-only', out: './staging' },
                     zip: { out: './app.zip' }
                 });
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' })).to.eql({
                     device: 'living-room',
                     password: 'aaaa',
                     //section wins over root
-                    rootDir: './stage-only',
+                    cwd: './stage-only',
                     out: './staging'
                 });
             });

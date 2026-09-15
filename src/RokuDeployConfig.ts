@@ -1,6 +1,6 @@
 import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceOption } from './DeviceConfig';
-import type { DeviceRegistryEntry, FileEntry } from './RokuDeployOptions';
+import type { DeviceRegistryEntry } from './RokuDeployOptions';
 import type {
     CaptureScreenshotOptions,
     ConvertToSquashfsOptions,
@@ -61,14 +61,6 @@ export interface RokuDeployConfig {
      * rceToken of its own
      */
     rceToken?: string;
-    /**
-     * The root path to the folder holding your Roku project's source files
-     */
-    rootDir?: string;
-    /**
-     * An array of source file paths, globs, or {src,dest} objects for staging/zipping
-     */
-    files?: FileEntry[];
     /**
      * The working directory used to resolve relative paths
      */
