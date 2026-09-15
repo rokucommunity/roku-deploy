@@ -1433,7 +1433,6 @@ export class RokuDeploy {
                     })
                 ));
             }
-            util.interpolateEnvVars(config, configPath);
             //surface broken registry entries early (but only warn: an unused bad entry shouldn't
             //break every command — resolveDevice() still hard-fails when the entry is actually used)
             for (const name in config.devices ?? {}) {

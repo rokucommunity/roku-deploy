@@ -7811,50 +7811,6 @@ describe('RokuDeploy', () => {
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
             });
 
-            // eslint-disable-next-line no-template-curly-in-string
-            it('interpolates ${VAR} env references in string values, including nested ones', () => {
-                process.env.ROKU_DEPLOY_TEST_PASSWORD = 'secret';
-                process.env.ROKU_DEPLOY_TEST_TOKEN = 'tok';
-                try {
-                    fsExtra.outputFileSync(s`${tempDir}/rokudeploy.json`, `{
-                        "password": "\${ROKU_DEPLOY_TEST_PASSWORD}",
-                        "devices": {
-                            "emu": { "esn": "X1", "rceToken": "pre-\${ROKU_DEPLOY_TEST_TOKEN}-post" }
-                        },
-                        "files": ["source/**/*", "\${ROKU_DEPLOY_TEST_TOKEN}"],
-                        "timeout": 5000
-                    }`);
-                    const config = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                    expect(config.password).to.equal('secret');
-                    expect(config.devices.emu.rceToken).to.equal('pre-tok-post');
-                    expect(config.files).to.eql(['source/**/*', 'tok']);
-                    //non-string values pass through untouched
-                    expect(config.timeout).to.equal(5000);
-                } finally {
-                    delete process.env.ROKU_DEPLOY_TEST_PASSWORD;
-                    delete process.env.ROKU_DEPLOY_TEST_TOKEN;
-                }
-            });
-
-            it('throws for an unset env var, naming the variable and where it was used', () => {
-                delete process.env.ROKU_DEPLOY_TEST_MISSING;
-                fsExtra.outputFileSync(s`${tempDir}/rokudeploy.json`, `{
-                    "devices": {
-                        "emu": { "esn": "X1", "rceToken": "\${ROKU_DEPLOY_TEST_MISSING}" }
-                    }
-                }`);
-                let ex: Error;
-                try {
-                    rokuDeploy.loadConfigFile({ cwd: tempDir });
-                } catch (e) {
-                    ex = e as Error;
-                }
-                expect(ex).to.exist;
-                expect(ex.message).to.include(`Environment variable 'ROKU_DEPLOY_TEST_MISSING'`);
-                expect(ex.message).to.include('devices.emu.rceToken');
-                expect(ex.message).to.include('rokudeploy.json');
-            });
-
             it('warns (but does not throw) for an invalid device registry entry', () => {
                 const warnStub = sinon.stub(rokuDeploy['logger'], 'warn');
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
