@@ -7356,6 +7356,60 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
             expect(stub.getCall(0).args[0].timeout).to.equal(1234);
         });
+
+        it('uses settings from a per-call devices registry entry', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'constructor-entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({
+                device: 'office-tv',
+                devices: { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } }
+            } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('call-entry-pass');
+        });
+
+        describe('getDeviceSettings', () => {
+            const devices = {
+                'office-tv': { host: '1.2.3.4', rceToken: 'token', password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 },
+                'bare-tv': { host: '5.6.7.8' }
+            };
+            const officeSettings = { password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 };
+
+            it('returns only the settings fields of the registry entry the call targets', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: 'office-tv' })).to.eql(officeSettings);
+            });
+
+            it('omits settings the entry does not define', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: 'bare-tv' })).to.eql({});
+            });
+
+            it('falls back to the constructor device when the call names none', () => {
+                const rd = new RokuDeploy({ device: 'office-tv', devices: devices });
+                expect((rd as any).getDeviceSettings({})).to.eql(officeSettings);
+                expect((rd as any).getDeviceSettings(undefined)).to.eql(officeSettings);
+            });
+
+            it('returns nothing for an inline device config, no device, or an unknown name', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: { host: '1.2.3.4', password: 'inline' } })).to.eql({});
+                expect((rd as any).getDeviceSettings(undefined)).to.eql({});
+                expect((rd as any).getDeviceSettings({ device: 'unknown' })).to.eql({});
+            });
+
+            it('prefers the per-call registry and falls back to the constructor registry by name', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                const callDevices = { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } };
+                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: callDevices })).to.eql({ password: 'call-entry-pass' });
+                expect((rd as any).getDeviceSettings({ device: 'bare-tv', devices: callDevices })).to.eql({});
+                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: {} })).to.eql(officeSettings);
+            });
+        });
     });
 
     describe('option validation', () => {

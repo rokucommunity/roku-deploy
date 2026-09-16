@@ -4,6 +4,7 @@ import type { DeviceOption } from './DeviceConfig';
 /**
  * The per-device settings a devices registry entry may override, applied whenever the entry is targeted by name.
  * Precedence: explicit per-call options > these entry settings > constructor options.
+ * @public
  */
 export interface DeviceRegistrySettings {
     password?: string;
