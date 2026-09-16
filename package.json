@@ -85,7 +85,8 @@
     "files": [
         "dist/**/*.js",
         "dist/**/*.js.map",
-        "dist/index.d.ts"
+        "dist/index.d.ts",
+        "docs/rokudeploy.sample.json"
     ],
     "bin": {
         "roku-deploy": "dist/cli.js"

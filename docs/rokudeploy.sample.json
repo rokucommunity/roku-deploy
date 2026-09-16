@@ -1,0 +1,149 @@
+// Sample `rokudeploy.json` for roku-deploy v4. Copy it to your project root, keep the keys you
+// need, delete the rest. The file is jsonc: comments and trailing commas are allowed.
+//
+// The CLI auto-detects `rokudeploy.json` in the cwd; point at another file with `--config <path>`
+// or skip config loading with `--no-config`. Library consumers load it explicitly with
+// `rokuDeploy.loadConfigFile({ configPath, section })`.
+//
+// Layout: root-level values apply to every command; each per-command section (keyed by the CLI
+// command name) overrides the root when a key appears in both. Per-command precedence:
+//     CLI args  >  [command] section  >  root level  >  defaults
+{
+    //---- root-level common values, applied to every command ----
+
+    // The target device: a name from `devices` below, or an inline `{ "host": "..." }` object
+    "device": "living-room",
+    // Named device registry. Each entry is a local `{host}` box or an RCE `{esn}`/`{id}`/`{instanceUrl}` device
+    "devices": {
+        // A physical Roku on the local network, reached over http at `host`
+        "living-room": { "host": "192.168.1.101" },
+        // A Roku Cloud Emulator device by serial number; `rceToken` can also live at the root
+        "cloud-emulator": { "esn": "X000000000000000", "rceToken": "<your-rce-bearer-token>" }
+    },
+    // The developer-portal password of the target device
+    "password": "securePassword",
+    // The developer-portal username. Roku only supports `rokudev` (the default); shown for completeness
+    "username": "rokudev",
+    // Port used to install/sideload packages. Default 80
+    "packagePort": 80,
+    // Port used for External Control Protocol (ECP) commands like key presses. Default 8060
+    "ecpPort": 8060,
+    // Per-request network timeout, in milliseconds. Default 150000 (large uploads need headroom)
+    "timeout": 150000,
+    // Default RCE bearer token for cloud-emulator devices whose registry entry has no `rceToken`
+    "rceToken": "<your-rce-bearer-token>",
+    // Working directory that relative paths (rootDir, out, zip, pkg, ...) resolve against. Default: process cwd
+    "cwd": "./",
+    // Logger verbosity: `off`, `error`, `warn`, `log`, `info`, `debug`, or `trace`
+    "logLevel": "log",
+
+    //---- per-command sections, override the root for that command only ----
+
+    // `roku-deploy stage`: copy the project files into a staging folder
+    "stage": {
+        // Folder holding your Roku project source (manifest, components/, source/ live directly under it). Default './'
+        "rootDir": "./src",
+        // Where the staged files are written
+        "out": "./out/.roku-deploy-staging",
+        // File globs (relative to rootDir) or `{src, dest}` objects to include in the package
+        "files": [
+            "source/**/*.*",
+            "components/**/*.*",
+            "images/**/*.*",
+            "locale/**/*.*",
+            "manifest",
+            // copy an environment-specific file into the package under a different name
+            { "src": "configs/dev.config.json", "dest": "config.json" }
+        ]
+    },
+
+    // `roku-deploy zip`: zip a folder into an installable package
+    "zip": {
+        // The folder to zip (typically the staging folder written by `stage`)
+        "dir": "./out/.roku-deploy-staging",
+        // The zip file to write
+        "out": "./out/roku-deploy.zip",
+        // Globs (relative to `dir`) to include in the zip. Default: everything
+        "files": ["**/*"]
+    },
+
+    // `roku-deploy sideload`: install a package on the device
+    "sideload": {
+        // The zip to install. Mutually exclusive with `dir` (a folder to zip on the fly)
+        "zip": "./out/roku-deploy.zip",
+        // `channel` for apps (the default), `dcl` for component libraries
+        "appType": "channel",
+        // Ask the device to start the remote debugger when the app launches
+        "remoteDebug": false,
+        // Fail the command when the device reports a compile error. Default true
+        "failOnCompileError": true,
+        // Remove the existing dev channel before installing. Default true
+        "deleteDevChannel": true
+    },
+
+    // `roku-deploy squash`: convert the installed dev channel to squashfs. Only the common
+    // device/credential keys apply, so override them here when this command targets another box
+    "squash": {
+        // Target a different registry device for this command only
+        "device": "living-room"
+    },
+
+    // `roku-deploy rekey`: change the device's signing key using a previously signed package
+    "rekey": {
+        // Path to the signed .pkg whose key should be installed
+        "pkg": "./keys/signed.pkg",
+        // The signing password that goes with `pkg`
+        "signingPassword": "signingPassword",
+        // Optional: fail if the device's dev id after rekeying differs from this
+        "devId": "1234567890abcdef1234567890abcdef12345678"
+    },
+
+    // `roku-deploy package`: create a signed .pkg from the installed dev channel
+    "package": {
+        // The signing password of the key currently on the device
+        "signingPassword": "signingPassword",
+        // The .pkg file to write
+        "out": "./out/roku-deploy.pkg",
+        // Optional: fail if the device's dev id differs from this
+        "devId": "1234567890abcdef1234567890abcdef12345678"
+    },
+
+    // `roku-deploy deleteDevChannel`: remove the installed dev channel. Only the common
+    // device/credential keys apply
+    "deleteDevChannel": {
+        // Give the request a shorter timeout than the root value
+        "timeout": 30000
+    },
+
+    // `roku-deploy screenshot`: capture the device's current screen
+    "screenshot": {
+        // File path to save the screenshot to (or `true` to save into `screenshotDir`/the OS temp dir)
+        "out": "./out/screenshot.png",
+        // Swap/append the file extension to match the format the device returns. Default false
+        "autoExtension": true
+    },
+
+    // `roku-deploy rce start`: boot a Roku Cloud Emulator device
+    "rce.start": {
+        // The RCE device to start, by serial number (alternatives: `deviceId`)
+        "esn": "X000000000000000",
+        // Snapshot to boot from, by name (`live` selects the live snapshot); or use `snapshotId`
+        "snapshot": "live",
+        // Maximum runtime for the instance, in seconds
+        "maxRuntime": 3600,
+        // Block until the device reports `running`
+        "wait": true,
+        // How long `wait` polls before giving up, in seconds
+        "timeout": 300
+    },
+
+    // `roku-deploy rce stop`: shut down a Roku Cloud Emulator device
+    "rce.stop": {
+        // The RCE device to stop, by serial number (alternative: `deviceId`)
+        "esn": "X000000000000000",
+        // Block until the device reports `shutdown`
+        "wait": true,
+        // How long `wait` polls before giving up, in seconds
+        "timeout": 120
+    }
+}
