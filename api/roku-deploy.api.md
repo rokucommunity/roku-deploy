@@ -516,16 +516,6 @@ export class EcpNetworkAccessModeDisabledError extends DeviceError {
 }
 
 // @public (undocumented)
-export interface EcpOptions {
-    body?: string | Buffer;
-    ecpPort?: number;
-    headers?: Record<string, string>;
-    method?: 'GET' | 'POST';
-    timeout?: number;
-    verify?: boolean;
-}
-
-// @public (undocumented)
 export interface EcpResult {
     body: string;
     headers: Record<string, string | string[]>;
@@ -587,9 +577,6 @@ export type GetDevIdOptions = BaseEcpOptions;
 export interface GetDevIdResult {
     devId: string;
 }
-
-// @public (undocumented)
-export type GetInstalledPackagesOptions = BaseRequestOptions;
 
 // @public (undocumented)
 export interface GetRegistryOptions extends BaseEcpOptions {
@@ -983,7 +970,7 @@ export class RokuDeploy {
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
-    sendEcpRequest(device: DeviceOption, route: string, options?: EcpOptions): Promise<EcpResult>;
+    sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
@@ -1057,7 +1044,6 @@ export enum RokuDeployErrorCode {
 // @public (undocumented)
 export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
-    autoLaunch?: boolean;
     cwd?: string;
     deleteDevChannel?: boolean;
     device?: DeviceOption;
@@ -1080,7 +1066,6 @@ export interface RokuDeployOptions {
     rootDir?: string;
     screenshotDir?: string;
     signingPassword?: string;
-    stagingDir?: string;
     timeout?: number;
     username?: string;
 }
@@ -1144,6 +1129,15 @@ export interface RokuRendezvousItem {
 
 // @public (undocumented)
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export interface SendEcpRequestOptions extends BaseEcpOptions {
+    body?: string | Buffer;
+    headers?: Record<string, string>;
+    method?: 'GET' | 'POST';
+    route: string;
+    verify?: boolean;
+}
 
 // Warning: (ae-internal-missing-underscore) The name "SendKeyEventOptions" should be prefixed with an underscore because the declaration is marked as @internal
 //
