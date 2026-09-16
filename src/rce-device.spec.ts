@@ -753,7 +753,7 @@ const REQUEST_TIMEOUT = 30_000;
         //a zip of exactly (BOUNDARY - 1) and exactly BOUNDARY bytes and asserts the former fails, the latter
         //installs. ~2x the slowest observed case in this block against RCE (~13.6s).
         this.timeout(30_000);
-        const BOUNDARY = rokuDeploy.RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE;
+        const BOUNDARY = rokuDeploy.RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE'];
 
         //`n` incompressible chars, so 1 char of comment padding == ~1 zip byte and we can converge on an
         //exact zip size (a repeated char would compress away and give us no size control).

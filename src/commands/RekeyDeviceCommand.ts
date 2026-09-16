@@ -1,4 +1,5 @@
-import { rokuDeploy, util } from '../index';
+import { rokuDeploy } from '../index';
+import { util } from '../util';
 import * as path from 'path';
 import { loadCommandOptions } from './commandUtils';
 

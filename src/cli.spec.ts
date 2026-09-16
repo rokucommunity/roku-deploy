@@ -138,8 +138,7 @@ describe('cli', function cli() {
         await command.run({
             host: '1.2.3.4',
             password: '5536',
-            signingPassword: undefined,
-            stagingDir: stagingDir
+            signingPassword: undefined
         });
 
         expect(
@@ -148,8 +147,7 @@ describe('cli', function cli() {
             cwd: cwd,
             host: '1.2.3.4',
             password: '5536',
-            signingPassword: undefined,
-            stagingDir: stagingDir
+            signingPassword: undefined
         });
     });
 

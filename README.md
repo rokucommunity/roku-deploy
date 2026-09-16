@@ -192,7 +192,7 @@ If you'd like to use roku-deploy to copy files to a staging folder, you can do t
 import { rokuDeploy } from 'roku-deploy';
 rokuDeploy.stage({
     rootDir: "folder/with/your/source/code",
-    stagingDir: 'path/to/staging/folder',
+    out: 'path/to/staging/folder',
     files: [
         "source/**/*",
         "components/**/*",
@@ -581,9 +581,6 @@ Here are the available options for customizing to your developer-specific workfl
     ```
 
     *NOTE:* If you override this "files" property, you need to provide **all** config values, as your array will completely overwrite the default.
-
-- **stagingDir?:** string = `` `${options.outDir}/.roku-deploy-staging` ``
-   The path to the staging folder (where roku-deploy places all of the files right before zipping them up).
 
 - **convertToSquashfs?:** boolean = `false`
    If true we convert to squashfs before creating the pkg file.
