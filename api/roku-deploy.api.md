@@ -31,6 +31,8 @@ export interface BaseRequestOptions {
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     devPort?: number;
+    // @deprecated (undocumented)
+    packagePort?: number;
     // (undocumented)
     password: string;
     // (undocumented)
@@ -563,6 +565,8 @@ export interface DeviceRegistrySettings {
     devPort?: number;
     // (undocumented)
     ecpPort?: number;
+    // @deprecated (undocumented)
+    packagePort?: number;
     // (undocumented)
     password?: string;
     // (undocumented)
@@ -1470,6 +1474,8 @@ export interface RokuDeployConfig {
     ecpPort?: number;
     logLevel?: LogLevel | LogLevelNumeric;
     package?: Partial<CreateSignedPackageOptions>;
+    // @deprecated (undocumented)
+    packagePort?: number;
     password?: string;
     rceToken?: string;
     rekey?: Partial<RekeyDeviceOptions>;
@@ -1489,6 +1495,8 @@ export interface RokuDeployConstructorOptions {
     devPort?: number;
     ecpPort?: number;
     logger?: Logger;
+    // @deprecated (undocumented)
+    packagePort?: number;
     password?: string;
     rceToken?: string;
     timeout?: number;
@@ -1550,6 +1558,8 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
     logger?: Logger;
     logLevel?: LogLevel | LogLevelNumeric;
+    // @deprecated (undocumented)
+    packagePort?: number;
     packageUploadOverrides?: {
         route?: string;
         formData?: Record<string, any>;

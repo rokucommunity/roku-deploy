@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import { rokuDeploy } from './index';
 import { ConvertToSquashfsCommand } from './commands/ConvertToSquashfsCommand';
+import { SideloadCommand } from './commands/SideloadCommand';
 import { RekeyDeviceCommand } from './commands/RekeyDeviceCommand';
 import { CreateSignedPackageCommand } from './commands/CreateSignedPackageCommand';
 import { DeleteDevChannelCommand } from './commands/DeleteDevChannelCommand';
@@ -895,6 +896,38 @@ describe('cli', function cli() {
             });
 
             expect((stub.getCall(0).args[0] as any).password).to.equal('from-custom');
+        });
+    });
+
+    describe('deprecated packagePort alias', () => {
+        it('passes a config-file packagePort through to sideload', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                device: { host: '1.2.3.4' },
+                password: 'aaaa',
+                packagePort: 8085
+            });
+            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', results: {} });
+
+            await new SideloadCommand().run({ cwd: tempDir, zip: 'app.zip' });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.packagePort).to.equal(8085);
+            expect(options.devPort).to.be.undefined;
+        });
+
+        it('lists --packagePort as deprecated in the sideload help', () => {
+            const help = execSync(`node ${cwd}/dist/cli.js sideload --help`).toString();
+            expect(help).to.match(/--packagePort[\s\S]*?\[deprecated: use --devPort instead\]/);
+        });
+
+        it('parses --packagePort and validates it under the devPort label', () => {
+            const result = childProcess.spawnSync(
+                process.execPath,
+                [`${cwd}/dist/cli.js`, 'sideload', '--device', '1.2.3.4', '--password', 'aaaa', '--zip', 'app.zip', '--packagePort', '70000', '--no-config'],
+                { cwd: tempDir, encoding: 'utf8' }
+            );
+            expect(result.status).to.not.equal(0);
+            expect(result.stderr).to.include(`Invalid devPort: must be an integer between 1 and 65535, received '70000'`);
         });
     });
 });

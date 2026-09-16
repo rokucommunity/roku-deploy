@@ -196,7 +196,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
@@ -377,7 +377,7 @@ export class RokuDeploy {
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -430,7 +430,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['device', 'password', 'signingPassword']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -525,7 +525,7 @@ export class RokuDeploy {
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RekeyDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -704,7 +704,7 @@ export class RokuDeploy {
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -857,12 +857,12 @@ export class RokuDeploy {
     public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ValidateDeveloperPasswordOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const username = options.username ?? 'rokudev';
-        const port = options.devPort ?? 80;
+        const port = this.resolveDevPort(options) ?? 80;
         const timeout = options.timeout ?? 3000;
 
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
@@ -1531,7 +1531,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.devPort, 'devPort');
+        this.validatePort(this.resolveDevPort(options), 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -1832,7 +1832,7 @@ export class RokuDeploy {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
-        const devPort = mergedOptions.devPort ?? RokuDeploy.defaults.devPort;
+        const devPort = this.resolveDevPort(mergedOptions) ?? RokuDeploy.defaults.devPort;
         const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
         const username = mergedOptions.username ?? 'rokudev';
 
@@ -2599,7 +2599,7 @@ export class RokuDeploy {
     /**
      * Every key of DeviceRegistrySettings, as a record so TypeScript errors if the two ever drift apart.
      */
-    private static readonly deviceRegistrySettingsKeys: Record<keyof DeviceRegistrySettings, true> = { password: true, username: true, devPort: true, ecpPort: true, timeout: true };
+    private static readonly deviceRegistrySettingsKeys: Record<keyof DeviceRegistrySettings, true> = { password: true, username: true, devPort: true, packagePort: true, ecpPort: true, timeout: true };
 
     /**
      * Get the per-device settings (password, username, ports, timeout) carried by the devices registry entry
@@ -2614,6 +2614,11 @@ export class RokuDeploy {
             if (entry?.[key] !== undefined) {
                 (settings[key] as unknown) = entry[key];
             }
+        }
+        //an entry still using the deprecated alias must beat the constructor's devPort, so surface it under the current name
+        if (settings.devPort === undefined && settings.packagePort !== undefined) {
+            settings.devPort = settings.packagePort;
+            delete settings.packagePort;
         }
         return settings;
     }
@@ -2655,6 +2660,13 @@ export class RokuDeploy {
     /**
      * Validate that a port number is a valid integer between 1 and 65535
      */
+    /**
+     * The developer-server port in effect: `devPort`, falling back to the deprecated `packagePort` alias.
+     */
+    private resolveDevPort(options: { devPort?: number; packagePort?: number }): number | undefined {
+        return options.devPort ?? options.packagePort;
+    }
+
     private validatePort(value: unknown, name: string): void {
         if (value === undefined) {
             return; // Optional ports use defaults
@@ -3127,6 +3139,8 @@ export interface BaseRequestOptions {
     password: string;
     /** The port of the device's developer web server. Defaults to 80. */
     devPort?: number;
+    /** @deprecated Use `devPort` instead; removed in the next major. */
+    packagePort?: number;
     timeout?: number;
 }
 

@@ -49,6 +49,10 @@ export interface RokuDeployConfig {
      */
     devPort?: number;
     /**
+     * @deprecated Use `devPort` instead; removed in the next major.
+     */
+    packagePort?: number;
+    /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      */
     ecpPort?: number;

@@ -592,6 +592,9 @@ Here are the available options for customizing to your developer-specific workfl
 - **devPort?:** number = `80`
     The port of the device's developer web server (sideloading, packaging, rebooting, etc). This is mainly used when your roku is behind a firewall with a port-forward.
 
+- **packagePort?:** number
+    *Deprecated* alias of `devPort`, kept for one release; `devPort` wins when both are set. Will be removed in the next major.
+
 - **ecpPort?:** number = `8060`
     The port used for sending ECP/remote control commands (like key presses). This is mainly used when your roku is behind a firewall with a port-forward.
 
