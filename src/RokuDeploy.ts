@@ -3191,6 +3191,9 @@ export interface GetDevIdResult {
     devId: string;
 }
 
+/**
+ * @public
+ */
 export interface SideloadResult {
     /**
      * Human-readable summary of the sideload outcome
@@ -3202,6 +3205,9 @@ export interface SideloadResult {
     rokuMessages: RokuMessages;
 }
 
+/**
+ * @public
+ */
 export interface ConvertToSquashfsResult {
     /**
      * Any messages the device reported in its response
@@ -3209,6 +3215,9 @@ export interface ConvertToSquashfsResult {
     rokuMessages: RokuMessages;
 }
 
+/**
+ * @public
+ */
 export interface RebootDeviceResult {
     /**
      * Any messages the device reported in its response
@@ -3216,6 +3225,9 @@ export interface RebootDeviceResult {
     rokuMessages: RokuMessages;
 }
 
+/**
+ * @public
+ */
 export interface CheckForUpdateResult {
     /**
      * Any messages the device reported in its response
@@ -3223,6 +3235,9 @@ export interface CheckForUpdateResult {
     rokuMessages: RokuMessages;
 }
 
+/**
+ * @public
+ */
 export interface DeleteDevChannelResult {
     /**
      * Any messages the device reported in its response
@@ -3230,6 +3245,9 @@ export interface DeleteDevChannelResult {
     rokuMessages: RokuMessages;
 }
 
+/**
+ * @public
+ */
 export interface DeleteAllSideloadedPluginsResult {
     /**
      * Any messages the device reported in its response
