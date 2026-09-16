@@ -74,6 +74,7 @@ describe('cli', function cli() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
@@ -185,6 +186,7 @@ describe('cli', function cli() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
@@ -247,6 +249,7 @@ describe('cli', function cli() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4'
         });
     });
@@ -291,6 +294,7 @@ describe('cli', function cli() {
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
+            cwd: cwd,
             host: '1.2.3.4',
             password: '5536'
         });
@@ -563,7 +567,7 @@ describe('cli', function cli() {
         it('throws when neither deviceId nor esn is provided', async () => {
             await expectThrowsAsync(
                 new RceStopCommand().run({ cwd: tempDir, token: 'abc' }),
-                'A device is required. Pass --deviceId or --esn'
+                'A device is required. Pass --deviceId, --esn, or --device'
             );
         });
 
@@ -696,6 +700,201 @@ describe('cli', function cli() {
 
             expect(consoleOutput).to.include('my-device');
             expect(consoleOutput).to.include('pending');
+        });
+
+        it('resolves the device from a --device registry name and takes the token from its entry', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                devices: {
+                    emu: { esn: 'X123', rceToken: 'entry-token' }
+                }
+            });
+            const findStub = sinon.stub(RceManagementClient.prototype, 'findDeviceByEsn').resolves(makeDevice({ id: 5 }));
+            const stopStub = sinon.stub(RceManagementClient.prototype, 'stopDevice').resolves(makeDevice({ status: 'pending' }));
+
+            //no --token and no root rceToken: the registry entry's rceToken is the only token available
+            await new RceStopCommand().run({
+                cwd: tempDir,
+                device: 'emu'
+            });
+
+            expect(findStub.getCall(0).args[0]).to.eql({ esn: 'X123' });
+            expect(stopStub.getCall(0).args[0]).to.eql({ deviceId: 5 });
+        });
+
+        it('throws when the --device registry name is unknown', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                rceToken: 'root-token',
+                devices: { emu: { esn: 'X123' } }
+            });
+            await expectThrowsAsync(
+                new RceStopCommand().run({ cwd: tempDir, device: 'nope' }),
+                `Device 'nope' was not found in the devices registry`
+            );
+        });
+
+        it('throws for a --device name when no devices registry exists at all', async () => {
+            await expectThrowsAsync(
+                new RceStopCommand().run({ cwd: tempDir, token: 'abc', device: 'nope' }),
+                `Device 'nope' was not found in the devices registry`
+            );
+        });
+
+        it('throws for an inline root device config without an id or esn', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                rceToken: 'root-token',
+                device: { host: '1.2.3.4' }
+            });
+            await expectThrowsAsync(
+                new RceStopCommand().run({ cwd: tempDir }),
+                `Device '{"host":"1.2.3.4"}' is not an RCE device (needs an 'id' or 'esn')`
+            );
+        });
+
+        it('throws when the --device registry entry has no id or esn', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                rceToken: 'root-token',
+                devices: { tv: { host: '1.2.3.4' } }
+            });
+            await expectThrowsAsync(
+                new RceStopCommand().run({ cwd: tempDir, device: 'tv' }),
+                `Device 'tv' is not an RCE device (needs an 'id' or 'esn')`
+            );
+        });
+
+        it('applies rce.start section values that yargs used to clobber with defaults', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                rceToken: 'root-token',
+                'rce.start': { maxRuntime: 120 }
+            });
+            sinon.stub(RceManagementClient.prototype, 'getDevice').resolves(makeDevice());
+            const startStub = sinon.stub(RceManagementClient.prototype, 'startDevice').resolves(makeDevice({ status: 'pending' }));
+
+            await new RceStartCommand().run({
+                cwd: tempDir,
+                deviceId: 5,
+                snapshotId: 11,
+                firmwareVersionId: 'fw-1'
+            });
+
+            expect(startStub.getCall(0).args[0].start.maxRuntime).to.equal(120);
+        });
+    });
+
+    describe('config file integration', () => {
+        it('merges root values and the command section under CLI args', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                password: 'from-root',
+                screenshot: { out: './shots' }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4'
+            });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.password).to.equal('from-root');
+            expect(options.out).to.equal('./shots');
+            expect(options.host).to.equal('1.2.3.4');
+        });
+
+        it('CLI args win over the command section', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                password: 'from-root',
+                screenshot: { out: './shots' }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4',
+                out: './cli-wins'
+            });
+
+            expect((stub.getCall(0).args[0] as any).out).to.equal('./cli-wins');
+        });
+
+        it('--no-config bypasses the config file entirely', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                password: 'from-root',
+                screenshot: { out: './shots' }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            //yargs turns --no-config into config: false
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                config: false,
+                host: '1.2.3.4'
+            });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.password).to.be.undefined;
+            expect(options.out).to.be.undefined;
+        });
+
+        it('announces which config file was loaded', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'from-root' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+            sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4'
+            });
+
+            expect(consoleOutput).to.include(`Using config: ${s`${tempDir}/rokudeploy.json`}`);
+        });
+
+        it('stays silent when no config file exists', async () => {
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+            sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                host: '1.2.3.4'
+            });
+
+            expect(consoleOutput).to.not.include('Using config');
+        });
+
+        it('resolves a registry device name from the config file (the CLI has no constructor registry)', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                device: 'office-tv',
+                password: 'aaaa',
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({ cwd: tempDir });
+
+            const options = stub.getCall(0).args[0] as any;
+            expect(options.device).to.equal('office-tv');
+            expect(options.devices['office-tv']).to.eql({ host: '1.2.3.4' });
+        });
+
+        it('loads the file named by --config instead of cwd/rokudeploy.json', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/elsewhere/deploy-config.json`, {
+                password: 'from-custom'
+            });
+            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
+
+            await new CaptureScreenshotCommand().run({
+                cwd: tempDir,
+                config: `${tempDir}/elsewhere/deploy-config.json`,
+                host: '1.2.3.4'
+            });
+
+            expect((stub.getCall(0).args[0] as any).password).to.equal('from-custom');
         });
     });
 });

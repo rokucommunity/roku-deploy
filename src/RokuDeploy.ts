@@ -25,7 +25,9 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { ConfigSectionName, ResolvedSectionOptions, RokuDeployConfig, RootConfigOptions } from './RokuDeployConfig';
+import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -197,7 +199,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
@@ -377,7 +379,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         let squashfsConfirmedAfterInvalidResponse = false;
         const results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -430,7 +432,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = options.cwd ?? process.cwd();
 
@@ -525,7 +527,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
@@ -609,6 +611,7 @@ export class RokuDeploy {
                 device: options.device,
                 route: 'query/device-info',
                 verify: true,
+                devices: options.devices,
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -703,7 +706,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -779,7 +782,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as RebootDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -815,7 +818,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as CheckForUpdateOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -854,7 +857,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
@@ -927,7 +930,7 @@ export class RokuDeploy {
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
@@ -1043,7 +1046,7 @@ export class RokuDeploy {
             const key = options.keys[stepIndex];
             let result: EcpResult;
             try {
-                result = await this.keyPress({ device: options.device, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
+                result = await this.keyPress({ device: options.device, devices: options.devices, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
             } catch (error) {
                 throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
             }
@@ -1063,7 +1066,7 @@ export class RokuDeploy {
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
         this.checkRequiredOptions(options, ['device']);
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (!isRceDeviceConfig(deviceConfig)) {
             throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
         }
@@ -1096,6 +1099,7 @@ export class RokuDeploy {
             route: `launch/${encodeURIComponent(options.appId)}${queryString}`,
             method: 'POST',
             verify: true,
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1115,6 +1119,7 @@ export class RokuDeploy {
             device: options.device,
             route: `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1158,6 +1163,7 @@ export class RokuDeploy {
         try {
             result = await this.sendEcpRequest({
                 device: options.device,
+                devices: options.devices,
                 route: 'query/apps',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -1203,6 +1209,7 @@ export class RokuDeploy {
         try {
             result = await this.sendEcpRequest({
                 device: options.device,
+                devices: options.devices,
                 route: 'query/active-app',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -1236,6 +1243,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: `query/registry/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1277,6 +1285,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: `query/app-state/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1307,6 +1316,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: 'query/sgrendezvous',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1340,6 +1350,7 @@ export class RokuDeploy {
             device: options.device,
             route: `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1359,7 +1370,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1380,7 +1391,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1400,7 +1411,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
         this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1440,7 +1451,7 @@ export class RokuDeploy {
         options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1452,21 +1463,44 @@ export class RokuDeploy {
     }
 
     /**
-     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
+     * about invalid device-registry entries. With no `section`, returns the full config. With a
+     * `section`, returns the flattened options for that section: root-level values overlaid with the
+     * section's values (section wins on collision), all other sections stripped; `section: null`
+     * flattens the same way for a consumer with no section of its own. The library never loads
+     * config implicitly — the CLI calls this for every command; library consumers call it explicitly.
      * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
+    /**
+     * @public
+     */
+    public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
+    /**
+     * @public
+     */
+    public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
+    /**
+     * @public
+     */
+    public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
+    /**
+     * @public
+     */
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
+        let config: RokuDeployConfig = {};
         if (fsExtra.existsSync(configPath)) {
             const configFileText = fsExtra.readFileSync(configPath).toString();
             const parseErrors: ParseError[] = [];
-            const fileOptions = parseJsonc(configFileText, parseErrors, {
+            //empty file (or a bare comment) parses to undefined
+            config = parseJsonc(configFileText, parseErrors, {
                 allowEmptyContent: true,
                 allowTrailingComma: true,
                 disallowComments: false
-            });
+            }) ?? {};
             if (parseErrors.length > 0) {
                 throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
                     parseErrors.map(x => {
@@ -1478,9 +1512,31 @@ export class RokuDeploy {
                     })
                 ));
             }
-            return fileOptions;
+            //surface broken registry entries early (but only warn: an unused bad entry shouldn't
+            //break every command — resolveDevice() still hard-fails when the entry is actually used)
+            for (const name in config.devices ?? {}) {
+                try {
+                    validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
+                } catch (e) {
+                    this.logger.warn(`${configPath}: ${(e as Error).message}`);
+                }
+            }
         }
-        return {};
+        //no section requested: hand back the whole config
+        if (options?.section === undefined) {
+            return config;
+        }
+        //flatten for one section: root values with the section overlaid, other sections stripped
+        const result: Record<string, any> = {};
+        for (const key in config) {
+            if (!configSectionNames.includes(key as ConfigSectionName)) {
+                result[key] = config[key];
+            }
+        }
+        if (options.section !== null) {
+            Object.assign(result, config[options.section]);
+        }
+        return result;
     }
 
     /**
@@ -2046,7 +2102,7 @@ export class RokuDeploy {
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['device', 'key']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (isRceDeviceConfig(deviceConfig)) {
             try {
                 const rceToken = this.getRceToken(deviceConfig);
@@ -2072,6 +2128,7 @@ export class RokuDeploy {
             device: options.device,
             route: `${options.action}/${encodeURIComponent(options.key)}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2361,10 +2418,10 @@ export class RokuDeploy {
      * Resolve a DeviceOption (string or DeviceConfig) to a concrete DeviceConfig.
      * If string, looks up in the devices registry. If object, validates and returns.
      */
-    private resolveDevice(device: DeviceOption): DeviceConfig {
-        // String = registry lookup
+    private resolveDevice(device: DeviceOption, devices?: Record<string, DeviceRegistryEntry>): DeviceConfig {
+        // String = registry lookup (per-call registry wins; constructor registry is the fallback)
         if (typeof device === 'string') {
-            const entry = this.options.devices?.[device];
+            const entry = devices?.[device] ?? this.options.devices?.[device];
             if (!entry) {
                 throw new Error(`Device '${device}' not found in devices registry`);
             }
@@ -2645,6 +2702,9 @@ export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
     device: DeviceOption;
 
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
+
     /** The developer password to check */
     password: string;
 
@@ -2868,6 +2928,8 @@ export interface PackageUploadOverridesOptions {
  */
 export interface BaseRequestOptions {
     device: DeviceOption;
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
     username?: string;
     password: string;
     packagePort?: number;
@@ -2879,6 +2941,8 @@ export interface BaseRequestOptions {
  */
 export interface BaseEcpOptions {
     device: DeviceOption;
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
     timeout?: number;

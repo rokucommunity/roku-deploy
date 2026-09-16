@@ -2,6 +2,7 @@
 //everything else (util, sockets, the RCE management/video-signaling clients) is internal.
 export * from './RokuDeploy';
 export * from './RokuDeployOptions';
+export * from './RokuDeployConfig';
 export * from './Errors';
 export * from './DeviceInfo';
 export * from './DeviceConfig';
