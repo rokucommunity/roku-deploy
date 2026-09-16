@@ -15,6 +15,7 @@ import type { LogLevelNumeric } from '@rokucommunity/logger';
 export interface BaseEcpOptions {
     // (undocumented)
     device: DeviceOption;
+    devices?: Record<string, DeviceRegistryEntry>;
     // (undocumented)
     ecpPort?: number;
     timeout?: number;
@@ -24,6 +25,7 @@ export interface BaseEcpOptions {
 export interface BaseRequestOptions {
     // (undocumented)
     device: DeviceOption;
+    devices?: Record<string, DeviceRegistryEntry>;
     // (undocumented)
     packagePort?: number;
     // (undocumented)
@@ -76,6 +78,12 @@ export class CompileError extends RokuDeployError<CompileErrorDetails> {
 
 // @public
 export type CompileErrorDetails = DeviceErrorDetails;
+
+// @public
+export type ConfigSectionName = typeof configSectionNames[number];
+
+// @public
+export const configSectionNames: readonly ["sideload", "stage", "zip", "squash", "rekey", "package", "deleteDevChannel", "screenshot", "rce.start", "rce.stop"];
 
 // @public
 export abstract class ConfigurationError extends RokuDeployError<ConfigurationErrorDetails> {
@@ -801,6 +809,28 @@ export interface RceDeviceConfigByUrl {
     rceToken?: string;
 }
 
+// @public
+export interface RceStartConfig {
+    deviceId?: number;
+    esn?: string;
+    firmwareVersionId?: string;
+    maxRuntime?: number;
+    snapshot?: string;
+    snapshotId?: number;
+    timeout?: number;
+    token?: string;
+    wait?: boolean;
+}
+
+// @public
+export interface RceStopConfig {
+    deviceId?: number;
+    esn?: string;
+    timeout?: number;
+    token?: string;
+    wait?: boolean;
+}
+
 // @public (undocumented)
 export type RebootDeviceOptions = BaseRequestOptions;
 
@@ -884,6 +914,9 @@ export enum RemoteKey {
 // @public (undocumented)
 export type RemoteKeyText = keyof typeof RemoteKey;
 
+// @public
+export type ResolvedSectionOptions<T extends ConfigSectionName> = RootConfigOptions & NonNullable<RokuDeployConfig[T]>;
+
 // @public (undocumented)
 export interface ResolveFilesArrayOptions {
     // (undocumented)
@@ -961,7 +994,21 @@ export class RokuDeploy {
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
-    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
+    loadConfigFile(options?: LoadConfigFileOptions & {
+        section?: undefined;
+    }): RokuDeployConfig;
+    // (undocumented)
+    loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & {
+        section: T;
+    }): ResolvedSectionOptions<T>;
+    // (undocumented)
+    loadConfigFile(options: LoadConfigFileOptions & {
+        section: null;
+    }): RootConfigOptions;
+    // (undocumented)
+    loadConfigFile(options: LoadConfigFileOptions & {
+        section: ConfigSectionName | null;
+    }): Record<string, any>;
     readonly logger: typeof logger;
     // Warning: (ae-forgotten-export) The symbol "HttpResponse" needs to be exported by the entry point index.d.ts
     //
@@ -986,6 +1033,30 @@ export class RokuDeploy {
 
 // @public (undocumented)
 export const rokuDeploy: RokuDeploy;
+
+// @public
+export interface RokuDeployConfig {
+    'rce.start'?: RceStartConfig;
+    'rce.stop'?: RceStopConfig;
+    cwd?: string;
+    deleteDevChannel?: Partial<DeleteDevChannelOptions>;
+    device?: DeviceOption;
+    devices?: Record<string, DeviceRegistryEntry>;
+    ecpPort?: number;
+    logLevel?: LogLevel | LogLevelNumeric;
+    package?: Partial<CreateSignedPackageOptions>;
+    packagePort?: number;
+    password?: string;
+    rceToken?: string;
+    rekey?: Partial<RekeyDeviceOptions>;
+    screenshot?: Partial<CaptureScreenshotOptions>;
+    sideload?: Partial<SideloadOptions>;
+    squash?: Partial<ConvertToSquashfsOptions>;
+    stage?: Partial<StageOptions>;
+    timeout?: number;
+    username?: string;
+    zip?: Partial<ZipOptions>;
+}
 
 // @public
 export interface RokuDeployConstructorOptions {
@@ -1127,6 +1198,9 @@ export interface RokuRendezvousItem {
     startTime: string;
 }
 
+// @public
+export type RootConfigOptions = Omit<RokuDeployConfig, ConfigSectionName>;
+
 // @public (undocumented)
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
@@ -1250,6 +1324,7 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
 // @public (undocumented)
 export interface ValidateDeveloperPasswordOptions {
     device: DeviceOption;
+    devices?: Record<string, DeviceRegistryEntry>;
     password: string;
     port?: number;
     timeout?: number;

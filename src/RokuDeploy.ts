@@ -1472,9 +1472,21 @@ export class RokuDeploy {
      * @public
      */
     public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
+    /**
+     * @public
+     */
     public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
+    /**
+     * @public
+     */
     public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
+    /**
+     * @public
+     */
     public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
+    /**
+     * @public
+     */
     public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
