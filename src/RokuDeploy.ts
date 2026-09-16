@@ -43,6 +43,7 @@ export class RokuDeploy {
 
     /**
      * Create a new RokuDeploy instance with optional default options
+     * @public
      */
     constructor(options?: RokuDeployConstructorOptions) {
         //`config` drives config-file loading and must not leak into the options merged into method calls
@@ -116,7 +117,7 @@ export class RokuDeploy {
      * Load the root-level (section-less) values from the config source given to the constructor.
      * `true` reads `rokudeploy.json` from cwd (a missing file is fine); a string path must exist.
      */
-    private loadConstructorConfig(): Record<string, any> {
+    private loadConstructorConfig(): RootConfigOptions {
         if (!this.config) {
             return {};
         }
@@ -129,7 +130,7 @@ export class RokuDeploy {
         } else {
             configPath = path.join(process.cwd(), 'rokudeploy.json');
         }
-        const values: Record<string, any> = this.loadConfigFile({ configPath: configPath, section: null });
+        const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: configPath, section: null });
         //a root-level `config` key has no meaning as a method option, so keep it out of the merge
         delete values.config;
         return values;
@@ -138,6 +139,7 @@ export class RokuDeploy {
     /**
      * Re-read the config source given to the constructor and rebuild the effective instance options
      * (same precedence and missing-file rules as construction). No-op when no `config` was given.
+     * @public
      */
     public reloadConfig(): void {
         this.options = this.buildEffectiveOptions();
