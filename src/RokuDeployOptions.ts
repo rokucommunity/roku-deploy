@@ -9,7 +9,7 @@ import type { DeviceOption } from './DeviceConfig';
 export interface DeviceRegistrySettings {
     password?: string;
     username?: string;
-    packagePort?: number;
+    devPort?: number;
     ecpPort?: number;
     timeout?: number;
 }
@@ -63,9 +63,9 @@ export interface RokuDeployConstructorOptions {
      */
     username?: string;
     /**
-     * The port that should be used when installing the package. Defaults to 80.
+     * The port of the device's developer web server (sideload, package, reboot, etc). Defaults to 80.
      */
-    packagePort?: number;
+    devPort?: number;
     /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      */
@@ -134,11 +134,10 @@ export interface RokuDeployOptions {
     devices?: Record<string, DeviceRegistryEntry>;
 
     /**
-     * The port that should be used when installing the package. Defaults to 80.
-     * This is mainly useful for things like emulators that use alternate ports,
-     * or when publishing through some type of port forwarding configuration.
+     * The port of the device's developer web server (sideload, package, reboot, etc). Defaults to 80.
+     * Mainly useful for emulators or Rokus behind a port-forward.
      */
-    packagePort?: number;
+    devPort?: number;
 
     /**
      * When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. Defaults to false.

@@ -589,8 +589,8 @@ Here are the available options for customizing to your developer-specific workfl
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
     just in case roku adds support for custom usernames in the future.
 
-- **packagePort?:** number = `80`
-    The port used for package-related requests. This is mainly used when your roku is behind a firewall with a port-forward.
+- **devPort?:** number = `80`
+    The port of the device's developer web server (sideloading, packaging, rebooting, etc). This is mainly used when your roku is behind a firewall with a port-forward.
 
 - **ecpPort?:** number = `8060`
     The port used for sending ECP/remote control commands (like key presses). This is mainly used when your roku is behind a firewall with a port-forward.

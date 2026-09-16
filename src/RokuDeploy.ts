@@ -74,7 +74,7 @@ export class RokuDeploy {
          * so this is much lower than `timeout` (which must accommodate large installer uploads).
          */
         ecpTimeout: 10000,
-        packagePort: 80,
+        devPort: 80,
         ecpPort: 8060,
         outDir: './out',
         outFile: 'roku-deploy.zip'
@@ -196,7 +196,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
@@ -377,7 +377,7 @@ export class RokuDeploy {
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -430,7 +430,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
         this.checkRequiredOptions(options, ['device', 'password', 'signingPassword']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -525,7 +525,7 @@ export class RokuDeploy {
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RekeyDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -704,7 +704,7 @@ export class RokuDeploy {
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -857,11 +857,12 @@ export class RokuDeploy {
     public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ValidateDeveloperPasswordOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
+        this.validatePort(options.devPort, 'devPort');
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const username = options.username ?? 'rokudev';
-        const port = options.port ?? 80;
+        const port = options.devPort ?? 80;
         const timeout = options.timeout ?? 3000;
 
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
@@ -1530,7 +1531,7 @@ export class RokuDeploy {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['device', 'password']);
-        this.validatePort(options.packagePort, 'packagePort');
+        this.validatePort(options.devPort, 'devPort');
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
@@ -1831,11 +1832,11 @@ export class RokuDeploy {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options
-        const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
+        const devPort = mergedOptions.devPort ?? RokuDeploy.defaults.devPort;
         const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
         const username = mergedOptions.username ?? 'rokudev';
 
-        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
+        const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, devPort);
         let baseRequestOptions = {
             url: `${baseUrl}/${requestPath}`,
             timeout: timeout,
@@ -1859,10 +1860,10 @@ export class RokuDeploy {
      * the installer's own HTTP Digest challenge) - two independent auth layers that can't share the
      * `Authorization` header.
      */
-    private async getInstallerRequestBase(deviceConfig: DeviceConfig, packagePort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
+    private async getInstallerRequestBase(deviceConfig: DeviceConfig, devPort: number): Promise<{ baseUrl: string; headers: Record<string, string> }> {
         if (!isRceDeviceConfig(deviceConfig)) {
             return {
-                baseUrl: `http://${deviceConfig.host}:${packagePort}`,
+                baseUrl: `http://${deviceConfig.host}:${devPort}`,
                 headers: {}
             };
         }
@@ -2598,7 +2599,7 @@ export class RokuDeploy {
     /**
      * Every key of DeviceRegistrySettings, as a record so TypeScript errors if the two ever drift apart.
      */
-    private static readonly deviceRegistrySettingsKeys: Record<keyof DeviceRegistrySettings, true> = { password: true, username: true, packagePort: true, ecpPort: true, timeout: true };
+    private static readonly deviceRegistrySettingsKeys: Record<keyof DeviceRegistrySettings, true> = { password: true, username: true, devPort: true, ecpPort: true, timeout: true };
 
     /**
      * Get the per-device settings (password, username, ports, timeout) carried by the devices registry entry
@@ -2903,8 +2904,8 @@ export interface ValidateDeveloperPasswordOptions {
     /** Defaults to `'rokudev'` */
     username?: string;
 
-    /** Defaults to `80` (the developer web-server port) */
-    port?: number;
+    /** The port of the device's developer web server. Defaults to `80`. */
+    devPort?: number;
 
     /** Defaults to `3000` (milliseconds per HTTP round-trip) */
     timeout?: number;
@@ -3124,7 +3125,8 @@ export interface BaseRequestOptions {
     devices?: Record<string, DeviceRegistryEntry>;
     username?: string;
     password: string;
-    packagePort?: number;
+    /** The port of the device's developer web server. Defaults to 80. */
+    devPort?: number;
     timeout?: number;
 }
 

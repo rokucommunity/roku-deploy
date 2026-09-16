@@ -45,9 +45,9 @@ export interface RokuDeployConfig {
      */
     password?: string;
     /**
-     * The port that should be used when installing the package. Defaults to 80.
+     * The port of the device's developer web server (sideload, package, reboot, etc). Defaults to 80.
      */
-    packagePort?: number;
+    devPort?: number;
     /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      */
