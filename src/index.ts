@@ -9,6 +9,6 @@ export * from './DeviceConfig';
 export * from './RokuDeploySocket';
 export * from './RceManagementClient';
 export * from './RceVideoSignalingClient';
-//`standardizePath`/`standardizePathPosix` are long-standing public path helpers used across the
+//`standardizePath`/`standardizePathPosix`/`getDestPath` are long-standing public helpers used across the
 //ecosystem; keep them public while the rest of `util` stays internal.
-export { standardizePath, standardizePathPosix } from './util';
+export { standardizePath, standardizePathPosix, getDestPath } from './util';

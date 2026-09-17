@@ -709,6 +709,9 @@ export interface GetAppStateOptions extends BaseEcpOptions {
     appId: string;
 }
 
+// @public
+export function getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch?: boolean): string;
+
 // @public (undocumented)
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
