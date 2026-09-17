@@ -10,6 +10,8 @@ import type { Logger } from '@rokucommunity/logger';
 import { logger } from '@rokucommunity/logger';
 import type { LogLevel } from '@rokucommunity/logger';
 import type { LogLevelNumeric } from '@rokucommunity/logger';
+import * as net from 'net';
+import * as stream from 'stream';
 import * as WebSocket from 'ws';
 
 // @public (undocumented)
@@ -139,6 +141,9 @@ export type ConvertToSquashfsOptions = BaseRequestOptions;
 export interface CreateEcpSocketOptions extends BaseEcpOptions {
     route: string;
 }
+
+// @public
+export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket;
 
 // @public (undocumented)
 export interface CreateSignedPackageOptions extends BaseRequestOptions {
@@ -693,19 +698,13 @@ export function isMissingRequiredOptionError(e: unknown): e is MissingRequiredOp
 // @public
 export function isRceDeviceConfig(config: DeviceConfigLike): config is RceDeviceConfig;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigByEsn" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigByEsn(config: DeviceConfigLike): config is RceDeviceConfigByEsn;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigById" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDeviceConfigById;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigByUrl" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl;
 
 // @public
@@ -767,6 +766,30 @@ export interface LocalDeviceConfig {
     host: string;
 }
 
+// Warning: (ae-internal-missing-underscore) The name "LocalSocket" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class LocalSocket extends net.Socket {
+    constructor(options: LocalSocketOptions);
+    connect(connectListener?: () => void): this;
+    // (undocumented)
+    connect(connectOptions: net.SocketConnectOpts, connectListener?: () => void): this;
+    // (undocumented)
+    connect(port: number, host?: string, connectListener?: () => void): this;
+    // (undocumented)
+    connect(port: number, connectListener?: () => void): this;
+    // (undocumented)
+    connect(path: string, connectListener?: () => void): this;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "LocalSocketOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface LocalSocketOptions extends SocketOptions {
+    // (undocumented)
+    device: LocalDeviceConfig;
+}
+
 // Warning: (ae-internal-missing-underscore) The name "ManifestData" should be prefixed with an underscore because the declaration is marked as @internal
 //
 // @internal (undocumented)
@@ -818,6 +841,38 @@ export interface RceDeviceConfigByUrl {
     instanceUrl: string;
     // (undocumented)
     rceToken?: string;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RceSocket" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class RceSocket extends stream.Duplex {
+    constructor(options: RceSocketOptions);
+    connect(connectListener?: () => void): this;
+    _destroy(error: Error | undefined, callback: (error?: Error | null) => void): void;
+    emit(event: string | symbol, ...args: any[]): boolean;
+    _final(callback: (error?: Error | null) => void): void;
+    // (undocumented)
+    get localAddress(): string | undefined;
+    // (undocumented)
+    get localFamily(): string | undefined;
+    // (undocumented)
+    get localPort(): number | undefined;
+    _read(size: number): void;
+    get remoteAddress(): string | undefined;
+    // (undocumented)
+    get remotePort(): number | undefined;
+    setTimeout(timeoutMilliseconds: number, timeoutListener?: () => void): this;
+    get timeout(): number | undefined;
+    _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RceSocketOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface RceSocketOptions extends SocketOptions {
+    // (undocumented)
+    device: RceDeviceConfig;
 }
 
 // @public
@@ -1157,6 +1212,32 @@ export interface RokuDeployOptions {
     username?: string;
 }
 
+// @public
+export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
+    // (undocumented)
+    connect: (connectListener?: () => void) => this;
+    // (undocumented)
+    destroy: (error?: Error) => this;
+    // (undocumented)
+    readonly destroyed: boolean;
+    // (undocumented)
+    end: ((callback?: () => void) => this) & ((buffer: Uint8Array | string, callback?: () => void) => this) & ((str: Uint8Array | string, encoding?: BufferEncoding, callback?: () => void) => this);
+    // (undocumented)
+    readonly localAddress?: string;
+    // (undocumented)
+    readonly localFamily?: string;
+    // (undocumented)
+    readonly localPort?: number;
+    // (undocumented)
+    readonly remoteAddress?: string;
+    // (undocumented)
+    readonly remotePort?: number;
+    // (undocumented)
+    setTimeout: (timeout: number, callback?: () => void) => this;
+    // (undocumented)
+    readonly timeout?: number;
+}
+
 // @public (undocumented)
 export interface RokuHeapSnapshotTrigger {
     timestamp?: number;
@@ -1279,6 +1360,12 @@ export type SideloadOptions = BaseSideloadOptions & ({
     dir: string;
     zip?: never;
 });
+
+// @public
+export interface SocketOptions {
+    device: DeviceConfig;
+    port: number;
+}
 
 // @public (undocumented)
 export interface StageOptions {
