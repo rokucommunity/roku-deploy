@@ -10,6 +10,7 @@ import type { Logger } from '@rokucommunity/logger';
 import { logger } from '@rokucommunity/logger';
 import type { LogLevel } from '@rokucommunity/logger';
 import type { LogLevelNumeric } from '@rokucommunity/logger';
+import * as WebSocket from 'ws';
 
 // @public (undocumented)
 export interface BaseEcpOptions {
@@ -133,6 +134,11 @@ export interface ConvertErrorDetails {
 
 // @public (undocumented)
 export type ConvertToSquashfsOptions = BaseRequestOptions;
+
+// @public (undocumented)
+export interface CreateEcpSocketOptions extends BaseEcpOptions {
+    route: string;
+}
 
 // @public (undocumented)
 export interface CreateSignedPackageOptions extends BaseRequestOptions {
@@ -528,6 +534,11 @@ export interface EcpResult {
     body: string;
     headers: Record<string, string | string[]>;
     status: number | undefined;
+}
+
+// @public (undocumented)
+export interface EnablePerfettoTracingOptions extends BaseEcpOptions {
+    appId: string;
 }
 
 // @public (undocumented)
@@ -970,11 +981,14 @@ export class RokuDeploy {
     // (undocumented)
     closeChannel(options: CloseChannelOptions): Promise<void>;
     convertToSquashfs(options: ConvertToSquashfsOptions): Promise<any>;
+    createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket>;
     createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult>;
+    protected createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket;
     deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions): Promise<void>;
     deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
     deleteComponentLibrary(options?: DeleteComponentLibraryOptions): Promise<void>;
     deleteDevChannel(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
+    enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing>;
     enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo;
     exitApp(options: ExitAppOptions): Promise<void>;
     getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp>;
@@ -1026,6 +1040,8 @@ export class RokuDeploy {
         results: any;
     }>;
     stage(options: StageOptions): Promise<StageResult>;
+    startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket>;
+    triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger>;
     validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean>;
     withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T>;
     zip(options: ZipOptions): Promise<ZipResult>;
@@ -1142,6 +1158,12 @@ export interface RokuDeployOptions {
 }
 
 // @public (undocumented)
+export interface RokuHeapSnapshotTrigger {
+    timestamp?: number;
+    timestampEnd?: number;
+}
+
+// @public (undocumented)
 export interface RokuMessages {
     // (undocumented)
     errors: string[];
@@ -1149,6 +1171,14 @@ export interface RokuMessages {
     infos: string[];
     // (undocumented)
     successes: string[];
+}
+
+// @public (undocumented)
+export interface RokuPerfettoTracing {
+    applicationAlreadyStarted: boolean;
+    enabledChannels: string[];
+    timestamp?: number;
+    timestampEnd?: number;
 }
 
 // @public (undocumented)
@@ -1277,6 +1307,14 @@ export function standardizePath(stringParts: any, ...expressions: any[]): string
 
 // @public
 export function standardizePathPosix(stringParts: any, ...expressions: any[]): string;
+
+// @public (undocumented)
+export type StartPerfettoSessionOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export interface TriggerHeapSnapshotOptions extends BaseEcpOptions {
+    appId: string;
+}
 
 // @public
 export class UnauthorizedDeviceResponseError extends DeviceError {
