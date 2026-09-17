@@ -3940,7 +3940,7 @@ describe('RokuDeploy', () => {
                 await expectThrowsAsync(
                     rokuDeploy.sideload({ device: { host: '1.2.3.4' }, password: 'password', zip: zipFile, close: false }),
                     `Failed to publish: Install Failure: Unzip failed. Invalid or corrupt zip archive. ` +
-                    `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE} bytes often cause this.`
+                    `The supplied zip is ${zipSize} bytes, and zips smaller than ${RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']} bytes often cause this.`
                 );
             });
 
@@ -3978,7 +3978,7 @@ describe('RokuDeploy', () => {
             });
 
             it('does NOT append a hint to a thrown corrupt-zip error when the zip is large enough', async () => {
-                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']));
                 sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake(() => {
                     return Promise.reject(new Error('Install Failure: Unzip failed. Invalid or corrupt zip archive.'));
                 });
@@ -4009,7 +4009,7 @@ describe('RokuDeploy', () => {
 
             it('does NOT append a hint when a corrupt-zip response comes from a large-enough zip', async () => {
                 //overwrite the dummy zip with one at/above the minimum installable size
-                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy.MINIMUM_INSTALLABLE_ZIP_SIZE));
+                fsExtra.outputFileSync(zipFile, 'a'.repeat(RokuDeploy['MINIMUM_INSTALLABLE_ZIP_SIZE']));
                 mockDoPostRequest('Install Failure: Unzip failed. Invalid or corrupt zip archive.');
 
                 //no hint => the corrupt-zip body is not turned into a thrown error, so sideload resolves normally
@@ -7026,6 +7026,30 @@ describe('RokuDeploy', () => {
     });
 
     describe('resolveDevice', () => {
+        it('resolves a name from a per-call devices registry (how the CLI passes config-file registries)', async () => {
+            //no constructor registry at all — the registry arrives with the call, like CLI config flow
+            const rd = new RokuDeploy();
+            sinon.stub(rd as any, 'doGetRequest').callsFake(() => {
+                let results = fakeHttpResponse(200, '<device-info><serial-number>SN123</serial-number></device-info>');
+                rd['checkRequest'](results);
+                return Promise.resolve(results);
+            });
+            const deviceInfo = await rd.getDeviceInfo({
+                device: 'office-tv',
+                devices: { 'office-tv': { host: '1.2.3.4' } }
+            });
+            expect(deviceInfo['serial-number']).to.eql('SN123');
+        });
+
+        it('per-call registry wins over the constructor registry; constructor is the fallback', () => {
+            const rd = new RokuDeploy({
+                devices: { tv: { host: '9.9.9.9' }, den: { host: '8.8.8.8' } }
+            });
+            expect(rd['resolveDevice']('tv', { tv: { host: '1.1.1.1' } })).to.eql({ host: '1.1.1.1' });
+            //name missing from the per-call registry falls back to the constructor's
+            expect(rd['resolveDevice']('den', { tv: { host: '1.1.1.1' } })).to.eql({ host: '8.8.8.8' });
+        });
+
         it('resolves a device from the devices registry by host', async () => {
             const rd = new RokuDeploy({
                 devices: {
@@ -8055,17 +8079,34 @@ describe('RokuDeploy', () => {
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             });
 
+            it('works when loading a command section from rokudeploy.json', () => {
+                sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
+                    return true;
+                });
+                sinon.stub(fsExtra, 'readFileSync').returns(`
+                    {
+                        "stage": {
+                            "out": "./staging-dir"
+                        }
+                    }
+                ` as any);
+                let loadedOptions = rokuDeploy.loadConfigFile();
+                expect(loadedOptions.stage.out).to.equal('./staging-dir');
+            });
+
             it('supports jsonc for rokudeploy.json', () => {
                 fsExtra.writeFileSync(s`${tempDir}/rokudeploy.json`, `
                     //leading comment
                     {
                         //inner comment
-                        "rootDir": "src" //trailing comment
+                        "stage": {
+                            "rootDir": "src" //trailing comment
+                        }
                     }
                     //trailing comment
                 `);
                 let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(loadedOptions.rootDir).to.equal('src');
+                expect(loadedOptions.stage.rootDir).to.equal('src');
             });
 
             it('returns empty object when config file does not exist', () => {
@@ -8077,6 +8118,75 @@ describe('RokuDeploy', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/custom-config.json`, { host: 'custom-host' });
                 const result = rokuDeploy.loadConfigFile({ configPath: s`${tempDir}/custom-config.json` });
                 expect(result).to.eql({ host: 'custom-host' });
+            });
+
+            it('returns empty object for an empty (comment-only) config file', () => {
+                fsExtra.outputFileSync(s`${tempDir}/rokudeploy.json`, '//nothing here yet\n');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
+            });
+
+            it('warns (but does not throw) for an invalid device registry entry', () => {
+                const warnStub = sinon.stub(rokuDeploy['logger'], 'warn');
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    devices: {
+                        good: { host: '1.2.3.4' },
+                        bad: { host: '1.2.3.4', esn: 'X1' }
+                    }
+                });
+                const config = rokuDeploy.loadConfigFile({ cwd: tempDir });
+                //the config still loads in full, including the bad entry
+                expect(config.devices.bad).to.exist;
+                expect(warnStub.callCount).to.equal(1);
+                expect(String(warnStub.getCall(0).args[0])).to.include(`Device registry entry 'bad'`);
+            });
+        });
+
+        describe('loadConfigFile with a section', () => {
+            it('overlays the section onto root values and strips other sections', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    device: 'living-room',
+                    password: 'aaaa',
+                    cwd: './everywhere',
+                    stage: { cwd: './stage-only', out: './staging' },
+                    zip: { out: './app.zip' }
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' })).to.eql({
+                    device: 'living-room',
+                    password: 'aaaa',
+                    //section wins over root
+                    cwd: './stage-only',
+                    out: './staging'
+                });
+            });
+
+            it('lets colliding option names coexist across sections (the motivating case)', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    stage: { out: '.roku-deploy-staging' },
+                    zip: { dir: '.roku-deploy-staging', out: './out/app.zip' }
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' }).out).to.equal('.roku-deploy-staging');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).out).to.equal('./out/app.zip');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).dir).to.equal('.roku-deploy-staging');
+            });
+
+            it('returns just the root values for a section the file does not configure', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    password: 'aaaa',
+                    zip: { out: './app.zip' }
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'sideload' })).to.eql({ password: 'aaaa' });
+            });
+
+            it('section null returns root values with all sections stripped', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    password: 'aaaa',
+                    ecpPort: 8060,
+                    zip: { out: './app.zip' }
+                });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: null })).to.eql({
+                    password: 'aaaa',
+                    ecpPort: 8060
+                });
             });
         });
 

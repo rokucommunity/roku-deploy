@@ -25,7 +25,9 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { ConfigSectionName, ResolvedSectionOptions, RokuDeployConfig, RootConfigOptions } from './RokuDeployConfig';
+import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -35,6 +37,9 @@ import * as semver from 'semver';
 import { formatTimestampForScreenshot } from './dateUtils';
 import * as WebSocket from 'ws';
 
+/**
+ * @public
+ */
 export class RokuDeploy {
 
     /**
@@ -51,10 +56,11 @@ export class RokuDeploy {
      * with "Install Failure: Unzip failed. Invalid or corrupt zip archive." (observed on firmware 15.x for
      * both channels and component libraries).
      */
-    public static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
+    private static readonly MINIMUM_INSTALLABLE_ZIP_SIZE = 512;
 
     /**
      * The logger instance for this RokuDeploy instance
+     * @public
      */
     public readonly logger: typeof logger;
 
@@ -97,6 +103,7 @@ export class RokuDeploy {
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
+     * @public
      */
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
@@ -139,6 +146,7 @@ export class RokuDeploy {
     /**
      * Given an already-populated staging folder, create a zip archive of it and copy it to the output folder
      * @param options
+     * @public
      */
     public async zip(options: ZipOptions): Promise<ZipResult> {
         options = { ...this.options, ...options };
@@ -182,6 +190,7 @@ export class RokuDeploy {
      * Sideload a zip to a remote Roku. Either `zip` (path to a pre-built zip) or `dir` (directory
      * to zip on-the-fly) must be provided.
      * @param options
+     * @public
      */
     public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
         options = { ...this.options, ...options } as SideloadOptions;
@@ -191,7 +200,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = options.cwd ?? process.cwd();
         // Set defaults
@@ -363,6 +372,7 @@ export class RokuDeploy {
     /**
      * Converts the currently sideloaded dev app to squashfs for faster loading packages
      * @param options
+     * @public
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions) {
         options = { ...this.options, ...options } as ConvertToSquashfsOptions;
@@ -370,7 +380,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         let squashfsConfirmedAfterInvalidResponse = false;
         const results = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -414,6 +424,7 @@ export class RokuDeploy {
     /**
      * Sign a pre-existing package using Roku and return path to it locally
      * @param options
+     * @public
      */
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
         options = { ...this.options, ...options } as CreateSignedPackageOptions;
@@ -422,7 +433,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = options.cwd ?? process.cwd();
 
@@ -509,6 +520,7 @@ export class RokuDeploy {
     /**
      * resign Roku Device with a supplied signed pkg and
      * @param options
+     * @public
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...options } as RekeyDeviceOptions;
@@ -516,7 +528,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const cwd = path.resolve(process.cwd(), options.cwd ?? '.');
 
@@ -580,9 +592,16 @@ export class RokuDeploy {
      * Get the `device-info` response from a Roku device
      * @param host the host or IP address of the Roku
      * @param port the port to use for the ECP request (defaults to 8060)
+     * @public
      */
     public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    /**
+     * @public
+     */
     public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
+    /**
+     * @public
+     */
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
         this.checkRequiredOptions(options, ['device']);
@@ -593,6 +612,7 @@ export class RokuDeploy {
                 device: options.device,
                 route: 'query/device-info',
                 verify: true,
+                devices: options.devices,
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
             });
@@ -644,6 +664,7 @@ export class RokuDeploy {
      *   - 'disabled': ECP is disabled (device may still be reachable but ECP commands won't work)
      *   - 'limited': Restricted functionality, text and movement commands only
      *   - 'permissive': Full access for internal networks
+     * @public
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         options = { ...this.options, ...options } as GetDeviceInfoOptions;
@@ -662,6 +683,7 @@ export class RokuDeploy {
      * Get the developer ID from the device-info response
      * @param options
      * @returns
+     * @public
      */
     public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
         options = { ...this.options, ...options } as GetDevIdOptions;
@@ -676,13 +698,16 @@ export class RokuDeploy {
      * Always returns an object with the screenshot buffer. If `out` is provided, also saves to disk.
      */
 
+    /**
+     * @public
+     */
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Ask for the device to make an image
         let createScreenshotResult = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -751,11 +776,14 @@ export class RokuDeploy {
         return result;
     }
 
+    /**
+     * @public
+     */
     public async rebootDevice(options: RebootDeviceOptions) {
         options = { ...this.options, ...options } as RebootDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -784,11 +812,14 @@ export class RokuDeploy {
         });
     }
 
+    /**
+     * @public
+     */
     public async checkForUpdate(options: CheckForUpdateOptions) {
         options = { ...this.options, ...options } as CheckForUpdateOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         // Get device info to check software version
         const deviceInfo = await this.getDeviceInfo(options);
@@ -821,12 +852,13 @@ export class RokuDeploy {
      * Check whether the given developer password is accepted by a Roku device.
      * Resolves `true` if the device accepts the credentials, `false` if it rejects them.
      * Throws `DeviceUnreachableError` for network failures and `InvalidDeviceResponseCodeError` for unexpected statuses.
+     * @public
      */
     public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         options = { ...this.options, ...options } as ValidateDeveloperPasswordOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
@@ -891,6 +923,7 @@ export class RokuDeploy {
      * Cloud Emulator devices go through their instance's `/api/v0/ports/<ecpPort>/http/<route>` proxy, so callers
      * never branch on device kind.
      * @param options
+     * @public
      */
     public async sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult> {
         options = { ...this.options, ...options } as SendEcpRequestOptions;
@@ -898,7 +931,7 @@ export class RokuDeploy {
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
@@ -950,6 +983,7 @@ export class RokuDeploy {
      * Resolves once the websocket handshake completes; the caller then attaches its own
      * `'message'`/`'error'`/`'close'` listeners exactly as it would for a websocket constructed
      * directly.
+     * @public
      */
     public async createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket> {
         options = { ...this.options, ...options } as CreateEcpSocketOptions;
@@ -1035,6 +1069,7 @@ export class RokuDeploy {
      * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
      * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
      * double-encoded.
+     * @public
      */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...options } as KeyPressOptions;
@@ -1048,6 +1083,7 @@ export class RokuDeploy {
     /**
      * Press a remote-control key without releasing it (pair with `keyUp`). Pass the key raw -
      * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
+     * @public
      */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...options } as KeyDownOptions;
@@ -1060,6 +1096,7 @@ export class RokuDeploy {
     /**
      * Release a remote-control key held by `keyDown`. Pass the key raw - it is URI-encoded when
      * the URL is built, so a pre-encoded value gets double-encoded.
+     * @public
      */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...options } as KeyUpOptions;
@@ -1072,6 +1109,7 @@ export class RokuDeploy {
     /**
      * Type text on the device by sending each character as a `Lit_` keypress. Pass the text raw -
      * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
+     * @public
      */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...options } as SendTextOptions;
@@ -1088,6 +1126,7 @@ export class RokuDeploy {
     /**
      * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
      * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
+     * @public
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...options } as SendKeySequenceOptions;
@@ -1100,7 +1139,7 @@ export class RokuDeploy {
             const key = options.keys[stepIndex];
             let result: EcpResult;
             try {
-                result = await this.keyPress({ device: options.device, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
+                result = await this.keyPress({ device: options.device, devices: options.devices, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
             } catch (error) {
                 throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
             }
@@ -1115,11 +1154,12 @@ export class RokuDeploy {
      * the on-screen developer setup wizard for the user to complete (this call only triggers that
      * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
      * only exists on the RCE instance api.
+     * @public
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...options } as SendDeveloperSettingsComboOptions;
         this.checkRequiredOptions(options, ['device']);
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (!isRceDeviceConfig(deviceConfig)) {
             throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
         }
@@ -1140,6 +1180,7 @@ export class RokuDeploy {
     /**
      * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
      * @param options
+     * @public
      */
     public async launchApp(options: LaunchAppOptions): Promise<void> {
         options = { ...this.options, ...options } as LaunchAppOptions;
@@ -1151,6 +1192,7 @@ export class RokuDeploy {
             route: `launch/${encodeURIComponent(options.appId)}${queryString}`,
             method: 'POST',
             verify: true,
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1159,6 +1201,7 @@ export class RokuDeploy {
     /**
      * Exit a running channel on the device (the ECP `exit-app/{appId}` endpoint).
      * @param options
+     * @public
      */
     public async exitApp(options: ExitAppOptions): Promise<void> {
         options = { ...this.options, ...options } as ExitAppOptions;
@@ -1169,6 +1212,7 @@ export class RokuDeploy {
             device: options.device,
             route: `exit-app/${encodeURIComponent(options.appId)}${forceSegment}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1185,6 +1229,9 @@ export class RokuDeploy {
         }
     }
 
+    /**
+     * @public
+     */
     public async closeChannel(options: CloseChannelOptions) {
         options = { ...this.options, ...options } as CloseChannelOptions;
         // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
@@ -1198,6 +1245,7 @@ export class RokuDeploy {
     /**
      * Query the list of channels currently installed on the device (the ECP `query/apps` endpoint).
      * @param options
+     * @public
      */
     public async getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]> {
         options = { ...this.options, ...options } as GetAppsOptions;
@@ -1208,6 +1256,7 @@ export class RokuDeploy {
         try {
             result = await this.sendEcpRequest({
                 device: options.device,
+                devices: options.devices,
                 route: 'query/apps',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -1242,6 +1291,7 @@ export class RokuDeploy {
      * Query the currently active app on the device (the ECP `query/active-app` endpoint). The active
      * "app" may be the Roku home screen or a screensaver rather than a sideloaded channel.
      * @param options
+     * @public
      */
     public async getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp> {
         options = { ...this.options, ...options } as GetActiveAppOptions;
@@ -1252,6 +1302,7 @@ export class RokuDeploy {
         try {
             result = await this.sendEcpRequest({
                 device: options.device,
+                devices: options.devices,
                 route: 'query/active-app',
                 ecpPort: options.ecpPort,
                 timeout: options.timeout
@@ -1277,6 +1328,7 @@ export class RokuDeploy {
      * Throws a FailedDeviceResponseError when the device reports a failure (for example
      * `Device not keyed`).
      * @param options
+     * @public
      */
     public async getRegistry(options: GetRegistryOptions): Promise<RokuRegistry> {
         options = { ...this.options, ...options } as GetRegistryOptions;
@@ -1284,6 +1336,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: `query/registry/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1317,6 +1370,7 @@ export class RokuDeploy {
      * Query the state of an app on the device (the ECP `query/app-state/{appId}` endpoint).
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async getAppState(options: GetAppStateOptions): Promise<RokuAppState> {
         options = { ...this.options, ...options } as GetAppStateOptions;
@@ -1324,6 +1378,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: `query/app-state/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1346,6 +1401,7 @@ export class RokuDeploy {
      * is enabled, plus any rendezvous events recorded since the last query.
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
         options = { ...this.options, ...options } as GetRendezvousTrackingOptions;
@@ -1353,6 +1409,7 @@ export class RokuDeploy {
 
         const result = await this.sendEcpRequest({
             device: options.device,
+            devices: options.devices,
             route: 'query/sgrendezvous',
             ecpPort: options.ecpPort,
             timeout: options.timeout
@@ -1376,6 +1433,7 @@ export class RokuDeploy {
      * endpoint) and return the tracking state the device reports afterwards.
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
         options = { ...this.options, ...options } as SetRendezvousTrackingOptions;
@@ -1385,6 +1443,7 @@ export class RokuDeploy {
             device: options.device,
             route: `sgrendezvous/${options.enabled ? 'track' : 'untrack'}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -1396,6 +1455,7 @@ export class RokuDeploy {
      * Enable perfetto tracing for a channel on the device (the ECP `perfetto/enable/{appId}` endpoint).
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing> {
         options = { ...this.options, ...options } as EnablePerfettoTracingOptions;
@@ -1422,6 +1482,7 @@ export class RokuDeploy {
      * Open a websocket carrying a device's perfetto session (the ECP `perfetto-session` endpoint):
      * a stream of binary Perfetto trace frames the device pushes once tracing has been turned on
      * (see `enablePerfettoTracing`). A thin wrapper over `createEcpSocket`.
+     * @public
      */
     public async startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket> {
         return this.createEcpSocket({ ...options, route: 'perfetto-session' });
@@ -1433,6 +1494,7 @@ export class RokuDeploy {
      * perfetto websocket instead.
      * Throws a FailedDeviceResponseError when the device reports a failure.
      * @param options
+     * @public
      */
     public async triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger> {
         options = { ...this.options, ...options } as TriggerHeapSnapshotOptions;
@@ -1456,6 +1518,7 @@ export class RokuDeploy {
     /**
      * Deletes any installed dev channel on the target Roku device
      * @param options
+     * @public
      */
     public async deleteDevChannel(options?: DeleteDevChannelOptions) {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
@@ -1464,7 +1527,7 @@ export class RokuDeploy {
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1479,12 +1542,13 @@ export class RokuDeploy {
     /**
      * Deletes any installed dev channel, and any installed component libraries on the target Roku device
      * @param options
+     * @public
      */
     public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
         options = { ...this.options, ...options } as DeleteDevChannelOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1498,12 +1562,13 @@ export class RokuDeploy {
 
     /**
      * Delete the component library with the specified filename from the device
+     * @public
      */
     public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
         options = { ...this.options, ...options } as DeleteComponentLibraryOptions;
         this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1519,6 +1584,7 @@ export class RokuDeploy {
 
     /**
      * Delete all component libraries from the device
+     * @public
      */
     public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
         options = { ...this.options, ...options } as DeleteAllComponentLibrariesOptions;
@@ -1536,12 +1602,13 @@ export class RokuDeploy {
     /**
      * Fetch the full list of installed plugins (side-loaded packages) from the device. Useful for finding the
      * file names of installed component libraries or the dev channel.
+     * @public
      */
     public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
         options = { ...this.options, ...options } as ListSideloadedPluginsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
 
         const result = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
@@ -1553,20 +1620,44 @@ export class RokuDeploy {
     }
 
     /**
-     * Load options from a rokudeploy.json file. Used by CLI commands to load configuration.
+     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
+     * about invalid device-registry entries. With no `section`, returns the full config. With a
+     * `section`, returns the flattened options for that section: root-level values overlaid with the
+     * section's values (section wins on collision), all other sections stripped; `section: null`
+     * flattens the same way for a consumer with no section of its own. The library never loads
+     * config implicitly — the CLI calls this for every command; library consumers call it explicitly.
+     * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
+    /**
+     * @public
+     */
+    public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
+    /**
+     * @public
+     */
+    public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
+    /**
+     * @public
+     */
+    public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
+    /**
+     * @public
+     */
+    public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
+        let config: RokuDeployConfig = {};
         if (fsExtra.existsSync(configPath)) {
             const configFileText = fsExtra.readFileSync(configPath).toString();
             const parseErrors: ParseError[] = [];
-            const fileOptions = parseJsonc(configFileText, parseErrors, {
+            //empty file (or a bare comment) parses to undefined
+            config = parseJsonc(configFileText, parseErrors, {
                 allowEmptyContent: true,
                 allowTrailingComma: true,
                 disallowComments: false
-            });
+            }) ?? {};
             if (parseErrors.length > 0) {
                 throw new Error(`Error parsing "${path.resolve(configPath)}": ` + JSON.stringify(
                     parseErrors.map(x => {
@@ -1578,15 +1669,38 @@ export class RokuDeploy {
                     })
                 ));
             }
-            return fileOptions;
+            //surface broken registry entries early (but only warn: an unused bad entry shouldn't
+            //break every command — resolveDevice() still hard-fails when the entry is actually used)
+            for (const name in config.devices ?? {}) {
+                try {
+                    validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
+                } catch (e) {
+                    this.logger.warn(`${configPath}: ${(e as Error).message}`);
+                }
+            }
         }
-        return {};
+        //no section requested: hand back the whole config
+        if (options?.section === undefined) {
+            return config;
+        }
+        //flatten for one section: root values with the section overlaid, other sections stripped
+        const result: Record<string, any> = {};
+        for (const key in config) {
+            if (!configSectionNames.includes(key as ConfigSectionName)) {
+                result[key] = config[key];
+            }
+        }
+        if (options.section !== null) {
+            Object.assign(result, config[options.section]);
+        }
+        return result;
     }
 
     /**
      * Resolve the `files` array into the concrete list of `{src, dest}` file mappings used to
      * build the staging folder: globs expanded against `rootDir`, each match paired with its
      * destination path inside the package.
+     * @public
      */
     public async resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]> {
         options = { ...this.options, ...options } as ResolveFilesArrayOptions;
@@ -1636,6 +1750,7 @@ export class RokuDeploy {
      * use this to pin a config to an ip up front). Only local devices are addressed by host; any
      * other device config (like a Roku Cloud Emulator device) is returned unchanged. A failed
      * lookup throws so the caller decides how to handle an unreachable host.
+     * @public
      */
     public async withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T> {
         if (device && isLocalDeviceConfig(device)) {
@@ -1650,6 +1765,7 @@ export class RokuDeploy {
      * The same enhancement `getDeviceInfo` applies with `{ enhance: true }`, for callers that
      * already have a raw device-info object and don't want another device request.
      * @param deviceInfo the raw device-info object to enhance
+     * @public
      */
     public enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo {
         const result = {} as DeviceInfo;
@@ -1660,7 +1776,7 @@ export class RokuDeploy {
         return result;
     }
 
-    public checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
+    private checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
         for (let opt of requiredOptions as string[]) {
             if (options[opt] === undefined) {
                 throw new Error('Missing required option: ' + opt);
@@ -2143,7 +2259,7 @@ export class RokuDeploy {
         this.logger.info('Sending key event:', options.key);
         this.checkRequiredOptions(options, ['device', 'key']);
 
-        const deviceConfig = this.resolveDevice(options.device);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (isRceDeviceConfig(deviceConfig)) {
             try {
                 const rceToken = this.getRceToken(deviceConfig);
@@ -2169,6 +2285,7 @@ export class RokuDeploy {
             device: options.device,
             route: `${options.action}/${encodeURIComponent(options.key)}`,
             method: 'POST',
+            devices: options.devices,
             ecpPort: options.ecpPort,
             timeout: options.timeout
         });
@@ -2458,10 +2575,10 @@ export class RokuDeploy {
      * Resolve a DeviceOption (string or DeviceConfig) to a concrete DeviceConfig.
      * If string, looks up in the devices registry. If object, validates and returns.
      */
-    private resolveDevice(device: DeviceOption): DeviceConfig {
-        // String = registry lookup
+    private resolveDevice(device: DeviceOption, devices?: Record<string, DeviceRegistryEntry>): DeviceConfig {
+        // String = registry lookup (per-call registry wins; constructor registry is the fallback)
         if (typeof device === 'string') {
-            const entry = this.options.devices?.[device];
+            const entry = devices?.[device] ?? this.options.devices?.[device];
             if (!entry) {
                 throw new Error(`Device '${device}' not found in devices registry`);
             }
@@ -2592,12 +2709,18 @@ export class RokuDeploy {
     }
 }
 
+/**
+ * @internal
+ */
 export interface ManifestData {
     [key: string]: any;
     keyIndexes?: Record<string, number>;
     lineCount?: number;
 }
 
+/**
+ * @public
+ */
 export interface StandardizedFileEntry {
     /**
      * The full path to the source file
@@ -2609,12 +2732,18 @@ export interface StandardizedFileEntry {
     dest: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuMessages {
     errors: string[];
     infos: string[];
     successes: string[];
 }
 
+/**
+ * @public
+ */
 export interface RokuPlugin {
     appType: 'channel' | 'dcl';
     archiveFileName: string;
@@ -2625,8 +2754,9 @@ export interface RokuPlugin {
     pkgPath: string;
     size: string;
 }
-export type RokuPackage = RokuPlugin;
-
+/**
+ * @public
+ */
 export type ListSideloadedPluginsOptions = BaseRequestOptions;
 
 enum RokuMessageType {
@@ -2635,6 +2765,9 @@ enum RokuMessageType {
     error = 'error'
 }
 
+/**
+ * @public
+ */
 export const DefaultFiles = [
     'source/**/*.*',
     'components/**/*.*',
@@ -2647,6 +2780,9 @@ export const DefaultFiles = [
 ];
 
 
+/**
+ * @public
+ */
 export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
      * When provided, saves the screenshot to disk in addition to returning the buffer.
@@ -2677,6 +2813,9 @@ export interface CaptureScreenshotOptions extends BaseRequestOptions {
     autoExtension?: boolean;
 }
 
+/**
+ * @public
+ */
 export interface CaptureScreenshotResult {
     /**
      * The screenshot image data
@@ -2692,6 +2831,9 @@ export interface CaptureScreenshotResult {
     filePath?: string;
 }
 
+/**
+ * @public
+ */
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
     /**
      * Should the device-info be enhanced by camel-casing the property names and converting boolean strings to booleans and number strings to numbers?
@@ -2700,13 +2842,25 @@ export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
 }
 
+/**
+ * @public
+ */
 export type GetAppsOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export type GetActiveAppOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface ValidateDeveloperPasswordOptions {
     /** The target device. Can be a registry name (string) or an inline device config. */
     device: DeviceOption;
+
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
 
     /** The developer password to check */
     password: string;
@@ -2724,6 +2878,7 @@ export interface ValidateDeveloperPasswordOptions {
 /**
  * The remote-control keys a Roku understands, in the canonical casing the device expects. Not an
  * enforced list — key options also accept raw strings (e.g. a `Lit_<char>` literal).
+ * @public
  */
 export enum RemoteKey {
     Back = 'Back',
@@ -2759,8 +2914,14 @@ export enum RemoteKey {
     VolumeUp = 'VolumeUp'
 }
 
+/**
+ * @public
+ */
 export type RemoteKeyText = keyof typeof RemoteKey;
 
+/**
+ * @internal
+ */
 export interface SendKeyEventOptions extends BaseEcpOptions {
     action?: 'keydown' | 'keypress' | 'keyup';
     //internal transport type: the public key methods enforce RemoteKeyText, but sendText feeds
@@ -2769,25 +2930,40 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
     key: RemoteKeyText | string;
 }
 
+/**
+ * @public
+ */
 export interface KeyUpOptions extends BaseEcpOptions {
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RemoteKeyText | string;
 }
 
+/**
+ * @public
+ */
 export interface KeyDownOptions extends BaseEcpOptions {
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RemoteKeyText | string;
 }
 
+/**
+ * @public
+ */
 export interface KeyPressOptions extends BaseEcpOptions {
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     key: RemoteKeyText | string;
 }
 
+/**
+ * @public
+ */
 export interface SendTextOptions extends BaseEcpOptions {
     text: string;
 }
 
+/**
+ * @public
+ */
 export interface SendKeySequenceOptions extends BaseEcpOptions {
     /** The remote keys to press, in order. */
     keys: RemoteKeyText[];
@@ -2798,10 +2974,19 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
     keyDelayMs?: number;
 }
 
+/**
+ * @public
+ */
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export type CloseChannelOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface LaunchAppOptions extends BaseEcpOptions {
     /** The channel id to launch (for example 'dev' for the sideloaded dev channel). */
     appId: string;
@@ -2813,6 +2998,9 @@ export interface LaunchAppOptions extends BaseEcpOptions {
     params?: Record<string, string>;
 }
 
+/**
+ * @public
+ */
 export interface ExitAppOptions extends BaseEcpOptions {
     /** The channel id to exit (for example 'dev' for the sideloaded dev channel). */
     appId: string;
@@ -2823,11 +3011,17 @@ export interface ExitAppOptions extends BaseEcpOptions {
     force?: boolean;
 }
 
+/**
+ * @public
+ */
 export interface ResolveFilesArrayOptions {
     files: FileEntry[];
     rootDir: string;
 }
 
+/**
+ * @public
+ */
 export interface StageOptions {
     rootDir?: string;
     files?: FileEntry[];
@@ -2838,6 +3032,9 @@ export interface StageOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export interface ZipOptions {
     /**
      * The directory containing the files to be zipped
@@ -2855,7 +3052,8 @@ export interface ZipOptions {
     cwd?: string;
 }
 
-type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
+/** @public */
+export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     appType?: 'channel' | 'dcl';
     close?: boolean;
     remoteDebug?: boolean;
@@ -2866,31 +3064,50 @@ type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };
 
+/**
+ * @public
+ */
 export type SideloadOptions = BaseSideloadOptions & (
     | { zip: string; dir?: never }
     | { dir: string; zip?: never }
 );
 
+/**
+ * @public
+ */
 export interface PackageUploadOverridesOptions {
     route?: string;
     formData?: Record<string, any>;
 }
 
+/**
+ * @public
+ */
 export interface BaseRequestOptions {
     device: DeviceOption;
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
     username?: string;
     password: string;
     packagePort?: number;
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export interface BaseEcpOptions {
     device: DeviceOption;
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export interface SendEcpRequestOptions extends BaseEcpOptions {
     /** The ECP route without a leading slash (for example `query/device-info`, `keypress/Home`) */
     route: string;
@@ -2908,11 +3125,17 @@ export interface SendEcpRequestOptions extends BaseEcpOptions {
     verify?: boolean;
 }
 
+/**
+ * @public
+ */
 export interface CreateEcpSocketOptions extends BaseEcpOptions {
     /** The ECP route without a leading slash (for example `perfetto-session`) */
     route: string;
 }
 
+/**
+ * @public
+ */
 export interface EcpResult {
     /** The http status code of the response, or undefined when the transport produced no response */
     status: number | undefined;
@@ -2925,11 +3148,17 @@ export interface EcpResult {
     headers: Record<string, string | string[]>;
 }
 
+/**
+ * @public
+ */
 export interface GetRegistryOptions extends BaseEcpOptions {
     /** The app whose registry to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuRegistry {
     /** The developer id the device is keyed with */
     devId?: string;
@@ -2941,13 +3170,22 @@ export interface RokuRegistry {
     sections: Record<string, Record<string, string>>;
 }
 
+/**
+ * @public
+ */
 export interface GetAppStateOptions extends BaseEcpOptions {
     /** The app whose state to query (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export type RokuAppStateValue = 'active' | 'background' | 'inactive' | 'unknown';
 
+/**
+ * @public
+ */
 export interface RokuAppState {
     appId?: string;
     appDevId?: string;
@@ -2956,14 +3194,23 @@ export interface RokuAppState {
     state: RokuAppStateValue;
 }
 
+/**
+ * @public
+ */
 export type GetRendezvousTrackingOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface RokuRendezvous {
     trackingEnabled: boolean;
     /** Rendezvous events recorded since the last query */
     items: RokuRendezvousItem[];
 }
 
+/**
+ * @public
+ */
 export interface RokuRendezvousItem {
     id: string;
     /** Event start time, in seconds (as reported by the device) */
@@ -2974,15 +3221,24 @@ export interface RokuRendezvousItem {
     file: string;
 }
 
+/**
+ * @public
+ */
 export interface SetRendezvousTrackingOptions extends BaseEcpOptions {
     enabled: boolean;
 }
 
+/**
+ * @public
+ */
 export interface EnablePerfettoTracingOptions extends BaseEcpOptions {
     /** The channel to enable perfetto tracing for (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuPerfettoTracing {
     /** The channels perfetto tracing is enabled for */
     enabledChannels: string[];
@@ -2994,13 +3250,22 @@ export interface RokuPerfettoTracing {
     timestampEnd?: number;
 }
 
+/**
+ * @public
+ */
 export type StartPerfettoSessionOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface TriggerHeapSnapshotOptions extends BaseEcpOptions {
     /** The channel to capture a heap snapshot for (for example `dev` for the sideloaded app) */
     appId: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuHeapSnapshotTrigger {
     /** When the device started processing the request, in epoch milliseconds */
     timestamp?: number;
@@ -3008,8 +3273,14 @@ export interface RokuHeapSnapshotTrigger {
     timestampEnd?: number;
 }
 
+/**
+ * @public
+ */
 export type ConvertToSquashfsOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export interface RekeyDeviceOptions extends BaseRequestOptions {
     pkg: string;
     signingPassword: string;
@@ -3020,6 +3291,9 @@ export interface RekeyDeviceOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export interface CreateSignedPackageOptions extends BaseRequestOptions {
     signingPassword: string;
     appTitle?: string;
@@ -3036,28 +3310,29 @@ export interface CreateSignedPackageOptions extends BaseRequestOptions {
     cwd?: string;
 }
 
+/**
+ * @public
+ */
 export type DeleteDevChannelOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export type RebootDeviceOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export type CheckForUpdateOptions = BaseRequestOptions;
 
-export interface GetOutputZipFilePathOptions {
-    out?: string;
-    cwd?: string;
-}
-
-export interface DeployOptions extends BaseRequestOptions {
-    files?: FileEntry[];
-    rootDir?: string;
-    stagingDir?: string;
-    deleteDevChannel?: boolean;
-    out?: string;
-    cwd?: string;
-}
-
+/**
+ * @public
+ */
 export type GetDevIdOptions = BaseEcpOptions;
 
+/**
+ * @public
+ */
 export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
     /**
      * The filename of the component library to delete
@@ -3065,8 +3340,14 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
     fileName: string;
 }
 
+/**
+ * @public
+ */
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
 
+/**
+ * @public
+ */
 export interface LoadConfigFileOptions {
     /**
      * The current working directory to use for relative paths
@@ -3078,6 +3359,9 @@ export interface LoadConfigFileOptions {
     configPath?: string;
 }
 
+/**
+ * @public
+ */
 export interface ZipResult {
     /**
      * The path to the created zip file
@@ -3085,6 +3369,9 @@ export interface ZipResult {
     zipPath: string;
 }
 
+/**
+ * @public
+ */
 export interface CreateSignedPackageResult {
     /**
      * The path to the created signed package file
@@ -3092,6 +3379,9 @@ export interface CreateSignedPackageResult {
     pkgPath: string;
 }
 
+/**
+ * @public
+ */
 export interface StageResult {
     /**
      * The path to the staging directory
@@ -3099,6 +3389,9 @@ export interface StageResult {
     stagingDir: string;
 }
 
+/**
+ * @public
+ */
 export interface GetDevIdResult {
     /**
      * The developer ID from the device
@@ -3107,9 +3400,18 @@ export interface GetDevIdResult {
 }
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
+/**
+ * @public
+ */
 export const rokuDeploy = new RokuDeploy();
+/**
+ * @public
+ */
 export type EcpNetworkAccessMode = 'enabled' | 'disabled' | 'limited' | 'permissive';
 
+/**
+ * @public
+ */
 export interface RokuAppDescriptor {
     /** The channel id, for example 'dev' for the sideloaded dev channel. */
     id: string;
@@ -3123,6 +3425,9 @@ export interface RokuAppDescriptor {
     version?: string;
 }
 
+/**
+ * @public
+ */
 export interface RokuActiveApp {
     /**
      * The active channel's id. Undefined when the active "app" is the Roku home screen or a screensaver,

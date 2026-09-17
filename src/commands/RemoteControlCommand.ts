@@ -1,15 +1,15 @@
 import * as readline from 'readline';
 import { rokuDeploy } from '../index';
 import type { RemoteKeyText } from '../index';
+import { loadCommandOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = {
-            ...rokuDeploy.loadConfigFile(args),
-            ...args
-        };
+        let options = loadCommandOptions(args, null);
 
-        rokuDeploy.checkRequiredOptions(options, ['host']);
+        //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        rokuDeploy['checkRequiredOptions'](options, ['host']);
 
         readline.emitKeypressEvents(process.stdin);
         process.stdin.setRawMode(true);
