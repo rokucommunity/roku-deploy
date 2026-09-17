@@ -33,6 +33,7 @@ import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { formatTimestampForScreenshot } from './dateUtils';
+import * as WebSocket from 'ws';
 
 export class RokuDeploy {
 
@@ -940,6 +941,97 @@ export class RokuDeploy {
     }
 
     /**
+     * Open a websocket to an ECP route that speaks WebSocket rather than plain HTTP (for example a
+     * device's perfetto-session trace stream). The websocket companion to `sendEcpRequest`: the
+     * single ECP websocket transport, so any current or future ECP websocket route can be reached
+     * the same way, smart-switching between a local device and a Roku Cloud Emulator (RCE) instance
+     * so callers never branch on device kind.
+     *
+     * Resolves once the websocket handshake completes; the caller then attaches its own
+     * `'message'`/`'error'`/`'close'` listeners exactly as it would for a websocket constructed
+     * directly.
+     */
+    public async createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket> {
+        options = { ...this.options, ...options } as CreateEcpSocketOptions;
+        this.checkRequiredOptions(options, ['device', 'route']);
+        this.validatePort(options.ecpPort, 'ecpPort');
+        this.validateTimeout(options.timeout);
+
+        const deviceConfig = this.resolveDevice(options.device);
+        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
+
+        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+            const { baseUrl, headers } = await this.getEcpRequestBase(deviceConfig, ecpPort);
+            const url = this.buildEcpWebSocketUrl(baseUrl, options.route);
+            return this.connectEcpWebSocket(url, headers, timeout);
+        });
+    }
+
+    /**
+     * Maps an ECP request base url (`http:`/`https:`) to its websocket equivalent (`ws:`/`wss:`) and
+     * appends the route. An already-`ws:`/`wss:` base (not expected from `getEcpRequestBase` today,
+     * but future-proof) passes through unchanged.
+     */
+    private buildEcpWebSocketUrl(baseUrl: string, route: string): string {
+        const url = new URL(`${baseUrl}/${route}`);
+        if (url.protocol === 'https:') {
+            url.protocol = 'wss:';
+        } else if (url.protocol === 'http:') {
+            url.protocol = 'ws:';
+        }
+        return url.toString();
+    }
+
+    /**
+     * Waits for an ECP websocket handshake to complete, rejecting with a descriptive error (carrying
+     * the HTTP status when the rejection came from the handshake response itself) instead of leaving
+     * every caller to juggle `'open'`/`'error'`/`'unexpected-response'` by hand. A handshake response
+     * that looks like a stale RCE instance (see `isRceInstanceGoneResponse`) is thrown as the same
+     * `InvalidDeviceResponseCodeError` `sendEcpRequest` throws for that case, so `withRceInstanceUrlRetry`
+     * recognizes it and retries against a freshly-resolved instance url exactly like every other RCE
+     * request.
+     */
+    private async connectEcpWebSocket(url: string, headers: Record<string, string>, timeout: number): Promise<WebSocket> {
+        return new Promise<WebSocket>((resolve, reject) => {
+            const webSocket = this.createWebSocket(url, { headers: headers, handshakeTimeout: timeout });
+
+            const onOpen = () => {
+                removeHandshakeListeners();
+                resolve(webSocket);
+            };
+            const onError = (error: NodeJS.ErrnoException) => {
+                removeHandshakeListeners();
+                reject(error);
+            };
+            const onUnexpectedResponse = (incomingRequest: unknown, response: { statusCode?: number; headers?: Record<string, string> }) => {
+                removeHandshakeListeners();
+                webSocket.terminate();
+                reject(new InvalidDeviceResponseCodeError(`Unexpected status ${response.statusCode} from the ECP websocket at ${url}`, {
+                    httpDetails: extractHttpDetails({ statusCode: response.statusCode, headers: response.headers })
+                }));
+            };
+            const removeHandshakeListeners = () => {
+                webSocket.removeListener('open', onOpen);
+                webSocket.removeListener('error', onError);
+                webSocket.removeListener('unexpected-response', onUnexpectedResponse);
+            };
+
+            webSocket.once('open', onOpen);
+            webSocket.once('error', onError);
+            webSocket.once('unexpected-response', onUnexpectedResponse);
+        });
+    }
+
+    /**
+     * Creates the websocket used by `createEcpSocket`. A dedicated method (rather than an inline
+     * `new WebSocket(...)`) so tests can stub it with a fake.
+     */
+    protected createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket {
+        return new WebSocket(url, requestOptions);
+    }
+
+    /**
      * Press and release a remote-control key. Pass the key raw (e.g. `Lit_&` for a literal
      * character) - it is URI-encoded when the URL is built, so a pre-encoded value gets
      * double-encoded.
@@ -1298,6 +1390,67 @@ export class RokuDeploy {
         });
         const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
         return root['tracking-enabled'] === 'true';
+    }
+
+    /**
+     * Enable perfetto tracing for a channel on the device (the ECP `perfetto/enable/{appId}` endpoint).
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing> {
+        options = { ...this.options, ...options } as EnablePerfettoTracingOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `perfetto/enable/${encodeURIComponent(options.appId)}`,
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = await this.getEcpEnvelope(result, 'perfetto-enable', 'Could not enable perfetto tracing');
+
+        return {
+            enabledChannels: this.toArray(root['enabled-channels']?.channel).filter(item => typeof item === 'string'),
+            applicationAlreadyStarted: root['application-already-started'] === 'true',
+            timestamp: root.timestamp !== undefined ? Number(root.timestamp) : undefined,
+            timestampEnd: root['timestamp-end'] !== undefined ? Number(root['timestamp-end']) : undefined
+        };
+    }
+
+    /**
+     * Open a websocket carrying a device's perfetto session (the ECP `perfetto-session` endpoint):
+     * a stream of binary Perfetto trace frames the device pushes once tracing has been turned on
+     * (see `enablePerfettoTracing`). A thin wrapper over `createEcpSocket`.
+     */
+    public async startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket> {
+        return this.createEcpSocket({ ...options, route: 'perfetto-session' });
+    }
+
+    /**
+     * Trigger a heap snapshot capture on the device (the ECP `perfetto/heapgraph/trigger/{appId}` endpoint).
+     * The snapshot itself is not returned by this call; the device writes it to the already-connected
+     * perfetto websocket instead.
+     * Throws a FailedDeviceResponseError when the device reports a failure.
+     * @param options
+     */
+    public async triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger> {
+        options = { ...this.options, ...options } as TriggerHeapSnapshotOptions;
+        this.checkRequiredOptions(options, ['device', 'appId']);
+
+        const result = await this.sendEcpRequest({
+            device: options.device,
+            route: `perfetto/heapgraph/trigger/${encodeURIComponent(options.appId)}`,
+            method: 'POST',
+            ecpPort: options.ecpPort,
+            timeout: options.timeout
+        });
+        const root = await this.getEcpEnvelope(result, 'perfetto-heapgraph-trigger', 'Could not trigger heap snapshot');
+
+        return {
+            timestamp: root.timestamp !== undefined ? Number(root.timestamp) : undefined,
+            timestampEnd: root['timestamp-end'] !== undefined ? Number(root['timestamp-end']) : undefined
+        };
     }
 
     /**
@@ -2755,6 +2908,11 @@ export interface SendEcpRequestOptions extends BaseEcpOptions {
     verify?: boolean;
 }
 
+export interface CreateEcpSocketOptions extends BaseEcpOptions {
+    /** The ECP route without a leading slash (for example `perfetto-session`) */
+    route: string;
+}
+
 export interface EcpResult {
     /** The http status code of the response, or undefined when the transport produced no response */
     status: number | undefined;
@@ -2818,6 +2976,36 @@ export interface RokuRendezvousItem {
 
 export interface SetRendezvousTrackingOptions extends BaseEcpOptions {
     enabled: boolean;
+}
+
+export interface EnablePerfettoTracingOptions extends BaseEcpOptions {
+    /** The channel to enable perfetto tracing for (for example `dev` for the sideloaded app) */
+    appId: string;
+}
+
+export interface RokuPerfettoTracing {
+    /** The channels perfetto tracing is enabled for */
+    enabledChannels: string[];
+    /** Whether the channel was already running when tracing was enabled */
+    applicationAlreadyStarted: boolean;
+    /** When the device started processing the request, in epoch milliseconds */
+    timestamp?: number;
+    /** When the device finished processing the request, in epoch milliseconds */
+    timestampEnd?: number;
+}
+
+export type StartPerfettoSessionOptions = BaseEcpOptions;
+
+export interface TriggerHeapSnapshotOptions extends BaseEcpOptions {
+    /** The channel to capture a heap snapshot for (for example `dev` for the sideloaded app) */
+    appId: string;
+}
+
+export interface RokuHeapSnapshotTrigger {
+    /** When the device started processing the request, in epoch milliseconds */
+    timestamp?: number;
+    /** When the device finished processing the request, in epoch milliseconds */
+    timestampEnd?: number;
 }
 
 export type ConvertToSquashfsOptions = BaseRequestOptions;

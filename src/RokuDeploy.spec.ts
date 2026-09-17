@@ -9,6 +9,9 @@ import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
 import * as xml2js from 'xml2js';
+import { EventEmitter } from 'events';
+import type * as WebSocket from 'ws';
+import * as ws from 'ws';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -1028,6 +1031,192 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('createEcpSocket', () => {
+        /**
+         * Minimal fake standing in for a real `ws` socket, enough for `connectEcpWebSocket` to drive
+         * its handshake listeners (`'open'`/`'error'`/`'unexpected-response'`) and for tests to
+         * trigger them.
+         */
+        class FakeWebSocket extends EventEmitter {
+            public terminated = false;
+
+            public terminate(): void {
+                this.terminated = true;
+            }
+        }
+
+        /**
+         * Lets the microtasks between calling `createEcpSocket` and it registering its handshake
+         * listeners (the dns lookup inside `getEcpRequestBase`, among others) settle before a test
+         * emits a handshake event, so the listener is guaranteed to be attached first.
+         */
+        function flushMicrotasks(): Promise<void> {
+            return new Promise((resolve) => {
+                setImmediate(resolve);
+            });
+        }
+
+        let fakeWebSocket: FakeWebSocket;
+        let capturedUrl: string | undefined;
+        let capturedRequestOptions: WebSocket.ClientOptions | undefined;
+
+        function stubCreateWebSocket(rd: RokuDeploy = rokuDeploy) {
+            return sinon.stub(rd as any, 'createWebSocket').callsFake((url: any, requestOptions: any) => {
+                capturedUrl = url as string;
+                capturedRequestOptions = requestOptions as WebSocket.ClientOptions;
+                return fakeWebSocket;
+            });
+        }
+
+        beforeEach(() => {
+            fakeWebSocket = new FakeWebSocket();
+            capturedUrl = undefined;
+            capturedRequestOptions = undefined;
+        });
+
+        it('builds the LAN url with no auth headers, using the default ecp port and timeout', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            const socket = await socketPromise;
+
+            expect(socket).to.equal(fakeWebSocket);
+            expect(capturedUrl).to.equal('ws://1.1.1.1:8060/perfetto-session');
+            expect(capturedRequestOptions).to.eql({ headers: {}, handshakeTimeout: 10000 });
+        });
+
+        it('uses an explicit ecpPort and timeout instead of the defaults', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session', ecpPort: 9999, timeout: 5000 });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://1.1.1.1:9999/perfetto-session');
+            expect(capturedRequestOptions.handshakeTimeout).to.equal(5000);
+        });
+
+        it('builds the url from the given route', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'some-other-route' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://1.1.1.1:8060/some-other-route');
+        });
+
+        it('resolves a registry-name device through the devices registry', async () => {
+            const rd = new RokuDeploy({ devices: { 'my-device': { host: '2.2.2.2' } } });
+            stubCreateWebSocket(rd);
+
+            const socketPromise = rd.createEcpSocket({ device: 'my-device', route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://2.2.2.2:8060/perfetto-session');
+        });
+
+        it('routes an RCE device through the wss instance proxy with the X-Authorization bearer header', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                route: 'perfetto-session'
+            });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/perfetto-session');
+            expect(capturedRequestOptions.headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+        });
+
+        it('rejects with the raw handshake error and never resolves the socket', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            const handshakeError = new Error('connect ECONNREFUSED');
+            fakeWebSocket.emit('error', handshakeError);
+
+            await expectThrowsAsync(socketPromise, 'connect ECONNREFUSED');
+        });
+
+        it('rejects with a status-carrying error and terminates the socket on an unexpected handshake response', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('unexpected-response', {}, { statusCode: 403, headers: {} });
+
+            await expectThrowsAsync(socketPromise, 'Unexpected status 403 from the ECP websocket at ws://1.1.1.1:8060/perfetto-session');
+            expect(fakeWebSocket.terminated).to.be.true;
+        });
+
+        it('retries against a refreshed instance url when the handshake reports the cached instance gone', async () => {
+            const rd = new RokuDeploy({ rceToken: 'default-token' });
+            const getInstanceUrlStub = sinon.stub();
+            getInstanceUrlStub.onFirstCall().resolves('https://device.rce.roku.com/instance/old');
+            getInstanceUrlStub.onSecondCall().resolves('https://device.rce.roku.com/instance/new');
+            sinon.stub(rd as any, 'createRceManagementClient').returns({ getInstanceUrl: getInstanceUrlStub });
+            //prime the cache with the soon-to-be-stale url, exactly like sendEcpRequest's equivalent test
+            await rd['getRceInstanceUrl']({ id: 123 });
+
+            const urlsSeen: string[] = [];
+            sinon.stub(rd as any, 'createWebSocket').callsFake((url: any) => {
+                urlsSeen.push(url as string);
+                const socket = new FakeWebSocket();
+                setImmediate(() => {
+                    if ((url as string).includes('/instance/old/')) {
+                        //the mesh-generated 404: no x-envoy-upstream-service-time header
+                        socket.emit('unexpected-response', {}, { statusCode: 404, headers: {} });
+                    } else {
+                        socket.emit('open');
+                    }
+                });
+                return socket;
+            });
+
+            const socket = await rd.createEcpSocket({ device: { id: 123 }, route: 'perfetto-session' });
+
+            expect(urlsSeen).to.eql([
+                'wss://device.rce.roku.com/instance/old/api/v0/ports/8060/http/perfetto-session',
+                'wss://device.rce.roku.com/instance/new/api/v0/ports/8060/http/perfetto-session'
+            ]);
+            expect(socket).to.be.instanceOf(FakeWebSocket);
+        });
+
+        it('creates a real ws websocket outside of tests (every other test stubs the factory)', () => {
+            const webSocket = (rokuDeploy as any).createWebSocket('ws://127.0.0.1:1', {}) as WebSocket;
+
+            expect(webSocket).to.be.instanceOf(ws.WebSocket);
+
+            //the connection attempt targets a closed port; silence and abort it
+            webSocket.on('error', () => { });
+            webSocket.terminate();
+        });
+
+        describe('startPerfettoSession', () => {
+            it('delegates to createEcpSocket with the perfetto-session route', async () => {
+                stubCreateWebSocket();
+
+                const socketPromise = rokuDeploy.startPerfettoSession({ device: { host: '1.1.1.1' } });
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+                const socket = await socketPromise;
+
+                expect(socket).to.equal(fakeWebSocket);
+                expect(capturedUrl).to.equal('ws://1.1.1.1:8060/perfetto-session');
+            });
+        });
+    });
+
     describe('getRegistry', () => {
         it('refines the registry response into sections keyed by name', async () => {
             const stub = mockDoGetRequest('<plugin-registry><registry><dev-id>12345</dev-id><plugins>dev</plugins><space-available>28000</space-available><sections><section><name>Section1</name><items><item><key>k1</key><value>v1</value></item><item><key>k2</key><value>v2</value></item></items></section></sections></registry><status>OK</status></plugin-registry>');
@@ -1191,6 +1380,128 @@ describe('RokuDeploy', () => {
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/sgrendezvous/untrack');
             expect(trackingEnabled).to.be.false;
+        });
+    });
+
+    describe('enablePerfettoTracing', () => {
+        it('POSTs perfetto/enable/{appId} and refines the response', async () => {
+            const stub = mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel></enabled-channels><application-already-started>false</application-already-started><timestamp>1789646795421</timestamp><timestamp-end>1789646795422</timestamp-end><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/enable/dev');
+            expect(result).to.eql({
+                enabledChannels: ['dev'],
+                applicationAlreadyStarted: false,
+                timestamp: 1789646795421,
+                timestampEnd: 1789646795422
+            });
+        });
+
+        it('normalizes multiple enabled-channels entries to an array', async () => {
+            mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel><channel>12</channel></enabled-channels><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.enabledChannels).to.eql(['dev', '12']);
+        });
+
+        it('returns an empty enabledChannels array when the response has no enabled-channels block', async () => {
+            mockDoPostRequest('<perfetto-enable><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.enabledChannels).to.eql([]);
+        });
+
+        it('returns undefined timestamps when the response omits them', async () => {
+            mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel></enabled-channels><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.timestamp).to.be.undefined;
+            expect(result.timestampEnd).to.be.undefined;
+        });
+
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoPostRequest('<perfetto-enable><status>OK</status></perfetto-enable>');
+            await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/enable/dev%20channel%2F1');
+        });
+
+        it('throws a FailedDeviceResponseError carrying the device error message', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 202, headers: {},
+                body: '<perfetto-enable><status>FAILED</status><error>Device not keyed</error></perfetto-enable>'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not enable perfetto tracing: Device not keyed');
+        });
+
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 403, headers: {},
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not enable perfetto tracing: ECP command not allowed in Limited mode.');
+        });
+    });
+
+    describe('triggerHeapSnapshot', () => {
+        it('POSTs perfetto/heapgraph/trigger/{appId} and refines the response', async () => {
+            const stub = mockDoPostRequest('<perfetto-heapgraph-trigger><timestamp>1789646795421</timestamp><timestamp-end>1789646795422</timestamp-end><status>OK</status></perfetto-heapgraph-trigger>');
+
+            const result = await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/heapgraph/trigger/dev');
+            expect(result).to.eql({
+                timestamp: 1789646795421,
+                timestampEnd: 1789646795422
+            });
+        });
+
+        it('returns undefined timestamps when the response omits them', async () => {
+            mockDoPostRequest('<perfetto-heapgraph-trigger><status>OK</status></perfetto-heapgraph-trigger>');
+
+            const result = await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.timestamp).to.be.undefined;
+            expect(result.timestampEnd).to.be.undefined;
+        });
+
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoPostRequest('<perfetto-heapgraph-trigger><status>OK</status></perfetto-heapgraph-trigger>');
+            await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/heapgraph/trigger/dev%20channel%2F1');
+        });
+
+        it('throws a FailedDeviceResponseError carrying the device error message', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 202, headers: {},
+                body: '<perfetto-heapgraph-trigger><status>FAILED</status><error>Device not keyed</error></perfetto-heapgraph-trigger>'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not trigger heap snapshot: Device not keyed');
+        });
+
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 403, headers: {},
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not trigger heap snapshot: ECP command not allowed in Limited mode.');
         });
     });
 
