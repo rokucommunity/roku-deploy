@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.8](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.7...v4.0.0-alpha.8) - 2026-09-18
+### Changed
+ - Restore public API exports needed by downstream consumers ([#424](https://github.com/rokucommunity/roku-deploy/pull/424))
+
+
+
+## [4.0.0-alpha.7](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.6...v4.0.0-alpha.7) - 2026-09-17
+### Added
+ - Add ECP websocket support and perfetto tracing wrappers ([#419](https://github.com/rokucommunity/roku-deploy/pull/419))
+ - Add sectioned rokudeploy.json config support ([#392](https://github.com/rokucommunity/roku-deploy/pull/392))
+### Changed
+ - Security enhancements ([#422](https://github.com/rokucommunity/roku-deploy/pull/422))
+ - Reduce Public Api Surface ([#360](https://github.com/rokucommunity/roku-deploy/pull/360))
+ - sendEcpRequest: take a single options object ([#413](https://github.com/rokucommunity/roku-deploy/pull/413))
+### Removed
+ - Remove dead RokuDeployOptions fields stagingDir and autoLaunch ([#412](https://github.com/rokucommunity/roku-deploy/pull/412))
+ - Delete dead v3 type GetInstalledPackagesOptions ([#411](https://github.com/rokucommunity/roku-deploy/pull/411))
+
+
+
 ## [4.0.0-alpha.6](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.5...v4.0.0-alpha.6) - 2026-09-08
 ### Added
  - Add rce startDevice/stopDevice CLI commands ([#372](https://github.com/rokucommunity/roku-deploy/pull/372))
