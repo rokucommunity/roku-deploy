@@ -44,11 +44,15 @@ export class RokuDeploy {
 
     /**
      * Create a new RokuDeploy instance with optional default options
+     * @public
      */
     constructor(options?: RokuDeployConstructorOptions) {
-        this.options = options ?? {};
-
-        this.logger = this.options.logger ?? logger;
+        //`config` drives config-file loading and must not leak into the options merged into method calls
+        const { config, ...constructorOptions } = options ?? {};
+        this.config = config;
+        this.constructorOptions = constructorOptions;
+        this.logger = constructorOptions.logger ?? logger;
+        this.options = this.buildEffectiveOptions();
     }
 
     /**
@@ -87,9 +91,60 @@ export class RokuDeploy {
     private static readonly rceInstanceUnreachableNetworkErrorCodes = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT']);
 
     /**
-     * Instance-level default options merged into every method call
+     * Instance-level default options merged into every method call: config-file values overlaid
+     * with the constructor's explicit options (constructor wins). Rebuilt by `reloadConfig`.
      */
-    private readonly options: RokuDeployConstructorOptions;
+    private options: RokuDeployConstructorOptions;
+
+    /**
+     * The `config` value given to the constructor, kept so `reloadConfig` re-reads the same source
+     */
+    private readonly config?: boolean | string;
+
+    /**
+     * The constructor options (minus `config`), kept so `reloadConfig` can rebuild `options`
+     */
+    private readonly constructorOptions: RokuDeployConstructorOptions;
+
+    /**
+     * Rebuild the effective instance options: config-file values overlaid with the constructor's
+     * explicit options (constructor wins on collision).
+     */
+    private buildEffectiveOptions(): RokuDeployConstructorOptions {
+        return { ...this.loadConstructorConfig(), ...this.constructorOptions };
+    }
+
+    /**
+     * Load the root-level (section-less) values from the config source given to the constructor.
+     * `true` reads `rokudeploy.json` from cwd (a missing file is fine); a string path must exist.
+     */
+    private loadConstructorConfig(): RootConfigOptions {
+        if (!this.config) {
+            return {};
+        }
+        let configPath: string;
+        if (typeof this.config === 'string') {
+            configPath = path.resolve(process.cwd(), this.config);
+            if (!fsExtra.existsSync(configPath)) {
+                throw new InvalidOptionError(`Config file does not exist at "${configPath}"`, { optionName: 'config' });
+            }
+        } else {
+            configPath = path.join(process.cwd(), 'rokudeploy.json');
+        }
+        const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: configPath, section: null });
+        //a root-level `config` key has no meaning as a method option, so keep it out of the merge
+        delete values.config;
+        return values;
+    }
+
+    /**
+     * Re-read the config source given to the constructor and rebuild the effective instance options
+     * (same precedence and missing-file rules as construction). No-op when no `config` was given.
+     * @public
+     */
+    public reloadConfig(): void {
+        this.options = this.buildEffectiveOptions();
+    }
 
     /**
      * Resolved RCE instance urls, cached per device config for the lifetime of this instance so a
@@ -1625,7 +1680,8 @@ export class RokuDeploy {
      * `section`, returns the flattened options for that section: root-level values overlaid with the
      * section's values (section wins on collision), all other sections stripped; `section: null`
      * flattens the same way for a consumer with no section of its own. The library never loads
-     * config implicitly — the CLI calls this for every command; library consumers call it explicitly.
+     * config implicitly — the CLI calls this for every command; library consumers call it explicitly
+     * or opt in with the constructor's `config` option.
      * @public
      */
     public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;

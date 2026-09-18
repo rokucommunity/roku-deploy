@@ -8190,6 +8190,88 @@ describe('RokuDeploy', () => {
             });
         });
 
+        describe('constructor config option', () => {
+            it('loads instance defaults from rokudeploy.json in cwd when config is true', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'file-pass', ecpPort: 1234 });
+                const rd = new RokuDeploy({ config: true });
+                expect(rd['options']).to.eql({ password: 'file-pass', ecpPort: 1234 });
+            });
+
+            it('lets constructor options beat file values and per-call options beat both', async () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'file-pass', device: { host: 'localhost' } });
+                const rd = new RokuDeploy({ config: true, password: 'constructor-pass' });
+                const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+                //constructor beats file, and the file's device value still applies
+                await rd.deleteDevChannel();
+                expect(stub.getCall(0).args[0].auth.password).to.equal('constructor-pass');
+                expect(stub.getCall(0).args[0].url).to.include('localhost');
+                //per-call beats constructor and file
+                await rd.deleteDevChannel({ password: 'call-pass' } as any);
+                expect(stub.getCall(1).args[0].auth.password).to.equal('call-pass');
+            });
+
+            it('silently skips a missing default config file when config is true', () => {
+                process.chdir(tempDir);
+                const rd = new RokuDeploy({ config: true, password: 'constructor-pass' });
+                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+            });
+
+            it('loads the file at a config path, resolving relative paths against cwd', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
+                const rd = new RokuDeploy({ config: 'configs/custom.json' });
+                expect(rd['options']).to.eql({ password: 'custom-pass' });
+            });
+
+            it('throws when a config path does not exist', () => {
+                expect(() => new RokuDeploy({ config: s`${tempDir}/missing.json` }))
+                    .to.throw(errors.InvalidOptionError, 'Config file does not exist');
+            });
+
+            it('takes root values only, stripping command sections and any config key', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                    password: 'aaaa',
+                    config: 'should-not-leak',
+                    stage: { out: './staging' }
+                });
+                const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json` });
+                expect(rd['options']).to.eql({ password: 'aaaa' });
+            });
+
+            it('never leaks the config option itself into the merged instance options', () => {
+                process.chdir(tempDir);
+                const rd = new RokuDeploy({ config: true });
+                expect(rd['options']).to.eql({});
+            });
+        });
+
+        describe('reloadConfig', () => {
+            it('picks up config file edits while constructor options still win', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'first', ecpPort: 1234 });
+                const rd = new RokuDeploy({ config: true, ecpPort: 9000 });
+                expect(rd['options']).to.eql({ password: 'first', ecpPort: 9000 });
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'second', ecpPort: 1234 });
+                rd.reloadConfig();
+                expect(rd['options']).to.eql({ password: 'second', ecpPort: 9000 });
+            });
+
+            it('is a no-op when no config was given', () => {
+                const rd = new RokuDeploy({ password: 'constructor-pass' });
+                rd.reloadConfig();
+                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+            });
+
+            it('throws when the config path no longer exists', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/custom.json`, { password: 'aaaa' });
+                const rd = new RokuDeploy({ config: s`${tempDir}/custom.json` });
+                fsExtra.removeSync(s`${tempDir}/custom.json`);
+                expect(() => rd.reloadConfig()).to.throw(errors.InvalidOptionError, 'Config file does not exist');
+            });
+        });
+
         describe('generateBaseRequestOptions', () => {
             it('uses default timeout', async () => {
                 const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
