@@ -14,7 +14,7 @@ import * as picomatch from 'picomatch';
 
 /**
  * Internal helper utilities for roku-deploy. Not part of the public API — the only helpers
- * we expose publicly are the `standardizePath`/`standardizePathPosix` tagged-template
+ * we expose publicly are the `standardizePath`/`standardizePathPosix`/`getDestPath`
  * functions exported at the bottom of this file.
  * @internal
  */
@@ -628,4 +628,17 @@ export function standardizePathPosix(stringParts, ...expressions: any[]) {
     return util.standardizePathPosix(
         result.join('')
     );
+}
+
+/**
+ * Given a full path to a file, determine its dest path
+ * @param srcPathAbsolute the absolute path to the file. This MUST be a file path, and it is not verified to exist on the filesystem
+ * @param files the files array
+ * @param rootDir the absolute path to the root dir
+ * @param skipMatch - skip running the minimatch process (i.e. assume the file is a match
+ * @returns the RELATIVE path to the dest location for the file, or undefined if the file is not matched by any entry in the files array (or is negated by one)
+ * @public
+ */
+export function getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false) {
+    return util.getDestPath(srcPathAbsolute, files, rootDir, skipMatch);
 }

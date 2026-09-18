@@ -6,10 +6,13 @@
 
 /// <reference types="node" />
 
+import { EventEmitter } from 'events';
 import type { Logger } from '@rokucommunity/logger';
 import { logger } from '@rokucommunity/logger';
 import type { LogLevel } from '@rokucommunity/logger';
 import type { LogLevelNumeric } from '@rokucommunity/logger';
+import * as net from 'net';
+import * as stream from 'stream';
 import * as WebSocket from 'ws';
 
 // @public (undocumented)
@@ -136,9 +139,21 @@ export interface ConvertErrorDetails {
 export type ConvertToSquashfsOptions = BaseRequestOptions;
 
 // @public (undocumented)
+export type CreatableDeviceType = 'tv' | 'stb';
+
+// @public (undocumented)
+export interface CreateDeviceOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    device: DeviceCreate;
+}
+
+// @public (undocumented)
 export interface CreateEcpSocketOptions extends BaseEcpOptions {
     route: string;
 }
+
+// @public
+export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket;
 
 // @public (undocumented)
 export interface CreateSignedPackageOptions extends BaseRequestOptions {
@@ -162,7 +177,18 @@ export interface CreateSignedPackageResult {
 }
 
 // @public (undocumented)
+export interface CreateSnapshotOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    snapshot: SnapshotCreate;
+}
+
+// @public (undocumented)
 export const DefaultFiles: string[];
+
+// @public
+export const defaultRceManagementBaseUrl = "https://api.rce.roku.com/api/v1";
 
 // @public (undocumented)
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
@@ -175,11 +201,33 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
 // @public (undocumented)
 export type DeleteDevChannelOptions = BaseRequestOptions;
 
+// @public (undocumented)
+export interface DeleteSnapshotOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    snapshotId: number;
+}
+
 // @public
 export type DeviceConfig = LocalDeviceConfig | RceDeviceConfig;
 
 // @public
 export type DeviceConfigLike = Partial<LocalDeviceConfig & RceDeviceConfigByEsn & RceDeviceConfigById & RceDeviceConfigByUrl>;
+
+// @public (undocumented)
+export interface DeviceCreate {
+    // (undocumented)
+    accountName?: string | null;
+    // (undocumented)
+    deviceType: CreatableDeviceType;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
+}
 
 // @public
 export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
@@ -193,6 +241,9 @@ export interface DeviceErrorDetails {
     // (undocumented)
     rokuMessages?: RokuMessages;
 }
+
+// @public (undocumented)
+export type DeviceId = number;
 
 // @public (undocumented)
 export interface DeviceInfo {
@@ -488,6 +539,9 @@ export interface DeviceInfoRaw {
     'uptime'?: string;
 }
 
+// @public (undocumented)
+export type DeviceInstanceStatus = 'created' | 'pending' | 'running' | 'completed' | 'failed' | 'crashed' | 'unknown';
+
 // @public
 export type DeviceOption = string | DeviceConfig;
 
@@ -514,10 +568,65 @@ export interface DeviceRegistryEntry {
     username?: string;
 }
 
+// @public (undocumented)
+export interface DeviceRun {
+    // (undocumented)
+    [key: string]: unknown;
+    // (undocumented)
+    createdAt?: string;
+    creatorId?: string;
+    creatorUsername?: string;
+    // (undocumented)
+    endedAt?: string | null;
+    // (undocumented)
+    firmwareVersionId?: string | null;
+    // (undocumented)
+    id: number;
+    instanceId?: number;
+    maxRuntime?: number;
+    runtime?: number;
+    // (undocumented)
+    snapshotId?: number;
+    // (undocumented)
+    snapshotName?: string;
+    // (undocumented)
+    startedAt?: string | null;
+    // (undocumented)
+    status?: DeviceInstanceStatus;
+}
+
+// @public (undocumented)
+export interface DeviceStart {
+    // (undocumented)
+    firmwareVersionId: string;
+    // (undocumented)
+    maxRuntime: number;
+    // (undocumented)
+    snapshotId: number;
+}
+
+// @public (undocumented)
+export type DeviceStatus = 'shutdown' | 'pending' | 'running';
+
+// @public (undocumented)
+export type DeviceType = 'tv' | 'stb' | 'streambar';
+
 // @public
 export class DeviceUnreachableError extends DeviceError {
     // (undocumented)
     readonly code = RokuDeployErrorCode.DEVICE_UNREACHABLE;
+}
+
+// @public (undocumented)
+export interface DeviceUpdate {
+    // (undocumented)
+    accountName?: string | null;
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
 }
 
 // @public (undocumented)
@@ -574,6 +683,22 @@ export type FileEntry = (string | {
 });
 
 // @public (undocumented)
+export interface FindDeviceByEsnOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    esn: string;
+}
+
+// @public (undocumented)
+export interface FirmwareVersion {
+    // (undocumented)
+    deviceType: DeviceType;
+    // (undocumented)
+    displayName?: string | null;
+    // (undocumented)
+    firmwareVersionId: string;
+}
+
+// @public (undocumented)
 export type GetActiveAppOptions = BaseEcpOptions;
 
 // @public (undocumented)
@@ -584,9 +709,24 @@ export interface GetAppStateOptions extends BaseEcpOptions {
     appId: string;
 }
 
+// @public
+export function getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch?: boolean): string;
+
 // @public (undocumented)
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
     enhance?: boolean;
+}
+
+// @public (undocumented)
+export interface GetDeviceOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+}
+
+// @public (undocumented)
+export interface GetDeviceRunsOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
 }
 
 // @public (undocumented)
@@ -598,12 +738,35 @@ export interface GetDevIdResult {
 }
 
 // @public (undocumented)
+export interface GetInstanceUrlOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    device: RceDeviceConfig;
+}
+
+// @public (undocumented)
 export interface GetRegistryOptions extends BaseEcpOptions {
     appId: string;
 }
 
 // @public (undocumented)
 export type GetRendezvousTrackingOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export interface GetRunningInstanceApiUrlOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+}
+
+// @public (undocumented)
+export interface GetSnapshotOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    snapshotId: number;
+}
+
+// @public (undocumented)
+export type GetUserInfoOptions = RceManagementRequestOptions;
 
 // Warning: (ae-internal-missing-underscore) The name "hasErrorCode" should be prefixed with an underscore because the declaration is marked as @internal
 //
@@ -619,6 +782,9 @@ export interface HttpDetails {
     // (undocumented)
     response?: HttpResponseDetails;
 }
+
+// @public (undocumented)
+export type HttpMethod = 'get' | 'post' | 'patch' | 'delete';
 
 // @public
 export interface HttpRequestDetails {
@@ -640,6 +806,16 @@ export interface HttpResponseDetails {
     headers?: Record<string, string>;
     // (undocumented)
     statusCode?: number;
+}
+
+// @public (undocumented)
+export interface IceServer {
+    // (undocumented)
+    credential?: string | null;
+    // (undocumented)
+    urls: string[];
+    // (undocumented)
+    username?: string | null;
 }
 
 // @public
@@ -693,19 +869,13 @@ export function isMissingRequiredOptionError(e: unknown): e is MissingRequiredOp
 // @public
 export function isRceDeviceConfig(config: DeviceConfigLike): config is RceDeviceConfig;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigByEsn" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigByEsn(config: DeviceConfigLike): config is RceDeviceConfigByEsn;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigById" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDeviceConfigById;
 
-// Warning: (ae-internal-missing-underscore) The name "isRceDeviceConfigByUrl" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
+// @public
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl;
 
 // @public
@@ -753,7 +923,19 @@ export interface LaunchAppOptions extends BaseEcpOptions {
 }
 
 // @public (undocumented)
+export type ListDevicesOptions = RceManagementRequestOptions & RceManagementPagingOptions;
+
+// @public (undocumented)
+export type ListFirmwareVersionsOptions = RceManagementRequestOptions & RceManagementPagingOptions;
+
+// @public (undocumented)
 export type ListSideloadedPluginsOptions = BaseRequestOptions;
+
+// @public (undocumented)
+export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceManagementPagingOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+}
 
 // @public (undocumented)
 export interface LoadConfigFileOptions {
@@ -765,6 +947,30 @@ export interface LoadConfigFileOptions {
 export interface LocalDeviceConfig {
     // (undocumented)
     host: string;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "LocalSocket" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class LocalSocket extends net.Socket {
+    constructor(options: LocalSocketOptions);
+    connect(connectListener?: () => void): this;
+    // (undocumented)
+    connect(connectOptions: net.SocketConnectOpts, connectListener?: () => void): this;
+    // (undocumented)
+    connect(port: number, host?: string, connectListener?: () => void): this;
+    // (undocumented)
+    connect(port: number, connectListener?: () => void): this;
+    // (undocumented)
+    connect(path: string, connectListener?: () => void): this;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "LocalSocketOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface LocalSocketOptions extends SocketOptions {
+    // (undocumented)
+    device: LocalDeviceConfig;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "ManifestData" should be prefixed with an underscore because the declaration is marked as @internal
@@ -791,6 +997,38 @@ export interface PackageUploadOverridesOptions {
     formData?: Record<string, any>;
     // (undocumented)
     route?: string;
+}
+
+// @public (undocumented)
+export interface RceDevice {
+    // (undocumented)
+    accountName?: string | null;
+    // (undocumented)
+    createdAt: string;
+    // (undocumented)
+    deviceType: DeviceType;
+    // (undocumented)
+    firmwareVersionId?: string | null;
+    // (undocumented)
+    id: number;
+    // (undocumented)
+    lastSnapshotId?: number | null;
+    // (undocumented)
+    lastSnapshotName?: string | null;
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
+    // (undocumented)
+    runningDevice?: RceDeviceInstance | null;
+    // (undocumented)
+    serialNumber?: string | null;
+    // (undocumented)
+    snapshots?: number[];
+    // (undocumented)
+    status?: DeviceStatus;
 }
 
 // @public
@@ -820,6 +1058,118 @@ export interface RceDeviceConfigByUrl {
     rceToken?: string;
 }
 
+// @public (undocumented)
+export interface RceDeviceInstance {
+    // (undocumented)
+    createdAt: string;
+    // (undocumented)
+    creatorId: string;
+    // (undocumented)
+    firmwareVersionId: string;
+    // (undocumented)
+    id: number;
+    // (undocumented)
+    instanceApiUrl?: string | null;
+    // (undocumented)
+    instanceUuid: string;
+    // (undocumented)
+    janusIceServers?: IceServer[] | null;
+    // (undocumented)
+    janusId?: number | null;
+    // (undocumented)
+    janusPin?: string | null;
+    // (undocumented)
+    janusToken?: string | null;
+    // (undocumented)
+    janusWebsocketUrl?: string | null;
+    // (undocumented)
+    maxRuntime: number;
+    // (undocumented)
+    snapshotId: number;
+    // (undocumented)
+    snapshotName?: string;
+    // (undocumented)
+    startedAt?: string | null;
+}
+
+// @public
+export class RceManagementClient {
+    constructor(options: RceManagementClientOptions);
+    createDevice(options: CreateDeviceOptions): Promise<RceDevice>;
+    // (undocumented)
+    createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot>;
+    // (undocumented)
+    deleteSnapshot(options: DeleteSnapshotOptions): Promise<void>;
+    findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined>;
+    getDevice(options: GetDeviceOptions): Promise<RceDevice>;
+    getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]>;
+    getInstanceUrl(options: GetInstanceUrlOptions): Promise<string>;
+    getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string>;
+    // (undocumented)
+    getSnapshot(options: GetSnapshotOptions): Promise<Snapshot>;
+    getUserInfo(options?: GetUserInfoOptions): Promise<User>;
+    listDevices(options?: ListDevicesOptions): Promise<RceDevice[]>;
+    listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
+    // (undocumented)
+    listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
+    protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
+    startDevice(options: StartDeviceOptions): Promise<RceDevice>;
+    stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
+    updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
+    // (undocumented)
+    updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot>;
+}
+
+// @public (undocumented)
+export interface RceManagementClientOptions {
+    baseUrl?: string;
+    timeout?: number;
+    token: string;
+}
+
+// @public
+export interface RceManagementPagingOptions {
+    items?: number;
+    page?: number;
+}
+
+// @public
+export interface RceManagementRequestOptions {
+    token?: string;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RceSocket" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export class RceSocket extends stream.Duplex {
+    constructor(options: RceSocketOptions);
+    connect(connectListener?: () => void): this;
+    _destroy(error: Error | undefined, callback: (error?: Error | null) => void): void;
+    emit(event: string | symbol, ...args: any[]): boolean;
+    _final(callback: (error?: Error | null) => void): void;
+    // (undocumented)
+    get localAddress(): string | undefined;
+    // (undocumented)
+    get localFamily(): string | undefined;
+    // (undocumented)
+    get localPort(): number | undefined;
+    _read(size: number): void;
+    get remoteAddress(): string | undefined;
+    // (undocumented)
+    get remotePort(): number | undefined;
+    setTimeout(timeoutMilliseconds: number, timeoutListener?: () => void): this;
+    get timeout(): number | undefined;
+    _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "RceSocketOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export interface RceSocketOptions extends SocketOptions {
+    // (undocumented)
+    device: RceDeviceConfig;
+}
+
 // @public
 export interface RceStartConfig {
     deviceId?: number;
@@ -840,6 +1190,61 @@ export interface RceStopConfig {
     timeout?: number;
     token?: string;
     wait?: boolean;
+}
+
+// @public (undocumented)
+export interface RceVideoJsep {
+    // (undocumented)
+    sdp: string;
+    // (undocumented)
+    type: string;
+}
+
+// @public
+export class RceVideoSignalingClient extends EventEmitter {
+    constructor(config: RceVideoSignalingConfig, options?: RceVideoSignalingClientOptions);
+    connect(): Promise<RceVideoSignalingOffer>;
+    on<K extends keyof RceVideoSignalingClientEvents>(event: K, listener: RceVideoSignalingClientEvents[K]): this;
+    sendAnswer(jsep: RceVideoJsep): Promise<void>;
+    sendCandidate(candidate: unknown): void;
+    sendCandidatesComplete(): void;
+    stop(): void;
+}
+
+// @public (undocumented)
+export interface RceVideoSignalingClientEvents {
+    // (undocumented)
+    close: () => void;
+    // (undocumented)
+    error: (error: Error) => void;
+}
+
+// @public (undocumented)
+export interface RceVideoSignalingClientOptions {
+    keepaliveIntervalMs?: number;
+    negotiationTimeoutMs?: number;
+}
+
+// @public
+export interface RceVideoSignalingConfig {
+    apiToken: string;
+    // (undocumented)
+    iceServers?: IceServer[];
+    janusToken?: string;
+    // (undocumented)
+    pin?: string;
+    // (undocumented)
+    streamId: number;
+    // (undocumented)
+    websocketUrl: string;
+}
+
+// @public (undocumented)
+export interface RceVideoSignalingOffer {
+    // (undocumented)
+    iceServers: IceServer[];
+    // (undocumented)
+    offer: RceVideoJsep;
 }
 
 // @public (undocumented)
@@ -1157,6 +1562,32 @@ export interface RokuDeployOptions {
     username?: string;
 }
 
+// @public
+export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
+    // (undocumented)
+    connect: (connectListener?: () => void) => this;
+    // (undocumented)
+    destroy: (error?: Error) => this;
+    // (undocumented)
+    readonly destroyed: boolean;
+    // (undocumented)
+    end: ((callback?: () => void) => this) & ((buffer: Uint8Array | string, callback?: () => void) => this) & ((str: Uint8Array | string, encoding?: BufferEncoding, callback?: () => void) => this);
+    // (undocumented)
+    readonly localAddress?: string;
+    // (undocumented)
+    readonly localFamily?: string;
+    // (undocumented)
+    readonly localPort?: number;
+    // (undocumented)
+    readonly remoteAddress?: string;
+    // (undocumented)
+    readonly remotePort?: number;
+    // (undocumented)
+    setTimeout: (timeout: number, callback?: () => void) => this;
+    // (undocumented)
+    readonly timeout?: number;
+}
+
 // @public (undocumented)
 export interface RokuHeapSnapshotTrigger {
     timestamp?: number;
@@ -1260,6 +1691,15 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
 }
 
 // @public (undocumented)
+export interface SendOptions {
+    // (undocumented)
+    body?: unknown;
+    // (undocumented)
+    query?: Record<string, string | number | undefined>;
+    token?: string;
+}
+
+// @public (undocumented)
 export interface SendTextOptions extends BaseEcpOptions {
     // (undocumented)
     text: string;
@@ -1279,6 +1719,64 @@ export type SideloadOptions = BaseSideloadOptions & ({
     dir: string;
     zip?: never;
 });
+
+// @public (undocumented)
+export interface Snapshot {
+    // (undocumented)
+    base: boolean;
+    // (undocumented)
+    children?: number[];
+    // (undocumented)
+    createdAt: string;
+    // (undocumented)
+    firmwareVersionDisplayName?: string | null;
+    // (undocumented)
+    firmwareVersionId?: string | null;
+    // (undocumented)
+    id: number;
+    // (undocumented)
+    live: boolean;
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    parentId?: number | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
+    // (undocumented)
+    ready?: boolean;
+    // (undocumented)
+    startedAt?: string | null;
+}
+
+// @public (undocumented)
+export interface SnapshotCreate {
+    // (undocumented)
+    name: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    parentId?: number | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
+}
+
+// @public (undocumented)
+export interface SnapshotUpdate {
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    note?: string | null;
+    // (undocumented)
+    properties?: Record<string, any> | null;
+}
+
+// @public
+export interface SocketOptions {
+    device: DeviceConfig;
+    port: number;
+}
 
 // @public (undocumented)
 export interface StageOptions {
@@ -1309,7 +1807,21 @@ export function standardizePath(stringParts: any, ...expressions: any[]): string
 export function standardizePathPosix(stringParts: any, ...expressions: any[]): string;
 
 // @public (undocumented)
+export interface StartDeviceOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    start: DeviceStart;
+}
+
+// @public (undocumented)
 export type StartPerfettoSessionOptions = BaseEcpOptions;
+
+// @public (undocumented)
+export interface StopDeviceOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+}
 
 // @public (undocumented)
 export interface TriggerHeapSnapshotOptions extends BaseEcpOptions {
@@ -1357,6 +1869,56 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
     readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
     // (undocumented)
     static MESSAGE: string;
+}
+
+// @public (undocumented)
+export interface UpdateDeviceOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    update: DeviceUpdate;
+}
+
+// @public (undocumented)
+export interface UpdateSnapshotOptions extends RceManagementRequestOptions {
+    // (undocumented)
+    deviceId: DeviceId;
+    // (undocumented)
+    snapshotId: number;
+    // (undocumented)
+    update: SnapshotUpdate;
+}
+
+// @public (undocumented)
+export interface User {
+    // (undocumented)
+    email?: string | null;
+    // (undocumented)
+    fullName?: string | null;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    organisation: UserOrganisation;
+    // (undocumented)
+    username: string;
+}
+
+// @public (undocumented)
+export interface UserOrganisation {
+    // (undocumented)
+    currentDevices: Record<string, number>;
+    // (undocumented)
+    id: number;
+    // (undocumented)
+    idpId: string;
+    // (undocumented)
+    maxDevices: number;
+    // (undocumented)
+    maxProjectRuntime: number;
+    // (undocumented)
+    maxSnapshots: number;
+    // (undocumented)
+    name: string;
 }
 
 // @public (undocumented)

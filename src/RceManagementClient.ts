@@ -6,6 +6,7 @@ import { util } from './util';
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API (distinct from a running
  * device's own instance API).
+ * @public
  */
 export const defaultRceManagementBaseUrl = 'https://api.rce.roku.com/api/v1';
 
@@ -17,6 +18,7 @@ export const defaultRceManagementBaseUrl = 'https://api.rce.roku.com/api/v1';
  * see camelCase: request bodies are converted camelCase -> snake_case on the way out, and response
  * bodies snake_case -> camelCase on the way in. Caller-defined data bags (`properties`) pass
  * through untouched in both directions.
+ * @public
  */
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions) {
@@ -263,6 +265,9 @@ function convertKeys(value: unknown, convert: (key: string) => string): unknown 
     return value;
 }
 
+/**
+ * @public
+ */
 export interface RceManagementClientOptions {
     /**
      * RCE bearer token (the same token used for a device's instance API).
@@ -278,12 +283,19 @@ export interface RceManagementClientOptions {
     timeout?: number;
 }
 
+/**
+ * @public
+ */
 export type HttpMethod = 'get' | 'post' | 'patch' | 'delete';
 
+/**
+ * @public
+ */
 export type DeviceId = number;
 
 /**
  * Options accepted by every RceManagementClient call.
+ * @public
  */
 export interface RceManagementRequestOptions {
     /**
@@ -294,6 +306,7 @@ export interface RceManagementRequestOptions {
 
 /**
  * Paging options accepted by the paginated list endpoints (devices, firmware versions, snapshots).
+ * @public
  */
 export interface RceManagementPagingOptions {
     /**
@@ -307,76 +320,130 @@ export interface RceManagementPagingOptions {
     page?: number;
 }
 
+/**
+ * @public
+ */
 export type GetUserInfoOptions = RceManagementRequestOptions;
 
+/**
+ * @public
+ */
 export type ListFirmwareVersionsOptions = RceManagementRequestOptions & RceManagementPagingOptions;
 
+/**
+ * @public
+ */
 export type ListDevicesOptions = RceManagementRequestOptions & RceManagementPagingOptions;
 
+/**
+ * @public
+ */
 export interface GetDeviceOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
 }
 
+/**
+ * @public
+ */
 export interface CreateDeviceOptions extends RceManagementRequestOptions {
     device: DeviceCreate;
 }
 
+/**
+ * @public
+ */
 export interface UpdateDeviceOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     update: DeviceUpdate;
 }
 
+/**
+ * @public
+ */
 export interface StartDeviceOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     start: DeviceStart;
 }
 
+/**
+ * @public
+ */
 export interface StopDeviceOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
 }
 
+/**
+ * @public
+ */
 export interface GetDeviceRunsOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
 }
 
+/**
+ * @public
+ */
 export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceManagementPagingOptions {
     deviceId: DeviceId;
 }
 
+/**
+ * @public
+ */
 export interface CreateSnapshotOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     snapshot: SnapshotCreate;
 }
 
+/**
+ * @public
+ */
 export interface GetSnapshotOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     snapshotId: number;
 }
 
+/**
+ * @public
+ */
 export interface UpdateSnapshotOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     snapshotId: number;
     update: SnapshotUpdate;
 }
 
+/**
+ * @public
+ */
 export interface DeleteSnapshotOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
     snapshotId: number;
 }
 
+/**
+ * @public
+ */
 export interface FindDeviceByEsnOptions extends RceManagementRequestOptions {
     esn: string;
 }
 
+/**
+ * @public
+ */
 export interface GetInstanceUrlOptions extends RceManagementRequestOptions {
     device: RceDeviceConfig;
 }
 
+/**
+ * @public
+ */
 export interface GetRunningInstanceApiUrlOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
 }
 
-interface SendOptions {
+/**
+ * @public
+ */
+export interface SendOptions {
     query?: Record<string, string | number | undefined>;
     body?: unknown;
     /**
@@ -385,20 +452,38 @@ interface SendOptions {
     token?: string;
 }
 
+/**
+ * @public
+ */
 export type DeviceType = 'tv' | 'stb' | 'streambar';
 
+/**
+ * @public
+ */
 export type CreatableDeviceType = 'tv' | 'stb';
 
+/**
+ * @public
+ */
 export type DeviceStatus = 'shutdown' | 'pending' | 'running';
 
+/**
+ * @public
+ */
 export type DeviceInstanceStatus = 'created' | 'pending' | 'running' | 'completed' | 'failed' | 'crashed' | 'unknown';
 
+/**
+ * @public
+ */
 export interface IceServer {
     urls: string[];
     username?: string | null;
     credential?: string | null;
 }
 
+/**
+ * @public
+ */
 export interface RceDeviceInstance {
     id: number;
     creatorId: string;
@@ -417,6 +502,9 @@ export interface RceDeviceInstance {
     maxRuntime: number;
 }
 
+/**
+ * @public
+ */
 export interface RceDevice {
     id: number;
     deviceType: DeviceType;
@@ -434,6 +522,9 @@ export interface RceDevice {
     runningDevice?: RceDeviceInstance | null;
 }
 
+/**
+ * @public
+ */
 export interface DeviceCreate {
     name: string;
     deviceType: CreatableDeviceType;
@@ -442,12 +533,18 @@ export interface DeviceCreate {
     properties?: Record<string, any> | null;
 }
 
+/**
+ * @public
+ */
 export interface DeviceStart {
     snapshotId: number;
     firmwareVersionId: string;
     maxRuntime: number;
 }
 
+/**
+ * @public
+ */
 export interface DeviceUpdate {
     name?: string;
     accountName?: string | null;
@@ -455,6 +552,9 @@ export interface DeviceUpdate {
     properties?: Record<string, any> | null;
 }
 
+/**
+ * @public
+ */
 export interface DeviceRun {
     id: number;
     /**
@@ -487,6 +587,9 @@ export interface DeviceRun {
     [key: string]: unknown;
 }
 
+/**
+ * @public
+ */
 export interface Snapshot {
     id: number;
     createdAt: string;
@@ -503,6 +606,9 @@ export interface Snapshot {
     firmwareVersionId?: string | null;
 }
 
+/**
+ * @public
+ */
 export interface SnapshotCreate {
     name: string;
     parentId?: number | null;
@@ -510,18 +616,27 @@ export interface SnapshotCreate {
     properties?: Record<string, any> | null;
 }
 
+/**
+ * @public
+ */
 export interface SnapshotUpdate {
     name?: string;
     note?: string | null;
     properties?: Record<string, any> | null;
 }
 
+/**
+ * @public
+ */
 export interface FirmwareVersion {
     firmwareVersionId: string;
     deviceType: DeviceType;
     displayName?: string | null;
 }
 
+/**
+ * @public
+ */
 export interface UserOrganisation {
     id: number;
     idpId: string;
@@ -532,6 +647,9 @@ export interface UserOrganisation {
     currentDevices: Record<string, number>;
 }
 
+/**
+ * @public
+ */
 export interface User {
     id: string;
     username: string;

@@ -15,6 +15,7 @@ import type { IceServer } from './RceManagementClient';
  * `Authorization: Bearer` header on the handshake itself, which a browser WebSocket cannot set —
  * so this class runs under Node's `ws` and hands the offer/answer/candidates off to wherever the
  * actual RTCPeerConnection lives (for example across a message channel to a browser or webview).
+ * @public
  */
 export class RceVideoSignalingClient extends EventEmitter {
     constructor(
@@ -401,6 +402,7 @@ export class RceVideoSignalingClient extends EventEmitter {
 /**
  * Everything needed to negotiate a stream from a running RCE device's Janus gateway (built from the
  * device's `runningDevice` Janus fields).
+ * @public
  */
 export interface RceVideoSignalingConfig {
     websocketUrl: string;
@@ -420,6 +422,9 @@ export interface RceVideoSignalingConfig {
     iceServers?: IceServer[];
 }
 
+/**
+ * @public
+ */
 export interface RceVideoSignalingClientOptions {
     /**
      * How often to send a Janus keepalive. Defaults to 25000ms (Janus sessions time out at 60s).
@@ -432,26 +437,41 @@ export interface RceVideoSignalingClientOptions {
     negotiationTimeoutMs?: number;
 }
 
+/**
+ * @public
+ */
 export interface RceVideoSignalingOffer {
     offer: RceVideoJsep;
     iceServers: IceServer[];
 }
 
+/**
+ * @public
+ */
 export interface RceVideoJsep {
     type: string;
     sdp: string;
 }
 
+/**
+ * @public
+ */
 export interface RceVideoSignalingClientEvents {
     error: (error: Error) => void;
     close: () => void;
 }
 
+/**
+ * @internal
+ */
 interface PendingJanusRequest {
     resolve: (message: JanusIncomingMessage) => void;
     reject: (error: Error) => void;
 }
 
+/**
+ * @internal
+ */
 interface JanusIncomingMessage {
     janus: string;
     transaction?: string;
