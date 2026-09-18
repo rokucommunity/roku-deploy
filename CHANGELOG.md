@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.8](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.7...v4.0.0-alpha.8) - 2026-09-18
+### Changed
+ - Restore public API exports needed by downstream consumers ([#424](https://github.com/rokucommunity/roku-deploy/pull/424))
+
+
+
 ## [4.0.0-alpha.7](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.6...v4.0.0-alpha.7) - 2026-09-17
 ### Added
  - Add ECP websocket support and perfetto tracing wrappers ([#419](https://github.com/rokucommunity/roku-deploy/pull/419))
