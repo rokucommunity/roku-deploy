@@ -1485,6 +1485,7 @@ export interface RokuDeployConstructorOptions {
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     logger?: Logger;
+    logLevel?: LogLevel | LogLevelNumeric;
     packagePort?: number;
     password?: string;
     rceToken?: string;

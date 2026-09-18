@@ -6,14 +6,15 @@ import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { ConfigSectionName } from '../RokuDeployConfig';
 import type { DeviceRegistryEntry } from '../RokuDeployOptions';
+import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 
 /**
  * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
  * cwd; skipped entirely with `--no-config`), flatten it for the command's config section (or just
  * the root values when the command has no section), then merge the CLI args on top.
- * Precedence: CLI args → `[section]` → root → defaults.
+ * Precedence: CLI args → `[section]` → root → defaults. Pass `quiet` to skip announcing the config file.
  */
-export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null): T {
+export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
@@ -22,13 +23,24 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
     //announce which config file feeds this run (even without --verbose) so file-supplied values
     //are never an invisible input; greppable in CI logs
-    if (fsExtra.existsSync(configPath)) {
+    if (!options?.quiet && fsExtra.existsSync(configPath)) {
         console.log(`Using config: ${configPath}`);
     }
     return {
         ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
         ...args
     } as T;
+}
+
+/**
+ * Apply `--logLevel` (falling back to the config file's root `logLevel`) to the shared CLI logger.
+ * Runs as yargs middleware so the level is in effect before any command starts.
+ */
+export function applyLogLevel(args: any) {
+    const { logLevel } = loadCommandOptions<{ logLevel?: LogLevel | LogLevelNumeric }>(args, null, { quiet: true });
+    if (logLevel !== undefined) {
+        rokuDeploy.logger.logLevel = logLevel;
+    }
 }
 
 /**
