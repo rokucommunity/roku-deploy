@@ -16,6 +16,7 @@ import { RceStopCommand } from './commands/RceStopCommand';
 import type { RceDevice } from './RceManagementClient';
 import { RceManagementClient } from './RceManagementClient';
 import { standardizePath as s, util } from './util';
+import { loadCommandOptions } from './commands/commandUtils';
 
 const sinon = createSandbox();
 
@@ -867,6 +868,19 @@ describe('cli', function cli() {
             const options = stub.getCall(0).args[0] as any;
             expect(options.password).to.be.undefined;
             expect(options.out).to.be.undefined;
+        });
+
+        it('stays silent about the config file when quiet is set', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+
+            const options = loadCommandOptions({ cwd: tempDir }, null, { quiet: true });
+
+            expect(options.logLevel).to.equal('trace');
+            expect(consoleOutput).to.not.include('Using config');
         });
 
         it('announces which config file was loaded', async () => {
