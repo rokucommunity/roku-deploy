@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.9](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.8...v4.0.0-alpha.9) - 2026-09-28
+### Changed
+ - Absorb the abort error when terminating a rejected ECP websocket ([#428](https://github.com/rokucommunity/roku-deploy/pull/428))
+
+
+
 ## [4.0.0-alpha.8](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.7...v4.0.0-alpha.8) - 2026-09-18
 ### Changed
  - Restore public API exports needed by downstream consumers ([#424](https://github.com/rokucommunity/roku-deploy/pull/424))
