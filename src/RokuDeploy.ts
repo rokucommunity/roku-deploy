@@ -1025,6 +1025,9 @@ export class RokuDeploy {
      * `InvalidDeviceResponseCodeError` `sendEcpRequest` throws for that case, so `withRceInstanceUrlRetry`
      * recognizes it and retries against a freshly-resolved instance url exactly like every other RCE
      * request.
+     *
+     * The resolved socket has no listeners attached, so callers must register their own `'error'`
+     * handler synchronously; a socket error with no listener crashes the process.
      */
     private async connectEcpWebSocket(url: string, headers: Record<string, string>, timeout: number): Promise<WebSocket> {
         return new Promise<WebSocket>((resolve, reject) => {
@@ -1040,6 +1043,9 @@ export class RokuDeploy {
             };
             const onUnexpectedResponse = (incomingRequest: unknown, response: { statusCode?: number; headers?: Record<string, string> }) => {
                 removeHandshakeListeners();
+                //`terminate()` on a still-connecting socket emits `'error'` a tick later. We reject below and
+                //throw this socket away, so absorb that error rather than let node crash on an unhandled one.
+                webSocket.on('error', () => { });
                 webSocket.terminate();
                 reject(new InvalidDeviceResponseCodeError(`Unexpected status ${response.statusCode} from the ECP websocket at ${url}`, {
                     httpDetails: extractHttpDetails({ statusCode: response.statusCode, headers: response.headers })
