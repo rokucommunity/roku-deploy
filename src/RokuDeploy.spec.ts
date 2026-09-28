@@ -1042,6 +1042,11 @@ describe('RokuDeploy', () => {
 
             public terminate(): void {
                 this.terminated = true;
+                //real `ws` aborts a still-connecting handshake by emitting `'error'` on the next tick, which
+                //throws if nothing is listening
+                process.nextTick(() => {
+                    this.emit('error', new Error('WebSocket was closed before the connection was established'));
+                });
             }
         }
 
@@ -1157,6 +1162,10 @@ describe('RokuDeploy', () => {
 
             await expectThrowsAsync(socketPromise, 'Unexpected status 403 from the ECP websocket at ws://1.1.1.1:8060/perfetto-session');
             expect(fakeWebSocket.terminated).to.be.true;
+            //the abort error `terminate()` emits has to land on a listener, or node turns it into an
+            //uncaught exception that takes down the host process
+            expect(fakeWebSocket.listenerCount('error')).to.be.greaterThan(0);
+            await flushMicrotasks();
         });
 
         it('retries against a refreshed instance url when the handshake reports the cached instance gone', async () => {
