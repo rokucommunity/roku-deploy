@@ -6,7 +6,6 @@ import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { ConfigSectionName } from '../RokuDeployConfig';
 import type { DeviceRegistryEntry } from '../RokuDeployOptions';
-import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 
 /**
  * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
@@ -30,17 +29,6 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
         ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
         ...args
     } as T;
-}
-
-/**
- * Apply `--logLevel` (falling back to the config file's root `logLevel`) to the shared CLI logger.
- * Runs as yargs middleware so the level is in effect before any command starts.
- */
-export function applyLogLevel(args: any) {
-    const { logLevel } = loadCommandOptions<{ logLevel?: LogLevel | LogLevelNumeric }>(args, null, { quiet: true });
-    if (logLevel !== undefined) {
-        rokuDeploy.logger.logLevel = logLevel;
-    }
 }
 
 /**

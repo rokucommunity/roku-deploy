@@ -17,7 +17,8 @@ import { KeyDownCommand } from './commands/KeyDownCommand';
 import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
-import { applyLogLevel } from './commands/commandUtils';
+import { loadCommandOptions } from './commands/commandUtils';
+import { rokuDeploy } from './index';
 
 void yargs
 
@@ -25,7 +26,12 @@ void yargs
     .option('logLevel', { type: 'string', description: 'The log level for roku-deploy output. Falls back to "logLevel" in rokudeploy.json', choices: ['off', 'error', 'warn', 'log', 'info', 'debug', 'trace'], global: true })
 
     //apply --logLevel (or the config file's logLevel) to the logger before running any command
-    .middleware(applyLogLevel)
+    .middleware((args) => {
+        const { logLevel } = loadCommandOptions(args, null, { quiet: true });
+        if (logLevel !== undefined) {
+            rokuDeploy.logger.logLevel = logLevel;
+        }
+    })
 
     .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder

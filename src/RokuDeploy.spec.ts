@@ -7728,6 +7728,17 @@ describe('RokuDeploy', () => {
             });
 
             describe('logLevel option', () => {
+                it('gives each instance its own logger', () => {
+                    const rd1 = new RokuDeploy();
+                    const rd2 = new RokuDeploy();
+                    expect(rd1.logger).to.not.equal(rd2.logger);
+                    expect(rd1.logger).to.not.equal(logger);
+
+                    const originalLogLevel = rd1.logger.logLevel;
+                    rd2.logger.logLevel = 'trace';
+                    expect(rd1.logger.logLevel).to.equal(originalLogLevel);
+                });
+
                 it('sets the logger level without mutating the global logger', () => {
                     const globalLogLevel = logger.logLevel;
                     const rd = new RokuDeploy({ logLevel: 'debug' });

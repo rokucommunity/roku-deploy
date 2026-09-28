@@ -49,8 +49,8 @@ export class RokuDeploy {
 
         this.validateEnum(this.options.logLevel, 'logLevel', Object.values(LogLevelNumeric));
 
-        //when a logLevel is set but no custom logger was provided, use a child logger so the shared global logger is not mutated
-        this.logger = this.options.logger ?? (this.options.logLevel === undefined ? logger : logger.createLogger());
+        //each instance gets its own logger so changing one instance's logLevel never affects another
+        this.logger = this.options.logger ?? logger.createLogger();
         if (this.options.logLevel !== undefined) {
             this.logger.logLevel = this.options.logLevel;
         }
