@@ -8264,6 +8264,16 @@ describe('RokuDeploy', () => {
                 expect(rd['options']).to.eql({ password: 'constructor-pass' });
             });
 
+            it('re-reads the file resolved at construction even after the process cwd changes', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'original' });
+                fsExtra.outputJsonSync(s`${tempDir}/elsewhere/rokudeploy.json`, { password: 'elsewhere' });
+                const rd = new RokuDeploy({ config: true });
+                process.chdir(s`${tempDir}/elsewhere`);
+                rd.reloadConfig();
+                expect(rd['options']).to.eql({ password: 'original' });
+            });
+
             it('throws when the config path no longer exists', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/custom.json`, { password: 'aaaa' });
                 const rd = new RokuDeploy({ config: s`${tempDir}/custom.json` });

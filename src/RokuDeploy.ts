@@ -50,6 +50,7 @@ export class RokuDeploy {
         //`config` drives config-file loading and must not leak into the options merged into method calls
         const { config, ...constructorOptions } = options ?? {};
         this.config = config;
+        this.configCwd = process.cwd();
         this.constructorOptions = constructorOptions;
         this.logger = constructorOptions.logger ?? logger;
         this.options = this.buildEffectiveOptions();
@@ -102,6 +103,12 @@ export class RokuDeploy {
     private readonly config?: boolean | string;
 
     /**
+     * The process cwd captured at construction, so `config` resolves to the same file on every
+     * (re)load even if the process changes directory later
+     */
+    private readonly configCwd: string;
+
+    /**
      * The constructor options (minus `config`), kept so `reloadConfig` can rebuild `options`
      */
     private readonly constructorOptions: RokuDeployConstructorOptions;
@@ -116,7 +123,8 @@ export class RokuDeploy {
 
     /**
      * Load the root-level (section-less) values from the config source given to the constructor.
-     * `true` reads `rokudeploy.json` from cwd (a missing file is fine); a string path must exist.
+     * `true` reads `rokudeploy.json` from the construction-time cwd (a missing file is fine); a string
+     * path (resolved against that same cwd) must exist.
      */
     private loadConstructorConfig(): RootConfigOptions {
         if (!this.config) {
@@ -124,12 +132,12 @@ export class RokuDeploy {
         }
         let configPath: string;
         if (typeof this.config === 'string') {
-            configPath = path.resolve(process.cwd(), this.config);
+            configPath = path.resolve(this.configCwd, this.config);
             if (!fsExtra.existsSync(configPath)) {
                 throw new InvalidOptionError(`Config file does not exist at "${configPath}"`, { optionName: 'config' });
             }
         } else {
-            configPath = path.join(process.cwd(), 'rokudeploy.json');
+            configPath = path.join(this.configCwd, 'rokudeploy.json');
         }
         const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: configPath, section: null });
         //a root-level `config` key has no meaning as a method option, so keep it out of the merge
