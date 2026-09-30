@@ -58,7 +58,7 @@
     },
     "overrides": {
         "serialize-javascript": "^7",
-        "brace-expansion": "^2",
+        "brace-expansion": "^2.1.7",
         "js-yaml": "^4",
         "@babel/core": "^7",
         "istanbul-lib-processinfo": "^3.0.1",
