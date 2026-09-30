@@ -546,9 +546,7 @@ export type DeviceInstanceStatus = 'created' | 'pending' | 'running' | 'complete
 export type DeviceOption = string | DeviceConfig;
 
 // @public
-export interface DeviceRegistryEntry {
-    // (undocumented)
-    ecpPort?: number;
+export interface DeviceRegistryEntry extends DeviceRegistrySettings {
     // (undocumented)
     esn?: string;
     // (undocumented)
@@ -557,11 +555,17 @@ export interface DeviceRegistryEntry {
     // (undocumented)
     instanceUrl?: string;
     // (undocumented)
+    rceToken?: string;
+}
+
+// @public
+export interface DeviceRegistrySettings {
+    // (undocumented)
+    ecpPort?: number;
+    // (undocumented)
     packagePort?: number;
     // (undocumented)
     password?: string;
-    // (undocumented)
-    rceToken?: string;
     // (undocumented)
     timeout?: number;
     // (undocumented)
