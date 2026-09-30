@@ -185,6 +185,13 @@ export interface CreateSnapshotOptions extends RceManagementRequestOptions {
 }
 
 // @public (undocumented)
+export interface CreateSocketOptions {
+    device?: DeviceOption;
+    devices?: Record<string, DeviceRegistryEntry>;
+    port: number;
+}
+
+// @public (undocumented)
 export const DefaultFiles: string[];
 
 // @public
@@ -712,9 +719,6 @@ export type GetAppsOptions = BaseEcpOptions;
 export interface GetAppStateOptions extends BaseEcpOptions {
     appId: string;
 }
-
-// @public
-export function getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch?: boolean): string;
 
 // @public (undocumented)
 export interface GetDeviceInfoOptions extends BaseEcpOptions {
@@ -1392,6 +1396,7 @@ export class RokuDeploy {
     convertToSquashfs(options: ConvertToSquashfsOptions): Promise<any>;
     createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket>;
     createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult>;
+    createSocket(options: CreateSocketOptions): RokuDeploySocket;
     protected createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket;
     deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions): Promise<void>;
     deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
@@ -1403,6 +1408,7 @@ export class RokuDeploy {
     getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp>;
     getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]>;
     getAppState(options: GetAppStateOptions): Promise<RokuAppState>;
+    getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch?: boolean): string;
     getDeviceInfo(options?: GetDeviceInfoOptions & {
         enhance: true;
     }): Promise<DeviceInfo>;
