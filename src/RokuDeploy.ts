@@ -31,7 +31,7 @@ import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
-import { logger } from '@rokucommunity/logger';
+import { logger, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { formatTimestampForScreenshot } from './dateUtils';
@@ -48,7 +48,13 @@ export class RokuDeploy {
     constructor(options?: RokuDeployConstructorOptions) {
         this.options = options ?? {};
 
-        this.logger = this.options.logger ?? logger;
+        this.validateEnum(this.options.logLevel, 'logLevel', Object.values(LogLevelNumeric));
+
+        //each instance gets its own logger so changing one instance's logLevel never affects another
+        this.logger = this.options.logger ?? logger.createLogger();
+        if (this.options.logLevel !== undefined) {
+            this.logger.logLevel = this.options.logLevel;
+        }
     }
 
     /**
