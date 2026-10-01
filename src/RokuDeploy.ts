@@ -31,6 +31,8 @@ import { configSectionNames } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
+import { createRokuDeploySocket } from './RokuDeploySocket';
+import type { RokuDeploySocket } from './RokuDeploySocket';
 import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
@@ -1752,6 +1754,29 @@ export class RokuDeploy {
     }
 
     /**
+     * Create a socket to one of the device's telnet consoles (for example port 8085 for the BrightScript
+     * console). Unlike the standalone `createRokuDeploySocket`, this honors the constructor options and
+     * resolves registry device names.
+     * @public
+     */
+    public createSocket(options: CreateSocketOptions): RokuDeploySocket {
+        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSocketOptions;
+        this.checkRequiredOptions(options, ['device', 'port']);
+        const deviceConfig = this.resolveDevice(options.device, options.devices);
+        return createRokuDeploySocket({ device: deviceConfig, port: options.port });
+    }
+
+    /**
+     * Given the absolute path to a file, determine its dest path (relative to the package root) per the
+     * `files` array, or undefined when no entry matches it (or one negates it).
+     * @param skipMatch - assume the file is a match and skip the glob matching
+     * @public
+     */
+    public getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch = false): string {
+        return util.getDestPath(srcPathAbsolute, files, rootDir, skipMatch);
+    }
+
+    /**
      * Resolve a device config's host through DNS, returning a new config with the host replaced by
      * its ip address (some Rokus reject ECP requests addressed by hostname or mDNS name, so callers
      * use this to pin a config to an ip up front). Only local devices are addressed by host; any
@@ -3154,6 +3179,18 @@ export interface BaseEcpOptions {
     ecpPort?: number;
     /** Request timeout in milliseconds. Defaults to 10000ms (10 seconds) */
     timeout?: number;
+}
+
+/**
+ * @public
+ */
+export interface CreateSocketOptions {
+    /** The target device: a registry name or an inline device config. Falls back to the constructor's `device`. */
+    device?: DeviceOption;
+    /** A registry of named devices, consulted when `device` is a name. Falls back to the constructor's registry. */
+    devices?: Record<string, DeviceRegistryEntry>;
+    /** The device console port to connect to (for example 8085 for the BrightScript console) */
+    port: number;
 }
 
 /**
