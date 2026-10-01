@@ -811,18 +811,10 @@ describe('cli', function cli() {
             expect(options.device).to.eql({ host: '9.9.9.9' });
         });
 
-        it('maps sideload --rootDir to the library dir option', async () => {
+        it('passes sideload --dir straight through to the library', async () => {
             const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', results: {} });
-            await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', rootDir: rootDir });
+            await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', dir: rootDir });
             expect(stub.getCall(0).args[0]).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa', dir: rootDir });
-        });
-
-        it('keeps an explicit sideload dir over rootDir', async () => {
-            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', results: {} });
-            await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', dir: 'explicit', rootDir: rootDir });
-            const options = stub.getCall(0).args[0] as any;
-            expect(options.dir).to.equal('explicit');
-            expect(options.rootDir).to.equal(rootDir);
         });
 
         it('reaches a device from the real CLI with only --host (no config file, nothing stubbed)', async () => {
