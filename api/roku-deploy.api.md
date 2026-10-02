@@ -30,7 +30,8 @@ export interface BaseRequestOptions {
     // (undocumented)
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    // (undocumented)
+    devPort?: number;
+    // @deprecated (undocumented)
     packagePort?: number;
     // (undocumented)
     password: string;
@@ -568,8 +569,10 @@ export interface DeviceRegistryEntry extends DeviceRegistrySettings {
 // @public
 export interface DeviceRegistrySettings {
     // (undocumented)
-    ecpPort?: number;
+    devPort?: number;
     // (undocumented)
+    ecpPort?: number;
+    // @deprecated (undocumented)
     packagePort?: number;
     // (undocumented)
     password?: string;
@@ -1473,9 +1476,11 @@ export interface RokuDeployConfig {
     deleteDevChannel?: Partial<DeleteDevChannelOptions>;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
+    devPort?: number;
     ecpPort?: number;
     logLevel?: LogLevel | LogLevelNumeric;
     package?: Partial<CreateSignedPackageOptions>;
+    // @deprecated (undocumented)
     packagePort?: number;
     password?: string;
     rceToken?: string;
@@ -1493,8 +1498,10 @@ export interface RokuDeployConfig {
 export interface RokuDeployConstructorOptions {
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
+    devPort?: number;
     ecpPort?: number;
     logger?: Logger;
+    // @deprecated (undocumented)
     packagePort?: number;
     password?: string;
     rceToken?: string;
@@ -1551,11 +1558,13 @@ export interface RokuDeployOptions {
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     devId?: string;
+    devPort?: number;
     ecpPort?: number;
     failOnCompileError?: boolean;
     files?: FileEntry[];
     logger?: Logger;
     logLevel?: LogLevel | LogLevelNumeric;
+    // @deprecated (undocumented)
     packagePort?: number;
     packageUploadOverrides?: {
         route?: string;
@@ -1935,8 +1944,8 @@ export interface UserOrganisation {
 export interface ValidateDeveloperPasswordOptions {
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
+    devPort?: number;
     password: string;
-    port?: number;
     timeout?: number;
     username?: string;
 }

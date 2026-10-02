@@ -2040,7 +2040,7 @@ describe('RokuDeploy', () => {
         });
 
         it('uses overridden port', async () => {
-            const result = await rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }, { device: { host: '1.2.3.4' }, packagePort: 999, password: 'password' });
+            const result = await rokuDeploy['generateBaseRequestOptions']('a_b_c', { host: '1.2.3.4' }, { device: { host: '1.2.3.4' }, devPort: 999, password: 'password' });
             expect(result.url).to.equal('http://1.2.3.4:999/a_b_c');
         });
 
@@ -7292,17 +7292,30 @@ describe('RokuDeploy', () => {
             expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
         });
 
-        it('uses the registry entry username and packagePort when the call provides none', async () => {
+        it('uses the registry entry username and devPort when the call provides none', async () => {
             const rd = new RokuDeploy({
                 password: 'root-pass',
-                packagePort: 8080,
+                devPort: 8080,
                 devices: {
-                    'office-tv': { host: '1.2.3.4', username: 'entry-user', packagePort: 8081 }
+                    'office-tv': { host: '1.2.3.4', username: 'entry-user', devPort: 8081 }
                 }
             });
             const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
             await rd.deleteDevChannel({ device: 'office-tv' } as any);
             expect(stub.getCall(0).args[0].auth.username).to.equal('entry-user');
+            expect(stub.getCall(0).args[0].url).to.include(':8081/');
+        });
+
+        it('lets a registry entry still using the deprecated packagePort beat the constructor devPort', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devPort: 8080,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', packagePort: 8081 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
             expect(stub.getCall(0).args[0].url).to.include(':8081/');
         });
 
@@ -7382,7 +7395,7 @@ describe('RokuDeploy', () => {
             const rd = new RokuDeploy({
                 password: 'root-pass',
                 username: 'root-user',
-                packagePort: 8080,
+                devPort: 8080,
                 timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4' }
@@ -7437,10 +7450,10 @@ describe('RokuDeploy', () => {
 
         describe('getDeviceSettings', () => {
             const devices = {
-                'office-tv': { host: '1.2.3.4', rceToken: 'token', password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 },
+                'office-tv': { host: '1.2.3.4', rceToken: 'token', password: 'entry-pass', username: 'entry-user', devPort: 8081, ecpPort: 9001, timeout: 1234 },
                 'bare-tv': { host: '5.6.7.8' }
             };
-            const officeSettings = { password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 };
+            const officeSettings = { password: 'entry-pass', username: 'entry-user', devPort: 8081, ecpPort: 9001, timeout: 1234 };
 
             it('returns only the settings fields of the registry entry the call targets', () => {
                 const rd = new RokuDeploy({ devices: devices });
@@ -7491,12 +7504,12 @@ describe('RokuDeploy', () => {
                         device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
-                        packagePort: 80.5,
+                        devPort: 80.5,
                         close: false
                     } as any);
                     assert.fail('Should have thrown');
                 } catch (e) {
-                    expect((e as Error).message).to.include('Invalid packagePort');
+                    expect((e as Error).message).to.include('Invalid devPort');
                 }
             });
 
@@ -7506,12 +7519,12 @@ describe('RokuDeploy', () => {
                         device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
-                        packagePort: 0,
+                        devPort: 0,
                         close: false
                     } as any);
                     assert.fail('Should have thrown');
                 } catch (e) {
-                    expect((e as Error).message).to.include('Invalid packagePort');
+                    expect((e as Error).message).to.include('Invalid devPort');
                 }
             });
 
@@ -7521,12 +7534,12 @@ describe('RokuDeploy', () => {
                         device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
-                        packagePort: 65536,
+                        devPort: 65536,
                         close: false
                     } as any);
                     assert.fail('Should have thrown');
                 } catch (e) {
-                    expect((e as Error).message).to.include('Invalid packagePort');
+                    expect((e as Error).message).to.include('Invalid devPort');
                 }
             });
 
@@ -7536,12 +7549,12 @@ describe('RokuDeploy', () => {
                         device: { host: '1.2.3.4' },
                         password: 'test',
                         zip: 'test.zip',
-                        packagePort: '80' as any,
+                        devPort: '80' as any,
                         close: false
                     });
                     assert.fail('Should have thrown');
                 } catch (e) {
-                    expect((e as Error).message).to.include('Invalid packagePort');
+                    expect((e as Error).message).to.include('Invalid devPort');
                 }
             });
 
@@ -7552,9 +7565,24 @@ describe('RokuDeploy', () => {
                     device: { host: '1.2.3.4' },
                     password: 'test',
                     zip: zipFile,
-                    packagePort: 8080,
+                    devPort: 8080,
                     close: false
                 });
+            });
+
+            it('rejects an invalid deprecated packagePort under the devPort label', async () => {
+                try {
+                    await rokuDeploy.sideload({
+                        device: { host: '1.2.3.4' },
+                        password: 'test',
+                        zip: 'test.zip',
+                        packagePort: 70000,
+                        close: false
+                    } as any);
+                    assert.fail('Should have thrown');
+                } catch (e) {
+                    expect((e as Error).message).to.include(`Invalid devPort: must be an integer between 1 and 65535, received '70000'`);
+                }
             });
         });
 
@@ -8281,7 +8309,7 @@ describe('RokuDeploy', () => {
                 });
             });
 
-            describe('packagePort option', () => {
+            describe('devPort option', () => {
                 it('uses static default when not provided anywhere', async () => {
                     const rd = new RokuDeploy();
                     const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
@@ -8289,14 +8317,32 @@ describe('RokuDeploy', () => {
                 });
 
                 it('uses constructor value when not provided in call', async () => {
-                    const rd = new RokuDeploy({ packagePort: 8080 });
+                    const rd = new RokuDeploy({ devPort: 8080 });
                     const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
                     expect(result.url).to.include(':8080/');
                 });
 
                 it('call value overrides constructor value', async () => {
-                    const rd = new RokuDeploy({ packagePort: 8080 });
-                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', packagePort: 9090 });
+                    const rd = new RokuDeploy({ devPort: 8080 });
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', devPort: 9090 });
+                    expect(result.url).to.include(':9090/');
+                });
+
+                it('honors the deprecated packagePort alias when devPort is not set', async () => {
+                    const rd = new RokuDeploy();
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', packagePort: 8085 });
+                    expect(result.url).to.include(':8085/');
+                });
+
+                it('honors a constructor-level packagePort alias', async () => {
+                    const rd = new RokuDeploy({ packagePort: 8085 });
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
+                    expect(result.url).to.include(':8085/');
+                });
+
+                it('devPort wins when both devPort and packagePort are given', async () => {
+                    const rd = new RokuDeploy();
+                    const result = await rd['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', devPort: 9090, packagePort: 8085 });
                     expect(result.url).to.include(':9090/');
                 });
             });
@@ -8487,9 +8533,9 @@ describe('RokuDeploy', () => {
                 expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
             });
 
-            it('uses default packagePort', async () => {
+            it('uses default devPort', async () => {
                 const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
-                expect(result.url).to.equal(`http://localhost:${RokuDeploy['defaults'].packagePort}/test`);
+                expect(result.url).to.equal(`http://localhost:${RokuDeploy['defaults'].devPort}/test`);
             });
 
             it('uses default username of rokudev', async () => {
@@ -8502,8 +8548,8 @@ describe('RokuDeploy', () => {
                 expect(result.timeout).to.equal(5000);
             });
 
-            it('allows overriding packagePort', async () => {
-                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', packagePort: 8080 });
+            it('allows overriding devPort', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test', devPort: 8080 });
                 expect(result.url).to.equal('http://localhost:8080/test');
             });
 
@@ -8725,20 +8771,43 @@ describe('RokuDeploy', () => {
             expect(headStub.firstCall.args[0].timeout).to.equal(3000);
         });
 
-        it('honors custom username and port', async () => {
+        it('rejects an invalid devPort before contacting the device', async () => {
+            const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
+
+            let thrown: unknown;
+            try {
+                await rokuDeploy.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa', devPort: 70000 });
+            } catch (e) {
+                thrown = e;
+            }
+
+            expect((thrown as Error).message).to.include('Invalid devPort');
+            expect(headStub.called).to.be.false;
+        });
+
+        it('honors custom username and devPort', async () => {
             const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({
                 device: { host: 'device.local' },
                 password: 'aaaa',
                 username: 'somebody',
-                port: 8888,
+                devPort: 8888,
                 timeout: 20
             });
 
             expect(headStub.firstCall.args[0].url).to.equal('http://device.local:8888/');
             expect(headStub.firstCall.args[0].auth.username).to.equal('somebody');
             expect(headStub.firstCall.args[0].timeout).to.equal(20);
+        });
+
+        it('falls back to the deprecated packagePort alias from the constructor defaults', async () => {
+            const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
+            const rd = new RokuDeploy({ packagePort: 8085 });
+
+            await rd.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa' });
+
+            expect(headStub.firstCall.args[0].url).to.equal('http://device.local:8085/');
         });
 
         it('stringifies non-Error transport rejections', async () => {
