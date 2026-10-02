@@ -49,6 +49,8 @@ sample rokudeploy.json
 }
 ```
 
+For a fully-commented example that covers every root-level value and every per-command section (`stage`, `zip`, `sideload`, `package`, `rce.start`, ...), see [docs/rokudeploy.sample.json](docs/rokudeploy.sample.json).
+
 ## Upgrading to v4
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
