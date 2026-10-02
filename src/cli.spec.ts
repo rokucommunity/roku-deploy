@@ -20,6 +20,7 @@ import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
 import { loadCommandOptions } from './commands/commandUtils';
+import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
 
@@ -781,6 +782,47 @@ describe('cli', function cli() {
             });
 
             expect(startStub.getCall(0).args[0].start.maxRuntime).to.equal(120);
+        });
+    });
+
+    describe('init', () => {
+        it('writes the sample config to rokudeploy.json in cwd', () => {
+            sinon.stub(console, 'log');
+            new InitCommand().run({ cwd: tempDir });
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.equal(fsExtra.readFileSync(sampleConfigPath).toString());
+        });
+
+        it('refuses to overwrite an existing rokudeploy.json', () => {
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ "password": "keep-me" }');
+            expect(() => new InitCommand().run({ cwd: tempDir })).to.throw('already exists');
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.equal('{ "password": "keep-me" }');
+        });
+
+        it('overwrites with --force', () => {
+            sinon.stub(console, 'log');
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ "password": "replace-me" }');
+            new InitCommand().run({ cwd: tempDir, force: true });
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.include('/* Device */');
+        });
+
+        it('defaults to the process cwd', () => {
+            sinon.stub(console, 'log');
+            const original = process.cwd();
+            process.chdir(tempDir);
+            try {
+                new InitCommand().run({});
+            } finally {
+                process.chdir(original);
+            }
+            expectPathExists(`${tempDir}/rokudeploy.json`);
+        });
+
+        it('produces a config the CLI then picks up automatically', () => {
+            execSync(`node ${cwd}/dist/cli.js init`);
+            fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+            //the generated file enables sideload.dir, so stage still needs its own flags; this just proves the file is detected
+            const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`).toString();
+            expect(output).to.include(`Using config: ${tempDir}`);
         });
     });
 
