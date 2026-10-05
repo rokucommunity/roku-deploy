@@ -1512,7 +1512,7 @@ export interface RokuDeployConfig {
 
 // @public
 export interface RokuDeployConstructorOptions {
-    config?: boolean | string;
+    config?: boolean | string | null;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;

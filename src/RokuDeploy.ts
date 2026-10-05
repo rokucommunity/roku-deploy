@@ -102,7 +102,7 @@ export class RokuDeploy {
     /**
      * The `config` value given to the constructor, kept so `reloadConfig` re-reads the same source
      */
-    private readonly config?: boolean | string;
+    private readonly config?: boolean | string | null;
 
     /**
      * The process cwd captured at construction, so `config` resolves to the same file on every
@@ -126,16 +126,20 @@ export class RokuDeploy {
     /**
      * Load the root-level (section-less) values from the config source given to the constructor.
      * `true` reads `rokudeploy.json` from the construction-time cwd (a missing file is fine); a string
-     * path (resolved against that same cwd) must exist.
+     * path (resolved against that same cwd) must exist, unless it starts with `?`, which makes the file optional.
      */
     private loadConstructorConfig(): RootConfigOptions {
-        if (!this.config) {
+        if (this.config === undefined || this.config === null || this.config === false) {
             return {};
         }
         let configPath: string;
         if (typeof this.config === 'string') {
-            configPath = path.resolve(this.configCwd, this.config);
+            const optional = this.config.startsWith('?');
+            configPath = path.resolve(this.configCwd, optional ? this.config.slice(1) : this.config);
             if (!fsExtra.existsSync(configPath)) {
+                if (optional) {
+                    return {};
+                }
                 throw new InvalidOptionError(`Config file does not exist at "${configPath}"`, { optionName: 'config' });
             }
         } else {

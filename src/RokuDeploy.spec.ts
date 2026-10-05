@@ -8517,6 +8517,25 @@ describe('RokuDeploy', () => {
                 expect(rd['options']).to.eql({ password: 'custom-pass' });
             });
 
+            it('treats null as not set', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'file-pass' });
+                const rd = new RokuDeploy({ config: null, password: 'constructor-pass' });
+                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+            });
+
+            it('loads an optional ?-prefixed config path when the file exists', () => {
+                process.chdir(tempDir);
+                fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
+                const rd = new RokuDeploy({ config: '?configs/custom.json' });
+                expect(rd['options']).to.eql({ password: 'custom-pass' });
+            });
+
+            it('silently skips an optional ?-prefixed config path when the file is missing', () => {
+                const rd = new RokuDeploy({ config: s`?${tempDir}/missing.json`, password: 'constructor-pass' });
+                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+            });
+
             it('throws when a config path does not exist', () => {
                 expect(() => new RokuDeploy({ config: s`${tempDir}/missing.json` }))
                     .to.throw(errors.InvalidOptionError, 'Config file does not exist');
@@ -8548,6 +8567,15 @@ describe('RokuDeploy', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'second', ecpPort: 1234 });
                 rd.reloadConfig();
                 expect(rd['options']).to.eql({ password: 'second', ecpPort: 9000 });
+            });
+
+            it('picks up an optional config file that appears after construction', () => {
+                const configPath = s`${tempDir}/later.json`;
+                const rd = new RokuDeploy({ config: `?${configPath}` });
+                expect(rd['options']).to.eql({});
+                fsExtra.outputJsonSync(configPath, { password: 'now-present' });
+                rd.reloadConfig();
+                expect(rd['options']).to.eql({ password: 'now-present' });
             });
 
             it('is a no-op when no config was given', () => {
