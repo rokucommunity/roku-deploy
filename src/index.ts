@@ -1,11 +1,14 @@
 //The public API surface. Only modules re-exported here are considered public;
-//everything else (util, sockets, the RCE management/video-signaling clients) is internal.
+//everything else (util) is internal.
 export * from './RokuDeploy';
 export * from './RokuDeployOptions';
 export * from './RokuDeployConfig';
 export * from './Errors';
 export * from './DeviceInfo';
 export * from './DeviceConfig';
-//`standardizePath`/`standardizePathPosix` are long-standing public path helpers used across the
-//ecosystem; keep them public while the rest of `util` stays internal.
+export * from './RokuDeploySocket';
+export * from './RceManagementClient';
+export * from './RceVideoSignalingClient';
+//`standardizePath`/`standardizePathPosix` are long-standing public tagged-template helpers used across the
+//ecosystem; keep them public while the rest of `util` stays internal (`getDestPath` lives on `RokuDeploy`).
 export { standardizePath, standardizePathPosix } from './util';

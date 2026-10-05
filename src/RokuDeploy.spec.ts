@@ -9,6 +9,9 @@ import * as JSZip from 'jszip';
 import * as child_process from 'child_process';
 import * as glob from 'glob';
 import * as xml2js from 'xml2js';
+import { EventEmitter } from 'events';
+import type * as WebSocket from 'ws';
+import * as ws from 'ws';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
 import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
@@ -17,6 +20,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
+import { LocalSocket, RceSocket } from './RokuDeploySocket';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
 
@@ -1028,6 +1032,201 @@ describe('RokuDeploy', () => {
         });
     });
 
+    describe('createEcpSocket', () => {
+        /**
+         * Minimal fake standing in for a real `ws` socket, enough for `connectEcpWebSocket` to drive
+         * its handshake listeners (`'open'`/`'error'`/`'unexpected-response'`) and for tests to
+         * trigger them.
+         */
+        class FakeWebSocket extends EventEmitter {
+            public terminated = false;
+
+            public terminate(): void {
+                this.terminated = true;
+                //real `ws` aborts a still-connecting handshake by emitting `'error'` on the next tick, which
+                //throws if nothing is listening
+                process.nextTick(() => {
+                    this.emit('error', new Error('WebSocket was closed before the connection was established'));
+                });
+            }
+        }
+
+        /**
+         * Lets the microtasks between calling `createEcpSocket` and it registering its handshake
+         * listeners (the dns lookup inside `getEcpRequestBase`, among others) settle before a test
+         * emits a handshake event, so the listener is guaranteed to be attached first.
+         */
+        function flushMicrotasks(): Promise<void> {
+            return new Promise((resolve) => {
+                setImmediate(resolve);
+            });
+        }
+
+        let fakeWebSocket: FakeWebSocket;
+        let capturedUrl: string | undefined;
+        let capturedRequestOptions: WebSocket.ClientOptions | undefined;
+
+        function stubCreateWebSocket(rd: RokuDeploy = rokuDeploy) {
+            return sinon.stub(rd as any, 'createWebSocket').callsFake((url: any, requestOptions: any) => {
+                capturedUrl = url as string;
+                capturedRequestOptions = requestOptions as WebSocket.ClientOptions;
+                return fakeWebSocket;
+            });
+        }
+
+        beforeEach(() => {
+            fakeWebSocket = new FakeWebSocket();
+            capturedUrl = undefined;
+            capturedRequestOptions = undefined;
+        });
+
+        it('builds the LAN url with no auth headers, using the default ecp port and timeout', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            const socket = await socketPromise;
+
+            expect(socket).to.equal(fakeWebSocket);
+            expect(capturedUrl).to.equal('ws://1.1.1.1:8060/perfetto-session');
+            expect(capturedRequestOptions).to.eql({ headers: {}, handshakeTimeout: 10000 });
+        });
+
+        it('uses an explicit ecpPort and timeout instead of the defaults', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session', ecpPort: 9999, timeout: 5000 });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://1.1.1.1:9999/perfetto-session');
+            expect(capturedRequestOptions.handshakeTimeout).to.equal(5000);
+        });
+
+        it('builds the url from the given route', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'some-other-route' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://1.1.1.1:8060/some-other-route');
+        });
+
+        it('resolves a registry-name device through the devices registry', async () => {
+            const rd = new RokuDeploy({ devices: { 'my-device': { host: '2.2.2.2' } } });
+            stubCreateWebSocket(rd);
+
+            const socketPromise = rd.createEcpSocket({ device: 'my-device', route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('ws://2.2.2.2:8060/perfetto-session');
+        });
+
+        it('routes an RCE device through the wss instance proxy with the X-Authorization bearer header', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({
+                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                route: 'perfetto-session'
+            });
+            await flushMicrotasks();
+            fakeWebSocket.emit('open');
+            await socketPromise;
+
+            expect(capturedUrl).to.equal('wss://device.rce.roku.com/instance/abc/api/v0/ports/8060/http/perfetto-session');
+            expect(capturedRequestOptions.headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+        });
+
+        it('rejects with the raw handshake error and never resolves the socket', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            const handshakeError = new Error('connect ECONNREFUSED');
+            fakeWebSocket.emit('error', handshakeError);
+
+            await expectThrowsAsync(socketPromise, 'connect ECONNREFUSED');
+        });
+
+        it('rejects with a status-carrying error and terminates the socket on an unexpected handshake response', async () => {
+            stubCreateWebSocket();
+
+            const socketPromise = rokuDeploy.createEcpSocket({ device: { host: '1.1.1.1' }, route: 'perfetto-session' });
+            await flushMicrotasks();
+            fakeWebSocket.emit('unexpected-response', {}, { statusCode: 403, headers: {} });
+
+            await expectThrowsAsync(socketPromise, 'Unexpected status 403 from the ECP websocket at ws://1.1.1.1:8060/perfetto-session');
+            expect(fakeWebSocket.terminated).to.be.true;
+            //the abort error `terminate()` emits has to land on a listener, or node turns it into an
+            //uncaught exception that takes down the host process
+            expect(fakeWebSocket.listenerCount('error')).to.be.greaterThan(0);
+            await flushMicrotasks();
+        });
+
+        it('retries against a refreshed instance url when the handshake reports the cached instance gone', async () => {
+            const rd = new RokuDeploy({ rceToken: 'default-token' });
+            const getInstanceUrlStub = sinon.stub();
+            getInstanceUrlStub.onFirstCall().resolves('https://device.rce.roku.com/instance/old');
+            getInstanceUrlStub.onSecondCall().resolves('https://device.rce.roku.com/instance/new');
+            sinon.stub(rd as any, 'createRceManagementClient').returns({ getInstanceUrl: getInstanceUrlStub });
+            //prime the cache with the soon-to-be-stale url, exactly like sendEcpRequest's equivalent test
+            await rd['getRceInstanceUrl']({ id: 123 });
+
+            const urlsSeen: string[] = [];
+            sinon.stub(rd as any, 'createWebSocket').callsFake((url: any) => {
+                urlsSeen.push(url as string);
+                const socket = new FakeWebSocket();
+                setImmediate(() => {
+                    if ((url as string).includes('/instance/old/')) {
+                        //the mesh-generated 404: no x-envoy-upstream-service-time header
+                        socket.emit('unexpected-response', {}, { statusCode: 404, headers: {} });
+                    } else {
+                        socket.emit('open');
+                    }
+                });
+                return socket;
+            });
+
+            const socket = await rd.createEcpSocket({ device: { id: 123 }, route: 'perfetto-session' });
+
+            expect(urlsSeen).to.eql([
+                'wss://device.rce.roku.com/instance/old/api/v0/ports/8060/http/perfetto-session',
+                'wss://device.rce.roku.com/instance/new/api/v0/ports/8060/http/perfetto-session'
+            ]);
+            expect(socket).to.be.instanceOf(FakeWebSocket);
+        });
+
+        it('creates a real ws websocket outside of tests (every other test stubs the factory)', () => {
+            const webSocket = (rokuDeploy as any).createWebSocket('ws://127.0.0.1:1', {}) as WebSocket;
+
+            expect(webSocket).to.be.instanceOf(ws.WebSocket);
+
+            //the connection attempt targets a closed port; silence and abort it
+            webSocket.on('error', () => { });
+            webSocket.terminate();
+        });
+
+        describe('startPerfettoSession', () => {
+            it('delegates to createEcpSocket with the perfetto-session route', async () => {
+                stubCreateWebSocket();
+
+                const socketPromise = rokuDeploy.startPerfettoSession({ device: { host: '1.1.1.1' } });
+                await flushMicrotasks();
+                fakeWebSocket.emit('open');
+                const socket = await socketPromise;
+
+                expect(socket).to.equal(fakeWebSocket);
+                expect(capturedUrl).to.equal('ws://1.1.1.1:8060/perfetto-session');
+            });
+        });
+    });
+
     describe('getRegistry', () => {
         it('refines the registry response into sections keyed by name', async () => {
             const stub = mockDoGetRequest('<plugin-registry><registry><dev-id>12345</dev-id><plugins>dev</plugins><space-available>28000</space-available><sections><section><name>Section1</name><items><item><key>k1</key><value>v1</value></item><item><key>k2</key><value>v2</value></item></items></section></sections></registry><status>OK</status></plugin-registry>');
@@ -1191,6 +1390,128 @@ describe('RokuDeploy', () => {
 
             expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/sgrendezvous/untrack');
             expect(trackingEnabled).to.be.false;
+        });
+    });
+
+    describe('enablePerfettoTracing', () => {
+        it('POSTs perfetto/enable/{appId} and refines the response', async () => {
+            const stub = mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel></enabled-channels><application-already-started>false</application-already-started><timestamp>1789646795421</timestamp><timestamp-end>1789646795422</timestamp-end><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/enable/dev');
+            expect(result).to.eql({
+                enabledChannels: ['dev'],
+                applicationAlreadyStarted: false,
+                timestamp: 1789646795421,
+                timestampEnd: 1789646795422
+            });
+        });
+
+        it('normalizes multiple enabled-channels entries to an array', async () => {
+            mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel><channel>12</channel></enabled-channels><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.enabledChannels).to.eql(['dev', '12']);
+        });
+
+        it('returns an empty enabledChannels array when the response has no enabled-channels block', async () => {
+            mockDoPostRequest('<perfetto-enable><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.enabledChannels).to.eql([]);
+        });
+
+        it('returns undefined timestamps when the response omits them', async () => {
+            mockDoPostRequest('<perfetto-enable><enabled-channels><channel>dev</channel></enabled-channels><application-already-started>false</application-already-started><status>OK</status></perfetto-enable>');
+
+            const result = await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.timestamp).to.be.undefined;
+            expect(result.timestampEnd).to.be.undefined;
+        });
+
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoPostRequest('<perfetto-enable><status>OK</status></perfetto-enable>');
+            await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/enable/dev%20channel%2F1');
+        });
+
+        it('throws a FailedDeviceResponseError carrying the device error message', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 202, headers: {},
+                body: '<perfetto-enable><status>FAILED</status><error>Device not keyed</error></perfetto-enable>'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not enable perfetto tracing: Device not keyed');
+        });
+
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 403, headers: {},
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.enablePerfettoTracing({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not enable perfetto tracing: ECP command not allowed in Limited mode.');
+        });
+    });
+
+    describe('triggerHeapSnapshot', () => {
+        it('POSTs perfetto/heapgraph/trigger/{appId} and refines the response', async () => {
+            const stub = mockDoPostRequest('<perfetto-heapgraph-trigger><timestamp>1789646795421</timestamp><timestamp-end>1789646795422</timestamp-end><status>OK</status></perfetto-heapgraph-trigger>');
+
+            const result = await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/heapgraph/trigger/dev');
+            expect(result).to.eql({
+                timestamp: 1789646795421,
+                timestampEnd: 1789646795422
+            });
+        });
+
+        it('returns undefined timestamps when the response omits them', async () => {
+            mockDoPostRequest('<perfetto-heapgraph-trigger><status>OK</status></perfetto-heapgraph-trigger>');
+
+            const result = await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+
+            expect(result.timestamp).to.be.undefined;
+            expect(result.timestampEnd).to.be.undefined;
+        });
+
+        it('uri-encodes the appId in the route', async () => {
+            const stub = mockDoPostRequest('<perfetto-heapgraph-trigger><status>OK</status></perfetto-heapgraph-trigger>');
+            await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev channel/1' });
+
+            expect(stub.getCall(0).args[0].url).to.equal('http://1.1.1.1:8060/perfetto/heapgraph/trigger/dev%20channel%2F1');
+        });
+
+        it('throws a FailedDeviceResponseError carrying the device error message', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 202, headers: {},
+                body: '<perfetto-heapgraph-trigger><status>FAILED</status><error>Device not keyed</error></perfetto-heapgraph-trigger>'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not trigger heap snapshot: Device not keyed');
+        });
+
+        it('carries a plain-text device explanation (for example limited mode) in the error', async () => {
+            sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({
+                statusCode: 403, headers: {},
+                body: 'ECP command not allowed in Limited mode.'
+            });
+
+            await expectThrowsAsync(async () => {
+                await rokuDeploy.triggerHeapSnapshot({ device: { host: '1.1.1.1' }, appId: 'dev' });
+            }, 'Could not trigger heap snapshot: ECP command not allowed in Limited mode.');
         });
     });
 
@@ -1743,6 +2064,68 @@ describe('RokuDeploy', () => {
             expect(result.headers).to.eql({ 'X-Authorization': 'Bearer default-token' });
         });
 
+    });
+
+    describe('createSocket', () => {
+        it('creates a local socket for an inline device config', () => {
+            const socket = rokuDeploy.createSocket({ device: { host: '1.2.3.4' }, port: 8085 });
+            expect(socket).to.be.instanceOf(LocalSocket);
+            expect(socket['host']).to.equal('1.2.3.4');
+            expect(socket['port']).to.equal(8085);
+        });
+
+        it('creates an rce socket for an rce device config', () => {
+            const socket = rokuDeploy.createSocket({ device: { instanceUrl: 'https://rce.example.com', rceToken: 'token' } as any, port: 8085 });
+            expect(socket).to.be.instanceOf(RceSocket);
+        });
+
+        it('resolves a registry device name through the constructor registry', () => {
+            const rd = new RokuDeploy({ devices: { tv: { host: '5.6.7.8' } } });
+            const socket = rd.createSocket({ device: 'tv', port: 8080 });
+            expect(socket['host']).to.equal('5.6.7.8');
+        });
+
+        it('resolves a registry device name through a per-call registry', () => {
+            const socket = rokuDeploy.createSocket({ device: 'tv', devices: { tv: { host: '5.6.7.8' } }, port: 8080 });
+            expect(socket['host']).to.equal('5.6.7.8');
+        });
+
+        it('falls back to the constructor device', () => {
+            const rd = new RokuDeploy({ device: { host: '9.9.9.9' } });
+            expect(rd.createSocket({ port: 8085 })['host']).to.equal('9.9.9.9');
+        });
+
+        it('throws when no device is available', () => {
+            expect(() => rokuDeploy.createSocket({ port: 8085 })).to.throw('Missing required option: device');
+        });
+
+        it('throws when no port is given', () => {
+            expect(() => rokuDeploy.createSocket({ device: { host: '1.2.3.4' } } as any)).to.throw('Missing required option: port');
+        });
+
+        it('throws for an unknown registry name', () => {
+            expect(() => rokuDeploy.createSocket({ device: 'nope', port: 8085 })).to.throw(`Device 'nope' not found in devices registry`);
+        });
+    });
+
+    describe('getDestPath', () => {
+        it('returns the dest path relative to the package root for a matched file', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/source/main.brs`, ['source/**/*'], rootDir)
+            ).to.equal(s`source/main.brs`);
+        });
+
+        it('returns undefined for a file no entry matches', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/unmatched/main.brs`, ['source/**/*'], rootDir)
+            ).to.be.undefined;
+        });
+
+        it('honors a dest override on a files entry', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/lib/thing.brs`, [{ src: 'lib/**/*', dest: 'source/lib' }], rootDir)
+            ).to.equal(s`source/lib/thing.brs`);
+        });
     });
 
     describe('withDnsResolvedHost', () => {
@@ -6871,6 +7254,225 @@ describe('RokuDeploy', () => {
                     device: { host: '1.2.3.4', esn: 'ABC123' } as any
                 });
             }, 'Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
+        });
+    });
+
+    describe('devices registry per-device settings', () => {
+        it('uses the registry entry password when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
+        });
+
+        it('call password overrides the registry entry password', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv', password: 'call-pass' });
+            expect(stub.getCall(0).args[0].auth.password).to.equal('call-pass');
+        });
+
+        it('falls back to the constructor password when the registry entry has none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
+        });
+
+        it('uses the registry entry username and packagePort when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                packagePort: 8080,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', username: 'entry-user', packagePort: 8081 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth.username).to.equal('entry-user');
+            expect(stub.getCall(0).args[0].url).to.include(':8081/');
+        });
+
+        it('uses the registry entry ecpPort when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                ecpPort: 9000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.include(':9001/');
+        });
+
+        it('call ecpPort overrides the registry entry ecpPort', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home', ecpPort: 9999 });
+            expect(stub.getCall(0).args[0].url).to.include(':9999/');
+        });
+
+        it('falls back to the constructor ecpPort when the registry entry has none', async () => {
+            const rd = new RokuDeploy({
+                ecpPort: 9000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'office-tv', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.include(':9000/');
+        });
+
+        it('uses the registry entry timeout when the call provides none', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                timeout: 5000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+        });
+
+        it('call timeout overrides the registry entry timeout', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv', timeout: 4321 } as any);
+            expect(stub.getCall(0).args[0].timeout).to.equal(4321);
+        });
+
+        it('applies registry entry settings when the device name comes from the constructor', async () => {
+            const rd = new RokuDeploy({
+                device: 'office-tv',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel();
+            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
+        });
+
+        it('uses constructor settings unchanged for an entry with only targeting fields', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                username: 'root-user',
+                packagePort: 8080,
+                timeout: 5000,
+                devices: {
+                    'office-tv': { host: '1.2.3.4' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: 'office-tv' } as any);
+            expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
+            expect(stub.getCall(0).args[0].url).to.include(':8080/');
+            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
+        });
+
+        it('does not apply registry settings to an inline device config', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({ device: { host: '1.2.3.4' } } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
+        });
+
+        it('still honors the registry entry rceToken alongside per-device settings', async () => {
+            const rd = new RokuDeploy({
+                devices: {
+                    'cloud-device': { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret', timeout: 1234 }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+            await rd.keyPress({ device: 'cloud-device', key: 'Home' });
+            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Home');
+            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+        });
+
+        it('uses settings from a per-call devices registry entry', async () => {
+            const rd = new RokuDeploy({
+                password: 'root-pass',
+                devices: {
+                    'office-tv': { host: '1.2.3.4', password: 'constructor-entry-pass' }
+                }
+            });
+            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
+            await rd.deleteDevChannel({
+                device: 'office-tv',
+                devices: { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } }
+            } as any);
+            expect(stub.getCall(0).args[0].auth.password).to.equal('call-entry-pass');
+        });
+
+        describe('getDeviceSettings', () => {
+            const devices = {
+                'office-tv': { host: '1.2.3.4', rceToken: 'token', password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 },
+                'bare-tv': { host: '5.6.7.8' }
+            };
+            const officeSettings = { password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 };
+
+            it('returns only the settings fields of the registry entry the call targets', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: 'office-tv' })).to.eql(officeSettings);
+            });
+
+            it('omits settings the entry does not define', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: 'bare-tv' })).to.eql({});
+            });
+
+            it('falls back to the constructor device when the call names none', () => {
+                const rd = new RokuDeploy({ device: 'office-tv', devices: devices });
+                expect((rd as any).getDeviceSettings({})).to.eql(officeSettings);
+                expect((rd as any).getDeviceSettings(undefined)).to.eql(officeSettings);
+            });
+
+            it('returns nothing for an inline device config, no device, or an unknown name', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                expect((rd as any).getDeviceSettings({ device: { host: '1.2.3.4', password: 'inline' } })).to.eql({});
+                expect((rd as any).getDeviceSettings(undefined)).to.eql({});
+                expect((rd as any).getDeviceSettings({ device: 'unknown' })).to.eql({});
+            });
+
+            it('prefers the per-call registry and falls back to the constructor registry by name', () => {
+                const rd = new RokuDeploy({ devices: devices });
+                const callDevices = { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } };
+                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: callDevices })).to.eql({ password: 'call-entry-pass' });
+                expect((rd as any).getDeviceSettings({ device: 'bare-tv', devices: callDevices })).to.eql({});
+                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: {} })).to.eql(officeSettings);
+            });
         });
     });
 

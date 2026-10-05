@@ -10,6 +10,7 @@ import { RceManagementClient } from './RceManagementClient';
  * console on port 8085) that behaves like a `net.Socket` regardless of where the device lives:
  * plain tcp for a local network device, an authenticated WebSocket for a Roku Cloud Emulator (RCE)
  * instance. Exposes the same method surface and events as `new net.Socket()`.
+ * @public
  */
 export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket {
     //runtime guard for javascript callers, since a registry name (string) cannot be resolved to a
@@ -35,6 +36,7 @@ export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket
  * A `net.Socket` wired up to connect to a local device's plain-tcp telnet console using the host
  * and port given at construction. Everything other than `connect()` is inherited `net.Socket`
  * behavior, unchanged.
+ * @internal
  */
 export class LocalSocket extends net.Socket {
     constructor(options: LocalSocketOptions) {
@@ -81,6 +83,7 @@ export class LocalSocket extends net.Socket {
  * socket to `telnet-client`, whose `_checkSocket()` injected-socket guard requires `pipe`,
  * `_write`, `_writableState`, `_read`, and `_readableState` — internals only a real Node stream
  * provides.
+ * @internal
  */
 export class RceSocket extends stream.Duplex {
     constructor(options: RceSocketOptions) {
@@ -486,6 +489,10 @@ interface PendingWrite {
     callback: (error?: Error | null) => void;
 }
 
+/**
+ * Options for `createRokuDeploySocket()`.
+ * @public
+ */
 export interface SocketOptions {
     /** the device to connect to. Registry names (strings) are not supported here; pass a resolved device config */
     device: DeviceConfig;
@@ -499,6 +506,7 @@ export interface SocketOptions {
 
 /**
  * `SocketOptions` narrowed to a local network device, the flavor `LocalSocket` requires
+ * @internal
  */
 export interface LocalSocketOptions extends SocketOptions {
     device: LocalDeviceConfig;
@@ -506,6 +514,7 @@ export interface LocalSocketOptions extends SocketOptions {
 
 /**
  * `SocketOptions` narrowed to an RCE device, the flavor `RceSocket` requires
+ * @internal
  */
 export interface RceSocketOptions extends SocketOptions {
     device: RceDeviceConfig;
@@ -517,6 +526,7 @@ export interface RceSocketOptions extends SocketOptions {
  * structurally; `RceSocket` implements it directly. The address fields and `timeout` are
  * informational, carried over from `net.Socket` for logging; an RCE connection has no tcp-level
  * address, so it reports `undefined` for those.
+ * @public
  */
 export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
     connect: (connectListener?: () => void) => this;
