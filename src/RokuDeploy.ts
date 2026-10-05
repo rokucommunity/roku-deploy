@@ -194,7 +194,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async sideload(options: SideloadOptions): Promise<{ message: string; results: any }> {
+    public async sideload(options: SideloadOptions): Promise<SideloadResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -353,10 +353,10 @@ export class RokuDeploy {
             }
 
             if (response.body.includes('Identical to previous version -- not replacing.')) {
-                return { message: 'Identical to previous version -- not replacing', results: response };
+                return { message: 'Identical to previous version -- not replacing', rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
             }
             this.logger.info('Successful sideload');
-            return { message: 'Successful sideload', results: response };
+            return { message: 'Successful sideload', rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
         } finally {
             //delete the zip file if we generated it from rootDir
             if (deleteZipAfterSideload) {
@@ -376,7 +376,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async convertToSquashfs(options: ConvertToSquashfsOptions) {
+    public async convertToSquashfs(options: ConvertToSquashfsOptions): Promise<ConvertToSquashfsResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
@@ -412,15 +412,13 @@ export class RokuDeploy {
                 throw error;
             }
         });
-        if (squashfsConfirmedAfterInvalidResponse) {
-            return results;
-        }
-        if (results.body.indexOf('Conversion succeeded') === -1) {
+        if (!squashfsConfirmedAfterInvalidResponse && results.body.indexOf('Conversion succeeded') === -1) {
             throw new ConvertError('Squashfs conversion failed', {
                 httpDetails: extractHttpDetails(results),
                 rokuMessages: this.getRokuMessagesFromResponseBody(results.body)
             });
         }
+        return { rokuMessages: this.getRokuMessagesFromResponseBody(results.body) };
     }
 
     /**
@@ -781,7 +779,7 @@ export class RokuDeploy {
     /**
      * @public
      */
-    public async rebootDevice(options: RebootDeviceOptions) {
+    public async rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RebootDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
@@ -803,7 +801,7 @@ export class RokuDeploy {
             );
         }
 
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             return this.doPostRequest({
                 ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
                 formData: {
@@ -812,12 +810,13 @@ export class RokuDeploy {
                 }
             });
         });
+        return { rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
     }
 
     /**
      * @public
      */
-    public async checkForUpdate(options: CheckForUpdateOptions) {
+    public async checkForUpdate(options: CheckForUpdateOptions): Promise<CheckForUpdateResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CheckForUpdateOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
@@ -839,7 +838,7 @@ export class RokuDeploy {
             );
         }
 
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             return this.doPostRequest({
                 ...(await this.generateBaseRequestOptions('plugin_swup', deviceConfig, options)),
                 formData: {
@@ -848,6 +847,7 @@ export class RokuDeploy {
                 }
             });
         });
+        return { rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
     }
 
     /**
@@ -1528,7 +1528,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async deleteDevChannel(options?: DeleteDevChannelOptions) {
+    public async deleteDevChannel(options?: DeleteDevChannelOptions): Promise<DeleteDevChannelResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -1537,7 +1537,7 @@ export class RokuDeploy {
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
             deleteOptions.formData = {
                 mysubmit: 'Delete',
@@ -1545,6 +1545,7 @@ export class RokuDeploy {
             };
             return this.doPostRequest(deleteOptions);
         });
+        return { rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
     }
 
     /**
@@ -1552,13 +1553,13 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions) {
+    public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<DeleteAllSideloadedPluginsResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
-        return this.withRceInstanceUrlRetry(deviceConfig, async () => {
+        const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             let deleteOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options);
             deleteOptions.formData = {
                 mysubmit: 'DeleteAll',
@@ -1566,6 +1567,7 @@ export class RokuDeploy {
             };
             return this.doPostRequest(deleteOptions);
         });
+        return { rokuMessages: this.getRokuMessagesFromResponseBody(response.body) };
     }
 
     /**
@@ -3469,6 +3471,70 @@ export interface GetDevIdResult {
      * The developer ID from the device
      */
     devId: string;
+}
+
+/**
+ * @public
+ */
+export interface SideloadResult {
+    /**
+     * Human-readable summary of the sideload outcome
+     */
+    message: string;
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
+}
+
+/**
+ * @public
+ */
+export interface ConvertToSquashfsResult {
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
+}
+
+/**
+ * @public
+ */
+export interface RebootDeviceResult {
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
+}
+
+/**
+ * @public
+ */
+export interface CheckForUpdateResult {
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
+}
+
+/**
+ * @public
+ */
+export interface DeleteDevChannelResult {
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
+}
+
+/**
+ * @public
+ */
+export interface DeleteAllSideloadedPluginsResult {
+    /**
+     * Any messages the device reported in its response
+     */
+    rokuMessages: RokuMessages;
 }
 
 //create a new static instance of RokuDeploy, and export those functions for backwards compatibility
