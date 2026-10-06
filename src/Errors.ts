@@ -125,21 +125,25 @@ export abstract class RokuDeployError<T = unknown> extends Error {
 
     /**
      * Error code for programmatic identification
+     * @public
      */
     public abstract readonly code: RokuDeployErrorCode;
 
     /**
      * Typed details specific to this error type
+     * @public
      */
     public readonly details: T;
 
     /**
      * Original error if this error wraps another
+     * @public
      */
     public readonly cause?: Error;
 
     /**
      * Serialize the error for logging/transmission
+     * @public
      */
     public toJSON(): Record<string, unknown> {
         return {
@@ -165,6 +169,7 @@ export abstract class RokuDeployError<T = unknown> extends Error {
 export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
     /**
      * Roku messages extracted from the device response
+     * @public
      */
     public get rokuMessages(): RokuMessages | undefined {
         return this.details?.rokuMessages;
@@ -178,6 +183,7 @@ export abstract class DeviceError extends RokuDeployError<DeviceErrorDetails> {
 export abstract class ConfigurationError extends RokuDeployError<ConfigurationErrorDetails> {
     /**
      * The name of the option that caused the error
+     * @public
      */
     public get optionName(): string | undefined {
         return this.details?.optionName;
@@ -193,6 +199,9 @@ export abstract class ConfigurationError extends RokuDeployError<ConfigurationEr
  * @public
  */
 export class InvalidDeviceResponseCodeError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.INVALID_RESPONSE_CODE;
 }
 
@@ -201,6 +210,9 @@ export class InvalidDeviceResponseCodeError extends DeviceError {
  * @public
  */
 export class UnauthorizedDeviceResponseError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.UNAUTHORIZED;
 }
 
@@ -209,6 +221,9 @@ export class UnauthorizedDeviceResponseError extends DeviceError {
  * @public
  */
 export class FailedDeviceResponseError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.FAILED_RESPONSE;
 }
 
@@ -217,6 +232,9 @@ export class FailedDeviceResponseError extends DeviceError {
  * @public
  */
 export class UnparsableDeviceResponseError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.UNPARSABLE_RESPONSE;
 }
 
@@ -225,6 +243,9 @@ export class UnparsableDeviceResponseError extends DeviceError {
  * @public
  */
 export class UnknownDeviceResponseError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.UNKNOWN_RESPONSE;
 }
 
@@ -233,6 +254,9 @@ export class UnknownDeviceResponseError extends DeviceError {
  * @public
  */
 export class DeviceUnreachableError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.DEVICE_UNREACHABLE;
 }
 
@@ -241,6 +265,9 @@ export class DeviceUnreachableError extends DeviceError {
  * @public
  */
 export class EcpNetworkAccessModeDisabledError extends DeviceError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.ECP_DISABLED;
 }
 
@@ -254,9 +281,16 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
         super(UpdateCheckRequiredError.MESSAGE, details, cause);
     }
 
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
 
-    static MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
+    /**
+     * The message every instance of this error carries.
+     * @public
+     */
+    public static readonly MESSAGE = `Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 }
 
 /**
@@ -271,9 +305,16 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
         super(ConnectionResetError.MESSAGE, details, cause);
     }
 
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.CONNECTION_RESET;
 
-    static MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
+    /**
+     * The message every instance of this error carries.
+     * @public
+     */
+    public static readonly MESSAGE = `The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.`;
 }
 
 /**
@@ -281,11 +322,15 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
  * @public
  */
 export class CompileError extends RokuDeployError<CompileErrorDetails> {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.COMPILE_ERROR;
 
     /**
      * Roku messages extracted from the device response.
      * The `errors` array contains compile error messages.
+     * @public
      */
     public get rokuMessages(): RokuMessages | undefined {
         return this.details?.rokuMessages;
@@ -297,6 +342,9 @@ export class CompileError extends RokuDeployError<CompileErrorDetails> {
  * @public
  */
 export class ConvertError extends RokuDeployError<ConvertErrorDetails> {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.CONVERT_ERROR;
 }
 
@@ -305,6 +353,9 @@ export class ConvertError extends RokuDeployError<ConvertErrorDetails> {
  * @public
  */
 export class MissingRequiredOptionError extends ConfigurationError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.MISSING_REQUIRED_OPTION;
 }
 
@@ -313,6 +364,9 @@ export class MissingRequiredOptionError extends ConfigurationError {
  * @public
  */
 export class InvalidOptionError extends ConfigurationError {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.INVALID_OPTION;
 }
 
@@ -321,6 +375,9 @@ export class InvalidOptionError extends ConfigurationError {
  * @public
  */
 export class UnsupportedFirmwareVersionError extends RokuDeployError<UnsupportedFirmwareDetails> {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.UNSUPPORTED_FIRMWARE;
 }
 
