@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import * as childProcess from 'child_process';
-import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import { Extractor, ExtractorConfig } from '@microsoft/api-extractor';
 
@@ -11,6 +10,7 @@ const rootDir = path.resolve(__dirname, '..');
  * API Extractor in "production" mode (local=false), which:
  *   1. fails if any exported symbol is missing a release tag (so nothing can leak in untagged), and
  *   2. fails if the generated API report differs from the committed `api/roku-deploy.api.md` (drift detection).
+ * Member-level release tags are enforced by the `local-rules/require-release-tag` lint rule instead.
  *
  * If one of these fails because of an *intentional* API change, run `npm run api:build-and-update`
  * and commit the updated `api/roku-deploy.api.md`.
@@ -62,57 +62,4 @@ describe('public API surface (api-extractor)', function apiExtractorSuite() {
             'intentional, run `npm run api:build-and-update` and commit the updated api/roku-deploy.api.md.'
         ).to.equal(true);
     });
-
-    it('every public member of every exported class carries an explicit @public or @internal tag', () => {
-        //api-extractor only enforces release tags on EXPORTS; class members inherit the class's tag,
-        //so an untagged public method would silently join the public API. Enforce member-level intent
-        //here for every module `index.ts` re-exports: each `public` member's docblock must say
-        //@public or @internal explicitly. Overload signatures share one docblock, so a member name is
-        //only checked the first time it appears in a class.
-        const indexSource = fsExtra.readFileSync(path.join(rootDir, 'src', 'index.ts')).toString();
-        const modules = [...indexSource.matchAll(/^export \* from '\.\/(\w+)';/gm)].map(x => x[1]);
-        expect(modules, 'index.ts should re-export at least one module').to.not.be.empty;
-
-        const untagged: string[] = [];
-        for (const moduleName of modules) {
-            const lines = fsExtra.readFileSync(path.join(rootDir, 'src', `${moduleName}.ts`)).toString().split(/\r?\n/);
-            let seenInClass = new Set<string>();
-            for (let i = 0; i < lines.length; i++) {
-                if (/^export (?:abstract )?class /.test(lines[i])) {
-                    seenInClass = new Set<string>();
-                }
-                const member = /^ {4}public (?:abstract )?(?:static )?(?:readonly )?(?:async )?(?:get |set )?(\w+)/.exec(lines[i]);
-                if (!member || seenInClass.has(member[1])) {
-                    continue;
-                }
-                seenInClass.add(member[1]);
-                if (!hasReleaseTag(lines, i)) {
-                    untagged.push(`${moduleName}.ts: ${member[1]} (line ${i + 1})`);
-                }
-            }
-        }
-        expect(
-            untagged,
-            'These public class members are missing an explicit @public/@internal release tag'
-        ).to.eql([]);
-    });
-
-    /**
-     * Whether the docblock ending on the line directly above `memberLine` contains a release tag.
-     */
-    function hasReleaseTag(lines: string[], memberLine: number) {
-        if (lines[memberLine - 1]?.trim() !== '*/') {
-            return false;
-        }
-        for (let j = memberLine - 1; j >= 0; j--) {
-            const line = lines[j].trim();
-            if (line.includes('@public') || line.includes('@internal')) {
-                return true;
-            }
-            if (line.startsWith('/**')) {
-                break;
-            }
-        }
-        return false;
-    }
 });
