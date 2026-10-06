@@ -107,15 +107,16 @@ describe('src/rokudeploy.sample.jsonc', () => {
         }
     });
 
+    //line-based checks split on \r?\n: a Windows checkout with autocrlf hands us CRLF text
     it('keeps every option on a single line so it can be enabled by deleting the leading slashes', () => {
         //a multi-line commented-out value would not survive uncommentOptions(), so guard the format itself
-        const commentedOpeners = text.split('\n').filter(line => /^\s*\/\/ "[^"]+":.*[[{]\s*$/.test(line));
+        const commentedOpeners = text.split(/\r?\n/).filter(line => /^\s*\/\/ "[^"]+":.*[[{]\s*$/.test(line));
         expect(commentedOpeners).to.eql([]);
     });
 
     it('aligns every description comment to the same column', () => {
         const columns = new Set(
-            text.split('\n')
+            text.split(/\r?\n/)
                 .map(line => /^(.*?\S)\s{2,}\/\* .* \*\/$/.exec(line))
                 .filter(match => match && !match[1].trim().startsWith('/*'))
                 //lastIndexOf: glob values like "**/*.*" contain "/*" too
