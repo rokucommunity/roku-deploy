@@ -67,7 +67,7 @@ describe('cli', function cli() {
 
     it('Converts to squashfs', async () => {
         const stub = sinon.stub(rokuDeploy, 'convertToSquashfs').callsFake(async () => {
-            return Promise.resolve();
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new ConvertToSquashfsCommand();
@@ -179,7 +179,7 @@ describe('cli', function cli() {
 
     it('Deletes an installed channel', async () => {
         const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
-            return Promise.resolve({ statusCode: 200, headers: {}, body: '', request: { url: '', method: 'POST' } });
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new DeleteDevChannelCommand();
@@ -854,7 +854,7 @@ describe('cli', function cli() {
         });
 
         it('passes sideload --dir straight through to the library', async () => {
-            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', results: {} });
+            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', rokuMessages: { errors: [], infos: [], successes: [] } });
             await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', dir: rootDir });
             expect(stub.getCall(0).args[0]).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa', dir: rootDir });
         });
