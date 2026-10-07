@@ -17,7 +17,7 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     args.cwd ??= process.cwd();
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
-        return { ...args } as T;
+        return mapCliArgsToLibraryOptions({ ...args }) as T;
     }
     const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
     //announce which config file feeds this run (even without --verbose) so file-supplied values
@@ -25,10 +25,22 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     if (!options?.quiet && fsExtra.existsSync(configPath)) {
         console.log(`Using config: ${configPath}`);
     }
-    return {
+    return mapCliArgsToLibraryOptions({
         ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
         ...args
-    } as T;
+    }) as T;
+}
+
+/**
+ * Translate CLI-only flag names into the option names the library understands. `--host` becomes an
+ * inline `device` config (and wins over any `device` from the config file, since CLI args take precedence).
+ */
+function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
+    if (typeof options.host === 'string') {
+        const { host, ...rest } = options;
+        return { ...rest, device: { host: host } } as unknown as T;
+    }
+    return options;
 }
 
 /**

@@ -109,7 +109,7 @@ Sideload a .zip package or directory to a roku device. By default, the channel i
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip'
 
 # Sideload from a directory (will be zipped first automatically)
-npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --rootDir './path/to/your/project'
+npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --dir './path/to/your/project'
 
 # Sideload without closing the channel first
 npx roku-deploy sideload --host 'ip.of.roku' --password 'password' --zip './path/to/your/app.zip' --no-close

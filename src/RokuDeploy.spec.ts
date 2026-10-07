@@ -21,6 +21,7 @@ import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
 import { logger, LogLevelNumeric } from '@rokucommunity/logger';
+import { LocalSocket, RceSocket } from './RokuDeploySocket';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
 
@@ -2066,6 +2067,68 @@ describe('RokuDeploy', () => {
 
     });
 
+    describe('createSocket', () => {
+        it('creates a local socket for an inline device config', () => {
+            const socket = rokuDeploy.createSocket({ device: { host: '1.2.3.4' }, port: 8085 });
+            expect(socket).to.be.instanceOf(LocalSocket);
+            expect(socket['host']).to.equal('1.2.3.4');
+            expect(socket['port']).to.equal(8085);
+        });
+
+        it('creates an rce socket for an rce device config', () => {
+            const socket = rokuDeploy.createSocket({ device: { instanceUrl: 'https://rce.example.com', rceToken: 'token' } as any, port: 8085 });
+            expect(socket).to.be.instanceOf(RceSocket);
+        });
+
+        it('resolves a registry device name through the constructor registry', () => {
+            const rd = new RokuDeploy({ devices: { tv: { host: '5.6.7.8' } } });
+            const socket = rd.createSocket({ device: 'tv', port: 8080 });
+            expect(socket['host']).to.equal('5.6.7.8');
+        });
+
+        it('resolves a registry device name through a per-call registry', () => {
+            const socket = rokuDeploy.createSocket({ device: 'tv', devices: { tv: { host: '5.6.7.8' } }, port: 8080 });
+            expect(socket['host']).to.equal('5.6.7.8');
+        });
+
+        it('falls back to the constructor device', () => {
+            const rd = new RokuDeploy({ device: { host: '9.9.9.9' } });
+            expect(rd.createSocket({ port: 8085 })['host']).to.equal('9.9.9.9');
+        });
+
+        it('throws when no device is available', () => {
+            expect(() => rokuDeploy.createSocket({ port: 8085 })).to.throw('Missing required option: device');
+        });
+
+        it('throws when no port is given', () => {
+            expect(() => rokuDeploy.createSocket({ device: { host: '1.2.3.4' } } as any)).to.throw('Missing required option: port');
+        });
+
+        it('throws for an unknown registry name', () => {
+            expect(() => rokuDeploy.createSocket({ device: 'nope', port: 8085 })).to.throw(`Device 'nope' not found in devices registry`);
+        });
+    });
+
+    describe('getDestPath', () => {
+        it('returns the dest path relative to the package root for a matched file', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/source/main.brs`, ['source/**/*'], rootDir)
+            ).to.equal(s`source/main.brs`);
+        });
+
+        it('returns undefined for a file no entry matches', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/unmatched/main.brs`, ['source/**/*'], rootDir)
+            ).to.be.undefined;
+        });
+
+        it('honors a dest override on a files entry', () => {
+            expect(
+                rokuDeploy.getDestPath(`${rootDir}/lib/thing.brs`, [{ src: 'lib/**/*', dest: 'source/lib' }], rootDir)
+            ).to.equal(s`source/lib/thing.brs`);
+        });
+    });
+
     describe('withDnsResolvedHost', () => {
         it('returns a local device config with the host replaced by its resolved ip', async () => {
             sinon.stub(util, 'dnsLookup').resolves('192.168.1.20');
@@ -3568,7 +3631,7 @@ describe('RokuDeploy', () => {
                 failOnCompileError: false,
                 close: false
             }).then((result) => {
-                expect(result.results.body).to.equal(body);
+                expect(result.message).to.equal('Identical to previous version -- not replacing');
             }, () => {
                 assert.fail('Should have resolved promise');
             });
@@ -4060,12 +4123,13 @@ describe('RokuDeploy', () => {
     });
 
     describe('squash', () => {
-        it('should not return an error if successful', async () => {
+        it('resolves with a result object when conversion succeeds', async () => {
             mockDoPostRequest('<font color="red">Conversion succeeded<p></p><code><br>Parallel mksquashfs: Using 1 processor');
-            await rokuDeploy.convertToSquashfs({
+            const result = await rokuDeploy.convertToSquashfs({
                 device: options.device,
                 password: 'password'
             });
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
         });
 
         it('should return ConvertError if converting failed', async () => {
@@ -5442,7 +5506,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.args[0][0].url).to.include(`/plugin_swup`);
             expect(stub.args[0][0].formData.mysubmit).to.include('Reboot');
         });
@@ -5454,7 +5518,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.args[0][0].url).to.include(`/plugin_swup`);
             expect(stub.args[0][0].formData.mysubmit).to.include('CheckUpdate');
         });
@@ -5572,7 +5636,7 @@ describe('RokuDeploy', () => {
                 device: { host: '1.2.3.4' },
                 password: 'password'
             });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
         });
 
         it('routes an RCE device through the instance sideload proxy with the X-Authorization bearer header', async () => {
@@ -7901,7 +7965,7 @@ describe('RokuDeploy', () => {
             const stub = mockDoPostRequest();
 
             let result = await rokuDeploy.deleteAllSideloadedPlugins({ ...options, device: { host: 'localhost' }, password: 'password' });
-            expect(result).not.to.be.undefined;
+            expect(result.rokuMessages).to.eql({ errors: [], infos: [], successes: [] });
             expect(stub.getCall(0).args[0].formData).to.include({
                 mysubmit: 'DeleteAll'
             });
