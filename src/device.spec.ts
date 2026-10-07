@@ -450,9 +450,19 @@ describe('device', function device() {
     });
 
     describe('deleteAllSideloadedPlugins', function deleteAllTests() {
-        //these tests do several device round-trips (install + verify + delete). ~2x the slowest
-        //observed case in this block (the multi-library delete, ~10s).
-        this.timeout(20_000);
+        //these tests do several device round-trips (install + verify + delete), and run right after the
+        //large zip uploads, when the device is at its slowest. The multi-library delete has been observed
+        //at ~20s, so leave plenty of headroom rather than sizing this to the happy path.
+        this.timeout(90_000);
+
+        //reboot before this block so it runs against a freshly-settled device instead of one still
+        //digesting the earlier back-to-back installs
+        before(async function rebootBeforeDeleteAllTests() {
+            this.timeout(180_000);
+            await rebootDeviceOrThrow(
+                'Could not reboot the device before the deleteAllSideloadedPlugins tests. The device is likely unhealthy.'
+            );
+        });
 
         it('deletes a single channel', async () => {
             //start clean
