@@ -1,112 +1,30 @@
 {
     /* Visit https://github.com/rokucommunity/roku-deploy#readme to read more about this file */
-    /* Root-level values apply to every command. A per-command section below overrides them for that command only. */
-    /* Precedence: CLI args > [command] section > root level > defaults. Comments and trailing commas are allowed. */
+    /* One flat list of values. Each comment names the commands that read it. CLI args override this file. */
+    /* Relative paths resolve against the folder containing this file. Comments and trailing commas are allowed. */
 
-    /* Device */
-    // "device": { "host": "192.168.1.101" },                            /* The target device: an inline { "host" } object or the name of an entry in "devices". */
-    // "devices": { "living-room": { "host": "192.168.1.101" } },        /* Named device registry: { "host" } for LAN devices, { "esn" } or { "id" } for Cloud Emulator devices; entries may carry their own password, ports and timeout. */
-    // "password": "",                                                   /* The developer-portal password of the target device. */
-    // "username": "rokudev",                                            /* The developer-portal username. Roku only supports "rokudev". */
-    // "packagePort": 80,                                                /* Port of the device's developer web server (sideload, package, reboot). Default 80. */
-    // "ecpPort": 8060,                                                  /* Port for External Control Protocol commands like key presses. Default 8060. */
-    // "timeout": 150000,                                                /* Per-request network timeout in milliseconds. Default 150000. */
-    // "rceToken": "",                                                   /* Bearer token for Roku Cloud Emulator devices whose registry entry has none. */
+    "device": { "host": "", "password": "" },                               /* all device commands. The target Roku: { "host", "password" }, or the name of an entry in "devices". A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
+    // "token": "",                                                         /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
+    // "devices": {                                                         /* all device commands. Named devices to pick from with "device": "<name>" or --device <name>. Each entry takes the same keys as "device" */
+    //     "my-ultra": { "host": "", "password": "" },
+    //     "my-tv": { "esn": "", "token": "" }
+    // },
 
-    /* General */
-    // "cwd": "./",                                                      /* Working directory that relative paths resolve against. Default: process cwd. */
-    // "logLevel": "log",                                                /* Logger verbosity: "off", "error", "warn", "log", "info", "debug" or "trace". */
+    "rootDir": "./",                                                        /* stage, sideload --stage, package --sideload. Folder holding your source; the manifest lives directly under it */
+    "files": [                                                              /* stage, sideload --stage, package --sideload. Globs relative to rootDir, or { "src", "dest" } objects. NOT used by zip, which takes its own --files */
+        "source/**/*.*",
+        "components/**/*.*",
+        "images/**/*.*",
+        "locale/**/*",
+        "fonts/**/*",
+        "manifest",
+        "!node_modules",
+        "!**/*.{md,DS_Store,db}"
+    ],
+    // "stagingDir": "./out/.roku-deploy-staging",                          /* stage, sideload --stage, package --sideload. Where the filtered copy of rootDir is written before zipping */
+    // "outFile": "roku-deploy",                                            /* zip, package. Name of the generated file: zip writes <outFile>.zip, package writes <outFile>.pkg. An extension is honored as given */
 
-    /* stage: copy the project files into a staging folder */
-    "stage": {
-        // "rootDir": "./",                                              /* Folder holding your project source; the manifest lives directly under it. Default "./". */
-        // "files": ["source/**/*.*", "components/**/*.*", "manifest"],  /* Globs (relative to rootDir) or { "src", "dest" } objects to include in the package. */
-        // "out": "./out/.roku-deploy-staging",                          /* Where the staged files are written. */
-        // "cwd": "./",                                                  /* Override the root-level cwd for this command only. */
-    },
-
-    /* zip: zip a folder into an installable package */
-    "zip": {
-        // "dir": "./out/.roku-deploy-staging",                          /* The folder to zip, typically the staging folder written by stage. */
-        // "files": ["**/*"],                                            /* Globs (relative to dir) to include in the zip. Default: everything. */
-        // "out": "./out/roku-deploy.zip",                               /* The zip file to write. */
-        // "cwd": "./",                                                  /* Override the root-level cwd for this command only. */
-    },
-
-    /* sideload: install a package on the device */
-    "sideload": {
-        // "dir": "./",                                                  /* A folder to zip on the fly and install. Mutually exclusive with "zip". */
-        // "zip": "./out/roku-deploy.zip",                               /* An existing zip to install. Mutually exclusive with "dir". */
-        // "appType": "channel",                                         /* "channel" for apps (the default), "dcl" for component libraries. */
-        // "close": true,                                                /* Close the running channel before installing. Default true. */
-        // "deleteDevChannel": true,                                     /* Remove the existing dev channel before installing. Default true. */
-        // "failOnCompileError": true,                                   /* Fail when the device reports a compile error. Default true. */
-        // "remoteDebug": false,                                         /* Ask the device to start the remote debugger when the app launches. */
-        // "remoteDebugConnectEarly": false,                             /* Connect the debugger before the app starts. */
-        // "device": "living-room",                                      /* Override the root-level device for this command only. */
-        // "password": "",                                               /* Override the root-level password for this command only. */
-        // "timeout": 150000,                                            /* Override the root-level timeout for this command only. */
-    },
-
-    /* package: create a signed .pkg from the installed dev channel */
-    "package": {
-        // "signingPassword": "",                                        /* The signing password of the key currently on the device. */
-        // "out": "./out/roku-deploy.pkg",                               /* The .pkg file to write. */
-        // "devId": "",                                                  /* Fail if the device's dev id differs from this. */
-        // "appTitle": "My App",                                         /* Title recorded in the package. Default: from the manifest. */
-        // "appVersion": "1.0.0",                                        /* Version recorded in the package. Default: from the manifest. */
-        // "manifestPath": "./manifest",                                 /* Manifest to read the title and version from. */
-        // "cwd": "./",                                                  /* Override the root-level cwd for this command only. */
-    },
-
-    /* rekey: change the device's signing key using a previously signed package */
-    "rekey": {
-        // "pkg": "./keys/signed.pkg",                                   /* The signed .pkg whose key should be installed. */
-        // "signingPassword": "",                                        /* The signing password that goes with "pkg". */
-        // "devId": "",                                                  /* Fail if the dev id after rekeying differs from this. */
-        // "cwd": "./",                                                  /* Override the root-level cwd for this command only. */
-    },
-
-    /* screenshot: capture the device's current screen */
-    "screenshot": {
-        // "out": "./out/screenshot.jpg",                                /* File to save to, or true to save into "screenshotDir". */
-        // "screenshotDir": "./out",                                     /* Folder used when "out" is true. Default: the OS temp directory. */
-        // "autoExtension": false,                                       /* Adjust the file extension to match the format the device returns. Default false. */
-        // "cwd": "./",                                                  /* Override the root-level cwd for this command only. */
-    },
-
-    /* squash: convert the installed dev channel to squashfs */
-    "squash": {
-        // "device": "living-room",                                      /* Override the root-level device for this command only. */
-        // "timeout": 150000,                                            /* Override the root-level timeout for this command only. */
-    },
-
-    /* deleteDevChannel: remove the installed dev channel */
-    "deleteDevChannel": {
-        // "device": "living-room",                                      /* Override the root-level device for this command only. */
-        // "timeout": 30000,                                             /* Override the root-level timeout for this command only. */
-    },
-
-    /* rce start: boot a Roku Cloud Emulator device */
-    "rce.start": {
-        // "esn": "",                                                    /* The RCE device to start, by serial number. */
-        // "deviceId": 0,                                                /* The RCE device to start, by management-api id (alternative to "esn"). */
-        // "token": "",                                                  /* RCE bearer token; the root-level "rceToken" is the usual home for this. */
-        // "snapshot": "live",                                           /* Snapshot to boot from, by name ("live" selects the live snapshot). */
-        // "snapshotId": 0,                                              /* Snapshot to boot from, by id (alternative to "snapshot"). */
-        // "firmwareVersionId": "",                                      /* The firmware to boot with. Default: the snapshot's, then the device's. */
-        // "maxRuntime": 3600,                                           /* Maximum runtime for the instance, in seconds. */
-        // "wait": true,                                                 /* Block until the device reports "running". */
-        // "timeout": 600,                                               /* How long "wait" polls before giving up, in seconds. Default 600. */
-    },
-
-    /* rce stop: shut down a Roku Cloud Emulator device */
-    "rce.stop": {
-        // "esn": "",                                                    /* The RCE device to stop, by serial number. */
-        // "deviceId": 0,                                                /* The RCE device to stop, by management-api id (alternative to "esn"). */
-        // "token": "",                                                  /* RCE bearer token; the root-level "rceToken" is the usual home for this. */
-        // "wait": true,                                                 /* Block until the device reports "shutdown". */
-        // "timeout": 600,                                               /* How long "wait" polls before giving up, in seconds. Default 600. */
-    }
+    // "convertToSquashfs": false,                                          /* package. Convert the installed channel to squashfs before packaging. Default false */
+    // "signingPassword": "",                                               /* package, rekey. The signing password of the key on the device */
+    // "rekeySignedPackage": "",                                            /* rekey, package --rekey. A previously signed .pkg whose key should be installed on the device; signed with signingPassword */
 }
-
