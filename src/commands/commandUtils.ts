@@ -32,13 +32,22 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
 }
 
 /**
- * Translate CLI-only flag names into the option names the library understands. `--host` becomes an
- * inline `device` config (and wins over any `device` from the config file, since CLI args take precedence).
+ * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
+ * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
+ * since CLI args take precedence); `--rceToken` (or the config file's root `rceToken`) rides along on an
+ * RCE device so the library can authenticate with it.
  */
 function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
-    if (typeof options.host === 'string') {
-        const { host, ...rest } = options;
+    const { host, esn, instanceUrl, ...rest } = options;
+    if (typeof host === 'string') {
         return { ...rest, device: { host: host } } as unknown as T;
+    }
+    const rceToken = rest.rceToken as string | undefined;
+    if (typeof esn === 'string') {
+        return { ...rest, device: { esn: esn, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
+    }
+    if (typeof instanceUrl === 'string') {
+        return { ...rest, device: { instanceUrl: instanceUrl, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
     }
     return options;
 }

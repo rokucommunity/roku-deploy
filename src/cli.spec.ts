@@ -811,6 +811,65 @@ describe('cli', function cli() {
             expect(options.device).to.eql({ host: '9.9.9.9' });
         });
 
+        it('maps --esn to an inline RCE device config carrying --rceToken', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ esn: 'X123', rceToken: 'abc' });
+            expect(options).not.to.have.property('esn');
+        });
+
+        it('maps --instanceUrl to an inline RCE device config carrying --rceToken', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
+            expect(options).not.to.have.property('instanceUrl');
+        });
+
+        it('falls back to the config file rceToken for an --esn device', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'from-config' });
+            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' }, null);
+            expect(options.device).to.eql({ esn: 'X123', rceToken: 'from-config' });
+        });
+
+        it('leaves the device token off when neither --rceToken nor a config rceToken exists', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' }, null);
+            expect(options.device).to.eql({ esn: 'X123' });
+        });
+
+        it('leaves the device token off an --instanceUrl device when no token is available', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' }, null);
+            expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
+        });
+
+        it('does not attach --rceToken to a --host device', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ host: '1.2.3.4' });
+        });
+
+        it('rejects more than one device address flag at parse time', () => {
+            try {
+                childProcess.execSync(`node ${cwd}/dist/cli.js getDeviceInfo --host 1.2.3.4 --esn X123`, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                expect(error.status).to.equal(1);
+                expect(`${error.stderr}`).to.include('Arguments host and esn are mutually exclusive');
+                return;
+            }
+            throw new Error('Expected the command to fail');
+        });
+
+        it('accepts the kebab-case spellings --instance-url and --rce-token', () => {
+            try {
+                //gets past argument parsing and fails on the missing password instead
+                childProcess.execSync(`node ${cwd}/dist/cli.js sideload --instance-url http://1.2.3.4 --rce-token abc --zip app.zip --no-config`, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                const output = `${error.stdout}${error.stderr}`;
+                expect(output).not.to.include('Unknown argument');
+                expect(output).to.include('Missing required option: password');
+                return;
+            }
+            throw new Error('Expected the command to fail');
+        });
+
         it('passes sideload --dir straight through to the library', async () => {
             const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', rokuMessages: { errors: [], infos: [], successes: [] } });
             await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', dir: rootDir });
