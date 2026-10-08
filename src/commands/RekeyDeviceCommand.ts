@@ -5,7 +5,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class RekeyDeviceCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'rekey');
+        let options = loadCommandOptions(args);
         if (args.pkg) {
             options.pkg = util.standardizePath(
                 path.resolve(args.cwd, args.pkg)

@@ -8371,19 +8371,17 @@ describe('RokuDeploy', () => {
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             });
 
-            it('works when loading a command section from rokudeploy.json', () => {
+            it('loads a value from rokudeploy.json', () => {
                 sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                     return true;
                 });
                 sinon.stub(fsExtra, 'readFileSync').returns(`
                     {
-                        "stage": {
-                            "out": "./staging-dir"
-                        }
+                        "stagingDir": "./staging-dir"
                     }
                 ` as any);
                 let loadedOptions = rokuDeploy.loadConfigFile();
-                expect(loadedOptions.stage.out).to.equal('./staging-dir');
+                expect(loadedOptions.stagingDir).to.equal('./staging-dir');
             });
 
             it('supports jsonc for rokudeploy.json', () => {
@@ -8391,14 +8389,12 @@ describe('RokuDeploy', () => {
                     //leading comment
                     {
                         //inner comment
-                        "stage": {
-                            "rootDir": "src" //trailing comment
-                        }
+                        "rootDir": "src" //trailing comment
                     }
                     //trailing comment
                 `);
                 let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(loadedOptions.stage.rootDir).to.equal('src');
+                expect(loadedOptions.rootDir).to.equal('src');
             });
 
             it('returns empty object when config file does not exist', () => {
@@ -8430,55 +8426,6 @@ describe('RokuDeploy', () => {
                 expect(config.devices.bad).to.exist;
                 expect(warnStub.callCount).to.equal(1);
                 expect(String(warnStub.getCall(0).args[0])).to.include(`Device registry entry 'bad'`);
-            });
-        });
-
-        describe('loadConfigFile with a section', () => {
-            it('overlays the section onto root values and strips other sections', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    device: 'living-room',
-                    password: 'aaaa',
-                    cwd: './everywhere',
-                    stage: { cwd: './stage-only', out: './staging' },
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' })).to.eql({
-                    device: 'living-room',
-                    password: 'aaaa',
-                    //section wins over root
-                    cwd: './stage-only',
-                    out: './staging'
-                });
-            });
-
-            it('lets colliding option names coexist across sections (the motivating case)', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    stage: { out: '.roku-deploy-staging' },
-                    zip: { dir: '.roku-deploy-staging', out: './out/app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' }).out).to.equal('.roku-deploy-staging');
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).out).to.equal('./out/app.zip');
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).dir).to.equal('.roku-deploy-staging');
-            });
-
-            it('returns just the root values for a section the file does not configure', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    password: 'aaaa',
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'sideload' })).to.eql({ password: 'aaaa' });
-            });
-
-            it('section null returns root values with all sections stripped', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    password: 'aaaa',
-                    ecpPort: 8060,
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: null })).to.eql({
-                    password: 'aaaa',
-                    ecpPort: 8060
-                });
             });
         });
 

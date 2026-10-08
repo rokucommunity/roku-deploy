@@ -4,10 +4,10 @@
     /* Relative paths resolve against the folder containing this file. Comments and trailing commas are allowed. */
 
     "device": { "host": "", "password": "" },                               /* all device commands. The target Roku: { "host", "password" }, or the name of an entry in "devices". A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
-    // "token": "",                                                         /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
+    // "rceToken": "",                                                      /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
     // "devices": {                                                         /* all device commands. Named devices to pick from with "device": "<name>" or --device <name>. Each entry takes the same keys as "device" */
     //     "my-ultra": { "host": "", "password": "" },
-    //     "my-tv": { "esn": "", "token": "" }
+    //     "my-tv": { "esn": "", "rceToken": "" }
     // },
 
     "rootDir": "./",                                                        /* stage, sideload --stage, package --sideload. Folder holding your source; the manifest lives directly under it */

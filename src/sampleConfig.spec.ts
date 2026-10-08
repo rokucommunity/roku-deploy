@@ -5,35 +5,24 @@ import { rokuDeploy } from './index';
 import { standardizePath as s } from './util';
 import { tempDir } from './testUtils.spec';
 import { sampleConfigPath } from './commands/InitCommand';
-import { configSectionNames } from './RokuDeployConfig';
-import type { ConfigSectionName, RokuDeployConfig, RootConfigOptions, RceStartConfig, RceStopConfig } from './RokuDeployConfig';
-import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, RekeyDeviceOptions, SideloadOptions, StageOptions, ZipOptions } from './RokuDeploy';
+import type { RokuDeployConfig } from './RokuDeployConfig';
+import type { DeviceRegistryEntry } from './RokuDeployOptions';
 
-//every key the sample may use, per section, typed against the real option interfaces so a renamed or removed
-//option fails to compile here before the sample can drift from the shape
-const rootKeys: Array<keyof RootConfigOptions> = ['device', 'devices', 'username', 'password', 'packagePort', 'ecpPort', 'timeout', 'rceToken', 'cwd', 'logLevel'];
-function keysOf<T>(...keys: Array<keyof T & string>): string[] {
-    return keys;
-}
-const sectionKeys: Record<ConfigSectionName, string[]> = {
-    stage: keysOf<StageOptions>('rootDir', 'out', 'files', 'cwd'),
-    zip: keysOf<ZipOptions>('dir', 'out', 'files', 'cwd'),
-    sideload: keysOf<SideloadOptions>('zip', 'dir', 'appType', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'device', 'password', 'timeout'),
-    squash: keysOf<ConvertToSquashfsOptions>('device', 'timeout'),
-    rekey: keysOf<RekeyDeviceOptions>('pkg', 'signingPassword', 'devId', 'cwd'),
-    package: keysOf<CreateSignedPackageOptions>('signingPassword', 'out', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'cwd'),
-    deleteDevChannel: keysOf<DeleteDevChannelOptions>('device', 'timeout'),
-    screenshot: keysOf<CaptureScreenshotOptions>('out', 'screenshotDir', 'autoExtension', 'cwd'),
-    'rce.start': keysOf<RceStartConfig>('token', 'deviceId', 'esn', 'snapshot', 'snapshotId', 'firmwareVersionId', 'maxRuntime', 'wait', 'timeout'),
-    'rce.stop': keysOf<RceStopConfig>('token', 'deviceId', 'esn', 'wait', 'timeout')
-};
+//the flat keys the sample is allowed to use, typed against RokuDeployConfig so a renamed or removed
+//option fails to compile here before the sample can drift from the real shape
+const sampleKeys: Array<keyof RokuDeployConfig> = [
+    'device', 'devices', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
+    'convertToSquashfs', 'signingPassword', 'rekeySignedPackage'
+];
+//the keys a device/registry entry in the sample may use, typed against the real entry interface
+const deviceEntryKeys: Array<keyof DeviceRegistryEntry> = ['host', 'password', 'esn', 'id', 'instanceUrl', 'rceToken'];
 
 /**
- * The sample lists every option but ships most of them commented out (`// "key": value,`), tsc --init style.
- * Strip that leading `// ` so the disabled options are parsed too and can be checked against the types.
+ * The sample lists its values but ships most of them commented out (`// "key": value,`), tsc --init
+ * style. Strip that leading `// ` so the disabled values parse too and can be checked against the types.
  */
 function uncommentOptions(text: string) {
-    return text.replace(/^(\s*)\/\/ ("[^"]+":)/gm, '$1$2');
+    return text.replace(/^(\s*)\/\/ ?/gm, '$1');
 }
 
 describe('src/rokudeploy.sample.jsonc', () => {
@@ -47,7 +36,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
         live = rokuDeploy.loadConfigFile({ configPath: sampleConfigPath });
         const errors = [];
         full = parseJsonc(uncommentOptions(text), errors, { allowTrailingComma: true });
-        expect(errors, 'the sample with every option enabled must still parse').to.eql([]);
+        expect(errors, 'the sample with every value enabled must still parse').to.eql([]);
     });
 
     afterEach(() => {
@@ -55,63 +44,44 @@ describe('src/rokudeploy.sample.jsonc', () => {
     });
 
     it('enables nothing out of the box, so a fresh config changes no behavior until edited', () => {
-        const liveKeys = Object.keys(live).filter(key => !(configSectionNames as readonly string[]).includes(key));
-        expect(liveKeys).to.eql([]);
-        for (const name of configSectionNames) {
-            expect(live[name], `section '${name}'`).to.eql({});
+        //everything the sample ships enabled must be blank/default, so loading it is a no-op
+        expect(live.device).to.eql({ host: '', password: '' });
+        expect(live.rootDir).to.equal('./');
+        //nothing else is enabled
+        const enabledKeys = Object.keys(live).filter(key => !['device', 'rootDir', 'files'].includes(key));
+        expect(enabledKeys).to.eql([]);
+    });
+
+    it('uses only keys that exist on RokuDeployConfig', () => {
+        const unknown = Object.keys(full).filter(key => !(sampleKeys as string[]).includes(key));
+        expect(unknown).to.eql([]);
+    });
+
+    it('uses only device keys that exist on the device entry type', () => {
+        const entries = [full.device as unknown as Record<string, unknown>, ...Object.values(full.devices ?? {})];
+        for (const entry of entries) {
+            const unknown = Object.keys(entry).filter(key => !(deviceEntryKeys as string[]).includes(key));
+            expect(unknown, `device entry ${JSON.stringify(entry)}`).to.eql([]);
         }
     });
 
     it('leaves every secret and account-specific identifier blank rather than showing a placeholder', () => {
-        const blanks: Record<string, string> = {
-            password: '""', signingPassword: '""', rceToken: '""', token: '""', esn: '""', devId: '""',
-            deviceId: '0', snapshotId: '0'
-        };
-        for (const [key, blank] of Object.entries(blanks)) {
-            const values = [...text.matchAll(new RegExp(`"${key}": ([^,]*),`, 'g'))].map(match => match[1]);
+        const blanks = ['password', 'rceToken', 'signingPassword', 'rekeySignedPackage'];
+        for (const key of blanks) {
+            //capture just the quoted value, so an inline `{ ..., "password": "" }` is read correctly
+            const values = [...text.matchAll(new RegExp(`"${key}": "([^"]*)"`, 'g'))].map(match => match[1]);
             expect(values, key).to.not.be.empty;
-            expect(values.every(value => value === blank), `${key} values: ${values.join(', ')}`).to.equal(true);
-        }
-    });
-
-    it('has a section object for every recognized command section', () => {
-        for (const name of configSectionNames) {
-            expect(live[name], `section '${name}'`).to.be.an('object');
-        }
-    });
-
-    it('uses only root-level keys that exist on RokuDeployConfig', () => {
-        const unknown = Object.keys(full)
-            .filter(key => !(configSectionNames as readonly string[]).includes(key))
-            .filter(key => !(rootKeys as string[]).includes(key));
-        expect(unknown).to.eql([]);
-    });
-
-    it('uses only keys that exist on each section\'s options type', () => {
-        for (const name of configSectionNames) {
-            const unknown = Object.keys(full[name]).filter(key => !sectionKeys[name].includes(key));
-            expect(unknown, `section '${name}'`).to.eql([]);
-        }
-    });
-
-    it('lists every root-level option, enabled or commented out', () => {
-        const missing = rootKeys.filter(key => !(key in full));
-        expect(missing).to.eql([]);
-    });
-
-    it('lists every option of every section, enabled or commented out', () => {
-        for (const name of configSectionNames) {
-            const section = full[name];
-            const missing = sectionKeys[name].filter(key => !(key in section));
-            expect(missing, `section '${name}'`).to.eql([]);
+            expect(values.every(value => value === ''), `${key} values: ${values.map(v => `"${v}"`).join(', ')}`).to.equal(true);
         }
     });
 
     //line-based checks split on \r?\n: a Windows checkout with autocrlf hands us CRLF text
-    it('keeps every option on a single line so it can be enabled by deleting the leading slashes', () => {
+    it('keeps every scalar value on a single line so it can be enabled by deleting the leading slashes', () => {
         //a multi-line commented-out value would not survive uncommentOptions(), so guard the format itself
-        const commentedOpeners = text.split(/\r?\n/).filter(line => /^\s*\/\/ "[^"]+":.*[[{]\s*$/.test(line));
-        expect(commentedOpeners).to.eql([]);
+        const commentedOpeners = text.split(/\r?\n/).filter(line => /^\s*\/\/ "[^"]+":.*[[{]\s*$/.test(line) && !/\].*\/\*/.test(line));
+        //the only multi-line commented blocks allowed are "devices" and "files" (whole-object examples)
+        const allowed = commentedOpeners.filter(line => !/"(devices)":/.test(line));
+        expect(allowed).to.eql([]);
     });
 
     it('aligns every description comment to the same column', () => {
@@ -125,13 +95,12 @@ describe('src/rokudeploy.sample.jsonc', () => {
         expect([...columns], 'description comments start at more than one column').to.have.lengthOf(1);
     });
 
-    it('flattens a section over the root once the options are enabled', () => {
-        //write the fully-enabled variant to disk and load it the way the CLI would
+    it('loads every value at the top level once enabled, with no nesting by command', () => {
         const enabledPath = s`${tempDir}/rokudeploy.json`;
         fsExtra.outputFileSync(enabledPath, uncommentOptions(text));
-        const sideload = rokuDeploy.loadConfigFile({ configPath: enabledPath, section: 'sideload' });
-        expect(sideload.dir).to.equal('./');
-        expect(sideload.ecpPort).to.equal(8060);
-        expect(sideload).not.to.have.property('stage');
+        const config = rokuDeploy.loadConfigFile({ configPath: enabledPath });
+        expect(config.rootDir).to.equal('./');
+        expect(config.outFile).to.equal('roku-deploy');
+        expect(config.convertToSquashfs).to.equal(false);
     });
 });

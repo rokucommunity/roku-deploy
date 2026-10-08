@@ -5,7 +5,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = loadCommandOptions(args, null);
+        let options = loadCommandOptions(args);
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation
