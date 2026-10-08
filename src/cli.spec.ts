@@ -826,6 +826,46 @@ describe('cli', function cli() {
         });
     });
 
+    describe('unknown arguments', () => {
+        /**
+         * Run the cli expecting a non-zero exit, returning its combined output.
+         */
+        function execExpectingFailure(command: string) {
+            try {
+                childProcess.execSync(command, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                return { status: error.status, output: `${error.stdout}${error.stderr}` };
+            }
+            throw new Error(`Expected "${command}" to fail`);
+        }
+
+        it('fails with a non-zero exit when an option is not recognized', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js stage --rootdir ${rootDir}`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: rootdir');
+        });
+
+        it('fails when the command itself is not recognized', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js deploy`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: deploy');
+        });
+
+        it('fails for an unknown option on a nested rce command', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js rce start --bogus`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: bogus');
+        });
+
+        it('still accepts the --no- negation of a declared boolean option', () => {
+            //gets past argument parsing and fails on the missing device instead
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js sideload --no-close --zip app.zip`);
+            expect(result.output).not.to.include('Unknown argument');
+            expect(result.output).to.include('Missing required option: device');
+        });
+    });
+
     describe('CLI flag names that differ from the library options', () => {
         it('maps --host to an inline device config', () => {
             const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' });
