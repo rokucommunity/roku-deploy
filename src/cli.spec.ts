@@ -1,4 +1,5 @@
 import * as childProcess from 'child_process';
+import * as path from 'path';
 import { cwd, expectPathExists, expectThrowsAsync, rootDir, stagingDir, tempDir, outDir } from './testUtils.spec';
 import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
@@ -908,6 +909,34 @@ describe('cli', function cli() {
                 return;
             }
             throw new Error('Expected the command to fail');
+        });
+
+        it('declares the same device options on every device command, so the inlined copies cannot drift', () => {
+            //the device flags are inlined per command for readability; guard that they stay identical.
+            //each is matched by a description fragment unique to the device block, so the rce start/stop
+            //commands' own esn flag (a different option) is not counted here
+            const lines = fsExtra.readFileSync(path.join(__dirname, 'cli.ts')).toString().split(/\r?\n/);
+            const deviceOptions = [
+                { name: 'host', fragment: 'The IP Address of the target Roku' },
+                { name: 'esn', fragment: 'Roku Cloud Emulator (RCE) device (instead of --host)' },
+                { name: 'instanceUrl', fragment: 'The instance api url of a running RCE device' },
+                { name: 'rceToken', fragment: 'The RCE bearer token used with --esn or --instanceUrl' }
+            ];
+            const declarations = deviceOptions.map(({ name, fragment }) => {
+                const matches = lines
+                    //strip a trailing `;` so the option that ends a builder chain compares equal to the rest
+                    .map(line => line.trim().replace(/;$/, ''))
+                    .filter(line => line.startsWith(`.option('${name}', {`) && line.includes(fragment));
+                return { name: name, matches: matches };
+            });
+            for (const { name, matches } of declarations) {
+                expect(matches, `device option '${name}' is never declared`).to.not.be.empty;
+                //all copies of a given device option are byte-identical (no drift between commands)
+                expect([...new Set(matches)], `device option '${name}' is declared inconsistently`).to.have.lengthOf(1);
+            }
+            //all four device options appear on the same number of commands
+            const counts = declarations.map(d => d.matches.length);
+            expect([...new Set(counts)], `device options appear on different numbers of commands: ${counts.join(', ')}`).to.have.lengthOf(1);
         });
 
         it('passes sideload --dir straight through to the library', async () => {

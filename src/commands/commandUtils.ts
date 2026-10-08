@@ -38,16 +38,16 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
  * RCE device so the library can authenticate with it.
  */
 function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
-    const { host, esn, instanceUrl, ...rest } = options;
+    const { host, esn, instanceUrl, ...remainingOptions } = options;
     if (typeof host === 'string') {
-        return { ...rest, device: { host: host } } as unknown as T;
+        return { ...remainingOptions, device: { host: host } } as unknown as T;
     }
-    const rceToken = rest.rceToken as string | undefined;
+    const rceToken = remainingOptions.rceToken as string | undefined;
     if (typeof esn === 'string') {
-        return { ...rest, device: { esn: esn, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
+        return { ...remainingOptions, device: { esn: esn, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
     }
     if (typeof instanceUrl === 'string') {
-        return { ...rest, device: { instanceUrl: instanceUrl, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
+        return { ...remainingOptions, device: { instanceUrl: instanceUrl, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
     }
     return options;
 }
