@@ -17,6 +17,10 @@ import { RceStopCommand } from './commands/RceStopCommand';
 import type { RceDevice } from './RceManagementClient';
 import { RceManagementClient } from './RceManagementClient';
 import { standardizePath as s, util } from './util';
+import * as http from 'http';
+import type { AddressInfo } from 'net';
+import { SideloadCommand } from './commands/SideloadCommand';
+import { loadCommandOptions } from './commands/commandUtils';
 
 const sinon = createSandbox();
 
@@ -63,7 +67,7 @@ describe('cli', function cli() {
 
     it('Converts to squashfs', async () => {
         const stub = sinon.stub(rokuDeploy, 'convertToSquashfs').callsFake(async () => {
-            return Promise.resolve();
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new ConvertToSquashfsCommand();
@@ -76,7 +80,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -100,7 +104,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536',
             pkg: s`${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
@@ -125,7 +129,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -146,7 +150,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536',
             signingPassword: undefined
         });
@@ -168,14 +172,14 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
 
     it('Deletes an installed channel', async () => {
         const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').callsFake(async () => {
-            return Promise.resolve({ statusCode: 200, headers: {}, body: '', request: { url: '', method: 'POST' } });
+            return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
         });
 
         const command = new DeleteDevChannelCommand();
@@ -188,7 +192,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -208,7 +212,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -229,7 +233,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -251,7 +255,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4'
+            device: { host: '1.2.3.4' }
         });
     });
 
@@ -296,7 +300,7 @@ describe('cli', function cli() {
             stub.getCall(0).args[0]
         ).to.eql({
             cwd: cwd,
-            host: '1.2.3.4',
+            device: { host: '1.2.3.4' },
             password: '5536'
         });
     });
@@ -781,6 +785,110 @@ describe('cli', function cli() {
         });
     });
 
+    describe('unknown arguments', () => {
+        /**
+         * Run the cli expecting a non-zero exit, returning its combined output.
+         */
+        function execExpectingFailure(command: string) {
+            try {
+                childProcess.execSync(command, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                return { status: error.status, output: `${error.stdout}${error.stderr}` };
+            }
+            throw new Error(`Expected "${command}" to fail`);
+        }
+
+        it('fails with a non-zero exit when an option is not recognized', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js stage --rootdir ${rootDir}`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: rootdir');
+        });
+
+        it('fails when the command itself is not recognized', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js deploy`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: deploy');
+        });
+
+        it('fails for an unknown option on a nested rce command', () => {
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js rce start --bogus`);
+            expect(result.status).to.equal(1);
+            expect(result.output).to.include('Unknown argument: bogus');
+        });
+
+        it('still accepts the --no- negation of a declared boolean option', () => {
+            //gets past argument parsing and fails on the missing device instead
+            const result = execExpectingFailure(`node ${cwd}/dist/cli.js sideload --no-close --zip app.zip`);
+            expect(result.output).not.to.include('Unknown argument');
+            expect(result.output).to.include('Missing required option: device');
+        });
+    });
+
+    describe('CLI flag names that differ from the library options', () => {
+        it('maps --host to an inline device config', () => {
+            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' }, null);
+            expect(options).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa' });
+        });
+
+        it('maps --host with --no-config too', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4' }, null);
+            expect(options.device).to.eql({ host: '1.2.3.4' });
+            expect(options).not.to.have.property('host');
+        });
+
+        it('lets --host win over the config file device', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                device: 'office-tv',
+                devices: { 'office-tv': { host: '9.9.9.9' } }
+            });
+            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4' }, null);
+            expect(options.device).to.eql({ host: '1.2.3.4' });
+        });
+
+        it('leaves the config file device alone when --host is not given', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '9.9.9.9' } });
+            const options = loadCommandOptions({ cwd: tempDir }, null);
+            expect(options.device).to.eql({ host: '9.9.9.9' });
+        });
+
+        it('passes sideload --dir straight through to the library', async () => {
+            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', rokuMessages: { errors: [], infos: [], successes: [] } });
+            await new SideloadCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', dir: rootDir });
+            expect(stub.getCall(0).args[0]).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa', dir: rootDir });
+        });
+
+        it('reaches a device from the real CLI with only --host (no config file, nothing stubbed)', async () => {
+            const requests: string[] = [];
+            const server = http.createServer((req, res) => {
+                requests.push(`${req.method} ${req.url}`);
+                res.writeHead(200);
+                res.end();
+            });
+            await new Promise<void>(resolve => {
+                server.listen(0, '127.0.0.1', resolve);
+            });
+            const port = (server.address() as AddressInfo).port;
+            try {
+                //spawn asynchronously: execSync would block this process's event loop and starve the server above
+                await new Promise<void>((resolve, reject) => {
+                    childProcess.exec(`node ${cwd}/dist/cli.js keyPress --key Home --host 127.0.0.1 --ecpPort ${port} --no-config`, { cwd: tempDir }, (error, stdout, stderr) => {
+                        if (error) {
+                            reject(new Error(`${error.message}\n${stdout}\n${stderr}`));
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+            } finally {
+                await new Promise<void>(resolve => {
+                    server.close(() => resolve());
+                });
+            }
+            expect(requests).to.eql(['POST /keypress/Home']);
+        });
+    });
+
     describe('config file integration', () => {
         it('merges root values and the command section under CLI args', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
@@ -797,7 +905,7 @@ describe('cli', function cli() {
             const options = stub.getCall(0).args[0] as any;
             expect(options.password).to.equal('from-root');
             expect(options.out).to.equal('./shots');
-            expect(options.host).to.equal('1.2.3.4');
+            expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
         it('CLI args win over the command section', async () => {

@@ -72,6 +72,11 @@ export interface CaptureScreenshotResult {
 export type CheckForUpdateOptions = BaseRequestOptions;
 
 // @public (undocumented)
+export interface CheckForUpdateResult {
+    rokuMessages: RokuMessages;
+}
+
+// @public (undocumented)
 export type CloseChannelOptions = BaseEcpOptions;
 
 // @public
@@ -140,6 +145,11 @@ export interface ConvertErrorDetails {
 export type ConvertToSquashfsOptions = BaseRequestOptions;
 
 // @public (undocumented)
+export interface ConvertToSquashfsResult {
+    rokuMessages: RokuMessages;
+}
+
+// @public (undocumented)
 export type CreatableDeviceType = 'tv' | 'stb';
 
 // @public (undocumented)
@@ -202,12 +212,22 @@ export const defaultRceManagementBaseUrl = "https://api.rce.roku.com/api/v1";
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
 
 // @public (undocumented)
+export interface DeleteAllSideloadedPluginsResult {
+    rokuMessages: RokuMessages;
+}
+
+// @public (undocumented)
 export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
     fileName: string;
 }
 
 // @public (undocumented)
 export type DeleteDevChannelOptions = BaseRequestOptions;
+
+// @public (undocumented)
+export interface DeleteDevChannelResult {
+    rokuMessages: RokuMessages;
+}
 
 // @public (undocumented)
 export interface DeleteSnapshotOptions extends RceManagementRequestOptions {
@@ -1262,6 +1282,11 @@ export interface RceVideoSignalingOffer {
 export type RebootDeviceOptions = BaseRequestOptions;
 
 // @public (undocumented)
+export interface RebootDeviceResult {
+    rokuMessages: RokuMessages;
+}
+
+// @public (undocumented)
 export interface RekeyDeviceOptions extends BaseRequestOptions {
     // (undocumented)
     cwd?: string;
@@ -1393,18 +1418,18 @@ export class RokuDeploy {
     // (undocumented)
     captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult>;
     // (undocumented)
-    checkForUpdate(options: CheckForUpdateOptions): Promise<HttpResponse>;
+    checkForUpdate(options: CheckForUpdateOptions): Promise<CheckForUpdateResult>;
     // (undocumented)
     closeChannel(options: CloseChannelOptions): Promise<void>;
-    convertToSquashfs(options: ConvertToSquashfsOptions): Promise<any>;
+    convertToSquashfs(options: ConvertToSquashfsOptions): Promise<ConvertToSquashfsResult>;
     createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket>;
     createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult>;
     createSocket(options: CreateSocketOptions): RokuDeploySocket;
     protected createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket;
     deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions): Promise<void>;
-    deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
+    deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<DeleteAllSideloadedPluginsResult>;
     deleteComponentLibrary(options?: DeleteComponentLibraryOptions): Promise<void>;
-    deleteDevChannel(options?: DeleteDevChannelOptions): Promise<HttpResponse>;
+    deleteDevChannel(options?: DeleteDevChannelOptions): Promise<DeleteDevChannelResult>;
     enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing>;
     enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo;
     exitApp(options: ExitAppOptions): Promise<void>;
@@ -1442,10 +1467,8 @@ export class RokuDeploy {
         section: ConfigSectionName | null;
     }): Record<string, any>;
     readonly logger: typeof logger;
-    // Warning: (ae-forgotten-export) The symbol "HttpResponse" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
-    rebootDevice(options: RebootDeviceOptions): Promise<HttpResponse>;
+    rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
@@ -1453,10 +1476,7 @@ export class RokuDeploy {
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
-    sideload(options: SideloadOptions): Promise<{
-        message: string;
-        results: any;
-    }>;
+    sideload(options: SideloadOptions): Promise<SideloadResult>;
     stage(options: StageOptions): Promise<StageResult>;
     startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket>;
     triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger>;
@@ -1738,6 +1758,12 @@ export type SideloadOptions = BaseSideloadOptions & ({
     dir: string;
     zip?: never;
 });
+
+// @public (undocumented)
+export interface SideloadResult {
+    message: string;
+    rokuMessages: RokuMessages;
+}
 
 // @public (undocumented)
 export interface Snapshot {

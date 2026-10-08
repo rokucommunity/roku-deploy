@@ -25,7 +25,7 @@ void yargs
     .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {
         return builder
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
-            .option('rootDir', { type: 'string', description: 'The root folder to be sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
+            .option('dir', { type: 'string', description: 'The folder to be zipped and sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
@@ -219,4 +219,5 @@ void yargs
         return new ZipCommand().run(args);
     })
 
+    .strict()
     .argv;
