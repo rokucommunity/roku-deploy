@@ -589,11 +589,11 @@ Here are the available options for customizing to your developer-specific workfl
     The username for the roku box. This will always be 'rokudev', but allow to be passed in
     just in case roku adds support for custom usernames in the future.
 
-- **devPort?:** number = `80`
+- **devAppInstallerPort?:** number = `80`
     The port of the device's developer web server (sideloading, packaging, rebooting, etc). This is mainly used when your roku is behind a firewall with a port-forward.
 
 - **packagePort?:** number
-    *Deprecated* alias of `devPort`, kept for one release; `devPort` wins when both are set. Will be removed in the next major.
+    *Deprecated* alias of `devAppInstallerPort`, kept for one release; `devAppInstallerPort` wins when both are set. Will be removed in the next major.
 
 - **ecpPort?:** number = `8060`
     The port used for sending ECP/remote control commands (like key presses). This is mainly used when your roku is behind a firewall with a port-forward.

@@ -27,10 +27,10 @@ export interface BaseEcpOptions {
 
 // @public (undocumented)
 export interface BaseRequestOptions {
+    devAppInstallerPort?: number;
     // (undocumented)
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    devPort?: number;
     // @deprecated (undocumented)
     packagePort?: number;
     // (undocumented)
@@ -589,7 +589,7 @@ export interface DeviceRegistryEntry extends DeviceRegistrySettings {
 // @public
 export interface DeviceRegistrySettings {
     // (undocumented)
-    devPort?: number;
+    devAppInstallerPort?: number;
     // (undocumented)
     ecpPort?: number;
     // @deprecated (undocumented)
@@ -1494,9 +1494,9 @@ export interface RokuDeployConfig {
     'rce.stop'?: RceStopConfig;
     cwd?: string;
     deleteDevChannel?: Partial<DeleteDevChannelOptions>;
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    devPort?: number;
     ecpPort?: number;
     logLevel?: LogLevel | LogLevelNumeric;
     package?: Partial<CreateSignedPackageOptions>;
@@ -1516,9 +1516,9 @@ export interface RokuDeployConfig {
 
 // @public
 export interface RokuDeployConstructorOptions {
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    devPort?: number;
     ecpPort?: number;
     logger?: Logger;
     // @deprecated (undocumented)
@@ -1575,10 +1575,10 @@ export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
     cwd?: string;
     deleteDevChannel?: boolean;
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     devId?: string;
-    devPort?: number;
     ecpPort?: number;
     failOnCompileError?: boolean;
     files?: FileEntry[];
@@ -1968,9 +1968,9 @@ export interface UserOrganisation {
 
 // @public (undocumented)
 export interface ValidateDeveloperPasswordOptions {
+    devAppInstallerPort?: number;
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    devPort?: number;
     password: string;
     timeout?: number;
     username?: string;

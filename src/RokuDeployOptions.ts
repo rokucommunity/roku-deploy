@@ -9,8 +9,8 @@ import type { DeviceOption } from './DeviceConfig';
 export interface DeviceRegistrySettings {
     password?: string;
     username?: string;
-    devPort?: number;
-    /** @deprecated Use `devPort` instead; removed in the next major. */
+    devAppInstallerPort?: number;
+    /** @deprecated Use `devAppInstallerPort` instead; removed in the next major. */
     packagePort?: number;
     ecpPort?: number;
     timeout?: number;
@@ -67,9 +67,9 @@ export interface RokuDeployConstructorOptions {
     /**
      * The port of the device's developer web server (sideload, package, reboot, etc). Defaults to 80.
      */
-    devPort?: number;
+    devAppInstallerPort?: number;
     /**
-     * @deprecated Use `devPort` instead; removed in the next major.
+     * @deprecated Use `devAppInstallerPort` instead; removed in the next major.
      */
     packagePort?: number;
     /**
@@ -143,9 +143,9 @@ export interface RokuDeployOptions {
      * The port of the device's developer web server (sideload, package, reboot, etc). Defaults to 80.
      * Mainly useful for emulators or Rokus behind a port-forward.
      */
-    devPort?: number;
+    devAppInstallerPort?: number;
     /**
-     * @deprecated Use `devPort` instead; removed in the next major.
+     * @deprecated Use `devAppInstallerPort` instead; removed in the next major.
      */
     packagePort?: number;
 

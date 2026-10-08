@@ -19,7 +19,6 @@ import { RceManagementClient } from './RceManagementClient';
 import { standardizePath as s, util } from './util';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
-import { SideloadCommand } from './commands/SideloadCommand';
 import { loadCommandOptions } from './commands/commandUtils';
 
 const sinon = createSandbox();
@@ -1014,28 +1013,28 @@ describe('cli', function cli() {
                 password: 'aaaa',
                 packagePort: 8085
             });
-            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', results: {} });
+            const stub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', rokuMessages: { errors: [], infos: [], successes: [] } });
 
             await new SideloadCommand().run({ cwd: tempDir, zip: 'app.zip' });
 
             const options = stub.getCall(0).args[0] as any;
             expect(options.packagePort).to.equal(8085);
-            expect(options.devPort).to.be.undefined;
+            expect(options.devAppInstallerPort).to.be.undefined;
         });
 
         it('lists --packagePort as deprecated in the sideload help', () => {
             const help = execSync(`node ${cwd}/dist/cli.js sideload --help`).toString();
-            expect(help).to.match(/--packagePort[\s\S]*?\[deprecated: use --devPort instead\]/);
+            expect(help).to.match(/--packagePort[\s\S]*?\[deprecated: use --devAppInstallerPort instead\]/);
         });
 
-        it('parses --packagePort and validates it under the devPort label', () => {
+        it('parses --packagePort and validates it under the devAppInstallerPort label', () => {
             const result = childProcess.spawnSync(
                 process.execPath,
-                [`${cwd}/dist/cli.js`, 'sideload', '--device', '1.2.3.4', '--password', 'aaaa', '--zip', 'app.zip', '--packagePort', '70000', '--no-config'],
+                [`${cwd}/dist/cli.js`, 'sideload', '--host', '1.2.3.4', '--password', 'aaaa', '--zip', 'app.zip', '--packagePort', '70000', '--no-config'],
                 { cwd: tempDir, encoding: 'utf8' }
             );
             expect(result.status).to.not.equal(0);
-            expect(result.stderr).to.include(`Invalid devPort: must be an integer between 1 and 65535, received '70000'`);
+            expect(result.stderr).to.include(`Invalid devAppInstallerPort: must be an integer between 1 and 65535, received '70000'`);
         });
     });
 });
