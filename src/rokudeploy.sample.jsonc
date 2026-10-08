@@ -1,17 +1,15 @@
 {
     /* Visit https://github.com/rokucommunity/roku-deploy#readme to read more about this file */
-    /* One flat list of values. Each comment names the commands that read it. CLI args override this file. */
-    /* Relative paths resolve against the folder containing this file. Comments and trailing commas are allowed. */
 
-    "device": { "host": "", "password": "" },                               /* all device commands. The target Roku: { "host", "password" }, or the name of an entry in "devices". A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
-    // "rceToken": "",                                                      /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
-    // "devices": {                                                         /* all device commands. Named devices to pick from with "device": "<name>" or --device <name>. Each entry takes the same keys as "device" */
+    "device": { "host": "", "password": "" },      /* all device commands. The target Roku: { "host", "password" }, or the name of an entry in "devices". A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
+    // "rceToken": "",                             /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
+    // "devices": {                                /* all device commands. Named devices to pick from with "device": "<name>" or --device <name>. Each entry takes the same keys as "device" */
     //     "my-ultra": { "host": "", "password": "" },
     //     "my-tv": { "esn": "", "rceToken": "" }
     // },
 
-    "rootDir": "./",                                                        /* stage, sideload --stage, package --sideload. Folder holding your source; the manifest lives directly under it */
-    "files": [                                                              /* stage, sideload --stage, package --sideload. Globs relative to rootDir, or { "src", "dest" } objects. NOT used by zip, which takes its own --files */
+    "rootDir": "./",                               /* stage, sideload --stage, package --sideload. Folder holding your source; the manifest lives directly under it */
+    "files": [                                     /* stage, sideload --stage, package --sideload. Globs relative to rootDir, or { "src", "dest" } objects. NOT used by zip, which takes its own --files */
         "source/**/*.*",
         "components/**/*.*",
         "images/**/*.*",
@@ -21,10 +19,10 @@
         "!node_modules",
         "!**/*.{md,DS_Store,db}"
     ],
-    // "stagingDir": "./out/.roku-deploy-staging",                          /* stage, sideload --stage, package --sideload. Where the filtered copy of rootDir is written before zipping */
-    // "outFile": "roku-deploy",                                            /* zip, package. Name of the generated file: zip writes <outFile>.zip, package writes <outFile>.pkg. An extension is honored as given */
+    // "stagingDir": "./out/.roku-deploy-staging", /* stage, sideload --stage, package --sideload. Where the filtered copy of rootDir is written before zipping */
+    // "outFile": "roku-deploy",                   /* zip, package. Name of the generated file: zip writes <outFile>.zip, package writes <outFile>.pkg. An extension is honored as given */
 
-    // "convertToSquashfs": false,                                          /* package. Convert the installed channel to squashfs before packaging. Default false */
-    // "signingPassword": "",                                               /* package, rekey. The signing password of the key on the device */
-    // "rekeySignedPackage": "",                                            /* rekey, package --rekey. A previously signed .pkg whose key should be installed on the device; signed with signingPassword */
+    // "convertToSquashfs": false,                 /* package. Convert the installed channel to squashfs before packaging. Default false */
+    // "signingPassword": "",                      /* package, rekey. The signing password of the key on the device */
+    // "rekeySignedPackage": "",                   /* rekey, package --rekey. A previously signed .pkg whose key should be installed on the device; signed with signingPassword */
 }

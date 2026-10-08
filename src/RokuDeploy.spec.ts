@@ -8427,6 +8427,20 @@ describe('RokuDeploy', () => {
                 expect(warnStub.callCount).to.equal(1);
                 expect(String(warnStub.getCall(0).args[0])).to.include(`Device registry entry 'bad'`);
             });
+
+            it('applies the config file logLevel so it wins over the current logger level', () => {
+                rokuDeploy['logger'].logLevel = 'error';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('debug');
+            });
+
+            it('leaves the logger level untouched when the config has no logLevel', () => {
+                rokuDeploy['logger'].logLevel = 'warn';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('warn');
+            });
         });
 
         describe('generateBaseRequestOptions', () => {
