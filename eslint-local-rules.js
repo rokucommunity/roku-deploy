@@ -7,22 +7,27 @@ const path = require('path');
 const RELEASE_TAG = /@(?:public|internal)\b/;
 const INDEX_PATH = path.join(__dirname, 'src', 'index.ts');
 
-let publicModulesCache;
-
 /**
  * Map of module basename to the names `src/index.ts` re-exports from it (`'*'` for `export *`).
  * Only these modules form the package's public API, so only they need release tags.
+ *
+ * Read fresh on every call instead of cached: index.ts is ~700 bytes, so re-reading it per linted
+ * file is immeasurable, and a module-level cache would go stale in a long-lived editor ESLint
+ * server (a newly index-exported module would not be flagged until the server restarted).
+ *
+ * Note: ESLint's own cross-file result cache (`eslint --cache`, used by editors) keys a file's
+ * result on that file's own contents, so a file that *becomes* public by an index.ts edit may not
+ * be re-linted until it changes. No in-rule change can fix that, and it does not affect CI, which
+ * runs without a persisted cache.
  */
 function getPublicModules() {
-    if (!publicModulesCache) {
-        publicModulesCache = new Map();
-        const source = fs.readFileSync(INDEX_PATH, 'utf8');
-        for (const match of source.matchAll(/^export (\*|\{([^}]*)\}) from '\.\/(\w+)';/gm)) {
-            const names = match[1] === '*' ? '*' : new Set(match[2].split(',').map(x => x.trim()).filter(Boolean));
-            publicModulesCache.set(match[3], names);
-        }
+    const modules = new Map();
+    const source = fs.readFileSync(INDEX_PATH, 'utf8');
+    for (const match of source.matchAll(/^export (\*|\{([^}]*)\}) from '\.\/(\w+)';/gm)) {
+        const names = match[1] === '*' ? '*' : new Set(match[2].split(',').map(x => x.trim()).filter(Boolean));
+        modules.set(match[3], names);
     }
-    return publicModulesCache;
+    return modules;
 }
 
 /**
