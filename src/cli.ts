@@ -233,4 +233,5 @@ void yargs
         return new ZipCommand().run(args);
     })
 
+    .strict()
     .argv;
