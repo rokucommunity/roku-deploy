@@ -49,6 +49,14 @@ sample rokudeploy.json
 }
 ```
 
+To start from a fully-commented config that lists every option (all commented out, `tsc --init` style), run:
+
+```shell
+npx roku-deploy init
+```
+
+This writes [rokudeploy.json](src/rokudeploy.sample.jsonc) to the current directory. Pass `--force` to overwrite an existing file.
+
 ## Upgrading to v4
 The new release has a few breaking changes that is worth going over in order to prepare developers for what they will need to change when they choose to upgrade.
 
@@ -101,6 +109,12 @@ Previously, some functions were available in the Node API, but have been moved t
 Lastly, the default files array has changed. node modules and static analysis files have been excluded to speed up load times. Also, `fonts/` and `locale/` was added as they are in some Roku documentation. The new default array can be seen in the section titled [Files Array](#files-array)
 
 ## CLI Usage
+
+### Create a config file
+Write a fully-commented `rokudeploy.json` listing every option to the current directory:
+```shell
+npx roku-deploy init
+```
 
 ### Sideload a project to your Roku device
 Sideload a .zip package or directory to a roku device. By default, the channel is closed before sideloading. Use `--no-close` to skip this.

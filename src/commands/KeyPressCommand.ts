@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
-        let options = loadCommandOptions(args, null);
+        let options = loadCommandOptions(args);
         await rokuDeploy.keyPress(options);
     }
 }

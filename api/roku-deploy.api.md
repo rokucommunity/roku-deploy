@@ -89,12 +89,6 @@ export class CompileError extends RokuDeployError<CompileErrorDetails> {
 export type CompileErrorDetails = DeviceErrorDetails;
 
 // @public
-export type ConfigSectionName = typeof configSectionNames[number];
-
-// @public
-export const configSectionNames: readonly ["sideload", "stage", "zip", "squash", "rekey", "package", "deleteDevChannel", "screenshot", "rce.start", "rce.stop"];
-
-// @public
 export abstract class ConfigurationError extends RokuDeployError<ConfigurationErrorDetails> {
     get optionName(): string | undefined;
 }
@@ -1198,28 +1192,6 @@ export interface RceSocketOptions extends SocketOptions {
     device: RceDeviceConfig;
 }
 
-// @public
-export interface RceStartConfig {
-    deviceId?: number;
-    esn?: string;
-    firmwareVersionId?: string;
-    maxRuntime?: number;
-    snapshot?: string;
-    snapshotId?: number;
-    timeout?: number;
-    token?: string;
-    wait?: boolean;
-}
-
-// @public
-export interface RceStopConfig {
-    deviceId?: number;
-    esn?: string;
-    timeout?: number;
-    token?: string;
-    wait?: boolean;
-}
-
 // @public (undocumented)
 export interface RceVideoJsep {
     // (undocumented)
@@ -1363,9 +1335,6 @@ export enum RemoteKey {
 // @public (undocumented)
 export type RemoteKeyText = keyof typeof RemoteKey;
 
-// @public
-export type ResolvedSectionOptions<T extends ConfigSectionName> = RootConfigOptions & NonNullable<RokuDeployConfig[T]>;
-
 // @public (undocumented)
 export interface ResolveFilesArrayOptions {
     // (undocumented)
@@ -1448,21 +1417,7 @@ export class RokuDeploy {
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
-    loadConfigFile(options?: LoadConfigFileOptions & {
-        section?: undefined;
-    }): RokuDeployConfig;
-    // (undocumented)
-    loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & {
-        section: T;
-    }): ResolvedSectionOptions<T>;
-    // (undocumented)
-    loadConfigFile(options: LoadConfigFileOptions & {
-        section: null;
-    }): RootConfigOptions;
-    // (undocumented)
-    loadConfigFile(options: LoadConfigFileOptions & {
-        section: ConfigSectionName | null;
-    }): Record<string, any>;
+    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig;
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
@@ -1487,26 +1442,23 @@ export const rokuDeploy: RokuDeploy;
 
 // @public
 export interface RokuDeployConfig {
-    'rce.start'?: RceStartConfig;
-    'rce.stop'?: RceStopConfig;
+    convertToSquashfs?: boolean;
     cwd?: string;
-    deleteDevChannel?: Partial<DeleteDevChannelOptions>;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
+    files?: FileEntry[];
     logLevel?: LogLevel | LogLevelNumeric;
-    package?: Partial<CreateSignedPackageOptions>;
+    outFile?: string;
     packagePort?: number;
     password?: string;
     rceToken?: string;
-    rekey?: Partial<RekeyDeviceOptions>;
-    screenshot?: Partial<CaptureScreenshotOptions>;
-    sideload?: Partial<SideloadOptions>;
-    squash?: Partial<ConvertToSquashfsOptions>;
-    stage?: Partial<StageOptions>;
+    rekeySignedPackage?: string;
+    rootDir?: string;
+    signingPassword?: string;
+    stagingDir?: string;
     timeout?: number;
     username?: string;
-    zip?: Partial<ZipOptions>;
 }
 
 // @public
@@ -1688,9 +1640,6 @@ export interface RokuRendezvousItem {
     lineNumber: string;
     startTime: string;
 }
-
-// @public
-export type RootConfigOptions = Omit<RokuDeployConfig, ConfigSectionName>;
 
 // @public (undocumented)
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
