@@ -52,6 +52,7 @@ export class RceVideoSignalingClient extends EventEmitter {
 
     /**
      * Type-safe wrapper around EventEmitter#on for this class's event map.
+     * @public
      */
     public on<K extends keyof RceVideoSignalingClientEvents>(event: K, listener: RceVideoSignalingClientEvents[K]): this {
         super.on(event, listener as (...args: any[]) => void);
@@ -63,6 +64,7 @@ export class RceVideoSignalingClient extends EventEmitter {
      * negotiation exceeds `negotiationTimeoutMs`, so a silently unresponsive gateway fails loudly.
      * One session at a time — a second connect() while one is active rejects (it would orphan the
      * first websocket with its listeners still driving this client); call stop() before reconnecting.
+     * @public
      */
     public async connect(): Promise<RceVideoSignalingOffer> {
         if (this.webSocket) {
@@ -180,6 +182,7 @@ export class RceVideoSignalingClient extends EventEmitter {
     /**
      * Answer the offer returned by connect(). Sends the `start` plugin message with the answer and
      * resolves once Janus's response to it arrives.
+     * @public
      */
     public async sendAnswer(jsep: RceVideoJsep): Promise<void> {
         await this.sendRequest({
@@ -193,6 +196,7 @@ export class RceVideoSignalingClient extends EventEmitter {
 
     /**
      * Trickle a single local ICE candidate to Janus.
+     * @public
      */
     public sendCandidate(candidate: unknown): void {
         this.sendFireAndForget({
@@ -205,6 +209,7 @@ export class RceVideoSignalingClient extends EventEmitter {
 
     /**
      * Tell Janus local ICE gathering has finished.
+     * @public
      */
     public sendCandidatesComplete(): void {
         this.sendFireAndForget({
@@ -218,6 +223,7 @@ export class RceVideoSignalingClient extends EventEmitter {
     /**
      * Tear the session down: best-effort session destroy, then close the socket and clear the
      * keepalive timer. Safe to call more than once, or before connect() has finished.
+     * @public
      */
     public stop(): void {
         this.stopKeepalive();

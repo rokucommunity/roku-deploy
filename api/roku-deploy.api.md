@@ -122,8 +122,7 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.CONNECTION_RESET;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public
@@ -1124,27 +1123,22 @@ export interface RceDeviceInstance {
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions);
     createDevice(options: CreateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot>;
-    // (undocumented)
     deleteSnapshot(options: DeleteSnapshotOptions): Promise<void>;
     findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined>;
     getDevice(options: GetDeviceOptions): Promise<RceDevice>;
     getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]>;
     getInstanceUrl(options: GetInstanceUrlOptions): Promise<string>;
     getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string>;
-    // (undocumented)
     getSnapshot(options: GetSnapshotOptions): Promise<Snapshot>;
     getUserInfo(options?: GetUserInfoOptions): Promise<User>;
     listDevices(options?: ListDevicesOptions): Promise<RceDevice[]>;
     listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
-    // (undocumented)
     listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
     startDevice(options: StartDeviceOptions): Promise<RceDevice>;
     stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
     updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot>;
 }
 
@@ -1903,8 +1897,7 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public (undocumented)
