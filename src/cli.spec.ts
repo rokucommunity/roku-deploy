@@ -65,6 +65,41 @@ describe('cli', function cli() {
         expectPathExists(`${stagingDir}/source/main.brs`);
     });
 
+    it('applies --logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --logLevel info`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
+    });
+
+    it('applies the config file logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
+    });
+
+    it('prefers --logLevel over the config file logLevel', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --logLevel error`).toString();
+
+        expect(output).to.not.include('Beginning to copy files to staging folder');
+    });
+
+    it('ignores the config file logLevel with --no-config', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --no-config`).toString();
+
+        expect(output).to.not.include('Beginning to copy files to staging folder');
+    });
+
     it('Converts to squashfs', async () => {
         const stub = sinon.stub(rokuDeploy, 'convertToSquashfs').callsFake(async () => {
             return Promise.resolve({ rokuMessages: { errors: [], infos: [], successes: [] } });
@@ -1028,6 +1063,19 @@ describe('cli', function cli() {
             const options = stub.getCall(0).args[0] as any;
             expect(options.password).to.be.undefined;
             expect(options.out).to.be.undefined;
+        });
+
+        it('stays silent about the config file when quiet is set', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+
+            const options = loadCommandOptions({ cwd: tempDir }, null, { quiet: true });
+
+            expect(options.logLevel).to.equal('trace');
+            expect(consoleOutput).to.not.include('Using config');
         });
 
         it('announces which config file was loaded', async () => {

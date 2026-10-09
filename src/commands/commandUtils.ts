@@ -11,9 +11,9 @@ import type { DeviceRegistryEntry } from '../RokuDeployOptions';
  * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
  * cwd; skipped entirely with `--no-config`), flatten it for the command's config section (or just
  * the root values when the command has no section), then merge the CLI args on top.
- * Precedence: CLI args → `[section]` → root → defaults.
+ * Precedence: CLI args → `[section]` → root → defaults. Pass `quiet` to skip announcing the config file.
  */
-export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null): T {
+export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
@@ -22,7 +22,7 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
     //announce which config file feeds this run (even without --verbose) so file-supplied values
     //are never an invisible input; greppable in CI logs
-    if (fsExtra.existsSync(configPath)) {
+    if (!options?.quiet && fsExtra.existsSync(configPath)) {
         console.log(`Using config: ${configPath}`);
     }
     return mapCliArgsToLibraryOptions({

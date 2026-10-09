@@ -20,6 +20,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
+import { logger } from '@rokucommunity/logger';
 import { LocalSocket, RceSocket } from './RokuDeploySocket';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
@@ -8326,6 +8327,17 @@ describe('RokuDeploy', () => {
                     const rd = new RokuDeploy();
                     rd.logger.logLevel = 'debug';
                     expect(rd.logger.logLevel).to.equal('debug');
+                });
+
+                it('gives each instance its own logger', () => {
+                    const rd1 = new RokuDeploy();
+                    const rd2 = new RokuDeploy();
+                    expect(rd1.logger).to.not.equal(rd2.logger);
+                    expect(rd1.logger).to.not.equal(logger);
+
+                    const originalLogLevel = rd1.logger.logLevel;
+                    rd2.logger.logLevel = 'trace';
+                    expect(rd1.logger.logLevel).to.equal(originalLogLevel);
                 });
             });
 
