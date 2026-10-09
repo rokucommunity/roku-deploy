@@ -25,4 +25,6 @@
     // "convertToSquashfs": false,                 /* package. Convert the installed channel to squashfs before packaging. Default false */
     // "signingPassword": "",                      /* package, rekey. The signing password of the key on the device */
     // "rekeySignedPackage": "",                   /* rekey, package --rekey. A previously signed .pkg whose key should be installed on the device; signed with signingPassword */
+
+    // "logLevel": "log",                          /* all commands. "off", "error", "warn", "log", "info", "debug" or "trace" */
 }

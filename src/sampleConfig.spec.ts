@@ -12,7 +12,7 @@ import type { DeviceRegistryEntry } from './RokuDeployOptions';
 //option fails to compile here before the sample can drift from the real shape
 const sampleKeys: Array<keyof RokuDeployConfig> = [
     'device', 'devices', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
-    'convertToSquashfs', 'signingPassword', 'rekeySignedPackage'
+    'convertToSquashfs', 'signingPassword', 'rekeySignedPackage', 'logLevel'
 ];
 //the keys a device/registry entry in the sample may use, typed against the real entry interface
 const deviceEntryKeys: Array<keyof DeviceRegistryEntry> = ['host', 'password', 'esn', 'id', 'instanceUrl', 'rceToken'];
