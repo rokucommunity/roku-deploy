@@ -1,4 +1,5 @@
 import * as childProcess from 'child_process';
+import * as path from 'path';
 import { cwd, expectPathExists, expectThrowsAsync, rootDir, stagingDir, tempDir, outDir } from './testUtils.spec';
 import * as fsExtra from 'fs-extra';
 import { expect } from 'chai';
@@ -884,6 +885,93 @@ describe('cli', function cli() {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '9.9.9.9' } });
             const options = loadCommandOptions({ cwd: tempDir }, null);
             expect(options.device).to.eql({ host: '9.9.9.9' });
+        });
+
+        it('maps --esn to an inline RCE device config carrying --rceToken', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ esn: 'X123', rceToken: 'abc' });
+            expect(options).not.to.have.property('esn');
+        });
+
+        it('maps --instanceUrl to an inline RCE device config carrying --rceToken', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
+            expect(options).not.to.have.property('instanceUrl');
+        });
+
+        it('falls back to the config file rceToken for an --esn device', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'from-config' });
+            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' }, null);
+            expect(options.device).to.eql({ esn: 'X123', rceToken: 'from-config' });
+        });
+
+        it('leaves the device token off when neither --rceToken nor a config rceToken exists', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' }, null);
+            expect(options.device).to.eql({ esn: 'X123' });
+        });
+
+        it('leaves the device token off an --instanceUrl device when no token is available', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' }, null);
+            expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
+        });
+
+        it('does not attach --rceToken to a --host device', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' }, null);
+            expect(options.device).to.eql({ host: '1.2.3.4' });
+        });
+
+        it('rejects more than one device address flag at parse time', () => {
+            try {
+                childProcess.execSync(`node ${cwd}/dist/cli.js getDeviceInfo --host 1.2.3.4 --esn X123`, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                expect(error.status).to.equal(1);
+                expect(`${error.stderr}`).to.include('Arguments host and esn are mutually exclusive');
+                return;
+            }
+            throw new Error('Expected the command to fail');
+        });
+
+        it('accepts the kebab-case spellings --instance-url and --rce-token', () => {
+            try {
+                //gets past argument parsing and fails on the missing password instead
+                childProcess.execSync(`node ${cwd}/dist/cli.js sideload --instance-url http://1.2.3.4 --rce-token abc --zip app.zip --no-config`, { cwd: tempDir, stdio: 'pipe' });
+            } catch (e) {
+                const error = e as childProcess.SpawnSyncReturns<Buffer>;
+                const output = `${error.stdout}${error.stderr}`;
+                expect(output).not.to.include('Unknown argument');
+                expect(output).to.include('Missing required option: password');
+                return;
+            }
+            throw new Error('Expected the command to fail');
+        });
+
+        it('declares the same device options on every device command, so the inlined copies cannot drift', () => {
+            //the device flags are inlined per command for readability; guard that they stay identical.
+            //each is matched by a description fragment unique to the device block, so the rce start/stop
+            //commands' own esn flag (a different option) is not counted here
+            const lines = fsExtra.readFileSync(path.join(__dirname, 'cli.ts')).toString().split(/\r?\n/);
+            const deviceOptions = [
+                { name: 'host', fragment: 'The IP Address of the target Roku' },
+                { name: 'esn', fragment: 'Roku Cloud Emulator (RCE) device (instead of --host)' },
+                { name: 'instanceUrl', fragment: 'The instance api url of a running RCE device' },
+                { name: 'rceToken', fragment: 'The RCE bearer token used with --esn or --instanceUrl' }
+            ];
+            const declarations = deviceOptions.map(({ name, fragment }) => {
+                const matches = lines
+                    //strip a trailing `;` so the option that ends a builder chain compares equal to the rest
+                    .map(line => line.trim().replace(/;$/, ''))
+                    .filter(line => line.startsWith(`.option('${name}', {`) && line.includes(fragment));
+                return { name: name, matches: matches };
+            });
+            for (const { name, matches } of declarations) {
+                expect(matches, `device option '${name}' is never declared`).to.not.be.empty;
+                //all copies of a given device option are byte-identical (no drift between commands)
+                expect([...new Set(matches)], `device option '${name}' is declared inconsistently`).to.have.lengthOf(1);
+            }
+            //all four device options appear on the same number of commands
+            const counts = declarations.map(d => d.matches.length);
+            expect([...new Set(counts)], `device options appear on different numbers of commands: ${counts.join(', ')}`).to.have.lengthOf(1);
         });
 
         it('passes sideload --dir straight through to the library', async () => {
