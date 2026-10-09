@@ -27,10 +27,11 @@ export interface BaseEcpOptions {
 
 // @public (undocumented)
 export interface BaseRequestOptions {
+    devAppInstallerPort?: number;
     // (undocumented)
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    // (undocumented)
+    // @deprecated (undocumented)
     packagePort?: number;
     // (undocumented)
     password: string;
@@ -588,8 +589,10 @@ export interface DeviceRegistryEntry extends DeviceRegistrySettings {
 // @public
 export interface DeviceRegistrySettings {
     // (undocumented)
-    ecpPort?: number;
+    devAppInstallerPort?: number;
     // (undocumented)
+    ecpPort?: number;
+    // @deprecated (undocumented)
     packagePort?: number;
     // (undocumented)
     password?: string;
@@ -1491,11 +1494,13 @@ export interface RokuDeployConfig {
     'rce.stop'?: RceStopConfig;
     cwd?: string;
     deleteDevChannel?: Partial<DeleteDevChannelOptions>;
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     logLevel?: LogLevel | LogLevelNumeric;
     package?: Partial<CreateSignedPackageOptions>;
+    // @deprecated (undocumented)
     packagePort?: number;
     password?: string;
     rceToken?: string;
@@ -1511,10 +1516,12 @@ export interface RokuDeployConfig {
 
 // @public
 export interface RokuDeployConstructorOptions {
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     logger?: Logger;
+    // @deprecated (undocumented)
     packagePort?: number;
     password?: string;
     rceToken?: string;
@@ -1568,6 +1575,7 @@ export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
     cwd?: string;
     deleteDevChannel?: boolean;
+    devAppInstallerPort?: number;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     devId?: string;
@@ -1576,6 +1584,7 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
     logger?: Logger;
     logLevel?: LogLevel | LogLevelNumeric;
+    // @deprecated (undocumented)
     packagePort?: number;
     packageUploadOverrides?: {
         route?: string;
@@ -1959,10 +1968,10 @@ export interface UserOrganisation {
 
 // @public (undocumented)
 export interface ValidateDeveloperPasswordOptions {
+    devAppInstallerPort?: number;
     device: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     password: string;
-    port?: number;
     timeout?: number;
     username?: string;
 }
