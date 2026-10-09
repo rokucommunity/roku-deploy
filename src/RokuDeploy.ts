@@ -1660,15 +1660,6 @@ export class RokuDeploy {
                     })
                 ));
             }
-            //surface broken registry entries early (but only warn: an unused bad entry shouldn't
-            //break every command — resolveDevice() still hard-fails when the entry is actually used)
-            for (const name in config.devices ?? {}) {
-                try {
-                    validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
-                } catch (e) {
-                    this.logger.warn(`${configPath}: ${(e as Error).message}`);
-                }
-            }
             //apply the config's logLevel so a file-supplied level wins over the logger's current level
             if (config.logLevel !== undefined) {
                 this.logger.logLevel = config.logLevel;

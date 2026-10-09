@@ -1,12 +1,8 @@
 {
     /* Visit https://github.com/rokucommunity/roku-deploy#readme to read more about this file */
 
-    "device": { "host": "", "password": "" },      /* all device commands. The target Roku: { "host", "password" }, or the name of an entry in "devices". A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
+    "device": { "host": "", "password": "" },      /* all device commands. The target Roku: { "host", "password" }. A Cloud Emulator device uses { "esn" }, { "id" } or { "instanceUrl" } instead of "host" */
     // "rceToken": "",                             /* all device commands targeting a Cloud Emulator, rce start, rce stop. Bearer token for the RCE api */
-    // "devices": {                                /* all device commands. Named devices to pick from with "device": "<name>" or --device <name>. Each entry takes the same keys as "device" */
-    //     "my-ultra": { "host": "", "password": "" },
-    //     "my-tv": { "esn": "", "rceToken": "" }
-    // },
 
     "rootDir": "./",                               /* stage, sideload --stage, package --sideload. Folder holding your source; the manifest lives directly under it */
     "files": [                                     /* stage, sideload --stage, package --sideload. Globs relative to rootDir, or { "src", "dest" } objects. NOT used by zip, which takes its own --files */
