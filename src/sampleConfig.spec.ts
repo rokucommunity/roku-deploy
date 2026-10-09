@@ -11,7 +11,7 @@ import type { DeviceRegistryEntry } from './RokuDeployOptions';
 //the flat keys the sample is allowed to use, typed against RokuDeployConfig so a renamed or removed
 //option fails to compile here before the sample can drift from the real shape
 const sampleKeys: Array<keyof RokuDeployConfig> = [
-    'device', 'devices', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
+    'device', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
     'convertToSquashfs', 'signingPassword', 'rekeySignedPackage', 'logLevel'
 ];
 //the keys a device/registry entry in the sample may use, typed against the real entry interface
@@ -58,7 +58,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
     });
 
     it('uses only device keys that exist on the device entry type', () => {
-        const entries = [full.device as unknown as Record<string, unknown>, ...Object.values(full.devices ?? {})];
+        const entries = [full.device as unknown as Record<string, unknown>];
         for (const entry of entries) {
             const unknown = Object.keys(entry).filter(key => !(deviceEntryKeys as string[]).includes(key));
             expect(unknown, `device entry ${JSON.stringify(entry)}`).to.eql([]);
@@ -79,9 +79,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
     it('keeps every scalar value on a single line so it can be enabled by deleting the leading slashes', () => {
         //a multi-line commented-out value would not survive uncommentOptions(), so guard the format itself
         const commentedOpeners = text.split(/\r?\n/).filter(line => /^\s*\/\/ "[^"]+":.*[[{]\s*$/.test(line) && !/\].*\/\*/.test(line));
-        //the only multi-line commented blocks allowed are "devices" and "files" (whole-object examples)
-        const allowed = commentedOpeners.filter(line => !/"(devices)":/.test(line));
-        expect(allowed).to.eql([]);
+        expect(commentedOpeners).to.eql([]);
     });
 
     it('aligns every description comment to the same column', () => {

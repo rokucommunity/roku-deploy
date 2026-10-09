@@ -8413,21 +8413,6 @@ describe('RokuDeploy', () => {
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
             });
 
-            it('warns (but does not throw) for an invalid device registry entry', () => {
-                const warnStub = sinon.stub(rokuDeploy['logger'], 'warn');
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    devices: {
-                        good: { host: '1.2.3.4' },
-                        bad: { host: '1.2.3.4', esn: 'X1' }
-                    }
-                });
-                const config = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                //the config still loads in full, including the bad entry
-                expect(config.devices.bad).to.exist;
-                expect(warnStub.callCount).to.equal(1);
-                expect(String(warnStub.getCall(0).args[0])).to.include(`Device registry entry 'bad'`);
-            });
-
             it('applies the config file logLevel so it wins over the current logger level', () => {
                 rokuDeploy['logger'].logLevel = 'error';
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });

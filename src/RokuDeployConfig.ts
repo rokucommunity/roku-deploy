@@ -1,6 +1,6 @@
 import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceOption } from './DeviceConfig';
-import type { DeviceRegistryEntry, FileEntry } from './RokuDeployOptions';
+import type { FileEntry } from './RokuDeployOptions';
 
 /**
  * The shape of a `rokudeploy.json` config file: one flat set of values that commands read as they
@@ -10,16 +10,10 @@ import type { DeviceRegistryEntry, FileEntry } from './RokuDeployOptions';
  */
 export interface RokuDeployConfig {
     /**
-     * The target device: an inline device config, or the name of an entry in `devices`.
+     * The target device, as an inline device config.
      * @example { host: '192.168.1.21', password: 'aaaa' }
-     * @example 'living-room'
      */
     device?: DeviceOption;
-    /**
-     * A registry of named devices, selected by name through `device`.
-     * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
-     */
-    devices?: Record<string, DeviceRegistryEntry>;
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
      * just in case roku adds support for custom usernames in the future
