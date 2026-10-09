@@ -55,13 +55,13 @@ export class RokuDeploy {
         this.constructorOptions = constructorOptions;
         this.logger = constructorOptions.logger ?? logger;
         //resolve the config file path once, against the current cwd, so every (re)load reads the
-        //same file even if the process later changes directory
+        //same file even if the process later changes directory. A `?` prefix (or the `true` default)
+        //marks the file optional, so a missing file is tolerated rather than thrown.
         if (typeof config === 'string') {
-            this.configOptional = config.startsWith('?');
-            this.configPath = path.resolve(process.cwd(), this.configOptional ? config.slice(1) : config);
+            const optional = config.startsWith('?');
+            this.config = { path: path.resolve(process.cwd(), optional ? config.slice(1) : config), optional: optional };
         } else if (config === true) {
-            this.configOptional = true;
-            this.configPath = path.join(process.cwd(), 'rokudeploy.json');
+            this.config = { path: path.join(process.cwd(), 'rokudeploy.json'), optional: true };
         }
         this.options = this.loadConfig();
     }
@@ -108,16 +108,11 @@ export class RokuDeploy {
     private options: RokuDeployConstructorOptions;
 
     /**
-     * The config file path resolved at construction, read on every `reloadConfig`. Undefined when no
-     * `config` was given (nothing is loaded).
+     * The config-file loading state resolved at construction: the absolute `path` (read on every
+     * `reloadConfig`) and whether a missing file is `optional`. Undefined when no `config` was given,
+     * which means nothing is loaded. Kept separate from `options` so it never leaks into method calls.
      */
-    private readonly configPath?: string;
-
-    /**
-     * Whether a missing `configPath` is tolerated (a `?`-prefixed path or the default `true`) rather
-     * than throwing.
-     */
-    private readonly configOptional: boolean = false;
+    private readonly config?: { path: string; optional: boolean };
 
     /**
      * The constructor options (minus `config`), kept so `reloadConfig` can rebuild `options`
@@ -131,14 +126,14 @@ export class RokuDeploy {
      */
     private loadConfig(): RokuDeployConstructorOptions {
         let configValues: RootConfigOptions = {};
-        if (this.configPath) {
-            if (fsExtra.existsSync(this.configPath)) {
-                const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: this.configPath, section: null });
+        if (this.config) {
+            if (fsExtra.existsSync(this.config.path)) {
+                const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: this.config.path, section: null });
                 //a root-level `config` key has no meaning as a method option, so keep it out of the merge
                 delete values.config;
                 configValues = values;
-            } else if (!this.configOptional) {
-                throw new InvalidOptionError(`Config file does not exist at "${this.configPath}"`, { optionName: 'config' });
+            } else if (!this.config.optional) {
+                throw new InvalidOptionError(`Config file does not exist at "${this.config.path}"`, { optionName: 'config' });
             }
         }
         return { ...configValues, ...this.constructorOptions };
