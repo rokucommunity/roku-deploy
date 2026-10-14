@@ -429,7 +429,12 @@ describe('RceManagementClient', () => {
         }
 
         it('exposes code and message from an object detail', async () => {
-            stubFailure(402, { detail: { code: 'trial_exhausted', message: 'Your trial has ended' } });
+            stubFailure(402, {
+                detail: {
+                    code: 'trial_exhausted',
+                    message: 'Your trial has ended'
+                }
+            });
 
             const error = await captureError();
 
@@ -446,7 +451,9 @@ describe('RceManagementClient', () => {
         });
 
         it('exposes a string detail as the api message', async () => {
-            stubFailure(404, { detail: 'Device not found' });
+            stubFailure(404, {
+                detail: 'Device not found'
+            });
 
             const error = await captureError();
 
@@ -458,8 +465,17 @@ describe('RceManagementClient', () => {
         it('joins validation error messages and exposes the list', async () => {
             stubFailure(422, {
                 detail: [
-                    { loc: ['body', 'maxRuntime'], msg: 'field required', type: 'value_error.missing' },
-                    { loc: ['query', 'limit', 0], msg: 'value is not a valid integer', type: 'type_error.integer', input: 'x' }
+                    {
+                        loc: ['body', 'maxRuntime'],
+                        msg: 'field required',
+                        type: 'value_error.missing'
+                    },
+                    {
+                        loc: ['query', 'limit', 0],
+                        msg: 'value is not a valid integer',
+                        type: 'type_error.integer',
+                        input: 'x'
+                    }
                 ]
             });
 
@@ -467,8 +483,16 @@ describe('RceManagementClient', () => {
 
             expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 422): field required; value is not a valid integer');
             expect(error.details.validationErrors).to.eql([
-                { loc: ['body', 'maxRuntime'], msg: 'field required', type: 'value_error.missing' },
-                { loc: ['query', 'limit', 0], msg: 'value is not a valid integer', type: 'type_error.integer' }
+                {
+                    loc: ['body', 'maxRuntime'],
+                    msg: 'field required',
+                    type: 'value_error.missing'
+                },
+                {
+                    loc: ['query', 'limit', 0],
+                    msg: 'value is not a valid integer',
+                    type: 'type_error.integer'
+                }
             ]);
         });
 
@@ -495,11 +519,23 @@ describe('RceManagementClient', () => {
         it('drops malformed validation items and normalizes loc and type', async () => {
             stubFailure(422, {
                 detail: [
-                    { msg: 'first' },
-                    { loc: 'x', msg: 'second', type: 5 },
+                    {
+                        msg: 'first'
+                    },
+                    {
+                        loc: 'x',
+                        msg: 'second',
+                        type: 5
+                    },
                     'junk',
-                    { loc: [] },
-                    { loc: ['body', 1, null, {}, true], msg: 'third', type: 'kind' }
+                    {
+                        loc: []
+                    },
+                    {
+                        loc: ['body', 1, null, {}, true],
+                        msg: 'third',
+                        type: 'kind'
+                    }
                 ]
             });
 
@@ -507,9 +543,21 @@ describe('RceManagementClient', () => {
 
             expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 422): first; second; third');
             expect(error.details.validationErrors).to.eql([
-                { loc: [], msg: 'first', type: '' },
-                { loc: [], msg: 'second', type: '' },
-                { loc: ['body', 1], msg: 'third', type: 'kind' }
+                {
+                    loc: [],
+                    msg: 'first',
+                    type: ''
+                },
+                {
+                    loc: [],
+                    msg: 'second',
+                    type: ''
+                },
+                {
+                    loc: ['body', 1],
+                    msg: 'third',
+                    type: 'kind'
+                }
             ]);
         });
 
