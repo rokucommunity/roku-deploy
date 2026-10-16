@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class CaptureScreenshotCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'screenshot');
+        let options = loadCommandOptions(args);
         await rokuDeploy.captureScreenshot(options);
     }
 }

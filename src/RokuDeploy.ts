@@ -26,8 +26,7 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import type { ConfigSectionName, ResolvedSectionOptions, RokuDeployConfig, RootConfigOptions } from './RokuDeployConfig';
-import { configSectionNames } from './RokuDeployConfig';
+import type { RokuDeployConfig } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -1631,30 +1630,12 @@ export class RokuDeploy {
 
     /**
      * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
-     * about invalid device-registry entries. With no `section`, returns the full config. With a
-     * `section`, returns the flattened options for that section: root-level values overlaid with the
-     * section's values (section wins on collision), all other sections stripped; `section: null`
-     * flattens the same way for a consumer with no section of its own. The library never loads
-     * config implicitly — the CLI calls this for every command; library consumers call it explicitly.
+     * about invalid device-registry entries. Returns the flat config as written; the empty object
+     * when the file is absent. The library never loads config implicitly — the CLI calls this for
+     * every command; library consumers call it explicitly.
      * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
-    /**
-     * @public
-     */
-    public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
-    /**
-     * @public
-     */
-    public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
-    /**
-     * @public
-     */
-    public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
-    /**
-     * @public
-     */
-    public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
@@ -1688,22 +1669,12 @@ export class RokuDeploy {
                     this.logger.warn(`${configPath}: ${(e as Error).message}`);
                 }
             }
-        }
-        //no section requested: hand back the whole config
-        if (options?.section === undefined) {
-            return config;
-        }
-        //flatten for one section: root values with the section overlaid, other sections stripped
-        const result: Record<string, any> = {};
-        for (const key in config) {
-            if (!configSectionNames.includes(key as ConfigSectionName)) {
-                result[key] = config[key];
+            //apply the config's logLevel so a file-supplied level wins over the logger's current level
+            if (config.logLevel !== undefined) {
+                this.logger.logLevel = config.logLevel;
             }
         }
-        if (options.section !== null) {
-            Object.assign(result, config[options.section]);
-        }
-        return result;
+        return config;
     }
 
     /**

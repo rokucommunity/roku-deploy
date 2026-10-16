@@ -1,37 +1,22 @@
 import type { LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceOption } from './DeviceConfig';
-import type { DeviceRegistryEntry } from './RokuDeployOptions';
-import type {
-    CaptureScreenshotOptions,
-    ConvertToSquashfsOptions,
-    CreateSignedPackageOptions,
-    DeleteDevChannelOptions,
-    RekeyDeviceOptions,
-    SideloadOptions,
-    StageOptions,
-    ZipOptions
-} from './RokuDeploy';
+import type { DeviceRegistryEntry, FileEntry } from './RokuDeployOptions';
 
 /**
- * The shape of a `rokudeploy.json` config file: root-level common values (device, credentials,
- * ports) that apply to every command, plus optional per-command sections that override them.
- * Sections exist because option names collide across commands (`stage.out` is the staging folder,
- * `zip.out` is the zip path) — a flat file cannot express a full workflow.
- *
- * Per-command precedence: CLI args → `[command]` section → root level → defaults.
+ * The shape of a `rokudeploy.json` config file: one flat set of values that commands read as they
+ * need them. A comment in the sample names the commands each value feeds. CLI args override the
+ * file, and the file overrides the built-in defaults.
  * @public
  */
 export interface RokuDeployConfig {
-    //---- root-level common values, applied to every command ----
-
     /**
-     * The target device. Can be a registry name (string) or an inline device config.
+     * The target device: an inline device config, or the name of an entry in `devices`.
+     * @example { host: '192.168.1.21', password: 'aaaa' }
      * @example 'living-room'
-     * @example { host: '192.168.1.21' }
      */
     device?: DeviceOption;
     /**
-     * A registry of named devices. Keys are device names, values are device configurations.
+     * A registry of named devices, selected by name through `device`.
      * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
      */
     devices?: Record<string, DeviceRegistryEntry>;
@@ -69,109 +54,36 @@ export interface RokuDeployConfig {
      * The log level
      */
     logLevel?: LogLevel | LogLevelNumeric;
-
-    //---- per-command sections (keyed by CLI command name), override root on collision ----
-    //only commands whose options are worth persisting get a section; per-invocation values
-    //(key presses, text) and interactive commands deliberately have none
-
-    /** Options applied only to the `sideload` command */
-    sideload?: Partial<SideloadOptions>;
-    /** Options applied only to the `stage` command */
-    stage?: Partial<StageOptions>;
-    /** Options applied only to the `zip` command */
-    zip?: Partial<ZipOptions>;
-    /** Options applied only to the `squash` command */
-    squash?: Partial<ConvertToSquashfsOptions>;
-    /** Options applied only to the `rekey` command */
-    rekey?: Partial<RekeyDeviceOptions>;
-    /** Options applied only to the `package` command */
-    package?: Partial<CreateSignedPackageOptions>;
-    /** Options applied only to the `deleteDevChannel` command */
-    deleteDevChannel?: Partial<DeleteDevChannelOptions>;
-    /** Options applied only to the `screenshot` command */
-    screenshot?: Partial<CaptureScreenshotOptions>;
-    /** Options applied only to the `rce start` command */
-    'rce.start'?: RceStartConfig;
-    /** Options applied only to the `rce stop` command */
-    'rce.stop'?: RceStopConfig;
+    /**
+     * The folder holding the project source; the manifest lives directly under it. Read by `stage`,
+     * and by `sideload`/`package` when they stage first.
+     */
+    rootDir?: string;
+    /**
+     * Globs (relative to `rootDir`), or `{ src, dest }` entries, selecting the files to include when
+     * staging. Read by `stage`, and by `sideload`/`package` when they stage first. The `zip` command
+     * takes its own files array instead.
+     */
+    files?: FileEntry[];
+    /**
+     * Where the filtered copy of `rootDir` is written before zipping.
+     */
+    stagingDir?: string;
+    /**
+     * The base name of generated files: `zip` writes `<outFile>.zip`, `package` writes `<outFile>.pkg`.
+     * An explicit extension is honored as given.
+     */
+    outFile?: string;
+    /**
+     * Convert the installed channel to squashfs before packaging. Read by `package`.
+     */
+    convertToSquashfs?: boolean;
+    /**
+     * The signing password of the key currently on the device. Read by `package` and `rekey`.
+     */
+    signingPassword?: string;
+    /**
+     * A previously signed `.pkg` whose key should be installed on the device. Read by `rekey`.
+     */
+    rekeySignedPackage?: string;
 }
-
-/**
- * Config-file options for the `rce start` command.
- * @public
- */
-export interface RceStartConfig {
-    /** The RCE bearer token (root-level `rceToken` is the usual home for this) */
-    token?: string;
-    /** The numeric management-api id of the RCE device */
-    deviceId?: number;
-    /** The serial number (ESN) of the RCE device */
-    esn?: string;
-    /** The name of the snapshot to boot from (`live` selects the live snapshot) */
-    snapshot?: string;
-    /** The id of the snapshot to boot from */
-    snapshotId?: number;
-    /** The firmware to boot with */
-    firmwareVersionId?: string;
-    /** The maximum runtime for the device instance, in seconds */
-    maxRuntime?: number;
-    /** Wait for the device to reach the 'running' status before exiting */
-    wait?: boolean;
-    /** How long --wait polls before giving up, in seconds */
-    timeout?: number;
-}
-
-/**
- * Config-file options for the `rce stop` command.
- * @public
- */
-export interface RceStopConfig {
-    /** The RCE bearer token (root-level `rceToken` is the usual home for this) */
-    token?: string;
-    /** The numeric management-api id of the RCE device */
-    deviceId?: number;
-    /** The serial number (ESN) of the RCE device */
-    esn?: string;
-    /** Wait for the device to reach the 'shutdown' status before exiting */
-    wait?: boolean;
-    /** How long --wait polls before giving up, in seconds */
-    timeout?: number;
-}
-
-/**
- * The section names recognized in a `rokudeploy.json` file — every key of `RokuDeployConfig`
- * that holds per-command options rather than a root-level value.
- * @public
- */
-export const configSectionNames = [
-    'sideload',
-    'stage',
-    'zip',
-    'squash',
-    'rekey',
-    'package',
-    'deleteDevChannel',
-    'screenshot',
-    'rce.start',
-    'rce.stop'
-] as const;
-
-/**
- * A recognized per-command section name in a `rokudeploy.json` file.
- * @public
- */
-export type ConfigSectionName = typeof configSectionNames[number];
-
-/**
- * The root-level common values of a `rokudeploy.json` config — everything except the per-command
- * sections. What `loadConfigFile({ section: null })` returns.
- * @public
- */
-export type RootConfigOptions = Omit<RokuDeployConfig, ConfigSectionName>;
-
-/**
- * The flattened options for one config section: the root-level common values overlaid with that
- * section's own options. What `loadConfigFile({ section: '<name>' })` returns.
- * @public
- */
-export type ResolvedSectionOptions<T extends ConfigSectionName> = RootConfigOptions & NonNullable<RokuDeployConfig[T]>;

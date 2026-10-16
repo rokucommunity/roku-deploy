@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class ConvertToSquashfsCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'squash');
+        let options = loadCommandOptions(args);
         await rokuDeploy.convertToSquashfs(options);
     }
 }
