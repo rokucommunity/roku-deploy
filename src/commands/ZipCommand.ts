@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class ZipCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'zip');
+        let options = loadCommandOptions(args);
         await rokuDeploy.zip(options);
     }
 }
