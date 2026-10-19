@@ -1445,7 +1445,6 @@ export interface RokuDeployConfig {
     convertToSquashfs?: boolean;
     cwd?: string;
     device?: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     files?: FileEntry[];
     logLevel?: LogLevel | LogLevelNumeric;
