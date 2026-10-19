@@ -6,7 +6,6 @@
 
 /// <reference types="node" />
 
-import { EventEmitter } from 'events';
 import type { Logger } from '@rokucommunity/logger';
 import { logger } from '@rokucommunity/logger';
 import type { LogLevel } from '@rokucommunity/logger';
@@ -1212,61 +1211,6 @@ export interface RceStopConfig {
     timeout?: number;
     token?: string;
     wait?: boolean;
-}
-
-// @public (undocumented)
-export interface RceVideoJsep {
-    // (undocumented)
-    sdp: string;
-    // (undocumented)
-    type: string;
-}
-
-// @public
-export class RceVideoSignalingClient extends EventEmitter {
-    constructor(config: RceVideoSignalingConfig, options?: RceVideoSignalingClientOptions);
-    connect(): Promise<RceVideoSignalingOffer>;
-    on<K extends keyof RceVideoSignalingClientEvents>(event: K, listener: RceVideoSignalingClientEvents[K]): this;
-    sendAnswer(jsep: RceVideoJsep): Promise<void>;
-    sendCandidate(candidate: unknown): void;
-    sendCandidatesComplete(): void;
-    stop(): void;
-}
-
-// @public (undocumented)
-export interface RceVideoSignalingClientEvents {
-    // (undocumented)
-    close: () => void;
-    // (undocumented)
-    error: (error: Error) => void;
-}
-
-// @public (undocumented)
-export interface RceVideoSignalingClientOptions {
-    keepaliveIntervalMs?: number;
-    negotiationTimeoutMs?: number;
-}
-
-// @public
-export interface RceVideoSignalingConfig {
-    apiToken: string;
-    // (undocumented)
-    iceServers?: IceServer[];
-    janusToken?: string;
-    // (undocumented)
-    pin?: string;
-    // (undocumented)
-    streamId: number;
-    // (undocumented)
-    websocketUrl: string;
-}
-
-// @public (undocumented)
-export interface RceVideoSignalingOffer {
-    // (undocumented)
-    iceServers: IceServer[];
-    // (undocumented)
-    offer: RceVideoJsep;
 }
 
 // @public (undocumented)
