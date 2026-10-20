@@ -412,6 +412,9 @@ export class UnsupportedFirmwareVersionError extends RokuDeployError<Unsupported
  * @public
  */
 export class RceManagementApiError extends RokuDeployError<RceManagementApiErrorDetails> {
+    /**
+     * @public
+     */
     public readonly code = RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR;
 }
 
