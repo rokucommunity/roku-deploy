@@ -7345,7 +7345,6 @@ describe('RokuDeploy', () => {
         it('uses the registry entry timeout when the call provides none', async () => {
             const rd = new RokuDeploy({
                 password: 'root-pass',
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4', timeout: 1234 }
                 }
@@ -7384,7 +7383,6 @@ describe('RokuDeploy', () => {
                 password: 'root-pass',
                 username: 'root-user',
                 packagePort: 8080,
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4' }
                 }
@@ -7393,7 +7391,6 @@ describe('RokuDeploy', () => {
             await rd.deleteDevChannel({ device: 'office-tv' } as any);
             expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
             expect(stub.getCall(0).args[0].url).to.include(':8080/');
-            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
         });
 
         it('does not apply registry settings to an inline device config', async () => {

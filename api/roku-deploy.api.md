@@ -1504,7 +1504,6 @@ export interface RokuDeployConfig {
     sideload?: Partial<SideloadOptions>;
     squash?: Partial<ConvertToSquashfsOptions>;
     stage?: Partial<StageOptions>;
-    timeout?: number;
     username?: string;
     zip?: Partial<ZipOptions>;
 }
@@ -1518,7 +1517,6 @@ export interface RokuDeployConstructorOptions {
     packagePort?: number;
     password?: string;
     rceToken?: string;
-    timeout?: number;
     username?: string;
 }
 
