@@ -906,6 +906,9 @@ export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDe
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl;
 
 // @public
+export function isRceManagementApiError(error: unknown): error is RceManagementApiError;
+
+// @public
 export function isRokuDeployError(e: unknown): e is RokuDeployError;
 
 // @public
@@ -1120,6 +1123,28 @@ export interface RceDeviceInstance {
 }
 
 // @public
+export class RceManagementApiError extends RokuDeployError<RceManagementApiErrorDetails> {
+    // (undocumented)
+    readonly code = RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR;
+}
+
+// @public
+export interface RceManagementApiErrorDetails {
+    // (undocumented)
+    apiCode?: string;
+    // (undocumented)
+    apiMessage?: string;
+    // (undocumented)
+    method: string;
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    statusCode: number;
+    // (undocumented)
+    validationErrors?: RceManagementValidationError[];
+}
+
+// @public
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions);
     createDevice(options: CreateDeviceOptions): Promise<RceDevice>;
@@ -1158,6 +1183,16 @@ export interface RceManagementPagingOptions {
 // @public
 export interface RceManagementRequestOptions {
     token?: string;
+}
+
+// @public
+export interface RceManagementValidationError {
+    // (undocumented)
+    loc: Array<string | number>;
+    // (undocumented)
+    msg: string;
+    // (undocumented)
+    type: string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "RceSocket" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1545,6 +1580,8 @@ export enum RokuDeployErrorCode {
     INVALID_RESPONSE_CODE = "INVALID_RESPONSE_CODE",
     // (undocumented)
     MISSING_REQUIRED_OPTION = "MISSING_REQUIRED_OPTION",
+    // (undocumented)
+    RCE_MANAGEMENT_API_ERROR = "RCE_MANAGEMENT_API_ERROR",
     // (undocumented)
     UNAUTHORIZED = "UNAUTHORIZED",
     // (undocumented)

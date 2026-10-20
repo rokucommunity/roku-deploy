@@ -19,7 +19,8 @@ export enum RokuDeployErrorCode {
     CONVERT_ERROR = 'CONVERT_ERROR',
     MISSING_REQUIRED_OPTION = 'MISSING_REQUIRED_OPTION',
     INVALID_OPTION = 'INVALID_OPTION',
-    UNSUPPORTED_FIRMWARE = 'UNSUPPORTED_FIRMWARE'
+    UNSUPPORTED_FIRMWARE = 'UNSUPPORTED_FIRMWARE',
+    RCE_MANAGEMENT_API_ERROR = 'RCE_MANAGEMENT_API_ERROR'
 }
 
 /**
@@ -106,6 +107,31 @@ export interface UnsupportedFirmwareDetails {
     currentVersion?: string;
     minimumVersion?: string;
     operation?: string;
+}
+
+/**
+ * One entry of a Roku Cloud Emulator (RCE) management API request validation failure (HTTP 422)
+ * @public
+ */
+export interface RceManagementValidationError {
+    loc: Array<string | number>;
+    msg: string;
+    type: string;
+}
+
+/**
+ * Details for Roku Cloud Emulator (RCE) management API errors. `apiCode` and `apiMessage` come from
+ * the server's error body when it has the `{ code, message }` shape; `apiMessage` is also set when the
+ * body's `detail` is a plain string. `validationErrors` is set when `detail` is a validation error list.
+ * @public
+ */
+export interface RceManagementApiErrorDetails {
+    method: string;
+    path: string;
+    statusCode: number;
+    apiCode?: string;
+    apiMessage?: string;
+    validationErrors?: RceManagementValidationError[];
 }
 
 /**
@@ -381,6 +407,14 @@ export class UnsupportedFirmwareVersionError extends RokuDeployError<Unsupported
     public readonly code = RokuDeployErrorCode.UNSUPPORTED_FIRMWARE;
 }
 
+/**
+ * Thrown when the Roku Cloud Emulator (RCE) management API answers with a non-2xx status
+ * @public
+ */
+export class RceManagementApiError extends RokuDeployError<RceManagementApiErrorDetails> {
+    public readonly code = RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR;
+}
+
 // ============================================================================
 // Type Guard Functions
 // ============================================================================
@@ -530,6 +564,14 @@ export function isInvalidOptionError(e: unknown): e is InvalidOptionError {
  */
 export function isUnsupportedFirmwareVersionError(e: unknown): e is UnsupportedFirmwareVersionError {
     return e instanceof UnsupportedFirmwareVersionError;
+}
+
+/**
+ * Check if an error is a RceManagementApiError
+ * @public
+ */
+export function isRceManagementApiError(error: unknown): error is RceManagementApiError {
+    return error instanceof RceManagementApiError;
 }
 
 // ============================================================================
