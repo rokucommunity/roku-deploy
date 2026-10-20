@@ -9,10 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.0.0-alpha.10](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.9...v4.0.0-alpha.10) - 2026-10-20
 ### Added
  - Add RceManagementApiError with the server's error code and message ([#454](https://github.com/rokucommunity/roku-deploy/pull/454))
- - Add a lint rule requiring release tags on the exported API ([#448](https://github.com/rokucommunity/roku-deploy/pull/448))
  - Add createSocket and getDestPath to the RokuDeploy class ([#436](https://github.com/rokucommunity/roku-deploy/pull/436))
 ### Changed
- - Enforce consistent line endings with check-eol ([#453](https://github.com/rokucommunity/roku-deploy/pull/453))
  - Accept --esn, --instanceUrl and --rceToken on every device command ([#449](https://github.com/rokucommunity/roku-deploy/pull/449))
  - Reject unknown CLI commands and options ([#447](https://github.com/rokucommunity/roku-deploy/pull/447))
  - Security enhancements ([#431](https://github.com/rokucommunity/roku-deploy/pull/431), [#440](https://github.com/rokucommunity/roku-deploy/pull/440), [#446](https://github.com/rokucommunity/roku-deploy/pull/446))
