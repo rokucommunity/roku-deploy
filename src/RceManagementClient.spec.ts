@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { createSandbox } from 'sinon';
 import * as needle from 'needle';
 import { RceManagementClient } from './RceManagementClient';
+import { RceManagementApiError, RokuDeployErrorCode, isRceManagementApiError } from './Errors';
 import { expectThrowsAsync } from './testUtils.spec';
 
 const sinon = createSandbox();
@@ -406,6 +407,185 @@ describe('RceManagementClient', () => {
                 client.getUserInfo(),
                 'RCE management GET /user/me failed (status 0)'
             );
+        });
+    });
+
+    describe('api error details', () => {
+        function stubFailure(statusCode: number, body: unknown) {
+            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(null, { statusCode: statusCode, body: body });
+                return {} as any;
+            }) as any);
+        }
+
+        async function captureError(): Promise<RceManagementApiError> {
+            const client = new RceManagementClient({ token: 'secret' });
+            try {
+                await client.startDevice({ deviceId: 1, start: { snapshotId: 7, firmwareVersionId: 'fw', maxRuntime: 3600 } });
+            } catch (error) {
+                return error as RceManagementApiError;
+            }
+            throw new Error('expected the request to reject');
+        }
+
+        it('exposes code and message from an object detail', async () => {
+            stubFailure(402, {
+                detail: {
+                    code: 'trial_exhausted',
+                    message: 'Your trial has ended'
+                }
+            });
+
+            const error = await captureError();
+
+            expect(error).to.be.instanceOf(RceManagementApiError);
+            expect(error.code).to.equal(RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR);
+            expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 402): Your trial has ended');
+            expect(error.details).to.eql({
+                method: 'POST',
+                path: '/devices/1/start',
+                statusCode: 402,
+                apiCode: 'trial_exhausted',
+                apiMessage: 'Your trial has ended'
+            });
+        });
+
+        it('exposes a string detail as the api message', async () => {
+            stubFailure(404, {
+                detail: 'Device not found'
+            });
+
+            const error = await captureError();
+
+            expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 404): Device not found');
+            expect(error.details.apiMessage).to.equal('Device not found');
+            expect(error.details.apiCode).to.be.undefined;
+        });
+
+        it('joins validation error messages and exposes the list', async () => {
+            stubFailure(422, {
+                detail: [
+                    {
+                        loc: ['body', 'maxRuntime'],
+                        msg: 'field required',
+                        type: 'value_error.missing'
+                    },
+                    {
+                        loc: ['query', 'limit', 0],
+                        msg: 'value is not a valid integer',
+                        type: 'type_error.integer',
+                        input: 'x'
+                    }
+                ]
+            });
+
+            const error = await captureError();
+
+            expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 422): field required; value is not a valid integer');
+            expect(error.details.validationErrors).to.eql([
+                {
+                    loc: ['body', 'maxRuntime'],
+                    msg: 'field required',
+                    type: 'value_error.missing'
+                },
+                {
+                    loc: ['query', 'limit', 0],
+                    msg: 'value is not a valid integer',
+                    type: 'type_error.integer'
+                }
+            ]);
+        });
+
+        const bodiesWithoutServerText: Array<[string, unknown]> = [
+            ['undefined', undefined],
+            ['null', null],
+            ['an empty object', {}],
+            ['an empty string', ''],
+            ['an html string', '<html>Bad Gateway</html>'],
+            ['an empty detail array', { detail: [] }],
+            ['an empty detail object', { detail: {} }]
+        ];
+        for (const [description, body] of bodiesWithoutServerText) {
+            it(`adds no suffix when the body is ${description}`, async () => {
+                stubFailure(502, body);
+
+                const error = await captureError();
+
+                expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 502)');
+                expect(error.details).to.eql({ method: 'POST', path: '/devices/1/start', statusCode: 502 });
+            });
+        }
+
+        it('drops malformed validation items and normalizes loc and type', async () => {
+            stubFailure(422, {
+                detail: [
+                    {
+                        msg: 'first'
+                    },
+                    {
+                        loc: 'x',
+                        msg: 'second',
+                        type: 5
+                    },
+                    'junk',
+                    {
+                        loc: []
+                    },
+                    {
+                        loc: ['body', 1, null, {}, true],
+                        msg: 'third',
+                        type: 'kind'
+                    }
+                ]
+            });
+
+            const error = await captureError();
+
+            expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 422): first; second; third');
+            expect(error.details.validationErrors).to.eql([
+                {
+                    loc: [],
+                    msg: 'first',
+                    type: ''
+                },
+                {
+                    loc: [],
+                    msg: 'second',
+                    type: ''
+                },
+                {
+                    loc: ['body', 1],
+                    msg: 'third',
+                    type: 'kind'
+                }
+            ]);
+        });
+
+        it('falls back to the api code when the detail has no message', async () => {
+            stubFailure(429, { detail: { code: 'trial_device_run_limit' } });
+
+            const error = await captureError();
+
+            expect(error.message).to.equal('RCE management POST /devices/1/start failed (status 429): trial_device_run_limit');
+        });
+
+        it('isRceManagementApiError matches only RceManagementApiError instances', () => {
+            expect(isRceManagementApiError(new RceManagementApiError('x'))).to.be.true;
+            expect(isRceManagementApiError(new Error('x'))).to.be.false;
+            expect(isRceManagementApiError(undefined)).to.be.false;
+        });
+
+        it('keeps network failures as the original error', async () => {
+            const networkError = new Error('ECONNRESET');
+            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(networkError);
+                return {} as any;
+            }) as any);
+
+            const error = await captureError();
+
+            expect(error).to.equal(networkError);
+            expect(isRceManagementApiError(error)).to.be.false;
         });
     });
 });

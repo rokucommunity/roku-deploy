@@ -2,6 +2,8 @@ import * as needle from 'needle';
 import type { RceDeviceConfig } from './DeviceConfig';
 import { isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
 import { util } from './util';
+import { RceManagementApiError } from './Errors';
+import type { RceManagementApiErrorDetails, RceManagementValidationError } from './Errors';
 
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API (distinct from a running
@@ -246,7 +248,12 @@ export class RceManagementClient {
                 }
                 const statusCode = response.statusCode ?? 0;
                 if (statusCode < 200 || statusCode >= 300) {
-                    reject(new Error(`RCE management ${method.toUpperCase()} ${path} failed (status ${statusCode})`));
+                    const details = buildApiErrorDetails(method.toUpperCase(), path, statusCode, response.body);
+                    const serverText = details.apiMessage ?? details.apiCode ?? details.validationErrors?.map((validationError) => validationError.msg).join('; ');
+                    reject(new RceManagementApiError(
+                        `RCE management ${details.method} ${path} failed (status ${statusCode})${serverText ? `: ${serverText}` : ''}`,
+                        details
+                    ));
                     return;
                 }
                 resolve(convertKeys(response.body, toCamelCaseKey) as TResponse);
@@ -263,6 +270,44 @@ export class RceManagementClient {
             .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
         return parts.length > 0 ? `?${parts.join('&')}` : '';
     }
+}
+
+/**
+ * Extract the api's error information from a non-2xx response body. The body may be an `ApiError`
+ * (`detail` is a string or `{ code, message }`), an `HTTPValidationError` (`detail` is a list of
+ * `{ loc, msg, type }`), or missing, empty or not JSON, in which case only the request and status are recorded.
+ * Validation error items are reduced to `loc` (string and number elements only), `msg` and `type`
+ * (`input` and `ctx` are dropped); items that are not objects or have no string `msg` are skipped.
+ */
+function buildApiErrorDetails(method: string, path: string, statusCode: number, body: unknown): RceManagementApiErrorDetails {
+    const details: RceManagementApiErrorDetails = { method: method, path: path, statusCode: statusCode };
+    const detail = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).detail : undefined;
+    if (typeof detail === 'string' && detail) {
+        details.apiMessage = detail;
+    } else if (Array.isArray(detail)) {
+        const validationErrors: RceManagementValidationError[] = [];
+        for (const item of detail) {
+            if (typeof item === 'object' && item !== null && typeof item.msg === 'string') {
+                validationErrors.push({
+                    loc: Array.isArray(item.loc) ? item.loc.filter((part: unknown) => typeof part === 'string' || typeof part === 'number') : [],
+                    msg: item.msg,
+                    type: typeof item.type === 'string' ? item.type : ''
+                });
+            }
+        }
+        if (validationErrors.length > 0) {
+            details.validationErrors = validationErrors;
+        }
+    } else if (typeof detail === 'object' && detail !== null) {
+        const { code, message } = detail as Record<string, unknown>;
+        if (typeof code === 'string' && code) {
+            details.apiCode = code;
+        }
+        if (typeof message === 'string' && message) {
+            details.apiMessage = message;
+        }
+    }
+    return details;
 }
 
 /**

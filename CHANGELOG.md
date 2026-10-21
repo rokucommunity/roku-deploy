@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [4.0.0-alpha.10](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.9...v4.0.0-alpha.10) - 2026-10-20
+### Added
+ - Add RceManagementApiError with the server's error code and message ([#454](https://github.com/rokucommunity/roku-deploy/pull/454))
+ - Add createSocket and getDestPath to the RokuDeploy class ([#436](https://github.com/rokucommunity/roku-deploy/pull/436))
+### Changed
+ - Accept --esn, --instanceUrl and --rceToken on every device command ([#449](https://github.com/rokucommunity/roku-deploy/pull/449))
+ - Reject unknown CLI commands and options ([#447](https://github.com/rokucommunity/roku-deploy/pull/447))
+ - Security enhancements ([#431](https://github.com/rokucommunity/roku-deploy/pull/431), [#440](https://github.com/rokucommunity/roku-deploy/pull/440), [#446](https://github.com/rokucommunity/roku-deploy/pull/446))
+ - Give device methods named result types instead of raw HttpResponse ([#417](https://github.com/rokucommunity/roku-deploy/pull/417))
+ - Map CLI --host and sideload --dir onto the library's options ([#434](https://github.com/rokucommunity/roku-deploy/pull/434))
+### Fixed
+ - Fix per-device settings being silently ignored in the devices registry ([#414](https://github.com/rokucommunity/roku-deploy/pull/414))
+
+
+
 ## [4.0.0-alpha.9](https://github.com/rokucommunity/roku-deploy/compare/4.0.0-alpha.8...v4.0.0-alpha.9) - 2026-09-28
 ### Changed
  - Absorb the abort error when terminating a rejected ECP websocket ([#428](https://github.com/rokucommunity/roku-deploy/pull/428))
