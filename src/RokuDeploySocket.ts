@@ -53,6 +53,7 @@ export class LocalSocket extends net.Socket {
      * Connects to the host and port this socket was constructed with. The additional overloads
      * below exist only so this override remains structurally compatible with `net.Socket`'s own
      * `connect()` overloads.
+     * @internal
      */
     public connect(connectListener?: () => void): this;
     public connect(connectOptions: net.SocketConnectOpts, connectListener?: () => void): this;
@@ -131,6 +132,7 @@ export class RceSocket extends stream.Duplex {
      * Unlike `net.Socket`, this socket cannot be reconnected: calling connect() a second time (or
      * on a destroyed socket) throws — a second websocket would orphan the first with its listeners
      * still feeding this stream, so both misuses fail loudly instead of leaking.
+     * @internal
      */
     public connect(connectListener?: () => void): this {
         if (this.destroyed) {
@@ -228,6 +230,7 @@ export class RceSocket extends stream.Duplex {
      * Sends a chunk, unchanged, as a binary websocket frame (the RCE port endpoints reject a TEXT
      * frame with close code 1003). A write issued before the websocket has opened is held and flushed on `'open'`,
      * matching the buffering `net.Socket` applies to writes issued while connecting.
+     * @internal
      */
     public _write(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
         const bufferedChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding);
@@ -251,6 +254,7 @@ export class RceSocket extends stream.Duplex {
      * Implements the writable half of `end()`. A websocket has no half-close, so the closest
      * equivalent to `net.Socket`'s FIN is starting the close handshake; the websocket's `'close'`
      * event then ends the readable side, so `end()` still arrives at exactly one `'close'` event.
+     * @internal
      */
     public _final(callback: (error?: Error | null) => void): void {
         if (this.webSocket?.readyState === WebSocket.OPEN) {
@@ -273,6 +277,7 @@ export class RceSocket extends stream.Duplex {
      * Data arrives asynchronously from the websocket's `'message'` event and is pushed as it comes
      * in (see `beginConnecting()`); the only on-demand work is releasing backpressure, since a full
      * readable buffer pauses the websocket until the consumer catches up.
+     * @internal
      */
     public _read(size: number): void {
         if (this.webSocket?.isPaused) {
@@ -284,6 +289,7 @@ export class RceSocket extends stream.Duplex {
      * Tears the websocket down (idempotent: safe whether it never finished opening, already closed
      * itself, or is being discarded outright) and lets the stream machinery finish the job, which
      * guarantees exactly one `'close'` event regardless of cause.
+     * @internal
      */
     public _destroy(error: Error | undefined, callback: (error?: Error | null) => void): void {
         this.clearIdleTimer();
@@ -315,6 +321,7 @@ export class RceSocket extends stream.Duplex {
      * Implements `net.Socket`'s idle-timeout semantics: (re)arms on every read or write and emits
      * `'timeout'` after `timeoutMilliseconds` of silence. Passing `0` disarms it. A timeout never
      * destroys the connection, matching `net.Socket` (the caller decides what to do about it).
+     * @internal
      */
     public setTimeout(timeoutMilliseconds: number, timeoutListener?: () => void): this {
         this.idleTimeoutMilliseconds = timeoutMilliseconds;
@@ -328,6 +335,7 @@ export class RceSocket extends stream.Duplex {
     /**
      * The idle timeout most recently configured through `setTimeout()`, or `undefined` if none is
      * armed. Mirrors `net.Socket#timeout`, which reports the same thing for logging purposes.
+     * @internal
      */
     public get timeout(): number | undefined {
         return this.idleTimeoutMilliseconds > 0 ? this.idleTimeoutMilliseconds : undefined;
@@ -335,23 +343,36 @@ export class RceSocket extends stream.Duplex {
 
     /**
      * There is no underlying tcp connection to report an address for.
+     * @internal
      */
     public get remoteAddress(): string | undefined {
         return undefined;
     }
 
+    /**
+     * @internal
+     */
     public get remotePort(): number | undefined {
         return undefined;
     }
 
+    /**
+     * @internal
+     */
     public get localAddress(): string | undefined {
         return undefined;
     }
 
+    /**
+     * @internal
+     */
     public get localPort(): number | undefined {
         return undefined;
     }
 
+    /**
+     * @internal
+     */
     public get localFamily(): string | undefined {
         return undefined;
     }
@@ -359,6 +380,7 @@ export class RceSocket extends stream.Duplex {
     /**
      * `net.Socket`'s `'close'` event carries a `hadError` boolean; the stream machinery emits the
      * event with no arguments, so decorate it on the way out.
+     * @internal
      */
     public emit(event: string | symbol, ...args: any[]): boolean {
         if (event === 'close' && args.length === 0) {

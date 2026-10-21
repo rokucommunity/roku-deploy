@@ -122,8 +122,7 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.CONNECTION_RESET;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public
@@ -907,6 +906,9 @@ export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDe
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl;
 
 // @public
+export function isRceManagementApiError(error: unknown): error is RceManagementApiError;
+
+// @public
 export function isRokuDeployError(e: unknown): e is RokuDeployError;
 
 // @public
@@ -1121,30 +1123,47 @@ export interface RceDeviceInstance {
 }
 
 // @public
+export class RceManagementApiError extends RokuDeployError<RceManagementApiErrorDetails> {
+    // (undocumented)
+    readonly code = RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR;
+}
+
+// @public
+export interface RceManagementApiErrorDetails {
+    // (undocumented)
+    apiCode?: string;
+    // (undocumented)
+    apiMessage?: string;
+    // (undocumented)
+    method: string;
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    statusCode: number;
+    // (undocumented)
+    validationErrors?: RceManagementValidationError[];
+}
+
+// @public
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions);
     createDevice(options: CreateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot>;
-    // (undocumented)
     deleteSnapshot(options: DeleteSnapshotOptions): Promise<void>;
     findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined>;
     getDevice(options: GetDeviceOptions): Promise<RceDevice>;
     getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]>;
     getInstanceUrl(options: GetInstanceUrlOptions): Promise<string>;
     getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string>;
-    // (undocumented)
     getSnapshot(options: GetSnapshotOptions): Promise<Snapshot>;
     getUserInfo(options?: GetUserInfoOptions): Promise<User>;
     listDevices(options?: ListDevicesOptions): Promise<RceDevice[]>;
     listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
-    // (undocumented)
     listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
     startDevice(options: StartDeviceOptions): Promise<RceDevice>;
     stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
     updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot>;
 }
 
@@ -1164,6 +1183,16 @@ export interface RceManagementPagingOptions {
 // @public
 export interface RceManagementRequestOptions {
     token?: string;
+}
+
+// @public
+export interface RceManagementValidationError {
+    // (undocumented)
+    loc: Array<string | number>;
+    // (undocumented)
+    msg: string;
+    // (undocumented)
+    type: string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "RceSocket" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1550,6 +1579,8 @@ export enum RokuDeployErrorCode {
     // (undocumented)
     MISSING_REQUIRED_OPTION = "MISSING_REQUIRED_OPTION",
     // (undocumented)
+    RCE_MANAGEMENT_API_ERROR = "RCE_MANAGEMENT_API_ERROR",
+    // (undocumented)
     UNAUTHORIZED = "UNAUTHORIZED",
     // (undocumented)
     UNKNOWN_RESPONSE = "UNKNOWN_RESPONSE",
@@ -1901,8 +1932,7 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public (undocumented)
