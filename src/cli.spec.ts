@@ -885,6 +885,19 @@ describe('cli', function cli() {
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
+        it('converts a device-command --timeout into a deadline budget', () => {
+            const before = Date.now();
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', password: 'aaaa', timeout: 5000 }, null);
+            expect(options).not.to.have.property('timeout');
+            expect(options.deadline).to.be.within(before + 5000, Date.now() + 5000);
+        });
+
+        it('leaves an rce-command --timeout as a seconds poll limit', () => {
+            const options = loadCommandOptions({ cwd: tempDir, config: false, deviceId: 5, timeout: 600 }, 'rce.start');
+            expect(options.timeout).to.equal(600);
+            expect(options).not.to.have.property('deadline');
+        });
+
         it('rejects more than one device address flag at parse time', () => {
             try {
                 childProcess.execSync(`node ${cwd}/dist/cli.js getDeviceInfo --host 1.2.3.4 --esn X123`, { cwd: tempDir, stdio: 'pipe' });

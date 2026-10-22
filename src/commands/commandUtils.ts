@@ -17,7 +17,7 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     args.cwd ??= process.cwd();
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
-        return mapCliArgsToLibraryOptions({ ...args }) as T;
+        return applyTimeoutBudget(mapCliArgsToLibraryOptions({ ...args }), section) as T;
     }
     const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
     //announce which config file feeds this run (even without --verbose) so file-supplied values
@@ -25,10 +25,26 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
     if (fsExtra.existsSync(configPath)) {
         console.log(`Using config: ${configPath}`);
     }
-    return mapCliArgsToLibraryOptions({
+    return applyTimeoutBudget(mapCliArgsToLibraryOptions({
         ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
         ...args
-    }) as T;
+    }), section) as T;
+}
+
+/**
+ * For device commands, a CLI `--timeout` is a budget for the WHOLE command, not a per-request value:
+ * convert it to a `deadline` (absolute epoch-ms) so the library caps each request to the time left.
+ * The `rce start`/`rce stop` commands are skipped — their `--timeout` is a seconds-based poll limit.
+ */
+function applyTimeoutBudget<T extends Record<string, any>>(options: T, section: ConfigSectionName | null): T {
+    if (section === 'rce.start' || section === 'rce.stop') {
+        return options;
+    }
+    if (typeof options.timeout === 'number') {
+        const { timeout, ...rest } = options;
+        return { ...rest, deadline: Date.now() + timeout } as unknown as T;
+    }
+    return options;
 }
 
 /**
