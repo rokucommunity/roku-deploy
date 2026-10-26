@@ -895,35 +895,35 @@ describe('cli', function cli() {
         });
 
         it('maps --esn to an inline RCE device config carrying --rceToken', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' });
             expect(options.device).to.eql({ esn: 'X123', rceToken: 'abc' });
             expect(options).not.to.have.property('esn');
         });
 
         it('maps --instanceUrl to an inline RCE device config carrying --rceToken', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
             expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
             expect(options).not.to.have.property('instanceUrl');
         });
 
         it('falls back to the config file rceToken for an --esn device', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'from-config' });
-            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' });
             expect(options.device).to.eql({ esn: 'X123', rceToken: 'from-config' });
         });
 
         it('leaves the device token off when neither --rceToken nor a config rceToken exists', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' });
             expect(options.device).to.eql({ esn: 'X123' });
         });
 
         it('leaves the device token off an --instanceUrl device when no token is available', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' });
             expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
         });
 
         it('does not attach --rceToken to a --host device', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' });
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
