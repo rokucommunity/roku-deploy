@@ -860,13 +860,13 @@ describe('cli', function cli() {
         });
     });
 
-    describe('sideload orchestration flags', () => {
+    describe('chained flows', () => {
         let rekeyStub: sinon.SinonStub;
         let sideloadStub: sinon.SinonStub;
         let squashStub: sinon.SinonStub;
         let packageStub: sinon.SinonStub;
         //--no-config so a stray rokudeploy.json can never feed these
-        const base = { cwd: tempDir, host: '1.2.3.4', password: 'aaaa', dir: rootDir, config: false };
+        const base = { cwd: tempDir, host: '1.2.3.4', password: 'aaaa', config: false };
 
         beforeEach(() => {
             rekeyStub = sinon.stub(rokuDeploy, 'rekeyDevice').resolves(undefined as any);
@@ -875,64 +875,117 @@ describe('cli', function cli() {
             packageStub = sinon.stub(rokuDeploy, 'createSignedPackage').resolves({} as any);
         });
 
-        it('runs only sideload when no flow flag is given', async () => {
-            await new SideloadCommand().run({ ...base });
-            expect(sideloadStub.callCount).to.equal(1);
-            expect(rekeyStub.callCount).to.equal(0);
-            expect(squashStub.callCount).to.equal(0);
-            expect(packageStub.callCount).to.equal(0);
+        describe('sideload --rekey', () => {
+            it('runs only sideload when --rekey is not given', async () => {
+                await new SideloadCommand().run({ ...base, dir: rootDir });
+                expect(sideloadStub.callCount).to.equal(1);
+                expect(rekeyStub.callCount).to.equal(0);
+            });
+
+            it('rekeys before sideloading and resolves the signed package relative to cwd', async () => {
+                await new SideloadCommand().run({ ...base, dir: rootDir, rekey: true, pkg: 'keys/signed.pkg', signingPassword: 'sp', devId: 'dev1' });
+                sinon.assert.callOrder(rekeyStub, sideloadStub);
+                const rekeyOptions = rekeyStub.getCall(0).args[0];
+                expect(rekeyOptions.pkg).to.equal(s`${tempDir}/keys/signed.pkg`);
+                expect(rekeyOptions.signingPassword).to.equal('sp');
+                expect(rekeyOptions.devId).to.equal('dev1');
+                //the flow flag never reaches the library
+                expect(sideloadStub.getCall(0).args[0]).not.to.have.property('rekey');
+                expect(sideloadStub.getCall(0).args[0]).not.to.have.property('pkg');
+            });
+
+            it('leaves pkg unset for --rekey without a signed package so the library reports it', async () => {
+                await new SideloadCommand().run({ ...base, dir: rootDir, rekey: true });
+                expect(rekeyStub.getCall(0).args[0]).not.to.have.property('pkg');
+            });
+
+            it('accepts --rekey on the real CLI under strict mode', () => {
+                try {
+                    //fails on the unreachable device, not on argument parsing
+                    childProcess.execSync(`node ${cwd}/dist/cli.js sideload --host 10.255.255.1 --password aaaa --dir ${rootDir} --rekey --pkg k.pkg --signingPassword sp --devId d --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
+                } catch (e) {
+                    expect(`${(e as childProcess.SpawnSyncReturns<Buffer>).stdout}${(e as childProcess.SpawnSyncReturns<Buffer>).stderr}`).not.to.include('Unknown argument');
+                    return;
+                }
+                throw new Error('Expected the command to fail on the unreachable device');
+            });
         });
 
-        it('rekeys before sideloading and resolves the signed package relative to cwd', async () => {
-            await new SideloadCommand().run({ ...base, rekey: true, pkg: 'keys/signed.pkg', signingPassword: 'sp' });
-            sinon.assert.callOrder(rekeyStub, sideloadStub);
-            const rekeyOptions = rekeyStub.getCall(0).args[0];
-            expect(path.isAbsolute(rekeyOptions.pkg)).to.equal(true);
-            expect(rekeyOptions.pkg.replace(/\\/g, '/')).to.match(/keys\/signed\.pkg$/);
-            expect(rekeyOptions.signingPassword).to.equal('sp');
-            //the flow flags never reach the library
-            expect(sideloadStub.getCall(0).args[0]).not.to.have.property('rekey');
-            expect(sideloadStub.getCall(0).args[0]).not.to.have.property('pkg');
-        });
+        describe('package --rekey --sideload --squash', () => {
+            it('runs only package when no flow flag is given', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, signingPassword: 'sp' });
+                expect(packageStub.callCount).to.equal(1);
+                expect(rekeyStub.callCount).to.equal(0);
+                expect(sideloadStub.callCount).to.equal(0);
+                expect(squashStub.callCount).to.equal(0);
+            });
 
-        it('leaves pkg unset for --rekey without a signed package so the library reports it', async () => {
-            await new SideloadCommand().run({ ...base, rekey: true });
-            expect(rekeyStub.getCall(0).args[0]).not.to.have.property('pkg');
-        });
+            it('runs the full flow in order: rekey, sideload, squash, package', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', sideload: true, dir: rootDir, squash: true, signingPassword: 'sp' });
+                sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
+            });
 
-        it('squashes by default and then packages after sideloading when --package is given', async () => {
-            await new SideloadCommand().run({ ...base, package: true, signingPassword: 'sp' });
-            sinon.assert.callOrder(sideloadStub, squashStub, packageStub);
-            expect(packageStub.getCall(0).args[0].signingPassword).to.equal('sp');
-            expect(packageStub.getCall(0).args[0]).not.to.have.property('package');
-        });
+            it('shares signingPassword and devId between rekey and package, and resolves pkg relative to cwd', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', signingPassword: 'sp', devId: 'dev1' });
+                sinon.assert.callOrder(rekeyStub, packageStub);
+                expect(rekeyStub.getCall(0).args[0].pkg).to.equal(s`${tempDir}/k.pkg`);
+                expect(rekeyStub.getCall(0).args[0].signingPassword).to.equal('sp');
+                expect(packageStub.getCall(0).args[0].signingPassword).to.equal('sp');
+                expect(packageStub.getCall(0).args[0].devId).to.equal('dev1');
+            });
 
-        it('packages without squashing when --no-squash is given', async () => {
-            await new SideloadCommand().run({ ...base, package: true, squash: false });
-            expect(squashStub.callCount).to.equal(0);
-            expect(packageStub.callCount).to.equal(1);
-        });
+            it('sideloads --dir before packaging and keeps the flow flags away from the library', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, sideload: true, dir: rootDir, signingPassword: 'sp' });
+                sinon.assert.callOrder(sideloadStub, packageStub);
+                expect(sideloadStub.getCall(0).args[0].dir).to.equal(rootDir);
+                for (const stub of [sideloadStub, packageStub]) {
+                    expect(stub.getCall(0).args[0]).not.to.have.property('sideload');
+                    expect(stub.getCall(0).args[0]).not.to.have.property('squash');
+                    expect(stub.getCall(0).args[0]).not.to.have.property('rekey');
+                }
+            });
 
-        it('squashes after sideloading without packaging when only --squash is given', async () => {
-            await new SideloadCommand().run({ ...base, squash: true });
-            sinon.assert.callOrder(sideloadStub, squashStub);
-            expect(packageStub.callCount).to.equal(0);
-        });
+            it('squashes the installed channel before packaging without sideloading', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, squash: true, signingPassword: 'sp' });
+                sinon.assert.callOrder(squashStub, packageStub);
+                expect(sideloadStub.callCount).to.equal(0);
+            });
 
-        it('runs the full flow in order: rekey, sideload, squash, package', async () => {
-            await new SideloadCommand().run({ ...base, rekey: true, pkg: 'k.pkg', package: true });
-            sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
-        });
+            it('reads each step from its own config section', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                    password: 'root-pass',
+                    rekey: { pkg: 'keys/signed.pkg', signingPassword: 'rekey-pass' },
+                    sideload: { dir: 'app' },
+                    package: { out: 'dist/app.pkg', signingPassword: 'package-pass' }
+                });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true, squash: true });
+                expect(rekeyStub.getCall(0).args[0].pkg).to.equal(s`${tempDir}/keys/signed.pkg`);
+                expect(rekeyStub.getCall(0).args[0].signingPassword).to.equal('rekey-pass');
+                expect(sideloadStub.getCall(0).args[0].dir).to.equal('app');
+                expect(sideloadStub.getCall(0).args[0]).not.to.have.property('out');
+                expect(squashStub.getCall(0).args[0].password).to.equal('root-pass');
+                expect(packageStub.getCall(0).args[0].out).to.equal('dist/app.pkg');
+                expect(packageStub.getCall(0).args[0].signingPassword).to.equal('package-pass');
+            });
 
-        it('accepts the flow flags on the real CLI under strict mode', () => {
-            try {
-                //fails on the unreachable device, not on argument parsing
-                childProcess.execSync(`node ${cwd}/dist/cli.js sideload --host 10.255.255.1 --password aaaa --dir ${rootDir} --rekey --pkg k.pkg --package --no-squash --signingPassword sp --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
-            } catch (e) {
-                expect(`${(e as childProcess.SpawnSyncReturns<Buffer>).stdout}${(e as childProcess.SpawnSyncReturns<Buffer>).stderr}`).not.to.include('Unknown argument');
-                return;
-            }
-            throw new Error('Expected the command to fail on the unreachable device');
+            it('announces the config file once for the whole flow', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'root-pass' });
+                const logStub = sinon.stub(console, 'log');
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true, dir: rootDir, squash: true });
+                const announcements = logStub.getCalls().filter(call => String(call.args[0]).startsWith('Using config'));
+                expect(announcements).to.have.lengthOf(1);
+            });
+
+            it('accepts the flow flags on the real CLI under strict mode', () => {
+                try {
+                    //fails on the unreachable device, not on argument parsing
+                    childProcess.execSync(`node ${cwd}/dist/cli.js package --host 10.255.255.1 --password aaaa --rekey --pkg k.pkg --sideload --dir ${rootDir} --squash --signingPassword sp --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
+                } catch (e) {
+                    expect(`${(e as childProcess.SpawnSyncReturns<Buffer>).stdout}${(e as childProcess.SpawnSyncReturns<Buffer>).stderr}`).not.to.include('Unknown argument');
+                    return;
+                }
+                throw new Error('Expected the command to fail on the unreachable device');
+            });
         });
     });
 

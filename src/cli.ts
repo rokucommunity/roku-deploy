@@ -51,16 +51,10 @@ void yargs
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
-            .option('rekey', { type: 'boolean', description: 'Rekey the device before sideloading, using --pkg and --signingPassword', demandOption: false })
+            .option('rekey', { type: 'boolean', description: 'Rekey the device before sideloading, using --pkg, --signingPassword and --devId', demandOption: false })
             .option('pkg', { type: 'string', description: 'The path to the signed package to be used for rekeying (--rekey), relative to cwd', demandOption: false })
-            .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs after sideloading. On by default with --package; use --no-squash to skip', demandOption: false })
-            .option('package', { type: 'boolean', description: 'Create a signed package from the installed channel after sideloading (squashes first unless --no-squash)', demandOption: false })
-            .option('signingPassword', { type: 'string', description: 'The signing password, shared by --rekey and --package', demandOption: false })
-            .option('devId', { type: 'string', description: 'Fail if the device dev id differs from this (used by --rekey and --package)', demandOption: false })
-            .option('appTitle', { type: 'string', description: 'Title recorded in the package (--package). Default: from the manifest', demandOption: false })
-            .option('appVersion', { type: 'string', description: 'Version recorded in the package (--package). Default: from the manifest', demandOption: false })
-            .option('manifestPath', { type: 'string', description: 'Manifest to read the package title and version from (--package), relative to cwd', demandOption: false })
-            .option('out', { type: 'string', description: 'Where --package writes the signed .pkg, relative to cwd', demandOption: false })
+            .option('signingPassword', { type: 'string', description: 'The password of the signing key (--rekey)', demandOption: false })
+            .option('devId', { type: 'string', description: 'The dev ID (--rekey)', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new SideloadCommand().run(args);
@@ -79,6 +73,19 @@ void yargs
             .option('manifestPath', { type: 'string', description: 'The path to the manifest file, relative to cwd', demandOption: false })
             .option('out', { type: 'string', description: 'The location where the signed package will be saved, relative to cwd', demandOption: false, defaultDescription: './out/roku-deploy.pkg' })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
+            .option('rekey', { type: 'boolean', description: 'Rekey the device first, using --pkg and the shared --signingPassword and --devId', demandOption: false })
+            .option('pkg', { type: 'string', description: 'The path to the signed package to be used for rekeying (--rekey), relative to cwd', demandOption: false })
+            .option('sideload', { type: 'boolean', description: 'Sideload --zip or --dir before packaging', demandOption: false })
+            .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd (--sideload)', demandOption: false })
+            .option('dir', { type: 'string', description: 'The folder to be zipped and sideloaded (instead of a zip file), relative to cwd (--sideload)', demandOption: false })
+            .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
+            .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
+            .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
+            .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
+            .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
+            .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
+            .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
