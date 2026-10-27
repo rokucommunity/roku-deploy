@@ -203,8 +203,8 @@ export interface RokuDeployOptions {
     failOnCompileError?: boolean;
 
     /**
-     * The log level.
-     * @default LogLevel.log
+     * The log level applied to the logger.
+     * @default 'log'
      */
     logLevel?: LogLevel | LogLevelNumeric;
 
