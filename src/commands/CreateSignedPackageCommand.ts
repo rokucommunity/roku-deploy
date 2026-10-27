@@ -1,5 +1,5 @@
 import { rokuDeploy } from '../index';
-import { loadFlowOptions } from './commandUtils';
+import { loadCommandOptions } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -7,7 +7,7 @@ import { loadFlowOptions } from './commandUtils';
  */
 export class CreateSignedPackageCommand {
     async run(args) {
-        const options = loadFlowOptions(args);
+        const options = loadCommandOptions(args);
         if (args.rekey) {
             await rokuDeploy.rekeyDevice(options);
         }

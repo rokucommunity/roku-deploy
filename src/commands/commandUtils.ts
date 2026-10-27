@@ -30,18 +30,6 @@ export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boole
 }
 
 /**
- * Options for a chained flow (`sideload --rekey`, `package --rekey --sideload --squash`): the CLI-only
- * flow flags are stripped so they never reach the library, and rekey's `--pkg` is resolved against cwd.
- */
-export function loadFlowOptions<T = any>(args: any): T {
-    const { rekey, sideload, squash, ...options } = loadCommandOptions(args);
-    if (args.pkg) {
-        options.pkg = util.standardizePath(path.resolve(args.cwd, args.pkg));
-    }
-    return options as T;
-}
-
-/**
  * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
  * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
  * since CLI args take precedence); `--rceToken` (or the config file's root `rceToken`) rides along on an

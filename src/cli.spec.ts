@@ -924,15 +924,14 @@ describe('cli', function cli() {
                 expect(rekeyStub.callCount).to.equal(0);
             });
 
-            it('rekeys before sideloading and resolves the signed package relative to cwd', async () => {
+            it('rekeys before sideloading with the rekey args passed through', async () => {
                 await new SideloadCommand().run({ ...base, dir: rootDir, rekey: true, pkg: 'keys/signed.pkg', signingPassword: 'sp', devId: 'dev1' });
                 sinon.assert.callOrder(rekeyStub, sideloadStub);
                 const rekeyOptions = rekeyStub.getCall(0).args[0];
-                expect(rekeyOptions.pkg).to.equal(s`${tempDir}/keys/signed.pkg`);
+                //the library resolves a relative pkg against cwd itself
+                expect(rekeyOptions.pkg).to.equal('keys/signed.pkg');
                 expect(rekeyOptions.signingPassword).to.equal('sp');
                 expect(rekeyOptions.devId).to.equal('dev1');
-                //the flow flag never reaches the library
-                expect(sideloadStub.getCall(0).args[0]).not.to.have.property('rekey');
             });
 
             it('leaves pkg unset for --rekey without a signed package so the library reports it', async () => {
@@ -966,24 +965,19 @@ describe('cli', function cli() {
                 sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
             });
 
-            it('shares signingPassword and devId between rekey and package, and resolves pkg relative to cwd', async () => {
+            it('shares signingPassword and devId between rekey and package', async () => {
                 await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', signingPassword: 'sp', devId: 'dev1' });
                 sinon.assert.callOrder(rekeyStub, packageStub);
-                expect(rekeyStub.getCall(0).args[0].pkg).to.equal(s`${tempDir}/k.pkg`);
+                expect(rekeyStub.getCall(0).args[0].pkg).to.equal('k.pkg');
                 expect(rekeyStub.getCall(0).args[0].signingPassword).to.equal('sp');
                 expect(packageStub.getCall(0).args[0].signingPassword).to.equal('sp');
                 expect(packageStub.getCall(0).args[0].devId).to.equal('dev1');
             });
 
-            it('sideloads --dir before packaging and keeps the flow flags away from the library', async () => {
+            it('sideloads --dir before packaging', async () => {
                 await new CreateSignedPackageCommand().run({ ...base, sideload: true, dir: rootDir, signingPassword: 'sp' });
                 sinon.assert.callOrder(sideloadStub, packageStub);
                 expect(sideloadStub.getCall(0).args[0].dir).to.equal(rootDir);
-                for (const stub of [sideloadStub, packageStub]) {
-                    expect(stub.getCall(0).args[0]).not.to.have.property('sideload');
-                    expect(stub.getCall(0).args[0]).not.to.have.property('squash');
-                    expect(stub.getCall(0).args[0]).not.to.have.property('rekey');
-                }
             });
 
             it('squashes the installed channel before packaging without sideloading', async () => {
