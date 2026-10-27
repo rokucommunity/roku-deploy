@@ -18,10 +18,21 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
 import { InitCommand } from './commands/InitCommand';
+import { loadCommandOptions } from './commands/commandUtils';
+import { rokuDeploy } from './index';
 
 void yargs
 
     .option('config', { type: 'string', description: 'Path to the config file (defaults to rokudeploy.json in cwd). Pass --no-config to skip loading any config file', global: true })
+    .option('logLevel', { type: 'string', description: 'The log level for roku-deploy output. Falls back to "logLevel" in rokudeploy.json', choices: ['off', 'error', 'warn', 'log', 'info', 'debug', 'trace'], global: true })
+
+    //apply --logLevel (or the config file's logLevel) to the logger before running any command
+    .middleware((args) => {
+        const { logLevel } = loadCommandOptions(args, { quiet: true });
+        if (logLevel !== undefined) {
+            rokuDeploy.logger.logLevel = logLevel;
+        }
+    })
 
     .command('init', 'Create a fully-commented rokudeploy.json in the current directory', (builder) => {
         return builder

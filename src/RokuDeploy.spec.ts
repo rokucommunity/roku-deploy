@@ -20,6 +20,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
+import { logger } from '@rokucommunity/logger';
 import { LocalSocket, RceSocket } from './RokuDeploySocket';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
@@ -8327,6 +8328,17 @@ describe('RokuDeploy', () => {
                     rd.logger.logLevel = 'debug';
                     expect(rd.logger.logLevel).to.equal('debug');
                 });
+
+                it('gives each instance its own logger', () => {
+                    const rd1 = new RokuDeploy();
+                    const rd2 = new RokuDeploy();
+                    expect(rd1.logger).to.not.equal(rd2.logger);
+                    expect(rd1.logger).to.not.equal(logger);
+
+                    const originalLogLevel = rd1.logger.logLevel;
+                    rd2.logger.logLevel = 'trace';
+                    expect(rd1.logger.logLevel).to.equal(originalLogLevel);
+                });
             });
 
         });
@@ -8411,20 +8423,6 @@ describe('RokuDeploy', () => {
             it('returns empty object for an empty (comment-only) config file', () => {
                 fsExtra.outputFileSync(s`${tempDir}/rokudeploy.json`, '//nothing here yet\n');
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
-            });
-
-            it('applies the config file logLevel so it wins over the current logger level', () => {
-                rokuDeploy['logger'].logLevel = 'error';
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
-                rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(rokuDeploy['logger'].logLevel).to.equal('debug');
-            });
-
-            it('leaves the logger level untouched when the config has no logLevel', () => {
-                rokuDeploy['logger'].logLevel = 'warn';
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });
-                rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(rokuDeploy['logger'].logLevel).to.equal('warn');
             });
         });
 
