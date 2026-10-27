@@ -1011,6 +1011,17 @@ describe('cli', function cli() {
                 expect(announcements).to.have.lengthOf(1);
             });
 
+            it('groups each flow step under its own heading in --help', () => {
+                const help = childProcess.execSync(`node ${cwd}/dist/cli.js package --help`, { cwd: tempDir, stdio: 'pipe' }).toString();
+                const headings = ['Package:', 'Rekey first (--rekey', 'Sideload first (--sideload):', 'Squash first (--squash):', 'Options:'];
+                const positions = headings.map(heading => help.indexOf(heading));
+                expect(positions.every(position => position >= 0), help).to.equal(true);
+                //the command's own options lead, the steps follow in run order, and the global flags trail
+                expect(positions).to.eql([...positions].sort((a, b) => a - b));
+                //the step flag sits under its heading, not in the general list
+                expect(help.indexOf('--sideload')).to.be.greaterThan(help.indexOf('Sideload first (--sideload):'));
+            });
+
             it('accepts the flow flags on the real CLI under strict mode', () => {
                 try {
                     //fails on the unreachable device, not on argument parsing

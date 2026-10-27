@@ -64,7 +64,9 @@ void yargs
             .option('pkg', { type: 'string', description: 'The path to the signed package to be used for rekeying (--rekey), relative to cwd', demandOption: false })
             .option('signingPassword', { type: 'string', description: 'The password of the signing key (--rekey)', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID (--rekey)', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
+            .group(['zip', 'dir', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'ecpPort', 'packagePort', 'close', 'timeout', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType', 'cwd'], 'Sideload:')
+            .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey first (--rekey):');
     }, (args: any) => {
         return new SideloadCommand().run(args);
     })
@@ -95,7 +97,11 @@ void yargs
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging', demandOption: false })
-            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
+            .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
+            .group(['host', 'esn', 'instanceUrl', 'rceToken', 'password', 'signingPassword', 'appTitle', 'appVersion', 'manifestPath', 'out', 'devId', 'cwd'], 'Package:')
+            .group(['rekey', 'pkg'], 'Rekey first (--rekey, shares --signingPassword and --devId):')
+            .group(['sideload', 'zip', 'dir', 'ecpPort', 'packagePort', 'close', 'timeout', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload first (--sideload):')
+            .group(['squash'], 'Squash first (--squash):');
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
     })
