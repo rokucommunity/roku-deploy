@@ -96,12 +96,12 @@ void yargs
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
             .option('deleteDevChannel', { type: 'boolean', description: 'Should the dev channel be deleted', demandOption: false })
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
-            .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging', demandOption: false })
+            .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging. On by default; use --no-squash to skip', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .group(['host', 'esn', 'instanceUrl', 'rceToken', 'password', 'signingPassword', 'appTitle', 'appVersion', 'manifestPath', 'out', 'devId', 'cwd'], 'Package:')
             .group(['rekey', 'pkg'], 'Rekey first (--rekey, shares --signingPassword and --devId):')
             .group(['sideload', 'zip', 'dir', 'ecpPort', 'packagePort', 'close', 'timeout', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload first (--sideload):')
-            .group(['squash'], 'Squash first (--squash):');
+            .group(['squash'], 'Squash first (on by default, --no-squash):');
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
     })

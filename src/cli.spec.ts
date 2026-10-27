@@ -171,6 +171,7 @@ describe('cli', function cli() {
     });
 
     it('Signs an existing package', async () => {
+        sinon.stub(rokuDeploy, 'convertToSquashfs').resolves({} as any);
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve({ pkgPath: '' });
         });
@@ -193,6 +194,7 @@ describe('cli', function cli() {
     });
 
     it('Signs an existing package using the provided cwd', async () => {
+        sinon.stub(rokuDeploy, 'convertToSquashfs').resolves({} as any);
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve({ pkgPath: '' });
         });
@@ -952,16 +954,28 @@ describe('cli', function cli() {
         });
 
         describe('package --rekey --sideload --squash', () => {
-            it('runs only package when no flow flag is given', async () => {
+            it('squashes then packages when no flow flag is given', async () => {
                 await new CreateSignedPackageCommand().run({ ...base, signingPassword: 'sp' });
-                expect(packageStub.callCount).to.equal(1);
+                sinon.assert.callOrder(squashStub, packageStub);
                 expect(rekeyStub.callCount).to.equal(0);
                 expect(sideloadStub.callCount).to.equal(0);
+            });
+
+            it('skips squash with --no-squash', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, squash: false, signingPassword: 'sp' });
                 expect(squashStub.callCount).to.equal(0);
+                expect(packageStub.callCount).to.equal(1);
+            });
+
+            it('skips squash when the config file turns it off', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { squash: false });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', signingPassword: 'sp' });
+                expect(squashStub.callCount).to.equal(0);
+                expect(packageStub.callCount).to.equal(1);
             });
 
             it('runs the full flow in order: rekey, sideload, squash, package', async () => {
-                await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', sideload: true, dir: rootDir, squash: true, signingPassword: 'sp' });
+                await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', sideload: true, dir: rootDir, signingPassword: 'sp' });
                 sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
             });
 
@@ -980,12 +994,6 @@ describe('cli', function cli() {
                 expect(sideloadStub.getCall(0).args[0].dir).to.equal(rootDir);
             });
 
-            it('squashes the installed channel before packaging without sideloading', async () => {
-                await new CreateSignedPackageCommand().run({ ...base, squash: true, signingPassword: 'sp' });
-                sinon.assert.callOrder(squashStub, packageStub);
-                expect(sideloadStub.callCount).to.equal(0);
-            });
-
             it('feeds every step from the flat config file', async () => {
                 fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
                     password: 'root-pass',
@@ -994,7 +1002,7 @@ describe('cli', function cli() {
                     dir: 'app',
                     out: 'dist/app.pkg'
                 });
-                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true, squash: true });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true });
                 expect(rekeyStub.getCall(0).args[0].pkg).to.equal('keys/signed.pkg');
                 expect(rekeyStub.getCall(0).args[0].signingPassword).to.equal('sign-pass');
                 expect(sideloadStub.getCall(0).args[0].dir).to.equal('app');
@@ -1006,14 +1014,14 @@ describe('cli', function cli() {
             it('announces the config file once for the whole flow', async () => {
                 fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'root-pass' });
                 const logStub = sinon.stub(console, 'log');
-                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true, dir: rootDir, squash: true });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true, dir: rootDir });
                 const announcements = logStub.getCalls().filter(call => String(call.args[0]).startsWith('Using config'));
                 expect(announcements).to.have.lengthOf(1);
             });
 
             it('groups each flow step under its own heading in --help', () => {
                 const help = childProcess.execSync(`node ${cwd}/dist/cli.js package --help`, { cwd: tempDir, stdio: 'pipe' }).toString();
-                const headings = ['Package:', 'Rekey first (--rekey', 'Sideload first (--sideload):', 'Squash first (--squash):', 'Options:'];
+                const headings = ['Package:', 'Rekey first (--rekey', 'Sideload first (--sideload):', 'Squash first (on by default, --no-squash):', 'Options:'];
                 const positions = headings.map(heading => help.indexOf(heading));
                 expect(positions.every(position => position >= 0), help).to.equal(true);
                 //the command's own options lead, the steps follow in run order, and the global flags trail
@@ -1025,7 +1033,7 @@ describe('cli', function cli() {
             it('accepts the flow flags on the real CLI under strict mode', () => {
                 try {
                     //fails on the unreachable device, not on argument parsing
-                    childProcess.execSync(`node ${cwd}/dist/cli.js package --host 10.255.255.1 --password aaaa --rekey --pkg k.pkg --sideload --dir ${rootDir} --squash --signingPassword sp --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
+                    childProcess.execSync(`node ${cwd}/dist/cli.js package --host 10.255.255.1 --password aaaa --rekey --pkg k.pkg --sideload --dir ${rootDir} --no-squash --signingPassword sp --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
                 } catch (e) {
                     expect(`${(e as childProcess.SpawnSyncReturns<Buffer>).stdout}${(e as childProcess.SpawnSyncReturns<Buffer>).stderr}`).not.to.include('Unknown argument');
                     return;
