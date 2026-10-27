@@ -2489,43 +2489,6 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('timeout budget (deadline)', () => {
-        function capturePost() {
-            const captured: { timeout?: number } = {};
-            sinon.stub(rokuDeploy as any, 'doPostRequest').callsFake((opts: any) => {
-                captured.timeout = opts.timeout;
-                return Promise.resolve({ statusCode: 200, headers: {}, body: '' });
-            });
-            return captured;
-        }
-
-        it('caps a request to the time left before the deadline', async () => {
-            const captured = capturePost();
-            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Home', deadline: Date.now() + 2000 } as any);
-            expect(captured.timeout).to.be.greaterThan(0);
-            expect(captured.timeout).to.be.at.most(2000);
-        });
-
-        it('floors the request timeout at 1ms once the deadline has passed', async () => {
-            const captured = capturePost();
-            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Home', deadline: Date.now() - 1 } as any);
-            expect(captured.timeout).to.equal(1);
-        });
-
-        it('caps a per-call timeout larger than the remaining budget', async () => {
-            const captured = capturePost();
-            await rokuDeploy.keyPress({ device: { host: '1.2.3.4' }, key: 'Home', timeout: 999999, deadline: Date.now() + 1500 } as any);
-            expect(captured.timeout).to.be.at.most(1500);
-        });
-
-        it('threads the budget through an internal sub-call (sendText drives sendKeyEvent)', async () => {
-            const captured = capturePost();
-            await rokuDeploy.sendText({ device: { host: '1.2.3.4' }, text: 'a', deadline: Date.now() + 2000 } as any);
-            expect(captured.timeout).to.be.greaterThan(0);
-            expect(captured.timeout).to.be.at.most(2000);
-        });
-    });
-
     describe('keyPress', () => {
         describe('constructor defaults', () => {
             it('fails when host not provided in constructor or call', async () => {

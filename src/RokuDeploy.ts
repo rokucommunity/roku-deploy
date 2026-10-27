@@ -77,47 +77,21 @@ export class RokuDeploy {
     };
 
     /**
-     * Per-action request timeouts, in milliseconds. roku-deploy manages these internally rather than
-     * exposing one global default, because the right wait depends on the action: a key press should
-     * fail fast, while a sideload legitimately takes minutes.
-     *
-     * These values are subject to change. We may INCREASE a timeout without a major version bump; a
-     * caller who needs a shorter wait should pass their own `timeout`. DECREASING a default is a
-     * breaking change that requires a major bump.
-     *
-     * The CLI `--timeout` sets a `deadline` (an absolute epoch-ms budget) for the whole command, and
-     * every request is capped to the time still remaining before it, so earlier steps consume the
-     * shared budget. A per-call library `timeout` option still overrides the default outright.
-     * Spreading one budget across a MULTI-command flow (e.g. `package --sideload`) is a follow-up
-     * that depends on the command-orchestration work.
+     * Per-action request timeouts, in milliseconds. A caller's `timeout` option overrides these.
+     * Raising a value is not a breaking change; lowering one is.
      */
     private static readonly timeouts = {
         /**
          * Quick requests over ECP or the installer: device info, key presses, reboot, update check,
          * channel delete, password check.
          */
-        quick: 10000,
+        quick: 10_000,
         /**
          * Long-running on-device operations that upload or build: sideload, package, convert to
          * squashfs, rekey.
          */
-        extended: 300000
+        extended: 300_000
     };
-
-    /**
-     * The effective timeout for one request: the caller's `timeout` (or the action's `defaultTimeout`),
-     * but never longer than the time left before `deadline` — an absolute epoch-ms budget the CLI
-     * `--timeout` sets for the whole command. Resolving to a concrete number at each request boundary
-     * means the shared budget shrinks as earlier steps run, without threading a deadline object around.
-     */
-    private resolveTimeout(options: { timeout?: number; deadline?: number }, defaultTimeout: number): number {
-        const base = options.timeout ?? defaultTimeout;
-        if (options.deadline === undefined) {
-            return base;
-        }
-        //floor at 1ms: an exhausted budget still needs a positive timeout for the request layer
-        return Math.min(base, Math.max(1, options.deadline - Date.now()));
-    }
 
     /**
      * Network error codes that mean the request never reached a live endpoint (host gone,
@@ -651,7 +625,7 @@ export class RokuDeploy {
                 verify: true,
                 devices: options.devices,
                 ecpPort: options.ecpPort,
-                timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick
             });
         } catch (e) {
             if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
@@ -901,7 +875,7 @@ export class RokuDeploy {
 
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
-        const timeout = this.resolveTimeout(options, RokuDeploy.timeouts.quick);
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
 
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
         //from before), an RCE device by its installer base url (never includes credentials)
@@ -971,7 +945,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
-        const timeout = this.resolveTimeout(options, RokuDeploy.timeouts.quick);
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         const verify = options.verify ?? false;
@@ -1031,7 +1005,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const timeout = this.resolveTimeout(options, RokuDeploy.timeouts.quick);
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -1184,7 +1158,7 @@ export class RokuDeploy {
             const key = options.keys[stepIndex];
             let result: EcpResult;
             try {
-                result = await this.keyPress({ device: options.device, devices: options.devices, key: key, ecpPort: options.ecpPort, timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick) });
+                result = await this.keyPress({ device: options.device, devices: options.devices, key: key, ecpPort: options.ecpPort, timeout: options.timeout });
             } catch (error) {
                 throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed: ${(error as Error).message}`);
             }
@@ -1216,7 +1190,7 @@ export class RokuDeploy {
             const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
             return this.doPostRequest({
                 url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick),
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick,
                 headers: this.buildRceAuthHeaders(rceToken)
             }, true);
         });
@@ -1239,7 +1213,7 @@ export class RokuDeploy {
             verify: true,
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
     }
 
@@ -1259,7 +1233,7 @@ export class RokuDeploy {
             method: 'POST',
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         //devices report exit-app failures through the ECP envelope (a 202 with the error in the
         //body), so surface that message; fall back to a plain status check when there is no envelope
@@ -1304,7 +1278,7 @@ export class RokuDeploy {
                 devices: options.devices,
                 route: 'query/apps',
                 ecpPort: options.ecpPort,
-                timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+                timeout: options.timeout
             });
             json = await this.parseEcpXml(result);
         } catch (e) {
@@ -1350,7 +1324,7 @@ export class RokuDeploy {
                 devices: options.devices,
                 route: 'query/active-app',
                 ecpPort: options.ecpPort,
-                timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+                timeout: options.timeout
             });
             json = await this.parseEcpXml(result);
         } catch (e) {
@@ -1384,7 +1358,7 @@ export class RokuDeploy {
             devices: options.devices,
             route: `query/registry/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'plugin-registry', 'Could not retrieve registry');
 
@@ -1426,7 +1400,7 @@ export class RokuDeploy {
             devices: options.devices,
             route: `query/app-state/${encodeURIComponent(options.appId)}`,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'app-state', 'Could not retrieve app state');
 
@@ -1457,7 +1431,7 @@ export class RokuDeploy {
             devices: options.devices,
             route: 'query/sgrendezvous',
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not retrieve rendezvous tracking');
 
@@ -1490,7 +1464,7 @@ export class RokuDeploy {
             method: 'POST',
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'sgrendezvous', 'Could not set rendezvous tracking');
         return root['tracking-enabled'] === 'true';
@@ -1511,7 +1485,7 @@ export class RokuDeploy {
             route: `perfetto/enable/${encodeURIComponent(options.appId)}`,
             method: 'POST',
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'perfetto-enable', 'Could not enable perfetto tracing');
 
@@ -1550,7 +1524,7 @@ export class RokuDeploy {
             route: `perfetto/heapgraph/trigger/${encodeURIComponent(options.appId)}`,
             method: 'POST',
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout
         });
         const root = await this.getEcpEnvelope(result, 'perfetto-heapgraph-trigger', 'Could not trigger heap snapshot');
 
@@ -1896,7 +1870,7 @@ export class RokuDeploy {
         const mergedOptions = { ...this.options, ...options };
         // Set defaults for request options. A caller-supplied timeout overrides the action's default.
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = this.resolveTimeout(mergedOptions, defaultTimeout);
+        const timeout = mergedOptions.timeout ?? defaultTimeout;
         const username = mergedOptions.username ?? 'rokudev';
 
         const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
@@ -2340,7 +2314,7 @@ export class RokuDeploy {
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                     const url = `${instanceUrl}/api/v0/input/${options.action}/${encodeURIComponent(canonicalKey)}`;
-                    return this.doPostRequest({ url: url, timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick), headers: this.buildRceAuthHeaders(rceToken) }, true);
+                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.timeouts.quick, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
                     status: response?.statusCode,
@@ -2357,7 +2331,7 @@ export class RokuDeploy {
             method: 'POST',
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: this.resolveTimeout(options, RokuDeploy.timeouts.quick)
+            timeout: options.timeout ?? RokuDeploy.timeouts.quick
         });
     }
 
