@@ -4,16 +4,14 @@ import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
-import type { ConfigSectionName } from '../RokuDeployConfig';
 import type { DeviceRegistryEntry } from '../RokuDeployOptions';
 
 /**
  * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
- * cwd; skipped entirely with `--no-config`), flatten it for the command's config section (or just
- * the root values when the command has no section), then merge the CLI args on top.
- * Precedence: CLI args → `[section]` → root → defaults. Pass `quiet` to skip announcing the config file.
+ * cwd; skipped entirely with `--no-config`), then merge the CLI args on top.
+ * Precedence: CLI args → config file → defaults. Pass `quiet` to skip announcing the config file.
  */
-export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null, options?: { quiet?: boolean }): T {
+export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
@@ -26,19 +24,19 @@ export function loadCommandOptions<T = any>(args: any, section: ConfigSectionNam
         console.log(`Using config: ${configPath}`);
     }
     return mapCliArgsToLibraryOptions({
-        ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
+        ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }),
         ...args
     }) as T;
 }
 
 /**
- * Options for one step of a chained flow (`sideload --rekey`, `package --rekey --sideload --squash`):
- * the step's own config section, minus the CLI-only flow flags, with rekey's `pkg` resolved against cwd.
+ * Options for a chained flow (`sideload --rekey`, `package --rekey --sideload --squash`): the CLI-only
+ * flow flags are stripped so they never reach the library, and rekey's `--pkg` is resolved against cwd.
  */
-export function loadFlowStepOptions<T = any>(args: any, section: ConfigSectionName, quiet: boolean): T {
-    const { rekey, sideload, squash, pkg, ...options } = loadCommandOptions(args, section, { quiet: quiet });
-    if (section === 'rekey' && pkg) {
-        options.pkg = util.standardizePath(path.resolve(args.cwd, pkg));
+export function loadFlowOptions<T = any>(args: any): T {
+    const { rekey, sideload, squash, ...options } = loadCommandOptions(args);
+    if (args.pkg) {
+        options.pkg = util.standardizePath(path.resolve(args.cwd, args.pkg));
     }
     return options as T;
 }
@@ -79,8 +77,8 @@ export const rceWaitPollIntervalMs = 2000;
  * The token comes from `--token`, falling back to the target device's registry entry, then
  * to `rceToken` from rokudeploy.json.
  */
-export function buildRceCommandContext(args: any, command: ConfigSectionName) {
-    const options = loadCommandOptions(args, command);
+export function buildRceCommandContext(args: any) {
+    const options = loadCommandOptions(args);
     const token = options.token ?? resolveRegistryEntry(options)?.rceToken ?? options.rceToken;
     if (!token) {
         throw new Error('An RCE token is required. Pass --token or set "rceToken" in rokudeploy.json');

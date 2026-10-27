@@ -4,7 +4,7 @@ import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableO
 
 export class RceStartCommand {
     async run(args: any) {
-        const { options, client } = buildRceCommandContext(args, 'rce.start');
+        const { options, client } = buildRceCommandContext(args);
         const device = await resolveRceDevice(client, options);
 
         let snapshots: Snapshot[] | undefined;

@@ -17,6 +17,7 @@ import { KeyDownCommand } from './commands/KeyDownCommand';
 import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
+import { InitCommand } from './commands/InitCommand';
 import { loadCommandOptions } from './commands/commandUtils';
 import { rokuDeploy } from './index';
 
@@ -27,10 +28,18 @@ void yargs
 
     //apply --logLevel (or the config file's logLevel) to the logger before running any command
     .middleware((args) => {
-        const { logLevel } = loadCommandOptions(args, null, { quiet: true });
+        const { logLevel } = loadCommandOptions(args, { quiet: true });
         if (logLevel !== undefined) {
             rokuDeploy.logger.logLevel = logLevel;
         }
+    })
+
+    .command('init', 'Create a fully-commented rokudeploy.json in the current directory', (builder) => {
+        return builder
+            .option('force', { type: 'boolean', description: 'Overwrite an existing rokudeploy.json', demandOption: false })
+            .option('cwd', { type: 'string', description: 'The directory to create the file in', demandOption: false });
+    }, (args: any) => {
+        return new InitCommand().run(args);
     })
 
     .command('sideload', 'Sideload a zip file or a folder to a remote Roku', (builder) => {

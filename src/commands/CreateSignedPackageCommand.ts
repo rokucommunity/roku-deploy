@@ -1,5 +1,5 @@
 import { rokuDeploy } from '../index';
-import { loadFlowStepOptions } from './commandUtils';
+import { loadFlowOptions } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -7,21 +7,16 @@ import { loadFlowStepOptions } from './commandUtils';
  */
 export class CreateSignedPackageCommand {
     async run(args) {
-        let announced = false;
-        const load = (section: 'rekey' | 'sideload' | 'squash' | 'package') => {
-            const options = loadFlowStepOptions(args, section, announced);
-            announced = true;
-            return options;
-        };
+        const options = loadFlowOptions(args);
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice(load('rekey'));
+            await rokuDeploy.rekeyDevice(options);
         }
         if (args.sideload) {
-            await rokuDeploy.sideload(load('sideload'));
+            await rokuDeploy.sideload(options);
         }
         if (args.squash) {
-            await rokuDeploy.convertToSquashfs(load('squash'));
+            await rokuDeploy.convertToSquashfs(options);
         }
-        await rokuDeploy.createSignedPackage(load('package'));
+        await rokuDeploy.createSignedPackage(options);
     }
 }

@@ -1,12 +1,13 @@
 import { rokuDeploy } from '../index';
-import { loadFlowStepOptions } from './commandUtils';
+import { loadFlowOptions } from './commandUtils';
 
 export class SideloadCommand {
     async run(args) {
+        const options = loadFlowOptions(args);
         //--rekey installs the signing key first so the dev channel runs under it
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice(loadFlowStepOptions(args, 'rekey', false));
+            await rokuDeploy.rekeyDevice(options);
         }
-        await rokuDeploy.sideload(loadFlowStepOptions(args, 'sideload', !!args.rekey));
+        await rokuDeploy.sideload(options);
     }
 }
