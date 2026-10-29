@@ -962,8 +962,8 @@ describe('cli', function cli() {
                 realCliAcceptsFlags(`sideload --dir ${rootDir} --rekey --pkg k.pkg --signingPassword sp --devId d`);
             });
 
-            it('groups the rekey options under their own --help heading', () => {
-                helpHeadingsInOrder('sideload', ['Sideload:', 'Rekey first (--rekey):', 'Options:']);
+            it('groups the options by step in --help', () => {
+                helpHeadingsInOrder('sideload', ['Device:', 'Rekey:', 'Sideload:', 'Options:']);
             });
         });
 
@@ -1028,9 +1028,13 @@ describe('cli', function cli() {
             });
 
             it('groups each flow step under its own --help heading, in run order', () => {
-                const help = helpHeadingsInOrder('package', ['Package:', 'Rekey first (--rekey', 'Sideload first (--sideload):', 'Squash first (on by default, --no-squash):', 'Options:']);
-                //the step flag sits under its heading, not in the general list
-                expect(help.indexOf('--sideload')).to.be.greaterThan(help.indexOf('Sideload first (--sideload):'));
+                const help = helpHeadingsInOrder('package', ['Device:', 'Rekey:', 'Sideload:', 'Squash:', 'Package:', 'Options:']);
+                //each step flag opens its own group, and nothing but the globals is left in the default group
+                //(match the option's own line, since descriptions mention other flags)
+                const optionLine = (name: string) => help.search(new RegExp(`^  --${name}\\b`, 'm'));
+                expect(optionLine('sideload')).to.be.within(help.indexOf('Sideload:'), help.indexOf('Squash:'));
+                expect(optionLine('signingPassword')).to.be.within(help.indexOf('Package:'), help.indexOf('Options:'));
+                expect(optionLine('cwd')).to.be.greaterThan(help.indexOf('Options:'));
             });
 
             it('accepts the flow flags on the real CLI under strict mode', () => {
