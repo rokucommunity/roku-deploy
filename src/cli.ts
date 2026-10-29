@@ -109,7 +109,7 @@ void yargs
             .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging. On by default, use --no-squash to skip', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
-            .group(['rekey', 'pkg', 'host', 'password'], 'Rekey:')
+            .group(['rekey', 'pkg'], 'Rekey:')
             .group(['sideload', 'zip', 'dir', 'ecpPort', 'close', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload:')
             .group(['squash'], 'Squash:');
     }, (args: any) => {
