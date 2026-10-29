@@ -7346,7 +7346,6 @@ describe('RokuDeploy', () => {
         it('uses the registry entry timeout when the call provides none', async () => {
             const rd = new RokuDeploy({
                 password: 'root-pass',
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4', timeout: 1234 }
                 }
@@ -7385,7 +7384,6 @@ describe('RokuDeploy', () => {
                 password: 'root-pass',
                 username: 'root-user',
                 packagePort: 8080,
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4' }
                 }
@@ -7394,7 +7392,6 @@ describe('RokuDeploy', () => {
             await rd.deleteDevChannel({ device: 'office-tv' } as any);
             expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
             expect(stub.getCall(0).args[0].url).to.include(':8080/');
-            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
         });
 
         it('does not apply registry settings to an inline device config', async () => {
@@ -8441,9 +8438,14 @@ describe('RokuDeploy', () => {
         });
 
         describe('generateBaseRequestOptions', () => {
-            it('uses default timeout', async () => {
+            it('uses the quick timeout by default', async () => {
                 const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
-                expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
+                expect(result.timeout).to.equal(RokuDeploy['timeouts'].quick);
+            });
+
+            it('uses a passed default timeout for long-running actions', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' }, {}, RokuDeploy['timeouts'].extended);
+                expect(result.timeout).to.equal(RokuDeploy['timeouts'].extended);
             });
 
             it('uses default packagePort', async () => {
@@ -8482,7 +8484,7 @@ describe('RokuDeploy', () => {
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
                 await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
             });
 
             it('allows overriding ecpPort', async () => {
@@ -8512,7 +8514,7 @@ describe('RokuDeploy', () => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
             });
         });
 
@@ -8674,14 +8676,14 @@ describe('RokuDeploy', () => {
             expect((thrown as Error).message).to.include('500');
         });
 
-        it('uses default port 80, username rokudev, root installer path, and 3000ms timeout', async () => {
+        it('uses default port 80, username rokudev, root installer path, and the quick timeout', async () => {
             const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa' });
 
             expect(headStub.firstCall.args[0].url).to.equal('http://device.local:80/');
             expect(headStub.firstCall.args[0].auth.username).to.equal('rokudev');
-            expect(headStub.firstCall.args[0].timeout).to.equal(3000);
+            expect(headStub.firstCall.args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
         });
 
         it('honors custom username and port', async () => {
