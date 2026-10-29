@@ -8424,6 +8424,20 @@ describe('RokuDeploy', () => {
                 fsExtra.outputFileSync(s`${tempDir}/rokudeploy.json`, '//nothing here yet\n');
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
             });
+
+            it('applies the config file logLevel so it wins over the current logger level', () => {
+                rokuDeploy['logger'].logLevel = 'error';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('debug');
+            });
+
+            it('leaves the logger level untouched when the config has no logLevel', () => {
+                rokuDeploy['logger'].logLevel = 'warn';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('warn');
+            });
         });
 
         describe('generateBaseRequestOptions', () => {

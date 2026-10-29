@@ -13,20 +13,27 @@ import type { DeviceRegistryEntry } from '../RokuDeployOptions';
  */
 export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
+    let result: Record<string, any>;
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
-        return mapCliArgsToLibraryOptions({ ...args }) as T;
+        result = mapCliArgsToLibraryOptions({ ...args });
+    } else {
+        const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
+        //announce which config file feeds this run (even without --verbose) so file-supplied values
+        //are never an invisible input; greppable in CI logs
+        if (!options?.quiet && fsExtra.existsSync(configPath)) {
+            console.log(`Using config: ${configPath}`);
+        }
+        result = mapCliArgsToLibraryOptions({
+            ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }),
+            ...args
+        });
     }
-    const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
-    //announce which config file feeds this run (even without --verbose) so file-supplied values
-    //are never an invisible input; greppable in CI logs
-    if (!options?.quiet && fsExtra.existsSync(configPath)) {
-        console.log(`Using config: ${configPath}`);
+    //loadConfigFile applies the file's logLevel; an explicit --logLevel still wins on the command line
+    if (args.logLevel !== undefined) {
+        rokuDeploy.logger.logLevel = args.logLevel;
     }
-    return mapCliArgsToLibraryOptions({
-        ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }),
-        ...args
-    }) as T;
+    return result as T;
 }
 
 /**

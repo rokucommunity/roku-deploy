@@ -1107,6 +1107,21 @@ describe('cli', function cli() {
             expect(options.out).to.be.undefined;
         });
 
+        it('applies --logLevel to the logger even with --no-config', () => {
+            rokuDeploy.logger.logLevel = 'error';
+            loadCommandOptions({ cwd: tempDir, config: false, logLevel: 'trace' });
+            expect(rokuDeploy.logger.logLevel).to.equal('trace');
+        });
+
+        it('lets --logLevel win over the config file on every load', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
+            loadCommandOptions({ cwd: tempDir, logLevel: 'error' });
+            expect(rokuDeploy.logger.logLevel).to.equal('error');
+            //a command's own load, after the middleware, must not let the file take over again
+            loadCommandOptions({ cwd: tempDir, logLevel: 'error' });
+            expect(rokuDeploy.logger.logLevel).to.equal('error');
+        });
+
         it('stays silent about the config file when quiet is set', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
             let consoleOutput = '';

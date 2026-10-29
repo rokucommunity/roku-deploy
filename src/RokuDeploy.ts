@@ -1661,6 +1661,10 @@ export class RokuDeploy {
                     })
                 ));
             }
+            //apply the config's logLevel so a file-supplied level wins over the logger's current level
+            if (config.logLevel !== undefined) {
+                this.logger.logLevel = config.logLevel;
+            }
         }
         return config;
     }
