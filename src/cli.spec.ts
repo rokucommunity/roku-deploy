@@ -967,7 +967,7 @@ describe('cli', function cli() {
                 const optionLine = (name: string) => help.search(new RegExp(`^  --${name}\\b`, 'm'));
                 expect(optionLine('dir')).to.be.lessThan(help.indexOf('Rekey:'));
                 expect(optionLine('rekey')).to.be.within(help.indexOf('Rekey:'), help.indexOf('Options:'));
-                expect(optionLine('config')).to.be.greaterThan(help.indexOf('Options:'));
+                expect(optionLine('help')).to.be.greaterThan(help.indexOf('Options:'));
                 expect(help).not.to.include('--version');
             });
         });
@@ -1032,14 +1032,15 @@ describe('cli', function cli() {
                 expect(packageStub.getCall(0).args[0].signingPassword).to.equal('sign-pass');
             });
 
-            it('lists its own options first, then each step in run order, in --help', () => {
-                const help = helpHeadingsInOrder('package', ['Options:', 'Rekey:', 'Sideload:', 'Squash:']);
+            it('lists its own options first, then each step in run order, then the globals in --help', () => {
+                const help = helpHeadingsInOrder('package', ['Rekey:', 'Sideload:', 'Squash:', 'Options:']);
                 //(match the option's own line, since descriptions mention other flags)
                 const optionLine = (name: string) => help.search(new RegExp(`^  --${name}\\b`, 'm'));
-                expect(optionLine('signingPassword')).to.be.within(help.indexOf('Options:'), help.indexOf('Rekey:'));
+                expect(optionLine('signingPassword')).to.be.lessThan(help.indexOf('Rekey:'));
                 expect(optionLine('rekey')).to.be.within(help.indexOf('Rekey:'), help.indexOf('Sideload:'));
                 expect(optionLine('sideload')).to.be.within(help.indexOf('Sideload:'), help.indexOf('Squash:'));
-                expect(optionLine('squash')).to.be.greaterThan(help.indexOf('Squash:'));
+                expect(optionLine('squash')).to.be.within(help.indexOf('Squash:'), help.indexOf('Options:'));
+                expect(optionLine('help')).to.be.greaterThan(help.indexOf('Options:'));
                 expect(help).not.to.include('--version');
             });
 
