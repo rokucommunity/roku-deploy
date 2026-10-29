@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as yargs from 'yargs';
+import * as fsExtra from 'fs-extra';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
 import { SideloadCommand } from './commands/SideloadCommand';
@@ -23,6 +24,15 @@ import { rokuDeploy } from './index';
 
 void yargs
 
+    //--version is a root-level flag only (yargs would otherwise list it on every command)
+    .version(false)
+    .option('version', { type: 'boolean', description: 'Show version number', global: false })
+    .middleware((args) => {
+        if (args.version) {
+            console.log(fsExtra.readJsonSync(`${__dirname}/../package.json`).version);
+            process.exit(0);
+        }
+    })
     .option('config', { type: 'string', description: 'Path to the config file (defaults to rokudeploy.json in cwd). Pass --no-config to skip loading any config file', global: true })
     .option('logLevel', { type: 'string', description: 'The log level for roku-deploy output. Falls back to "logLevel" in rokudeploy.json', choices: ['off', 'error', 'warn', 'log', 'info', 'debug', 'trace'], global: true })
 
@@ -65,9 +75,8 @@ void yargs
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .group(['host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout'], 'Device:')
-            .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey:')
-            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload:');
+            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey:');
     }, (args: any) => {
         return new SideloadCommand().run(args);
     })
@@ -99,11 +108,10 @@ void yargs
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging. On by default, use --no-squash to skip', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .group(['host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout'], 'Device:')
-            .group(['rekey', 'pkg'], 'Rekey:')
+            .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .group(['rekey', 'pkg', 'host', 'password'], 'Rekey:')
             .group(['sideload', 'zip', 'dir', 'ecpPort', 'close', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload:')
-            .group(['squash'], 'Squash:')
-            .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out'], 'Package:');
+            .group(['squash'], 'Squash:');
     }, (args: any) => {
         return new CreateSignedPackageCommand().run(args);
     })
