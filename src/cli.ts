@@ -19,7 +19,7 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
 import { InitCommand } from './commands/InitCommand';
-import { loadCommandOptions } from './commands/commandUtils';
+import { describeConfigValues, helpDescription, loadCommandOptions } from './commands/commandUtils';
 import { rokuDeploy } from './index';
 
 void yargs
@@ -44,16 +44,16 @@ void yargs
         }
     })
 
-    .command('init', 'Create a fully-commented rokudeploy.json in the current directory', (builder) => {
-        return builder
+    .command('init', helpDescription('init', 'Create a fully-commented rokudeploy.json in the current directory'), (builder) => {
+        return describeConfigValues(builder)
             .option('force', { type: 'boolean', description: 'Overwrite an existing rokudeploy.json', demandOption: false })
             .option('cwd', { type: 'string', description: 'The directory to create the file in', demandOption: false });
     }, (args: any) => {
         return new InitCommand().run(args);
     })
 
-    .command('sideload', 'Sideload a zip file or a folder to a remote Roku. With --rekey, the signing key is installed first', (builder) => {
-        return builder
+    .command('sideload', helpDescription('sideload', 'Sideload a zip file or a folder to a remote Roku. With --rekey, the signing key is installed first'), (builder) => {
+        return describeConfigValues(builder)
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd.', demandOption: false })
             .option('dir', { type: 'string', description: 'The folder to be zipped and sideloaded (instead of a zip file), relative to cwd.', demandOption: false })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
@@ -81,8 +81,8 @@ void yargs
         return new SideloadCommand().run(args);
     })
 
-    .command('package', 'Create a signed package from the installed dev channel. Optional steps run before it, always in this order: rekey, sideload, squash', (builder) => {
-        return builder
+    .command('package', helpDescription('package', 'Create a signed package from the installed dev channel. Optional steps run before it, always in this order: rekey, sideload, squash'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -116,8 +116,8 @@ void yargs
         return new CreateSignedPackageCommand().run(args);
     })
 
-    .command('keyPress', 'send keypress command', (builder) => {
-        return builder
+    .command('keyPress', helpDescription('keyPress', 'send keypress command'), (builder) => {
+        return describeConfigValues(builder)
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
@@ -129,8 +129,8 @@ void yargs
         return new KeyPressCommand().run(args);
     })
 
-    .command('keyUp', 'send keyup command', (builder) => {
-        return builder
+    .command('keyUp', helpDescription('keyUp', 'send keyup command'), (builder) => {
+        return describeConfigValues(builder)
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
@@ -142,8 +142,8 @@ void yargs
         return new KeyUpCommand().run(args);
     })
 
-    .command('keyDown', 'send keydown command', (builder) => {
-        return builder
+    .command('keyDown', helpDescription('keyDown', 'send keydown command'), (builder) => {
+        return describeConfigValues(builder)
             .option('key', { type: 'string', description: 'The key to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
@@ -155,8 +155,8 @@ void yargs
         return new KeyDownCommand().run(args);
     })
 
-    .command('sendText', 'Send text command', (builder) => {
-        return builder
+    .command('sendText', helpDescription('sendText', 'Send text command'), (builder) => {
+        return describeConfigValues(builder)
             .option('text', { type: 'string', description: 'The text to send', demandOption: true })
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
@@ -168,8 +168,8 @@ void yargs
         return new SendTextCommand().run(args);
     })
 
-    .command('remote-control', 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line', (builder) => {
-        return builder
+    .command('remote-control', helpDescription('remote-control', 'Provides a way to send a series of ECP key events similar to how Roku Remote Tool works but from the command line'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -179,8 +179,8 @@ void yargs
         return new RemoteControlCommand().run(args);
     })
 
-    .command('stage', 'Copies all of the referenced files to the staging folder', (builder) => {
-        return builder
+    .command('stage', helpDescription('stage', 'Copies all of the referenced files to the staging folder'), (builder) => {
+        return describeConfigValues(builder)
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
             .option('files', { type: 'array', description: 'An array of source file paths indicating where the source files are', demandOption: false })
@@ -189,8 +189,8 @@ void yargs
         return new StageCommand().run(args);
     })
 
-    .command('squash', 'Convert a pre-existing packaged zip file to a squashfs file', (builder) => {
-        return builder
+    .command('squash', helpDescription('squash', 'Convert a pre-existing packaged zip file to a squashfs file'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -200,8 +200,8 @@ void yargs
         return new ConvertToSquashfsCommand().run(args);
     })
 
-    .command('rekey', 'Rekey a device', (builder) => {
-        return builder
+    .command('rekey', helpDescription('rekey', 'Rekey a device'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -215,8 +215,8 @@ void yargs
         return new RekeyDeviceCommand().run(args);
     })
 
-    .command('deleteDevChannel', 'Delete an installed channel', (builder) => {
-        return builder
+    .command('deleteDevChannel', helpDescription('deleteDevChannel', 'Delete an installed channel'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -226,8 +226,8 @@ void yargs
         return new DeleteDevChannelCommand().run(args);
     })
 
-    .command('screenshot', 'Take a screenshot', (builder) => {
-        return builder
+    .command('screenshot', helpDescription('screenshot', 'Take a screenshot'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -240,8 +240,8 @@ void yargs
         return new CaptureScreenshotCommand().run(args);
     })
 
-    .command('getDeviceInfo', 'Get the `device-info` response from a Roku device', (builder) => {
-        return builder
+    .command('getDeviceInfo', helpDescription('getDeviceInfo', 'Get the `device-info` response from a Roku device'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -250,8 +250,8 @@ void yargs
         return new GetDeviceInfoCommand().run(args);
     })
 
-    .command('getDevId', 'Get Dev ID', (builder) => {
-        return builder
+    .command('getDevId', helpDescription('getDevId', 'Get Dev ID'), (builder) => {
+        return describeConfigValues(builder)
             .option('host', { type: 'string', description: 'The IP Address of the target Roku', demandOption: false, conflicts: ['esn', 'instanceUrl'] })
             .option('esn', { type: 'string', description: 'The serial number (ESN) of a Roku Cloud Emulator (RCE) device (instead of --host)', demandOption: false, conflicts: ['instanceUrl'] })
             .option('instanceUrl', { type: 'string', description: 'The instance api url of a running RCE device (instead of --host or --esn)', demandOption: false })
@@ -260,10 +260,10 @@ void yargs
         return new GetDevIdCommand().run(args);
     })
 
-    .command('rce', 'Manage Roku Cloud Emulator (RCE) devices', (rceBuilder) => {
+    .command('rce', helpDescription('rce', 'Manage Roku Cloud Emulator (RCE) devices'), (rceBuilder) => {
         return rceBuilder
-            .command('start', 'Boot an RCE device from a snapshot', (builder) => {
-                return builder
+            .command('start', helpDescription('start', 'Boot an RCE device from a snapshot'), (builder) => {
+                return describeConfigValues(builder)
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
                     .option('device', { type: 'string', description: 'A named device from the config devices registry (must carry an id or esn)', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
@@ -282,8 +282,8 @@ void yargs
             }, (args: any) => {
                 return new RceStartCommand().run(args);
             })
-            .command('stop', 'Shut down a running RCE device', (builder) => {
-                return builder
+            .command('stop', helpDescription('stop', 'Shut down a running RCE device'), (builder) => {
+                return describeConfigValues(builder)
                     .option('token', { type: 'string', description: 'The RCE bearer token. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
                     .option('device', { type: 'string', description: 'A named device from the config devices registry (must carry an id or esn)', demandOption: false })
                     .option('deviceId', { type: 'number', description: 'The numeric management-api id of the RCE device', demandOption: false })
@@ -300,8 +300,8 @@ void yargs
             .demandCommand(1, 'Please specify an rce command');
     })
 
-    .command('zip', 'Zip a folder into a package', (builder) => {
-        return builder
+    .command('zip', helpDescription('zip', 'Zip a folder into a package'), (builder) => {
+        return describeConfigValues(builder)
             .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
             .option('files', { type: 'array', description: 'Optional file patterns to filter which files are included (defaults to all files)', demandOption: false })
             .option('out', { type: 'string', description: 'The path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })

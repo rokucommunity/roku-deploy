@@ -20,7 +20,8 @@ import { standardizePath as s, util } from './util';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
-import { loadCommandOptions } from './commands/commandUtils';
+import { describeConfigValues, helpDescription, loadCommandOptions } from './commands/commandUtils';
+import * as yargs from 'yargs';
 import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
@@ -901,6 +902,141 @@ describe('cli', function cli() {
             const result = execExpectingFailure(`node ${cwd}/dist/cli.js sideload --no-close --zip app.zip`);
             expect(result.output).not.to.include('Unknown argument');
             expect(result.output).to.include('Missing required option: device');
+        });
+    });
+
+    describe('helpDescription', () => {
+        it('returns the description unchanged when help is not requested or no config is found', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            expect(helpDescription('package', 'Make a package', ['package', '--cwd', tempDir])).to.equal('Make a package');
+            fsExtra.removeSync(`${tempDir}/rokudeploy.json`);
+            expect(helpDescription('package', 'Make a package', ['package', '--help', '--cwd', tempDir])).to.equal('Make a package');
+        });
+
+        it('adds a paragraph naming the config file for help on that command only', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            const argv = ['package', '--help', '--cwd', tempDir];
+            //the temp dir lives under the repo (process.cwd()), so the path is shown relative to it
+            expect(helpDescription('package', 'Make a package', argv)).to.equal(`Make a package\n\nUsing config: ./${path.relative(process.cwd(), tempDir)}/rokudeploy.json`);
+            //the root command list must stay one line per command
+            expect(helpDescription('sideload', 'Sideload', argv)).to.equal('Sideload');
+        });
+
+        it('shows the absolute path when the file is outside the current directory', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            const cwdStub = sinon.stub(process, 'cwd').returns(`${tempDir}/elsewhere`);
+            try {
+                expect(helpDescription('package', 'Make a package', ['package', '--help', '--cwd', tempDir])).to.include(`Using config: ${s`${tempDir}/rokudeploy.json`}`);
+            } finally {
+                cwdStub.restore();
+            }
+        });
+
+        it('shows the path relative to the current directory when the file lives under it', () => {
+            fsExtra.outputJsonSync(`${tempDir}/custom.json`, { password: 'x' });
+            const cwdStub = sinon.stub(process, 'cwd').returns(tempDir);
+            try {
+                expect(helpDescription('package', 'Make a package', ['package', '-h', '--config', 'custom.json'])).to.include('Using config: ./custom.json');
+            } finally {
+                cwdStub.restore();
+            }
+        });
+
+        it('reads process.argv when no argv is given', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            const originalArgv = process.argv;
+            process.argv = ['node', 'cli.js', 'package', '--help', '--cwd', tempDir];
+            try {
+                expect(helpDescription('package', 'Make a package')).to.include('Using config:');
+            } finally {
+                process.argv = originalArgv;
+            }
+        });
+
+        it('shows the config paragraph in the real CLI help', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            //yargs wraps long lines, so check the label and the path separately with line breaks removed
+            const help = childProcess.execSync(`node ${cwd}/dist/cli.js package --help`, { cwd: tempDir, stdio: 'pipe' }).toString().replace(/\n/g, '');
+            expect(help).to.include('Using config: ./rokudeploy.json');
+            const root = childProcess.execSync(`node ${cwd}/dist/cli.js --help`, { cwd: tempDir, stdio: 'pipe' }).toString();
+            expect(root).not.to.include('Using config');
+        });
+    });
+
+    describe('describeConfigValues', () => {
+        async function helpFor(argv: string[], config?: Record<string, any>) {
+            if (config) {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, config);
+            }
+            const builder = describeConfigValues(yargs([]), argv)
+                .option('host', { type: 'string', description: 'The host' })
+                .option('esn', { type: 'string', description: 'The esn' })
+                .option('instanceUrl', { type: 'string', description: 'The url' })
+                .option('password', { type: 'string', description: 'The password' })
+                .option('out', { type: 'string', description: 'The out', defaultDescription: './out/x.pkg' });
+            return builder.getHelp();
+        }
+        const tag = /\[default: from config\]/g;
+
+        it('does nothing unless --help was requested', async () => {
+            const help = await helpFor(['--cwd', tempDir], { password: 'x' });
+            expect(help.match(tag)).to.equal(null);
+        });
+
+        it('tags each option the config file supplies, without printing the value', async () => {
+            const help = await helpFor(['--help', '--cwd', tempDir], { password: 'x', out: 'dist/a.pkg' });
+            expect(help).not.to.include('dist/a.pkg');
+            expect(help.match(tag)).to.have.lengthOf(2);
+            expect(help).to.match(/--password[^\n]*\n?[^\n]*from config/);
+            //a file value replaces the option's own default description
+            expect(help).not.to.include('./out/x.pkg');
+        });
+
+        it('accepts --cwd=<dir> and a custom --config file', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/custom.json`, { host: '1.2.3.4' });
+            const help = await helpFor(['--help', `--cwd=${tempDir}`, '--config', 'custom.json']);
+            expect(help.match(tag)).to.have.lengthOf(1);
+        });
+
+        it('tags the device address options when the config names a registry device', async () => {
+            const help = await helpFor(['-h', '--cwd', tempDir], { device: 'office-tv' });
+            expect([...help.matchAll(tag)]).to.have.lengthOf(3);
+        });
+
+        it('tags only the address fields an inline device config carries', async () => {
+            const help = await helpFor(['--help', '--cwd', tempDir], { device: { esn: 'X1' } });
+            expect(help.match(tag)).to.have.lengthOf(1);
+            expect(help).to.match(/--esn[^\n]*\n?[^\n]*from config/);
+        });
+
+        it('stays quiet with --no-config, with no config file, and with a broken one', async () => {
+            expect((await helpFor(['--help', '--cwd', tempDir, '--no-config'], { password: 'x' })).match(tag)).to.equal(null);
+            fsExtra.removeSync(`${tempDir}/rokudeploy.json`);
+            expect((await helpFor(['--help', '--cwd', tempDir])).match(tag)).to.equal(null);
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ not json');
+            expect((await helpFor(['--help', '--cwd', tempDir])).match(tag)).to.equal(null);
+        });
+
+        it('reads process.argv when no argv is given', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
+            const originalArgv = process.argv;
+            process.argv = ['node', 'cli.js', 'package', '--help', '--cwd', tempDir];
+            try {
+                const help = await describeConfigValues(yargs([])).option('password', { type: 'string', description: 'The password' }).getHelp();
+                expect(help.match(tag)).to.have.lengthOf(1);
+            } finally {
+                process.argv = originalArgv;
+            }
+        });
+
+        it('falls back to process.cwd() when --cwd is not given', async () => {
+            const cwdStub = sinon.stub(process, 'cwd').returns(tempDir);
+            try {
+                const help = await helpFor(['--help'], { password: 'x' });
+                expect(help.match(tag)).to.have.lengthOf(1);
+            } finally {
+                cwdStub.restore();
+            }
         });
     });
 
