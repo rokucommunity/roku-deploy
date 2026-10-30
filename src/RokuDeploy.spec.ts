@@ -20,6 +20,7 @@ import { createSandbox } from 'sinon';
 import { request } from './request';
 import type { HttpResponse } from './request';
 import { RokuDeploy } from './RokuDeploy';
+import { logger } from '@rokucommunity/logger';
 import { LocalSocket, RceSocket } from './RokuDeploySocket';
 import { RceManagementClient } from './RceManagementClient';
 import type { CaptureScreenshotOptions, ConvertToSquashfsOptions, CreateSignedPackageOptions, DeleteDevChannelOptions, GetDevIdOptions, GetDeviceInfoOptions, RekeyDeviceOptions, SideloadOptions } from './RokuDeploy';
@@ -7345,7 +7346,6 @@ describe('RokuDeploy', () => {
         it('uses the registry entry timeout when the call provides none', async () => {
             const rd = new RokuDeploy({
                 password: 'root-pass',
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4', timeout: 1234 }
                 }
@@ -7384,7 +7384,6 @@ describe('RokuDeploy', () => {
                 password: 'root-pass',
                 username: 'root-user',
                 packagePort: 8080,
-                timeout: 5000,
                 devices: {
                     'office-tv': { host: '1.2.3.4' }
                 }
@@ -7393,7 +7392,6 @@ describe('RokuDeploy', () => {
             await rd.deleteDevChannel({ device: 'office-tv' } as any);
             expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
             expect(stub.getCall(0).args[0].url).to.include(':8080/');
-            expect(stub.getCall(0).args[0].timeout).to.equal(5000);
         });
 
         it('does not apply registry settings to an inline device config', async () => {
@@ -8327,6 +8325,17 @@ describe('RokuDeploy', () => {
                     rd.logger.logLevel = 'debug';
                     expect(rd.logger.logLevel).to.equal('debug');
                 });
+
+                it('gives each instance its own logger', () => {
+                    const rd1 = new RokuDeploy();
+                    const rd2 = new RokuDeploy();
+                    expect(rd1.logger).to.not.equal(rd2.logger);
+                    expect(rd1.logger).to.not.equal(logger);
+
+                    const originalLogLevel = rd1.logger.logLevel;
+                    rd2.logger.logLevel = 'trace';
+                    expect(rd1.logger.logLevel).to.equal(originalLogLevel);
+                });
             });
 
         });
@@ -8371,19 +8380,17 @@ describe('RokuDeploy', () => {
                 fsExtra.removeSync(s`${process.cwd()}/rokudeploy.json`);
             });
 
-            it('works when loading a command section from rokudeploy.json', () => {
+            it('loads a value from rokudeploy.json', () => {
                 sinon.stub(fsExtra, 'existsSync').callsFake((filePath) => {
                     return true;
                 });
                 sinon.stub(fsExtra, 'readFileSync').returns(`
                     {
-                        "stage": {
-                            "out": "./staging-dir"
-                        }
+                        "stagingDir": "./staging-dir"
                     }
                 ` as any);
                 let loadedOptions = rokuDeploy.loadConfigFile();
-                expect(loadedOptions.stage.out).to.equal('./staging-dir');
+                expect(loadedOptions.stagingDir).to.equal('./staging-dir');
             });
 
             it('supports jsonc for rokudeploy.json', () => {
@@ -8391,14 +8398,12 @@ describe('RokuDeploy', () => {
                     //leading comment
                     {
                         //inner comment
-                        "stage": {
-                            "rootDir": "src" //trailing comment
-                        }
+                        "rootDir": "src" //trailing comment
                     }
                     //trailing comment
                 `);
                 let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(loadedOptions.stage.rootDir).to.equal('src');
+                expect(loadedOptions.rootDir).to.equal('src');
             });
 
             it('returns empty object when config file does not exist', () => {
@@ -8417,68 +8422,18 @@ describe('RokuDeploy', () => {
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
             });
 
-            it('warns (but does not throw) for an invalid device registry entry', () => {
-                const warnStub = sinon.stub(rokuDeploy['logger'], 'warn');
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    devices: {
-                        good: { host: '1.2.3.4' },
-                        bad: { host: '1.2.3.4', esn: 'X1' }
-                    }
-                });
-                const config = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                //the config still loads in full, including the bad entry
-                expect(config.devices.bad).to.exist;
-                expect(warnStub.callCount).to.equal(1);
-                expect(String(warnStub.getCall(0).args[0])).to.include(`Device registry entry 'bad'`);
-            });
-        });
-
-        describe('loadConfigFile with a section', () => {
-            it('overlays the section onto root values and strips other sections', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    device: 'living-room',
-                    password: 'aaaa',
-                    cwd: './everywhere',
-                    stage: { cwd: './stage-only', out: './staging' },
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' })).to.eql({
-                    device: 'living-room',
-                    password: 'aaaa',
-                    //section wins over root
-                    cwd: './stage-only',
-                    out: './staging'
-                });
+            it('applies the config file logLevel so it wins over the current logger level', () => {
+                rokuDeploy['logger'].logLevel = 'error';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('debug');
             });
 
-            it('lets colliding option names coexist across sections (the motivating case)', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    stage: { out: '.roku-deploy-staging' },
-                    zip: { dir: '.roku-deploy-staging', out: './out/app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'stage' }).out).to.equal('.roku-deploy-staging');
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).out).to.equal('./out/app.zip');
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'zip' }).dir).to.equal('.roku-deploy-staging');
-            });
-
-            it('returns just the root values for a section the file does not configure', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    password: 'aaaa',
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: 'sideload' })).to.eql({ password: 'aaaa' });
-            });
-
-            it('section null returns root values with all sections stripped', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
-                    password: 'aaaa',
-                    ecpPort: 8060,
-                    zip: { out: './app.zip' }
-                });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, section: null })).to.eql({
-                    password: 'aaaa',
-                    ecpPort: 8060
-                });
+            it('leaves the logger level untouched when the config has no logLevel', () => {
+                rokuDeploy['logger'].logLevel = 'warn';
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(rokuDeploy['logger'].logLevel).to.equal('warn');
             });
         });
 
@@ -8541,14 +8496,23 @@ describe('RokuDeploy', () => {
                     .to.throw(errors.InvalidOptionError, 'Config file does not exist');
             });
 
-            it('takes root values only, stripping command sections and any config key', () => {
+            it('takes the flat file values, dropping any config key', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
                     password: 'aaaa',
                     config: 'should-not-leak',
-                    stage: { out: './staging' }
+                    rootDir: './app'
                 });
                 const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json` });
-                expect(rd['options']).to.eql({ password: 'aaaa' });
+                expect(rd['options']).to.eql({ password: 'aaaa', rootDir: './app' });
+            });
+
+            it('applies the file logLevel to the logger passed to the constructor', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './app', logLevel: 'info' });
+                const myLogger = logger.createLogger();
+                myLogger.logLevel = 'error';
+                const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json`, logger: myLogger });
+                expect(myLogger.logLevel).to.equal('info');
+                expect(rd['options']).to.include({ rootDir: './app' });
             });
 
             it('never leaks the config option itself into the merged instance options', () => {
@@ -8603,9 +8567,14 @@ describe('RokuDeploy', () => {
         });
 
         describe('generateBaseRequestOptions', () => {
-            it('uses default timeout', async () => {
+            it('uses the quick timeout by default', async () => {
                 const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' });
-                expect(result.timeout).to.equal(RokuDeploy['defaults'].timeout);
+                expect(result.timeout).to.equal(RokuDeploy['timeouts'].quick);
+            });
+
+            it('uses a passed default timeout for long-running actions', async () => {
+                const result = await rokuDeploy['generateBaseRequestOptions']('test', { host: 'localhost' }, { device: { host: 'localhost' }, password: 'test' }, {}, RokuDeploy['timeouts'].extended);
+                expect(result.timeout).to.equal(RokuDeploy['timeouts'].extended);
             });
 
             it('uses default packagePort', async () => {
@@ -8644,7 +8613,7 @@ describe('RokuDeploy', () => {
             it('uses default timeout', async () => {
                 const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({});
                 await rokuDeploy['sendKeyEvent']({ device: { host: 'localhost' }, key: 'Home', action: 'keypress' });
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
             });
 
             it('allows overriding ecpPort', async () => {
@@ -8674,7 +8643,7 @@ describe('RokuDeploy', () => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['defaults'].ecpTimeout);
+                expect(stub.getCall(0).args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
             });
         });
 
@@ -8836,14 +8805,14 @@ describe('RokuDeploy', () => {
             expect((thrown as Error).message).to.include('500');
         });
 
-        it('uses default port 80, username rokudev, root installer path, and 3000ms timeout', async () => {
+        it('uses default port 80, username rokudev, root installer path, and the quick timeout', async () => {
             const headStub = sinon.stub(request, 'head').resolves(fakeHttpResponse(200));
 
             await rokuDeploy.validateDeveloperPassword({ device: { host: 'device.local' }, password: 'aaaa' });
 
             expect(headStub.firstCall.args[0].url).to.equal('http://device.local:80/');
             expect(headStub.firstCall.args[0].auth.username).to.equal('rokudev');
-            expect(headStub.firstCall.args[0].timeout).to.equal(3000);
+            expect(headStub.firstCall.args[0].timeout).to.equal(RokuDeploy['timeouts'].quick);
         });
 
         it('honors custom username and port', async () => {

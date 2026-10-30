@@ -21,6 +21,7 @@ import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
 import { loadCommandOptions } from './commands/commandUtils';
+import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
 
@@ -63,6 +64,41 @@ describe('cli', function cli() {
         execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`);
 
         expectPathExists(`${stagingDir}/source/main.brs`);
+    });
+
+    it('applies --logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --logLevel info`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
+    });
+
+    it('applies the config file logLevel to the logger', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`).toString();
+
+        expect(output).to.include('Beginning to copy files to staging folder');
+    });
+
+    it('prefers --logLevel over the config file logLevel', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --logLevel error`).toString();
+
+        expect(output).to.not.include('Beginning to copy files to staging folder');
+    });
+
+    it('ignores the config file logLevel with --no-config', () => {
+        fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+        fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'info' });
+
+        const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir} --no-config`).toString();
+
+        expect(output).to.not.include('Beginning to copy files to staging folder');
     });
 
     it('Converts to squashfs', async () => {
@@ -135,6 +171,7 @@ describe('cli', function cli() {
     });
 
     it('Signs an existing package', async () => {
+        sinon.stub(rokuDeploy, 'convertToSquashfs').resolves({} as any);
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve({ pkgPath: '' });
         });
@@ -157,6 +194,7 @@ describe('cli', function cli() {
     });
 
     it('Signs an existing package using the provided cwd', async () => {
+        sinon.stub(rokuDeploy, 'convertToSquashfs').resolves({} as any);
         const stub = sinon.stub(rokuDeploy, 'createSignedPackage').callsFake(async () => {
             return Promise.resolve({ pkgPath: '' });
         });
@@ -766,10 +804,10 @@ describe('cli', function cli() {
             );
         });
 
-        it('applies rce.start section values that yargs used to clobber with defaults', async () => {
+        it('applies config-file values that yargs used to clobber with defaults', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
                 rceToken: 'root-token',
-                'rce.start': { maxRuntime: 120 }
+                maxRuntime: 120
             });
             sinon.stub(RceManagementClient.prototype, 'getDevice').resolves(makeDevice());
             const startStub = sinon.stub(RceManagementClient.prototype, 'startDevice').resolves(makeDevice({ status: 'pending' }));
@@ -782,6 +820,47 @@ describe('cli', function cli() {
             });
 
             expect(startStub.getCall(0).args[0].start.maxRuntime).to.equal(120);
+        });
+    });
+
+    describe('init', () => {
+        it('writes the sample config to rokudeploy.json in cwd', () => {
+            sinon.stub(console, 'log');
+            new InitCommand().run({ cwd: tempDir });
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.equal(fsExtra.readFileSync(sampleConfigPath).toString());
+        });
+
+        it('refuses to overwrite an existing rokudeploy.json', () => {
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ "password": "keep-me" }');
+            expect(() => new InitCommand().run({ cwd: tempDir })).to.throw('already exists');
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.equal('{ "password": "keep-me" }');
+        });
+
+        it('overwrites with --force', () => {
+            sinon.stub(console, 'log');
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ "password": "replace-me" }');
+            new InitCommand().run({ cwd: tempDir, force: true });
+            expect(fsExtra.readFileSync(`${tempDir}/rokudeploy.json`).toString()).to.include('"rootDir"');
+        });
+
+        it('defaults to the process cwd', () => {
+            sinon.stub(console, 'log');
+            const original = process.cwd();
+            process.chdir(tempDir);
+            try {
+                new InitCommand().run({});
+            } finally {
+                process.chdir(original);
+            }
+            expectPathExists(`${tempDir}/rokudeploy.json`);
+        });
+
+        it('produces a config the CLI then picks up automatically', () => {
+            execSync(`node ${cwd}/dist/cli.js init`);
+            fsExtra.outputFileSync(`${rootDir}/source/main.brs`, '');
+            //the generated file enables sideload.dir, so stage still needs its own flags; this just proves the file is detected
+            const output = execSync(`node ${cwd}/dist/cli.js stage --rootDir ${rootDir} --out ${stagingDir}`).toString();
+            expect(output).to.include(`Using config: ${tempDir}`);
         });
     });
 
@@ -825,14 +904,160 @@ describe('cli', function cli() {
         });
     });
 
+    describe('chained flows', () => {
+        let rekeyStub: sinon.SinonStub;
+        let sideloadStub: sinon.SinonStub;
+        let squashStub: sinon.SinonStub;
+        let packageStub: sinon.SinonStub;
+        //--no-config so a stray rokudeploy.json can never feed these
+        const base = { cwd: tempDir, host: '1.2.3.4', password: 'aaaa', config: false };
+
+        beforeEach(() => {
+            rekeyStub = sinon.stub(rokuDeploy, 'rekeyDevice').resolves(undefined as any);
+            sideloadStub = sinon.stub(rokuDeploy, 'sideload').resolves({ message: '', rokuMessages: { errors: [], infos: [], successes: [] } });
+            squashStub = sinon.stub(rokuDeploy, 'convertToSquashfs').resolves({} as any);
+            packageStub = sinon.stub(rokuDeploy, 'createSignedPackage').resolves({} as any);
+        });
+
+        function realCliAcceptsFlags(command: string) {
+            try {
+                //fails on the unreachable device, not on argument parsing
+                childProcess.execSync(`node ${cwd}/dist/cli.js ${command} --host 10.255.255.1 --password aaaa --no-config`, { cwd: tempDir, stdio: 'pipe', timeout: 30000 });
+            } catch (e) {
+                expect(`${(e as childProcess.SpawnSyncReturns<Buffer>).stdout}${(e as childProcess.SpawnSyncReturns<Buffer>).stderr}`).not.to.include('Unknown argument');
+                return;
+            }
+            throw new Error('Expected the command to fail on the unreachable device');
+        }
+
+        function helpHeadingsInOrder(command: string, headings: string[]) {
+            const help = childProcess.execSync(`node ${cwd}/dist/cli.js ${command} --help`, { cwd: tempDir, stdio: 'pipe' }).toString();
+            const positions = headings.map(heading => help.indexOf(heading));
+            expect(positions.every(position => position >= 0), help).to.equal(true);
+            expect(positions).to.eql([...positions].sort((a, b) => a - b));
+            return help;
+        }
+
+        describe('sideload --rekey', () => {
+            it('runs only sideload when --rekey is not given', async () => {
+                await new SideloadCommand().run({ ...base, dir: rootDir });
+                expect(sideloadStub.callCount).to.equal(1);
+                expect(rekeyStub.callCount).to.equal(0);
+            });
+
+            it('rekeys before sideloading', async () => {
+                await new SideloadCommand().run({ ...base, dir: rootDir, rekey: true, pkg: 'keys/signed.pkg', signingPassword: 'sp' });
+                sinon.assert.callOrder(rekeyStub, sideloadStub);
+                //the library resolves a relative pkg against cwd itself
+                expect(rekeyStub.getCall(0).args[0].pkg).to.equal('keys/signed.pkg');
+            });
+
+            it('does not sideload when the rekey fails', async () => {
+                rekeyStub.rejects(new Error('bad signing password'));
+                await expectThrowsAsync(() => new SideloadCommand().run({ ...base, dir: rootDir, rekey: true, pkg: 'k.pkg' }), 'bad signing password');
+                expect(sideloadStub.callCount).to.equal(0);
+            });
+
+            it('accepts --rekey on the real CLI under strict mode', () => {
+                realCliAcceptsFlags(`sideload --dir ${rootDir} --rekey --pkg k.pkg --signingPassword sp --devId d`);
+            });
+
+            it('lists its own options first, then the rekey step, then the globals in --help', () => {
+                const help = helpHeadingsInOrder('sideload', ['Rekey:', 'Options:']);
+                const optionLine = (name: string) => help.search(new RegExp(`^  --${name}\\b`, 'm'));
+                expect(optionLine('dir')).to.be.lessThan(help.indexOf('Rekey:'));
+                expect(optionLine('rekey')).to.be.within(help.indexOf('Rekey:'), help.indexOf('Options:'));
+                expect(optionLine('help')).to.be.greaterThan(help.indexOf('Options:'));
+                expect(help).not.to.include('--version');
+            });
+        });
+
+        describe('package --rekey --sideload --squash', () => {
+            it('squashes then packages when no flow flag is given', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, signingPassword: 'sp' });
+                sinon.assert.callOrder(squashStub, packageStub);
+                expect(rekeyStub.callCount).to.equal(0);
+                expect(sideloadStub.callCount).to.equal(0);
+            });
+
+            it('skips squash with --no-squash', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, squash: false, signingPassword: 'sp' });
+                expect(squashStub.callCount).to.equal(0);
+                expect(packageStub.callCount).to.equal(1);
+            });
+
+            it('skips squash when the config file turns it off', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { squash: false });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', signingPassword: 'sp' });
+                expect(squashStub.callCount).to.equal(0);
+                expect(packageStub.callCount).to.equal(1);
+            });
+
+            it('lets --squash on the CLI override a config file that turns it off', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { squash: false });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', signingPassword: 'sp', squash: true });
+                expect(squashStub.callCount).to.equal(1);
+            });
+
+            it('runs the full flow in order, handing every step the same options', async () => {
+                await new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', sideload: true, dir: rootDir, signingPassword: 'sp', devId: 'dev1' });
+                sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
+                const options = rekeyStub.getCall(0).args[0];
+                for (const stub of [sideloadStub, squashStub, packageStub]) {
+                    expect(stub.getCall(0).args[0]).to.equal(options);
+                }
+            });
+
+            it('stops at the first failing step', async () => {
+                sideloadStub.rejects(new Error('compile error'));
+                await expectThrowsAsync(() => new CreateSignedPackageCommand().run({ ...base, rekey: true, pkg: 'k.pkg', sideload: true, dir: rootDir, signingPassword: 'sp' }), 'compile error');
+                expect(rekeyStub.callCount).to.equal(1);
+                expect(squashStub.callCount).to.equal(0);
+                expect(packageStub.callCount).to.equal(0);
+            });
+
+            it('feeds every step from the flat config file', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
+                    password: 'root-pass',
+                    pkg: 'keys/signed.pkg',
+                    signingPassword: 'sign-pass',
+                    dir: 'app',
+                    out: 'dist/app.pkg'
+                });
+                await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', rekey: true, sideload: true });
+                expect(rekeyStub.getCall(0).args[0].pkg).to.equal('keys/signed.pkg');
+                expect(sideloadStub.getCall(0).args[0].dir).to.equal('app');
+                expect(squashStub.getCall(0).args[0].password).to.equal('root-pass');
+                expect(packageStub.getCall(0).args[0].out).to.equal('dist/app.pkg');
+                expect(packageStub.getCall(0).args[0].signingPassword).to.equal('sign-pass');
+            });
+
+            it('lists its own options first, then each step in run order, then the globals in --help', () => {
+                const help = helpHeadingsInOrder('package', ['Rekey:', 'Sideload:', 'Squash:', 'Options:']);
+                //(match the option's own line, since descriptions mention other flags)
+                const optionLine = (name: string) => help.search(new RegExp(`^  --${name}\\b`, 'm'));
+                expect(optionLine('signingPassword')).to.be.lessThan(help.indexOf('Rekey:'));
+                expect(optionLine('rekey')).to.be.within(help.indexOf('Rekey:'), help.indexOf('Sideload:'));
+                expect(optionLine('sideload')).to.be.within(help.indexOf('Sideload:'), help.indexOf('Squash:'));
+                expect(optionLine('squash')).to.be.within(help.indexOf('Squash:'), help.indexOf('Options:'));
+                expect(optionLine('help')).to.be.greaterThan(help.indexOf('Options:'));
+                expect(help).not.to.include('--version');
+            });
+
+            it('accepts the flow flags on the real CLI under strict mode', () => {
+                realCliAcceptsFlags(`package --rekey --pkg k.pkg --sideload --dir ${rootDir} --no-squash --signingPassword sp`);
+            });
+        });
+    });
+
     describe('CLI flag names that differ from the library options', () => {
         it('maps --host to an inline device config', () => {
-            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' });
             expect(options).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa' });
         });
 
         it('maps --host with --no-config too', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4' });
             expect(options.device).to.eql({ host: '1.2.3.4' });
             expect(options).not.to.have.property('host');
         });
@@ -842,46 +1067,46 @@ describe('cli', function cli() {
                 device: 'office-tv',
                 devices: { 'office-tv': { host: '9.9.9.9' } }
             });
-            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, host: '1.2.3.4' });
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
         it('leaves the config file device alone when --host is not given', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '9.9.9.9' } });
-            const options = loadCommandOptions({ cwd: tempDir }, null);
+            const options = loadCommandOptions({ cwd: tempDir });
             expect(options.device).to.eql({ host: '9.9.9.9' });
         });
 
         it('maps --esn to an inline RCE device config carrying --rceToken', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' });
             expect(options.device).to.eql({ esn: 'X123', rceToken: 'abc' });
             expect(options).not.to.have.property('esn');
         });
 
         it('maps --instanceUrl to an inline RCE device config carrying --rceToken', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
             expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4', rceToken: 'abc' });
             expect(options).not.to.have.property('instanceUrl');
         });
 
         it('falls back to the config file rceToken for an --esn device', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'from-config' });
-            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, esn: 'X123' });
             expect(options.device).to.eql({ esn: 'X123', rceToken: 'from-config' });
         });
 
         it('leaves the device token off when neither --rceToken nor a config rceToken exists', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, esn: 'X123' });
             expect(options.device).to.eql({ esn: 'X123' });
         });
 
         it('leaves the device token off an --instanceUrl device when no token is available', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4' });
             expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
         });
 
         it('does not attach --rceToken to a --host device', () => {
-            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' }, null);
+            const options = loadCommandOptions({ cwd: tempDir, config: false, host: '1.2.3.4', rceToken: 'abc' });
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
@@ -977,10 +1202,10 @@ describe('cli', function cli() {
     });
 
     describe('config file integration', () => {
-        it('merges root values and the command section under CLI args', async () => {
+        it('merges config-file values under CLI args', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
                 password: 'from-root',
-                screenshot: { out: './shots' }
+                rootDir: './src'
             });
             const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
 
@@ -991,7 +1216,7 @@ describe('cli', function cli() {
 
             const options = stub.getCall(0).args[0] as any;
             expect(options.password).to.equal('from-root');
-            expect(options.out).to.equal('./shots');
+            expect(options.rootDir).to.equal('./src');
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
@@ -1028,6 +1253,34 @@ describe('cli', function cli() {
             const options = stub.getCall(0).args[0] as any;
             expect(options.password).to.be.undefined;
             expect(options.out).to.be.undefined;
+        });
+
+        it('applies --logLevel to the logger even with --no-config', () => {
+            rokuDeploy.logger.logLevel = 'error';
+            loadCommandOptions({ cwd: tempDir, config: false, logLevel: 'trace' });
+            expect(rokuDeploy.logger.logLevel).to.equal('trace');
+        });
+
+        it('lets --logLevel win over the config file on every load', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
+            loadCommandOptions({ cwd: tempDir, logLevel: 'error' });
+            expect(rokuDeploy.logger.logLevel).to.equal('error');
+            //a command's own load, after the middleware, must not let the file take over again
+            loadCommandOptions({ cwd: tempDir, logLevel: 'error' });
+            expect(rokuDeploy.logger.logLevel).to.equal('error');
+        });
+
+        it('stays silent about the config file when quiet is set', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+            let consoleOutput = '';
+            sinon.stub(console, 'log').callsFake((...logArgs) => {
+                consoleOutput += logArgs.join(' ') + '\n';
+            });
+
+            const options = loadCommandOptions({ cwd: tempDir }, { quiet: true });
+
+            expect(options.logLevel).to.equal('trace');
+            expect(consoleOutput).to.not.include('Using config');
         });
 
         it('announces which config file was loaded', async () => {

@@ -11,13 +11,15 @@ module.exports = {
     },
     plugins: [
         '@typescript-eslint',
-        'import'
+        'import',
+        'local-rules'
     ],
     extends: [
         'eslint:all',
         'plugin:@typescript-eslint/all'
     ],
     rules: {
+        'local-rules/require-release-tag': 'error',
         '@typescript-eslint/array-type': 'off',
         '@typescript-eslint/consistent-type-assertions': 'off',
         '@typescript-eslint/explicit-function-return-type': 'off',

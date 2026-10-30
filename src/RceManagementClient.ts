@@ -2,6 +2,8 @@ import * as needle from 'needle';
 import type { RceDeviceConfig } from './DeviceConfig';
 import { isRceDeviceConfigById, isRceDeviceConfigByUrl } from './DeviceConfig';
 import { util } from './util';
+import { RceManagementApiError } from './Errors';
+import type { RceManagementApiErrorDetails, RceManagementValidationError } from './Errors';
 
 /**
  * Default base URL for the Roku Cloud Emulator (RCE) management API (distinct from a running
@@ -35,6 +37,7 @@ export class RceManagementClient {
 
     /**
      * Get the authenticated user and their organisation (device/snapshot limits, current counts).
+     * @public
      */
     public getUserInfo(options?: GetUserInfoOptions): Promise<User> {
         return this.send('get', '/user/me', { token: options?.token });
@@ -42,6 +45,7 @@ export class RceManagementClient {
 
     /**
      * List the firmware versions available for creating and starting devices.
+     * @public
      */
     public listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]> {
         return this.send('get', '/firmwareVersions', { query: { items: options?.items, page: options?.page }, token: options?.token });
@@ -49,6 +53,7 @@ export class RceManagementClient {
 
     /**
      * List the caller's devices.
+     * @public
      */
     public listDevices(options?: ListDevicesOptions): Promise<RceDevice[]> {
         return this.send('get', '/devices', { query: { items: options?.items, page: options?.page }, token: options?.token });
@@ -56,6 +61,7 @@ export class RceManagementClient {
 
     /**
      * Get a single device by id.
+     * @public
      */
     public getDevice(options: GetDeviceOptions): Promise<RceDevice> {
         return this.send('get', `/devices/${options.deviceId}`, { token: options.token });
@@ -63,6 +69,7 @@ export class RceManagementClient {
 
     /**
      * Create a new device.
+     * @public
      */
     public createDevice(options: CreateDeviceOptions): Promise<RceDevice> {
         return this.send('post', '/devices', { body: options.device, token: options.token });
@@ -70,6 +77,7 @@ export class RceManagementClient {
 
     /**
      * Update a device's mutable fields (name, account name, note, properties).
+     * @public
      */
     public updateDevice(options: UpdateDeviceOptions): Promise<RceDevice> {
         return this.send('patch', `/devices/${options.deviceId}`, { body: options.update, token: options.token });
@@ -78,6 +86,7 @@ export class RceManagementClient {
     /**
      * Boot a device from a snapshot. Resolves with the device, whose `runningDevice` block carries
      * the instance API URL and video (Janus) connection details.
+     * @public
      */
     public startDevice(options: StartDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/start`, { body: options.start, token: options.token });
@@ -85,6 +94,7 @@ export class RceManagementClient {
 
     /**
      * Shut down a running device.
+     * @public
      */
     public stopDevice(options: StopDeviceOptions): Promise<RceDevice> {
         return this.send('post', `/devices/${options.deviceId}/stop`, { token: options.token });
@@ -92,33 +102,55 @@ export class RceManagementClient {
 
     /**
      * Get a device's run history.
+     * @public
      */
     public getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]> {
         return this.send('get', `/devices/${options.deviceId}/runs`, { token: options.token });
     }
 
+    /**
+     * List a device's snapshots.
+     * @public
+     */
     public listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]> {
         return this.send('get', `/devices/${options.deviceId}/snapshots`, { query: { items: options.items, page: options.page }, token: options.token });
     }
 
+    /**
+     * Create a snapshot of a device.
+     * @public
+     */
     public createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot> {
         return this.send('post', `/devices/${options.deviceId}/snapshots`, { body: options.snapshot, token: options.token });
     }
 
+    /**
+     * Get a single snapshot by id.
+     * @public
+     */
     public getSnapshot(options: GetSnapshotOptions): Promise<Snapshot> {
         return this.send('get', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { token: options.token });
     }
 
+    /**
+     * Update a snapshot's mutable fields (name, description).
+     * @public
+     */
     public updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot> {
         return this.send('patch', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { body: options.update, token: options.token });
     }
 
+    /**
+     * Delete a snapshot.
+     * @public
+     */
     public deleteSnapshot(options: DeleteSnapshotOptions): Promise<void> {
         return this.send('delete', `/devices/${options.deviceId}/snapshots/${options.snapshotId}`, { token: options.token });
     }
 
     /**
      * Find a device by its serial number (ESN), or undefined when the caller has no such device.
+     * @public
      */
     public async findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined> {
         //the devices endpoint is paginated and defaults to 100 items per page, which would silently
@@ -133,6 +165,7 @@ export class RceManagementClient {
      * Resolve an RCE device config to its live instance API URL (trailing slashes stripped). An
      * instanceUrl-addressed config is returned directly; an id- or esn-addressed config is resolved
      * through the management api and must be running.
+     * @public
      */
     public async getInstanceUrl(options: GetInstanceUrlOptions): Promise<string> {
         const config = options.device;
@@ -169,6 +202,7 @@ export class RceManagementClient {
     /**
      * Resolve the live instance API URL for a running device, throwing when the device is not running.
      * This is the base URL a caller uses to talk ECP and logs directly to the instance.
+     * @public
      */
     public async getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string> {
         const device = await this.getDevice({ deviceId: options.deviceId, token: options.token });
@@ -214,7 +248,12 @@ export class RceManagementClient {
                 }
                 const statusCode = response.statusCode ?? 0;
                 if (statusCode < 200 || statusCode >= 300) {
-                    reject(new Error(`RCE management ${method.toUpperCase()} ${path} failed (status ${statusCode})`));
+                    const details = buildApiErrorDetails(method.toUpperCase(), path, statusCode, response.body);
+                    const serverText = details.apiMessage ?? details.apiCode ?? details.validationErrors?.map((validationError) => validationError.msg).join('; ');
+                    reject(new RceManagementApiError(
+                        `RCE management ${details.method} ${path} failed (status ${statusCode})${serverText ? `: ${serverText}` : ''}`,
+                        details
+                    ));
                     return;
                 }
                 resolve(convertKeys(response.body, toCamelCaseKey) as TResponse);
@@ -231,6 +270,44 @@ export class RceManagementClient {
             .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
         return parts.length > 0 ? `?${parts.join('&')}` : '';
     }
+}
+
+/**
+ * Extract the api's error information from a non-2xx response body. The body may be an `ApiError`
+ * (`detail` is a string or `{ code, message }`), an `HTTPValidationError` (`detail` is a list of
+ * `{ loc, msg, type }`), or missing, empty or not JSON, in which case only the request and status are recorded.
+ * Validation error items are reduced to `loc` (string and number elements only), `msg` and `type`
+ * (`input` and `ctx` are dropped); items that are not objects or have no string `msg` are skipped.
+ */
+function buildApiErrorDetails(method: string, path: string, statusCode: number, body: unknown): RceManagementApiErrorDetails {
+    const details: RceManagementApiErrorDetails = { method: method, path: path, statusCode: statusCode };
+    const detail = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).detail : undefined;
+    if (typeof detail === 'string' && detail) {
+        details.apiMessage = detail;
+    } else if (Array.isArray(detail)) {
+        const validationErrors: RceManagementValidationError[] = [];
+        for (const item of detail) {
+            if (typeof item === 'object' && item !== null && typeof item.msg === 'string') {
+                validationErrors.push({
+                    loc: Array.isArray(item.loc) ? item.loc.filter((part: unknown) => typeof part === 'string' || typeof part === 'number') : [],
+                    msg: item.msg,
+                    type: typeof item.type === 'string' ? item.type : ''
+                });
+            }
+        }
+        if (validationErrors.length > 0) {
+            details.validationErrors = validationErrors;
+        }
+    } else if (typeof detail === 'object' && detail !== null) {
+        const { code, message } = detail as Record<string, unknown>;
+        if (typeof code === 'string' && code) {
+            details.apiCode = code;
+        }
+        if (typeof message === 'string' && message) {
+            details.apiMessage = message;
+        }
+    }
+    return details;
 }
 
 /**

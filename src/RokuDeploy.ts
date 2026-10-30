@@ -26,14 +26,13 @@ import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
 import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import type { ConfigSectionName, ResolvedSectionOptions, RokuDeployConfig, RootConfigOptions } from './RokuDeployConfig';
-import { configSectionNames } from './RokuDeployConfig';
+import type { RokuDeployConfig } from './RokuDeployConfig';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
+import { logger } from '@rokucommunity/logger';
 import { createRokuDeploySocket } from './RokuDeploySocket';
 import type { RokuDeploySocket } from './RokuDeploySocket';
-import { logger } from '@rokucommunity/logger';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
 import { formatTimestampForScreenshot } from './dateUtils';
@@ -53,7 +52,8 @@ export class RokuDeploy {
         //shallow clone, so a caller mutating their object later can't change this instance.
         const { config, ...constructorOptions } = options ?? {};
         this.constructorOptions = constructorOptions;
-        this.logger = constructorOptions.logger ?? logger;
+        //each instance gets its own logger so changing one instance's logLevel never affects another
+        this.logger = constructorOptions.logger ?? logger.createLogger();
         //resolve the config file path once, against the current cwd, so every (re)load reads the
         //same file even if the process later changes directory. A `?` prefix (or the `true` default)
         //marks the file optional, so a missing file is tolerated rather than thrown.
@@ -83,16 +83,27 @@ export class RokuDeploy {
      * Default values for common options used across multiple functions
      */
     private static readonly defaults = {
-        timeout: 150000,
-        /**
-         * The default timeout for ECP requests, in milliseconds. ECP commands are small and fast,
-         * so this is much lower than `timeout` (which must accommodate large installer uploads).
-         */
-        ecpTimeout: 10000,
         packagePort: 80,
         ecpPort: 8060,
         outDir: './out',
         outFile: 'roku-deploy.zip'
+    };
+
+    /**
+     * Per-action request timeouts, in milliseconds. A caller's `timeout` option overrides these.
+     * Raising a value is not a breaking change; lowering one is.
+     */
+    private static readonly timeouts = {
+        /**
+         * Quick requests over ECP or the installer: device info, key presses, reboot, update check,
+         * channel delete, password check.
+         */
+        quick: 10_000,
+        /**
+         * Long-running on-device operations that upload or build: sideload, package, convert to
+         * squashfs, rekey.
+         */
+        extended: 300_000
     };
 
     /**
@@ -125,10 +136,10 @@ export class RokuDeploy {
      * `?`-prefixed path, or the `true` default); when no `config` was given, nothing is loaded.
      */
     private loadConfig(): RokuDeployConstructorOptions {
-        let configValues: RootConfigOptions = {};
+        let configValues: RokuDeployConfig = {};
         if (this.config) {
             if (fsExtra.existsSync(this.config.path)) {
-                const values: RootConfigOptions & { config?: unknown } = this.loadConfigFile({ configPath: this.config.path, section: null });
+                const values: RokuDeployConfig & { config?: unknown } = this.loadConfigFile({ configPath: this.config.path });
                 //a root-level `config` key has no meaning as a method option, so keep it out of the merge
                 delete values.config;
                 configValues = values;
@@ -319,7 +330,7 @@ export class RokuDeploy {
                         mysubmit: 'Replace',
                         archive: readStream,
                         ...(options.appType ? { 'app_type': options.appType } : {})
-                    });
+                    }, RokuDeploy.timeouts.extended);
 
                     //attach the remotedebug flag if configured
                     if (options.remoteDebug) {
@@ -445,7 +456,7 @@ export class RokuDeploy {
             let requestOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options, {
                 archive: '',
                 mysubmit: 'Convert to squashfs'
-            });
+            }, RokuDeploy.timeouts.extended);
             try {
                 return await this.doPostRequest(requestOptions);
             } catch (error) {
@@ -540,7 +551,7 @@ export class RokuDeploy {
                 'pkg_time': (new Date()).getTime(),
                 passwd: options.signingPassword,
                 'app_name': appName
-            });
+            }, RokuDeploy.timeouts.extended);
             return this.doPostRequest(requestOptions);
         });
 
@@ -604,7 +615,7 @@ export class RokuDeploy {
                     mysubmit: 'Rekey',
                     passwd: options.signingPassword,
                     archive: archiveStream
-                });
+                }, RokuDeploy.timeouts.extended);
                 return this.doPostRequest(requestOptions);
             });
         } finally {
@@ -669,7 +680,7 @@ export class RokuDeploy {
                 verify: true,
                 devices: options.devices,
                 ecpPort: options.ecpPort,
-                timeout: options.timeout
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick
             });
         } catch (e) {
             if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
@@ -919,7 +930,7 @@ export class RokuDeploy {
 
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
-        const timeout = options.timeout ?? 3000;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
 
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
         //from before), an RCE device by its installer base url (never includes credentials)
@@ -989,7 +1000,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         const verify = options.verify ?? false;
@@ -1049,7 +1060,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -1234,7 +1245,7 @@ export class RokuDeploy {
             const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
             return this.doPostRequest({
                 url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick,
                 headers: this.buildRceAuthHeaders(rceToken)
             }, true);
         });
@@ -1686,31 +1697,12 @@ export class RokuDeploy {
 
     /**
      * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
-     * about invalid device-registry entries. With no `section`, returns the full config. With a
-     * `section`, returns the flattened options for that section: root-level values overlaid with the
-     * section's values (section wins on collision), all other sections stripped; `section: null`
-     * flattens the same way for a consumer with no section of its own. The library never loads
-     * config implicitly — the CLI calls this for every command; library consumers call it explicitly
-     * or opt in with the constructor's `config` option.
+     * about invalid device-registry entries. Returns the flat config as written; the empty object
+     * when the file is absent. The library never loads config implicitly — the CLI calls this for
+     * every command; library consumers call it explicitly or opt in with the constructor's `config` option.
      * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions & { section?: undefined }): RokuDeployConfig;
-    /**
-     * @public
-     */
-    public loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & { section: T }): ResolvedSectionOptions<T>;
-    /**
-     * @public
-     */
-    public loadConfigFile(options: LoadConfigFileOptions & { section: null }): RootConfigOptions;
-    /**
-     * @public
-     */
-    public loadConfigFile(options: LoadConfigFileOptions & { section: ConfigSectionName | null }): Record<string, any>;
-    /**
-     * @public
-     */
-    public loadConfigFile(options?: LoadConfigFileOptions & { section?: ConfigSectionName | null }): RokuDeployConfig | Record<string, any> {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig {
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
@@ -1735,31 +1727,12 @@ export class RokuDeploy {
                     })
                 ));
             }
-            //surface broken registry entries early (but only warn: an unused bad entry shouldn't
-            //break every command — resolveDevice() still hard-fails when the entry is actually used)
-            for (const name in config.devices ?? {}) {
-                try {
-                    validateDeviceConfig(config.devices[name], `Device registry entry '${name}'`);
-                } catch (e) {
-                    this.logger.warn(`${configPath}: ${(e as Error).message}`);
-                }
+            //apply the config's logLevel so a file-supplied level wins over the logger's current level
+            if (config.logLevel !== undefined) {
+                this.logger.logLevel = config.logLevel;
             }
         }
-        //no section requested: hand back the whole config
-        if (options?.section === undefined) {
-            return config;
-        }
-        //flatten for one section: root values with the section overlaid, other sections stripped
-        const result: Record<string, any> = {};
-        for (const key in config) {
-            if (!configSectionNames.includes(key as ConfigSectionName)) {
-                result[key] = config[key];
-            }
-        }
-        if (options.section !== null) {
-            Object.assign(result, config[options.section]);
-        }
-        return result;
+        return config;
     }
 
     /**
@@ -1910,12 +1883,12 @@ export class RokuDeploy {
         return fsExtra.writeFile(zipFilePath, content);
     }
 
-    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T): Promise<RequestOptions> {
+    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T, defaultTimeout: number = RokuDeploy.timeouts.quick): Promise<RequestOptions> {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
-        // Set defaults for request options
+        // Set defaults for request options. A caller-supplied timeout overrides the action's default.
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const timeout = mergedOptions.timeout ?? defaultTimeout;
         const username = mergedOptions.username ?? 'rokudev';
 
         const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
@@ -2359,7 +2332,7 @@ export class RokuDeploy {
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                     const url = `${instanceUrl}/api/v0/input/${options.action}/${encodeURIComponent(canonicalKey)}`;
-                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.timeouts.quick, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
                     status: response?.statusCode,
@@ -2376,7 +2349,7 @@ export class RokuDeploy {
             method: 'POST',
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: options.timeout
+            timeout: options.timeout ?? RokuDeploy.timeouts.quick
         });
     }
 
