@@ -62,7 +62,8 @@ void yargs
             .option('rceToken', { type: 'string', description: 'The RCE bearer token used with --esn or --instanceUrl. Falls back to "rceToken" in rokudeploy.json', demandOption: false })
             .option('password', { type: 'string', description: 'The password of the target Roku', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
-            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
+            .option('devAppInstallerPort', { type: 'number', description: 'The port of the developer web server on the device (sideload, package, reboot). Defaults to 80', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'Alias of --devAppInstallerPort', deprecated: 'use --devAppInstallerPort instead', demandOption: false })
             .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
             .option('remoteDebug', { type: 'boolean', description: 'Should the command be run in remote debug mode', demandOption: false })
@@ -75,7 +76,7 @@ void yargs
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'devAppInstallerPort', 'packagePort', 'timeout', 'config', 'logLevel'], '')
             .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey:');
     }, (args: any) => {
         return new SideloadCommand().run(args);
@@ -100,7 +101,8 @@ void yargs
             .option('zip', { type: 'string', description: 'The file to be sideloaded (instead of a folder), relative to cwd', demandOption: false })
             .option('dir', { type: 'string', description: 'The folder to be zipped and sideloaded (instead of a zip file), relative to cwd', demandOption: false })
             .option('ecpPort', { type: 'number', description: 'The port to use for ECP commands (like pressing the home button)', demandOption: false })
-            .option('packagePort', { type: 'number', description: 'The port to use for sending a packaging to the device', demandOption: false })
+            .option('devAppInstallerPort', { type: 'number', description: 'The port of the developer web server on the device (sideload, package, reboot). Defaults to 80', demandOption: false })
+            .option('packagePort', { type: 'number', description: 'Alias of --devAppInstallerPort', deprecated: 'use --devAppInstallerPort instead', demandOption: false })
             .option('close', { type: 'boolean', description: 'Close the channel before sideloading. Use --no-close to skip.', demandOption: false })
             .option('timeout', { type: 'number', description: 'The timeout for this command', demandOption: false })
             .option('failOnCompileError', { type: 'boolean', description: 'Should the command fail if there is a compile error', demandOption: false })
@@ -108,7 +110,7 @@ void yargs
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging. On by default, use --no-squash to skip', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'devAppInstallerPort', 'packagePort', 'timeout', 'config', 'logLevel'], '')
             .group(['rekey', 'pkg'], 'Rekey:')
             .group(['sideload', 'zip', 'dir', 'ecpPort', 'close', 'failOnCompileError', 'deleteDevChannel', 'appType'], 'Sideload:')
             .group(['squash'], 'Squash:');
