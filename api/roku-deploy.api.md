@@ -90,12 +90,6 @@ export class CompileError extends RokuDeployError<CompileErrorDetails> {
 export type CompileErrorDetails = DeviceErrorDetails;
 
 // @public
-export type ConfigSectionName = typeof configSectionNames[number];
-
-// @public
-export const configSectionNames: readonly ["sideload", "stage", "zip", "squash", "rekey", "package", "deleteDevChannel", "screenshot", "rce.start", "rce.stop"];
-
-// @public
 export abstract class ConfigurationError extends RokuDeployError<ConfigurationErrorDetails> {
     get optionName(): string | undefined;
 }
@@ -123,8 +117,7 @@ export class ConnectionResetError extends RokuDeployError<ConnectionErrorDetails
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.CONNECTION_RESET;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "The Roku device ended the connection unexpectedly and may need to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public
@@ -910,6 +903,9 @@ export function isRceDeviceConfigById(config: DeviceConfigLike): config is RceDe
 export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceDeviceConfigByUrl;
 
 // @public
+export function isRceManagementApiError(error: unknown): error is RceManagementApiError;
+
+// @public
 export function isRokuDeployError(e: unknown): e is RokuDeployError;
 
 // @public
@@ -1124,30 +1120,47 @@ export interface RceDeviceInstance {
 }
 
 // @public
+export class RceManagementApiError extends RokuDeployError<RceManagementApiErrorDetails> {
+    // (undocumented)
+    readonly code = RokuDeployErrorCode.RCE_MANAGEMENT_API_ERROR;
+}
+
+// @public
+export interface RceManagementApiErrorDetails {
+    // (undocumented)
+    apiCode?: string;
+    // (undocumented)
+    apiMessage?: string;
+    // (undocumented)
+    method: string;
+    // (undocumented)
+    path: string;
+    // (undocumented)
+    statusCode: number;
+    // (undocumented)
+    validationErrors?: RceManagementValidationError[];
+}
+
+// @public
 export class RceManagementClient {
     constructor(options: RceManagementClientOptions);
     createDevice(options: CreateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     createSnapshot(options: CreateSnapshotOptions): Promise<Snapshot>;
-    // (undocumented)
     deleteSnapshot(options: DeleteSnapshotOptions): Promise<void>;
     findDeviceByEsn(options: FindDeviceByEsnOptions): Promise<RceDevice | undefined>;
     getDevice(options: GetDeviceOptions): Promise<RceDevice>;
     getDeviceRuns(options: GetDeviceRunsOptions): Promise<DeviceRun[]>;
     getInstanceUrl(options: GetInstanceUrlOptions): Promise<string>;
     getRunningInstanceApiUrl(options: GetRunningInstanceApiUrlOptions): Promise<string>;
-    // (undocumented)
     getSnapshot(options: GetSnapshotOptions): Promise<Snapshot>;
     getUserInfo(options?: GetUserInfoOptions): Promise<User>;
     listDevices(options?: ListDevicesOptions): Promise<RceDevice[]>;
     listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
-    // (undocumented)
     listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
     startDevice(options: StartDeviceOptions): Promise<RceDevice>;
     stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
     updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
-    // (undocumented)
     updateSnapshot(options: UpdateSnapshotOptions): Promise<Snapshot>;
 }
 
@@ -1167,6 +1180,16 @@ export interface RceManagementPagingOptions {
 // @public
 export interface RceManagementRequestOptions {
     token?: string;
+}
+
+// @public
+export interface RceManagementValidationError {
+    // (undocumented)
+    loc: Array<string | number>;
+    // (undocumented)
+    msg: string;
+    // (undocumented)
+    type: string;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "RceSocket" should be prefixed with an underscore because the declaration is marked as @internal
@@ -1199,28 +1222,6 @@ export class RceSocket extends stream.Duplex {
 export interface RceSocketOptions extends SocketOptions {
     // (undocumented)
     device: RceDeviceConfig;
-}
-
-// @public
-export interface RceStartConfig {
-    deviceId?: number;
-    esn?: string;
-    firmwareVersionId?: string;
-    maxRuntime?: number;
-    snapshot?: string;
-    snapshotId?: number;
-    timeout?: number;
-    token?: string;
-    wait?: boolean;
-}
-
-// @public
-export interface RceStopConfig {
-    deviceId?: number;
-    esn?: string;
-    timeout?: number;
-    token?: string;
-    wait?: boolean;
 }
 
 // @public (undocumented)
@@ -1366,9 +1367,6 @@ export enum RemoteKey {
 // @public (undocumented)
 export type RemoteKeyText = keyof typeof RemoteKey;
 
-// @public
-export type ResolvedSectionOptions<T extends ConfigSectionName> = RootConfigOptions & NonNullable<RokuDeployConfig[T]>;
-
 // @public (undocumented)
 export interface ResolveFilesArrayOptions {
     // (undocumented)
@@ -1451,21 +1449,7 @@ export class RokuDeploy {
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
-    loadConfigFile(options?: LoadConfigFileOptions & {
-        section?: undefined;
-    }): RokuDeployConfig;
-    // (undocumented)
-    loadConfigFile<T extends ConfigSectionName>(options: LoadConfigFileOptions & {
-        section: T;
-    }): ResolvedSectionOptions<T>;
-    // (undocumented)
-    loadConfigFile(options: LoadConfigFileOptions & {
-        section: null;
-    }): RootConfigOptions;
-    // (undocumented)
-    loadConfigFile(options: LoadConfigFileOptions & {
-        section: ConfigSectionName | null;
-    }): Record<string, any>;
+    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig;
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
@@ -1490,28 +1474,23 @@ export const rokuDeploy: RokuDeploy;
 
 // @public
 export interface RokuDeployConfig {
-    'rce.start'?: RceStartConfig;
-    'rce.stop'?: RceStopConfig;
+    convertToSquashfs?: boolean;
     cwd?: string;
-    deleteDevChannel?: Partial<DeleteDevChannelOptions>;
     devAppInstallerPort?: number;
     device?: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
+    files?: FileEntry[];
     logLevel?: LogLevel | LogLevelNumeric;
-    package?: Partial<CreateSignedPackageOptions>;
+    outFile?: string;
     // @deprecated (undocumented)
     packagePort?: number;
     password?: string;
     rceToken?: string;
-    rekey?: Partial<RekeyDeviceOptions>;
-    screenshot?: Partial<CaptureScreenshotOptions>;
-    sideload?: Partial<SideloadOptions>;
-    squash?: Partial<ConvertToSquashfsOptions>;
-    stage?: Partial<StageOptions>;
-    timeout?: number;
+    rekeySignedPackage?: string;
+    rootDir?: string;
+    signingPassword?: string;
+    stagingDir?: string;
     username?: string;
-    zip?: Partial<ZipOptions>;
 }
 
 // @public
@@ -1525,7 +1504,6 @@ export interface RokuDeployConstructorOptions {
     packagePort?: number;
     password?: string;
     rceToken?: string;
-    timeout?: number;
     username?: string;
 }
 
@@ -1558,6 +1536,8 @@ export enum RokuDeployErrorCode {
     INVALID_RESPONSE_CODE = "INVALID_RESPONSE_CODE",
     // (undocumented)
     MISSING_REQUIRED_OPTION = "MISSING_REQUIRED_OPTION",
+    // (undocumented)
+    RCE_MANAGEMENT_API_ERROR = "RCE_MANAGEMENT_API_ERROR",
     // (undocumented)
     UNAUTHORIZED = "UNAUTHORIZED",
     // (undocumented)
@@ -1697,9 +1677,6 @@ export interface RokuRendezvousItem {
     lineNumber: string;
     startTime: string;
 }
-
-// @public
-export type RootConfigOptions = Omit<RokuDeployConfig, ConfigSectionName>;
 
 // @public (undocumented)
 export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
@@ -1912,8 +1889,7 @@ export class UpdateCheckRequiredError extends RokuDeployError<ConnectionErrorDet
     constructor(details?: ConnectionErrorDetails, cause?: Error);
     // (undocumented)
     readonly code = RokuDeployErrorCode.UPDATE_CHECK_REQUIRED;
-    // (undocumented)
-    static MESSAGE: string;
+    static readonly MESSAGE = "Your device needs to check for updates before accepting connections. Please navigate to System Settings and check for updates and then try again.\n\nhttps://support.roku.com/article/208755668.";
 }
 
 // @public (undocumented)

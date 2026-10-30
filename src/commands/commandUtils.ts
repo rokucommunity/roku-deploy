@@ -4,41 +4,55 @@ import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
-import type { ConfigSectionName } from '../RokuDeployConfig';
 import type { DeviceRegistryEntry } from '../RokuDeployOptions';
 
 /**
  * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
- * cwd; skipped entirely with `--no-config`), flatten it for the command's config section (or just
- * the root values when the command has no section), then merge the CLI args on top.
- * Precedence: CLI args → `[section]` → root → defaults.
+ * cwd; skipped entirely with `--no-config`), then merge the CLI args on top.
+ * Precedence: CLI args → config file → defaults. Pass `quiet` to skip announcing the config file.
  */
-export function loadCommandOptions<T = any>(args: any, section: ConfigSectionName | null): T {
+export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
+    let result: Record<string, any>;
     //--no-config: bypass config auto-detection entirely
     if (args.config === false) {
-        return mapCliArgsToLibraryOptions({ ...args }) as T;
+        result = mapCliArgsToLibraryOptions({ ...args });
+    } else {
+        const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
+        //announce which config file feeds this run (even without --verbose) so file-supplied values
+        //are never an invisible input; greppable in CI logs
+        if (!options?.quiet && fsExtra.existsSync(configPath)) {
+            console.log(`Using config: ${configPath}`);
+        }
+        result = mapCliArgsToLibraryOptions({
+            ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }),
+            ...args
+        });
     }
-    const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
-    //announce which config file feeds this run (even without --verbose) so file-supplied values
-    //are never an invisible input; greppable in CI logs
-    if (fsExtra.existsSync(configPath)) {
-        console.log(`Using config: ${configPath}`);
+    //loadConfigFile applies the file's logLevel; an explicit --logLevel still wins on the command line
+    if (args.logLevel !== undefined) {
+        rokuDeploy.logger.logLevel = args.logLevel;
     }
-    return mapCliArgsToLibraryOptions({
-        ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath, section: section }),
-        ...args
-    }) as T;
+    return result as T;
 }
 
 /**
- * Translate CLI-only flag names into the option names the library understands. `--host` becomes an
- * inline `device` config (and wins over any `device` from the config file, since CLI args take precedence).
+ * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
+ * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
+ * since CLI args take precedence); `--rceToken` (or the config file's root `rceToken`) rides along on an
+ * RCE device so the library can authenticate with it.
  */
 function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
-    if (typeof options.host === 'string') {
-        const { host, ...rest } = options;
-        return { ...rest, device: { host: host } } as unknown as T;
+    const { host, esn, instanceUrl, ...remainingOptions } = options;
+    if (typeof host === 'string') {
+        return { ...remainingOptions, device: { host: host } } as unknown as T;
+    }
+    const rceToken = remainingOptions.rceToken as string | undefined;
+    if (typeof esn === 'string') {
+        return { ...remainingOptions, device: { esn: esn, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
+    }
+    if (typeof instanceUrl === 'string') {
+        return { ...remainingOptions, device: { instanceUrl: instanceUrl, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
     }
     return options;
 }
@@ -58,8 +72,8 @@ export const rceWaitPollIntervalMs = 2000;
  * The token comes from `--token`, falling back to the target device's registry entry, then
  * to `rceToken` from rokudeploy.json.
  */
-export function buildRceCommandContext(args: any, command: ConfigSectionName) {
-    const options = loadCommandOptions(args, command);
+export function buildRceCommandContext(args: any) {
+    const options = loadCommandOptions(args);
     const token = options.token ?? resolveRegistryEntry(options)?.rceToken ?? options.rceToken;
     if (!token) {
         throw new Error('An RCE token is required. Pass --token or set "rceToken" in rokudeploy.json');
