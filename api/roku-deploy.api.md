@@ -1485,7 +1485,6 @@ export interface RokuDeployConfig {
     rootDir?: string;
     signingPassword?: string;
     stagingDir?: string;
-    timeout?: number;
     username?: string;
 }
 
@@ -1498,7 +1497,6 @@ export interface RokuDeployConstructorOptions {
     packagePort?: number;
     password?: string;
     rceToken?: string;
-    timeout?: number;
     username?: string;
 }
 

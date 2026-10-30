@@ -32,10 +32,6 @@ export interface RokuDeployConfig {
      */
     ecpPort?: number;
     /**
-     * The timeout for each network request to the device, in milliseconds
-     */
-    timeout?: number;
-    /**
      * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
      * rceToken of its own
      */

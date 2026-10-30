@@ -70,16 +70,27 @@ export class RokuDeploy {
      * Default values for common options used across multiple functions
      */
     private static readonly defaults = {
-        timeout: 150000,
-        /**
-         * The default timeout for ECP requests, in milliseconds. ECP commands are small and fast,
-         * so this is much lower than `timeout` (which must accommodate large installer uploads).
-         */
-        ecpTimeout: 10000,
         packagePort: 80,
         ecpPort: 8060,
         outDir: './out',
         outFile: 'roku-deploy.zip'
+    };
+
+    /**
+     * Per-action request timeouts, in milliseconds. A caller's `timeout` option overrides these.
+     * Raising a value is not a breaking change; lowering one is.
+     */
+    private static readonly timeouts = {
+        /**
+         * Quick requests over ECP or the installer: device info, key presses, reboot, update check,
+         * channel delete, password check.
+         */
+        quick: 10_000,
+        /**
+         * Long-running on-device operations that upload or build: sideload, package, convert to
+         * squashfs, rekey.
+         */
+        extended: 300_000
     };
 
     /**
@@ -264,7 +275,7 @@ export class RokuDeploy {
                         mysubmit: 'Replace',
                         archive: readStream,
                         ...(options.appType ? { 'app_type': options.appType } : {})
-                    });
+                    }, RokuDeploy.timeouts.extended);
 
                     //attach the remotedebug flag if configured
                     if (options.remoteDebug) {
@@ -390,7 +401,7 @@ export class RokuDeploy {
             let requestOptions = await this.generateBaseRequestOptions('plugin_install', deviceConfig, options, {
                 archive: '',
                 mysubmit: 'Convert to squashfs'
-            });
+            }, RokuDeploy.timeouts.extended);
             try {
                 return await this.doPostRequest(requestOptions);
             } catch (error) {
@@ -485,7 +496,7 @@ export class RokuDeploy {
                 'pkg_time': (new Date()).getTime(),
                 passwd: options.signingPassword,
                 'app_name': appName
-            });
+            }, RokuDeploy.timeouts.extended);
             return this.doPostRequest(requestOptions);
         });
 
@@ -549,7 +560,7 @@ export class RokuDeploy {
                     mysubmit: 'Rekey',
                     passwd: options.signingPassword,
                     archive: archiveStream
-                });
+                }, RokuDeploy.timeouts.extended);
                 return this.doPostRequest(requestOptions);
             });
         } finally {
@@ -614,7 +625,7 @@ export class RokuDeploy {
                 verify: true,
                 devices: options.devices,
                 ecpPort: options.ecpPort,
-                timeout: options.timeout
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick
             });
         } catch (e) {
             if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
@@ -864,7 +875,7 @@ export class RokuDeploy {
 
         const username = options.username ?? 'rokudev';
         const port = options.port ?? 80;
-        const timeout = options.timeout ?? 3000;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
 
         //for the unreachable/unexpected-status messages: a local device is identified by its host (unchanged
         //from before), an RCE device by its installer base url (never includes credentials)
@@ -934,7 +945,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         const verify = options.verify ?? false;
@@ -994,7 +1005,7 @@ export class RokuDeploy {
         this.validateTimeout(options.timeout);
 
         const deviceConfig = this.resolveDevice(options.device);
-        const timeout = options.timeout ?? RokuDeploy.defaults.ecpTimeout;
+        const timeout = options.timeout ?? RokuDeploy.timeouts.quick;
         const ecpPort = options.ecpPort ?? RokuDeploy.defaults.ecpPort;
 
         return this.withRceInstanceUrlRetry(deviceConfig, async () => {
@@ -1179,7 +1190,7 @@ export class RokuDeploy {
             const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
             return this.doPostRequest({
                 url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout,
+                timeout: options.timeout ?? RokuDeploy.timeouts.quick,
                 headers: this.buildRceAuthHeaders(rceToken)
             }, true);
         });
@@ -1817,12 +1828,12 @@ export class RokuDeploy {
         return fsExtra.writeFile(zipFilePath, content);
     }
 
-    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T): Promise<RequestOptions> {
+    private async generateBaseRequestOptions<T>(requestPath: string, deviceConfig: DeviceConfig, options: BaseRequestOptions, formData = {} as T, defaultTimeout: number = RokuDeploy.timeouts.quick): Promise<RequestOptions> {
         // Merge constructor options with call options
         const mergedOptions = { ...this.options, ...options };
-        // Set defaults for request options
+        // Set defaults for request options. A caller-supplied timeout overrides the action's default.
         const packagePort = mergedOptions.packagePort ?? RokuDeploy.defaults.packagePort;
-        const timeout = mergedOptions.timeout ?? RokuDeploy.defaults.timeout;
+        const timeout = mergedOptions.timeout ?? defaultTimeout;
         const username = mergedOptions.username ?? 'rokudev';
 
         const { baseUrl, headers } = await this.getInstallerRequestBase(deviceConfig, packagePort);
@@ -2266,7 +2277,7 @@ export class RokuDeploy {
                 const response = await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                     const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
                     const url = `${instanceUrl}/api/v0/input/${options.action}/${encodeURIComponent(canonicalKey)}`;
-                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.defaults.ecpTimeout, headers: this.buildRceAuthHeaders(rceToken) }, true);
+                    return this.doPostRequest({ url: url, timeout: options.timeout ?? RokuDeploy.timeouts.quick, headers: this.buildRceAuthHeaders(rceToken) }, true);
                 });
                 return {
                     status: response?.statusCode,
@@ -2283,7 +2294,7 @@ export class RokuDeploy {
             method: 'POST',
             devices: options.devices,
             ecpPort: options.ecpPort,
-            timeout: options.timeout
+            timeout: options.timeout ?? RokuDeploy.timeouts.quick
         });
     }
 
