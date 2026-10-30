@@ -37,6 +37,72 @@ export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boole
 }
 
 /**
+ * The config file a `--help` run would read, honoring `--cwd`, `--config` and `--no-config`: its absolute
+ * path and its parsed values. Undefined when help was not requested, when config
+ * loading is off, or when the file is missing or unparseable (the latter is reported by the real run).
+ */
+function findHelpConfig(argv: string[]): { path: string; values: Record<string, any> } | undefined {
+    if (!argv.includes('--help') && !argv.includes('-h') || argv.includes('--no-config')) {
+        return undefined;
+    }
+    const flag = (name: string) => {
+        const index = argv.findIndex(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
+        if (index < 0) {
+            return undefined;
+        }
+        return argv[index].includes('=') ? argv[index].split('=').slice(1).join('=') : argv[index + 1];
+    };
+    const cwd = flag('cwd') ?? process.cwd();
+    const name = flag('config') ?? 'rokudeploy.json';
+    const configPath = path.resolve(cwd, name);
+    if (!fsExtra.existsSync(configPath)) {
+        return undefined;
+    }
+    try {
+        return { path: configPath, values: rokuDeploy.loadConfigFile({ cwd: cwd, configPath: configPath }) };
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * A command description for `--help` that, when a config file is found, adds a second paragraph naming
+ * it (relative to cwd when it lives there). Only for help on that command (`argv` carries its name), so
+ * the root command list stays one line each.
+ */
+export function helpDescription(command: string, description: string, argv: string[] = process.argv): string {
+    const config = argv.includes(command) ? findHelpConfig(argv) : undefined;
+    if (!config) {
+        return description;
+    }
+    const cwd = process.cwd();
+    const shown = config.path.startsWith(cwd + path.sep) ? `./${path.relative(cwd, config.path)}` : config.path;
+    return `${description}\n\nUsing config: ${shown}`;
+}
+
+/**
+ * For `--help` only: tag every option that the config file supplies with `[default: from config]`, so the
+ * reader can see which values the command will pick up without the values themselves being printed.
+ * `--host`/`--esn`/`--instanceUrl` are tagged when the file's `device` covers them. Call it first in a
+ * command builder: it wraps `option()` so each declaration that follows picks up the tag.
+ */
+export function describeConfigValues<T extends { option: (key: string, def: Record<string, any>) => T }>(builder: T, argv: string[] = process.argv): T {
+    const config = findHelpConfig(argv);
+    if (!config) {
+        return builder;
+    }
+    const supplied = new Set(Object.keys(config.values));
+    if (typeof config.values.device === 'string') {
+        ['host', 'esn', 'instanceUrl'].forEach(key => supplied.add(key));
+    } else if (config.values.device) {
+        Object.keys(config.values.device).forEach(key => supplied.add(key));
+    }
+    const declare = builder.option.bind(builder);
+    builder.option = (key, def) => declare(key, supplied.has(key) ? { ...def, defaultDescription: 'from config' } : def);
+    return builder;
+}
+
+/**
  * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
  * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
  * since CLI args take precedence); `--rceToken` (or the config file's root `rceToken`) rides along on an
