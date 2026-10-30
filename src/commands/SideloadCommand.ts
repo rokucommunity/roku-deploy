@@ -3,7 +3,7 @@ import { loadCommandOptions } from './commandUtils';
 
 export class SideloadCommand {
     async run(args) {
-        let options = loadCommandOptions(args, 'sideload');
+        let options = loadCommandOptions(args);
 
         await rokuDeploy.sideload(options);
     }
