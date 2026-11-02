@@ -1,7 +1,4 @@
-import * as path from 'path';
-import * as fsExtra from 'fs-extra';
 import { rokuDeploy } from '../index';
-import { InvalidOptionError } from '../Errors';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
@@ -14,28 +11,16 @@ import type { DeviceRegistryEntry } from '../RokuDeployOptions';
  */
 export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boolean }): T {
     args.cwd ??= process.cwd();
-    //--config drives file loading; it is not an option any library method reads
+    //--config drives file loading; it is not an option any library method reads. Omitted means the
+    //optional default rokudeploy.json; --no-config (false) skips the file entirely
     const { config: configArg, ...cliOptions } = args;
-    let result: Record<string, any>;
-    //--no-config: bypass config auto-detection entirely
-    if (configArg === false) {
-        result = mapCliArgsToLibraryOptions({ ...cliOptions });
-    } else {
-        //same rules as the constructor's `config` option: an explicit --config (resolved against cwd) must
-        //exist; the default rokudeploy.json in cwd is optional
-        const configPath = path.resolve(args.cwd, configArg ?? 'rokudeploy.json');
-        if (configArg !== undefined && !fsExtra.existsSync(configPath)) {
-            throw new InvalidOptionError(`Config file does not exist at "${configPath}"`, { optionName: 'config' });
-        }
-        //announce which config file feeds this run (even without --verbose) so file-supplied values
-        //are never an invisible input; greppable in CI logs
-        if (!options?.quiet && fsExtra.existsSync(configPath)) {
-            console.log(`Using config: ${configPath}`);
-        }
-        //a `config` key inside the file has no meaning as an option, so it never reaches the library
-        const { config, ...configValues } = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }) as Record<string, any>;
-        result = mapCliArgsToLibraryOptions({ ...configValues, ...cliOptions });
+    const { configPath, values } = rokuDeploy.resolveConfig({ cwd: args.cwd, config: configArg ?? true });
+    //announce which config file feeds this run (even without --verbose) so file-supplied values
+    //are never an invisible input; greppable in CI logs
+    if (configPath && !options?.quiet) {
+        console.log(`Using config: ${configPath}`);
     }
+    const result = mapCliArgsToLibraryOptions({ ...values, ...cliOptions });
     //loadConfigFile applies the file's logLevel; an explicit --logLevel still wins on the command line
     if (args.logLevel !== undefined) {
         rokuDeploy.logger.logLevel = args.logLevel;

@@ -1364,6 +1364,22 @@ export enum RemoteKey {
 // @public (undocumented)
 export type RemoteKeyText = keyof typeof RemoteKey;
 
+// Warning: (ae-internal-missing-underscore) The name "ResolveConfigOptions" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export interface ResolveConfigOptions {
+    config?: boolean | string | null;
+    cwd?: string;
+}
+
+// Warning: (ae-internal-missing-underscore) The name "ResolvedConfig" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal (undocumented)
+export interface ResolvedConfig {
+    configPath?: string;
+    values: RokuDeployConfig;
+}
+
 // @public (undocumented)
 export interface ResolveFilesArrayOptions {
     // (undocumented)
@@ -1451,6 +1467,8 @@ export class RokuDeploy {
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
+    // @internal
+    resolveConfig(options?: ResolveConfigOptions): ResolvedConfig;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
