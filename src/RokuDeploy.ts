@@ -53,8 +53,13 @@ export class RokuDeploy {
         const { config, ...constructorOptions } = options ?? {};
         //each instance gets its own logger so changing one instance's logLevel never affects another
         this.logger = constructorOptions.logger ?? logger.createLogger();
-        //config-file values become the instance defaults; explicit constructor options win
-        this.options = { ...this.resolveConfig({ config: config }).values, ...constructorOptions };
+        //config-file values become the instance defaults; explicit constructor options win. The file is
+        //announced (never its values) so file-supplied settings are never an invisible input
+        const { configPath, values } = this.resolveConfig({ cwd: constructorOptions.cwd, config: config });
+        if (configPath) {
+            this.logger.log(`Using config: ${configPath}`);
+        }
+        this.options = { ...values, ...constructorOptions };
     }
 
     /**
@@ -1646,14 +1651,12 @@ export class RokuDeploy {
     }
 
     /**
-     * Resolve and read the config file described by `config`, by the same rules the constructor and
-     * every CLI command use: `true` reads `rokudeploy.json` from cwd and tolerates a missing file; a
-     * path (resolved against cwd) must exist unless prefixed with `?`; `false`, `null` or omitted reads
-     * nothing. A root-level `config` key inside the file is dropped. `configPath` is set only when a
-     * file was read.
-     * @internal
+     * Resolve and read the config file described by `config`: `true` reads `rokudeploy.json` from cwd and
+     * tolerates a missing file; a path (resolved against cwd) must exist unless prefixed with `?`;
+     * `false`, `null` or omitted reads nothing. A root-level `config` key inside the file is dropped.
+     * `configPath` is set only when a file was read.
      */
-    public resolveConfig(options?: ResolveConfigOptions): ResolvedConfig {
+    private resolveConfig(options?: { cwd?: string; config?: boolean | string | null }): { configPath?: string; values: RokuDeployConfig } {
         const { config, cwd = process.cwd() } = options ?? {};
         if (typeof config !== 'string' && config !== true) {
             return { values: {} };
@@ -1677,7 +1680,7 @@ export class RokuDeploy {
      * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
      * about invalid device-registry entries. Returns the flat config as written; the empty object
      * when the file is absent. The library never loads config implicitly — library consumers call this
-     * (or `resolveConfig`) explicitly or opt in with the constructor's `config` option.
+     * explicitly or opt in with the constructor's `config` option.
      * @public
      */
     public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig {
@@ -3425,35 +3428,6 @@ export interface DeleteComponentLibraryOptions extends BaseRequestOptions {
  * @public
  */
 export type DeleteAllComponentLibrariesOptions = BaseRequestOptions;
-
-/**
- * @internal
- */
-export interface ResolveConfigOptions {
-    /**
-     * The directory relative paths resolve against. Defaults to `process.cwd()`.
-     */
-    cwd?: string;
-    /**
-     * Which config file to read: `true` for `rokudeploy.json` in cwd (optional), a path that must exist,
-     * a `?`-prefixed path that may be missing, or `false`/`null`/omitted for none.
-     */
-    config?: boolean | string | null;
-}
-
-/**
- * @internal
- */
-export interface ResolvedConfig {
-    /**
-     * Absolute path of the file that was read; undefined when no file was read.
-     */
-    configPath?: string;
-    /**
-     * The file's flat values (without any root-level `config` key); empty when no file was read.
-     */
-    values: RokuDeployConfig;
-}
 
 /**
  * @public

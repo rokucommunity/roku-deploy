@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { CaptureScreenshotOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class CaptureScreenshotCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.captureScreenshot(options);
+        await createRokuDeploy(args).captureScreenshot({} as CaptureScreenshotOptions);
     }
 }

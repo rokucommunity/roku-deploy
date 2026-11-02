@@ -1,15 +1,14 @@
 import * as readline from 'readline';
-import { rokuDeploy } from '../index';
-import type { RemoteKeyText } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { KeyPressOptions, RemoteKeyText, SendTextOptions } from '../index';
+import { createRokuDeploy, resolvedOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = loadCommandOptions(args);
+        const rokuDeploy = createRokuDeploy(args);
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation
-        rokuDeploy['checkRequiredOptions'](options, ['device']);
+        rokuDeploy['checkRequiredOptions'](resolvedOptions(rokuDeploy), ['device']);
 
         readline.emitKeypressEvents(process.stdin);
         process.stdin.setRawMode(true);
@@ -84,15 +83,13 @@ export class RemoteControlCommand {
                             text = ' ';
                         }
 
-                        void rokuDeploy.sendText({
-                            text: text, ...options
-                        });
+                        void rokuDeploy.sendText({ text: text } as SendTextOptions);
                     }
                     break;
             }
 
             if (rokuDeployKeyName) {
-                void rokuDeploy.keyPress({ key: rokuDeployKeyName, ...options });
+                void rokuDeploy.keyPress({ key: rokuDeployKeyName } as KeyPressOptions);
             }
         });
 

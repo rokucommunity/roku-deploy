@@ -1,9 +1,7 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { createRokuDeploy } from './commandUtils';
 
 export class DeleteDevChannelCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.deleteDevChannel(options);
+        await createRokuDeploy(args).deleteDevChannel();
     }
 }

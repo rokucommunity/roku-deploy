@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { KeyDownOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class KeyDownCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.keyDown(options);
+        await createRokuDeploy(args).keyDown({} as KeyDownOptions);
     }
 }

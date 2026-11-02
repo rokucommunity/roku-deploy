@@ -38,12 +38,16 @@ export interface DeviceRegistryEntry extends DeviceRegistrySettings {
  */
 export interface RokuDeployConstructorOptions {
     /**
-     * Load a `rokudeploy.json` config file at construction. `true` reads `rokudeploy.json` from cwd (a
-     * missing file is fine). A string path (resolved against cwd) must exist; prefix it with `?` to make
+     * Load a `rokudeploy.json` config file at construction. `true` reads `rokudeploy.json` from `cwd` (a
+     * missing file is fine). A string path (resolved against `cwd`) must exist; prefix it with `?` to make
      * the file optional (e.g. `'?../rokudeploy.json'`). `false`, `null` or omitted loads nothing. The
-     * file's values become instance defaults; explicit constructor options win.
+     * file's values become instance defaults; explicit constructor options win. The file's path is logged.
      */
     config?: boolean | string | null;
+    /**
+     * The working directory that relative paths (including `config`) resolve against. Defaults to `process.cwd()`.
+     */
+    cwd?: string;
     /**
      * A custom logger instance. If not provided, the global logger will be used.
      */

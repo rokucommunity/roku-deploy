@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { ConvertToSquashfsOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class ConvertToSquashfsCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.convertToSquashfs(options);
+        await createRokuDeploy(args).convertToSquashfs({} as ConvertToSquashfsOptions);
     }
 }

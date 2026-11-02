@@ -1,10 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { createRokuDeploy } from './commandUtils';
 
 export class GetDevIdCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        const { devId } = await rokuDeploy.getDevId(options);
+        const { devId } = await createRokuDeploy(args).getDevId();
         console.log(devId);
     }
 }

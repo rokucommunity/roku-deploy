@@ -1,11 +1,10 @@
-import { rokuDeploy } from '../index';
+import type { GetDeviceInfoOptions } from '../index';
 import { util } from '../util';
-import { loadCommandOptions } from './commandUtils';
+import { createRokuDeploy } from './commandUtils';
 
 export class GetDeviceInfoCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        const outputPath = await rokuDeploy.getDeviceInfo(options);
+        const outputPath = await createRokuDeploy(args).getDeviceInfo({} as GetDeviceInfoOptions);
         console.log(util.objectToTableString(outputPath));
     }
 }

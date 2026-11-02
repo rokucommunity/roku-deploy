@@ -1,16 +1,13 @@
-import { rokuDeploy } from '../index';
+import type { RekeyDeviceOptions } from '../index';
 import { util } from '../util';
 import * as path from 'path';
-import { loadCommandOptions } from './commandUtils';
+import { createRokuDeploy } from './commandUtils';
 
 export class RekeyDeviceCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        if (args.pkg) {
-            options.pkg = util.standardizePath(
-                path.resolve(args.cwd, args.pkg)
-            );
-        }
-        await rokuDeploy.rekeyDevice(options);
+        const rokuDeploy = createRokuDeploy(args);
+        //--pkg is relative to cwd; a per-call option, so it wins over any pkg the config file sets
+        const pkg = args.pkg ? util.standardizePath(path.resolve(args.cwd, args.pkg)) : undefined;
+        await rokuDeploy.rekeyDevice((pkg ? { pkg: pkg } : {}) as RekeyDeviceOptions);
     }
 }

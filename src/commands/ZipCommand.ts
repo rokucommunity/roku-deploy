@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { ZipOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class ZipCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.zip(options);
+        await createRokuDeploy(args).zip({} as ZipOptions);
     }
 }

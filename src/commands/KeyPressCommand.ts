@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { KeyPressOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.keyPress(options);
+        await createRokuDeploy(args).keyPress({} as KeyPressOptions);
     }
 }

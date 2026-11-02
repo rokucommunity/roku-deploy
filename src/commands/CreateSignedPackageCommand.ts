@@ -1,5 +1,5 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { ConvertToSquashfsOptions, CreateSignedPackageOptions, RekeyDeviceOptions, SideloadOptions } from '../index';
+import { createRokuDeploy, resolvedOptions } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -7,18 +7,18 @@ import { loadCommandOptions } from './commandUtils';
  */
 export class CreateSignedPackageCommand {
     async run(args) {
-        const options = loadCommandOptions(args);
+        const rokuDeploy = createRokuDeploy(args);
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice(options);
+            await rokuDeploy.rekeyDevice({} as RekeyDeviceOptions);
         }
         if (args.sideload) {
-            await rokuDeploy.sideload(options);
+            await rokuDeploy.sideload({} as SideloadOptions);
         }
         //a production package should be squashed, so squash runs unless --no-squash (or a config
         //`squash: false`) opts out
-        if (options.squash !== false) {
-            await rokuDeploy.convertToSquashfs(options);
+        if (resolvedOptions(rokuDeploy).squash !== false) {
+            await rokuDeploy.convertToSquashfs({} as ConvertToSquashfsOptions);
         }
-        await rokuDeploy.createSignedPackage(options);
+        await rokuDeploy.createSignedPackage({} as CreateSignedPackageOptions);
     }
 }

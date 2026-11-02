@@ -1,9 +1,8 @@
-import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import type { StageOptions } from '../index';
+import { createRokuDeploy } from './commandUtils';
 
 export class StageCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.stage(options);
+        await createRokuDeploy(args).stage({} as StageOptions);
     }
 }
