@@ -1451,7 +1451,6 @@ export class RokuDeploy {
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
-    reloadConfig(): void;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
