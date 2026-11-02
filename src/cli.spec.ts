@@ -36,6 +36,8 @@ describe('cli', function cli() {
     this.timeout(60_000);
 
     before(() => {
+        //execSync runs in tempDir, which a previous run's afterEach may have removed
+        fsExtra.ensureDirSync(tempDir);
         execSync('npm run build');
     });
 
@@ -917,7 +919,7 @@ describe('cli', function cli() {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
             const argv = ['package', '--help', '--cwd', tempDir];
             //the temp dir lives under the repo (process.cwd()), so the path is shown relative to it
-            expect(helpDescription('package', 'Make a package', argv)).to.equal(`Make a package\n\nUsing config: ./${path.relative(process.cwd(), tempDir)}/rokudeploy.json`);
+            expect(helpDescription('package', 'Make a package', argv)).to.equal(`Make a package\n\nUsing config: .${path.sep}${s`${path.relative(process.cwd(), tempDir)}/rokudeploy.json`}`);
             //the root command list must stay one line per command
             expect(helpDescription('sideload', 'Sideload', argv)).to.equal('Sideload');
         });
@@ -936,7 +938,7 @@ describe('cli', function cli() {
             fsExtra.outputJsonSync(`${tempDir}/custom.json`, { password: 'x' });
             const cwdStub = sinon.stub(process, 'cwd').returns(tempDir);
             try {
-                expect(helpDescription('package', 'Make a package', ['package', '-h', '--config', 'custom.json'])).to.include('Using config: ./custom.json');
+                expect(helpDescription('package', 'Make a package', ['package', '-h', '--config', 'custom.json'])).to.include(`Using config: .${path.sep}custom.json`);
             } finally {
                 cwdStub.restore();
             }
@@ -957,7 +959,7 @@ describe('cli', function cli() {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'x' });
             //yargs wraps long lines, so check the label and the path separately with line breaks removed
             const help = childProcess.execSync(`node ${cwd}/dist/cli.js package --help`, { cwd: tempDir, stdio: 'pipe' }).toString().replace(/\n/g, '');
-            expect(help).to.include('Using config: ./rokudeploy.json');
+            expect(help).to.include(`Using config: .${path.sep}rokudeploy.json`);
             const root = childProcess.execSync(`node ${cwd}/dist/cli.js --help`, { cwd: tempDir, stdio: 'pipe' }).toString();
             expect(root).not.to.include('Using config');
         });

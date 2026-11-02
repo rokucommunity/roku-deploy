@@ -76,7 +76,7 @@ export function helpDescription(command: string, description: string, argv: stri
         return description;
     }
     const cwd = process.cwd();
-    const shown = config.path.startsWith(cwd + path.sep) ? `./${path.relative(cwd, config.path)}` : config.path;
+    const shown = config.path.startsWith(cwd + path.sep) ? `.${path.sep}${path.relative(cwd, config.path)}` : config.path;
     return `${description}\n\nUsing config: ${shown}`;
 }
 
