@@ -2788,26 +2788,42 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('sendDeveloperSettingsCombo', () => {
+    describe('requestSecretScreen', () => {
         it('POSTs to the instance api developer-settings-combo endpoint with the X-Authorization bearer header', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
 
-            await rokuDeploy.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' } });
+            await rokuDeploy.requestSecretScreen({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }, screen: 'developerSettings' });
 
             expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/xi/developer-settings-combo');
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
         });
 
+        it('throws for an unknown screen before touching the device', async () => {
+            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest');
+            await expectThrowsAsync(
+                rokuDeploy.requestSecretScreen({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' }, screen: 'wifi' as any }),
+                `Unknown secret screen 'wifi'. Supported screens: developerSettings`
+            );
+            expect(stub.called).to.be.false;
+        });
+
+        it('throws when no screen is given', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.requestSecretScreen({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' } } as any),
+                'Missing required option: screen'
+            );
+        });
+
         it('throws for a local device', async () => {
             await expectThrowsAsync(
-                rokuDeploy.sendDeveloperSettingsCombo({ device: { host: '1.2.3.4' } }),
-                'sendDeveloperSettingsCombo is only supported for RCE devices'
+                rokuDeploy.requestSecretScreen({ device: { host: '1.2.3.4' }, screen: 'developerSettings' }),
+                'requestSecretScreen is only supported for RCE devices'
             );
         });
 
         it('throws for an RCE device without any rceToken', async () => {
             await expectThrowsAsync(
-                rokuDeploy.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' } }),
+                rokuDeploy.requestSecretScreen({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' }, screen: 'developerSettings' }),
                 'An rceToken is required to reach the instance api on an RCE device'
             );
         });
@@ -2816,7 +2832,7 @@ describe('RokuDeploy', () => {
             const rd = new RokuDeploy({ rceToken: 'default-token' });
             const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
 
-            await rd.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' } });
+            await rd.requestSecretScreen({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' }, screen: 'developerSettings' });
 
             expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer default-token' });
         });
@@ -2824,8 +2840,9 @@ describe('RokuDeploy', () => {
         it('honors an explicit timeout', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
 
-            await rokuDeploy.sendDeveloperSettingsCombo({
+            await rokuDeploy.requestSecretScreen({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
+                screen: 'developerSettings',
                 timeout: 1234
             });
 

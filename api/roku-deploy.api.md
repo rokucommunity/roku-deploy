@@ -1365,6 +1365,11 @@ export enum RemoteKey {
 export type RemoteKeyText = keyof typeof RemoteKey;
 
 // @public (undocumented)
+export interface RequestSecretScreenOptions extends BaseEcpOptions {
+    screen: SecretScreen;
+}
+
+// @public (undocumented)
 export interface ResolveFilesArrayOptions {
     // (undocumented)
     files: FileEntry[];
@@ -1451,8 +1456,8 @@ export class RokuDeploy {
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
+    requestSecretScreen(options: RequestSecretScreenOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
-    sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
@@ -1669,8 +1674,8 @@ export interface RokuRendezvousItem {
     startTime: string;
 }
 
-// @public (undocumented)
-export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
+// @public
+export type SecretScreen = 'developerSettings';
 
 // @public (undocumented)
 export interface SendEcpRequestOptions extends BaseEcpOptions {

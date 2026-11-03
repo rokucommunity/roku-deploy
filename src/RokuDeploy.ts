@@ -1169,18 +1169,22 @@ export class RokuDeploy {
     }
 
     /**
-     * Enter the developer-settings key combo on a Roku Cloud Emulator device, causing it to show
-     * the on-screen developer setup wizard for the user to complete (this call only triggers that
-     * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
-     * only exists on the RCE instance api.
+     * Ask a Roku Cloud Emulator device to show one of its hidden "secret" screens (the ones a physical
+     * remote reaches through a key combo). `developerSettings` shows the developer setup wizard for the
+     * user to complete on screen; this call only brings the screen up. Local devices are not supported:
+     * the combo endpoints only exist on the RCE instance api.
      * @public
      */
-    public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
-        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendDeveloperSettingsComboOptions;
-        this.checkRequiredOptions(options, ['device']);
+    public async requestSecretScreen(options: RequestSecretScreenOptions): Promise<void> {
+        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RequestSecretScreenOptions;
+        this.checkRequiredOptions(options, ['device', 'screen']);
+        const route = RokuDeploy.secretScreenRoutes[options.screen];
+        if (!route) {
+            throw new Error(`Unknown secret screen '${options.screen as string}'. Supported screens: ${Object.keys(RokuDeploy.secretScreenRoutes).join(', ')}`);
+        }
         const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (!isRceDeviceConfig(deviceConfig)) {
-            throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
+            throw new Error('requestSecretScreen is only supported for RCE devices');
         }
         const rceToken = this.getRceToken(deviceConfig);
         if (!rceToken) {
@@ -1189,12 +1193,19 @@ export class RokuDeploy {
         await this.withRceInstanceUrlRetry(deviceConfig, async () => {
             const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
             return this.doPostRequest({
-                url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
+                url: `${instanceUrl}/api/v0/xi/${route}`,
                 timeout: options.timeout ?? RokuDeploy.timeouts.quick,
                 headers: this.buildRceAuthHeaders(rceToken)
             }, true);
         });
     }
+
+    /**
+     * The RCE instance api route behind each secret screen.
+     */
+    private static readonly secretScreenRoutes: Record<SecretScreen, string> = {
+        developerSettings: 'developer-settings-combo'
+    };
 
     /**
      * Launch a channel on the device (the ECP `launch/{appId}` endpoint).
@@ -3011,9 +3022,18 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
 }
 
 /**
+ * A hidden Roku screen that `requestSecretScreen` can bring up on an RCE device.
  * @public
  */
-export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
+export type SecretScreen = 'developerSettings';
+
+/**
+ * @public
+ */
+export interface RequestSecretScreenOptions extends BaseEcpOptions {
+    /** Which secret screen to show. */
+    screen: SecretScreen;
+}
 
 /**
  * @public
