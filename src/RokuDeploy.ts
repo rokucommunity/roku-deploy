@@ -54,7 +54,7 @@ export class RokuDeploy {
         //each instance gets its own logger so changing one instance's logLevel never affects another
         this.logger = constructorOptions.logger ?? logger.createLogger();
         //config-file values become the instance defaults; explicit constructor options win
-        this.options = { ...this.loadConfigFile({ cwd: constructorOptions.cwd, config: config ?? false }), ...constructorOptions };
+        this._options = { ...this.loadConfigFile({ cwd: constructorOptions.cwd, config: config ?? false }), ...constructorOptions };
         //loading applied the file's logLevel; an explicit logLevel option beats it
         if (constructorOptions.logLevel !== undefined) {
             this.logger.logLevel = constructorOptions.logLevel;
@@ -109,9 +109,14 @@ export class RokuDeploy {
 
     /**
      * Instance-level default options merged into every method call: config-file values overlaid
-     * with the constructor's explicit options (constructor wins).
+     * with the constructor's explicit options (constructor wins). Fixed when the instance is built.
+     * @public
      */
-    private readonly options: RokuDeployConstructorOptions;
+    public get options(): Readonly<RokuDeployConstructorOptions> {
+        return this._options;
+    }
+
+    private readonly _options: RokuDeployConstructorOptions;
 
     /**
      * Resolved RCE instance urls, cached per device config for the lifetime of this instance so a
@@ -127,6 +132,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async stage(options?: Partial<StageOptions>): Promise<StageResult>;
     public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
@@ -170,6 +176,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async zip(options?: Partial<ZipOptions>): Promise<ZipResult>;
     public async zip(options: ZipOptions): Promise<ZipResult> {
         options = { ...this.options, ...options };
         logger.info('Beginning to zip');
@@ -214,6 +221,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async sideload(options?: Partial<SideloadOptions>): Promise<SideloadResult>;
     public async sideload(options: SideloadOptions): Promise<SideloadResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
@@ -396,6 +404,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async convertToSquashfs(options?: Partial<ConvertToSquashfsOptions>): Promise<ConvertToSquashfsResult>;
     public async convertToSquashfs(options: ConvertToSquashfsOptions): Promise<ConvertToSquashfsResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ConvertToSquashfsOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -446,6 +455,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async createSignedPackage(options?: Partial<CreateSignedPackageOptions>): Promise<CreateSignedPackageResult>;
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
@@ -542,6 +552,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async rekeyDevice(options?: Partial<RekeyDeviceOptions>): Promise<void>;
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RekeyDeviceOptions;
         this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
@@ -614,27 +625,27 @@ export class RokuDeploy {
      * @param port the port to use for the ECP request (defaults to 8060)
      * @public
      */
-    public async getDeviceInfo(options?: GetDeviceInfoOptions & { enhance: true }): Promise<DeviceInfo>;
+    public async getDeviceInfo(options?: Partial<GetDeviceInfoOptions> & { enhance: true }): Promise<DeviceInfo>;
     /**
      * @public
      */
-    public async getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
+    public async getDeviceInfo(options?: Partial<GetDeviceInfoOptions>): Promise<DeviceInfoRaw>;
     /**
      * @public
      */
-    public async getDeviceInfo(options: GetDeviceInfoOptions) {
-        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDeviceInfoOptions;
-        this.checkRequiredOptions(options, ['device']);
+    public async getDeviceInfo(options?: Partial<GetDeviceInfoOptions>) {
+        const resolved = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDeviceInfoOptions;
+        this.checkRequiredOptions(resolved, ['device']);
 
         let result: EcpResult;
         try {
             result = await this.sendEcpRequest({
-                device: options.device,
+                device: resolved.device,
                 route: 'query/device-info',
                 verify: true,
-                devices: options.devices,
-                ecpPort: options.ecpPort,
-                timeout: options.timeout ?? RokuDeploy.timeouts.quick
+                devices: resolved.devices,
+                ecpPort: resolved.ecpPort,
+                timeout: resolved.timeout ?? RokuDeploy.timeouts.quick
             });
         } catch (e) {
             if ((e as any)?.details?.httpDetails?.response?.headers?.server?.includes('Roku')) {
@@ -661,7 +672,7 @@ export class RokuDeploy {
         try {
             let deviceInfo = { ...deviceInfoRoot } as Record<string, any>;
 
-            if (options.enhance) {
+            if (resolved.enhance) {
                 deviceInfo = this.enhanceDeviceInfo(deviceInfo as DeviceInfoRaw);
             }
             this.logger.debug('Device info:', deviceInfo);
@@ -705,6 +716,7 @@ export class RokuDeploy {
      * @returns
      * @public
      */
+    public async getDevId(options?: Partial<GetDevIdOptions>): Promise<GetDevIdResult>;
     public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDevIdOptions;
         this.checkRequiredOptions(options, ['device']);
@@ -721,6 +733,7 @@ export class RokuDeploy {
     /**
      * @public
      */
+    public async captureScreenshot(options?: Partial<CaptureScreenshotOptions>): Promise<CaptureScreenshotResult>;
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CaptureScreenshotOptions;
         this.checkRequiredOptions(options, ['device', 'password']);
@@ -1099,6 +1112,7 @@ export class RokuDeploy {
      * double-encoded.
      * @public
      */
+    public async keyPress(options?: Partial<KeyPressOptions>): Promise<EcpResult>;
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyPressOptions;
         return this.sendKeyEvent({
@@ -1113,6 +1127,7 @@ export class RokuDeploy {
      * it is URI-encoded when the URL is built, so a pre-encoded value gets double-encoded.
      * @public
      */
+    public async keyDown(options?: Partial<KeyDownOptions>): Promise<EcpResult>;
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyDownOptions;
         return this.sendKeyEvent({
@@ -1126,6 +1141,7 @@ export class RokuDeploy {
      * the URL is built, so a pre-encoded value gets double-encoded.
      * @public
      */
+    public async keyUp(options?: Partial<KeyUpOptions>): Promise<EcpResult>;
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyUpOptions;
         return this.sendKeyEvent({
@@ -1139,6 +1155,7 @@ export class RokuDeploy {
      * each character is URI-encoded when the URL is built, so pre-encoded text gets double-encoded.
      * @public
      */
+    public async sendText(options?: Partial<SendTextOptions>): Promise<void>;
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendTextOptions;
         this.checkRequiredOptions(options, ['device', 'text']);
@@ -1548,6 +1565,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
+    public async deleteDevChannel(options?: Partial<DeleteDevChannelOptions>): Promise<DeleteDevChannelResult>;
     public async deleteDevChannel(options?: DeleteDevChannelOptions): Promise<DeleteDevChannelResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');

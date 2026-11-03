@@ -28,11 +28,11 @@ describe('config loading parity (constructor vs CLI)', () => {
 
     //strip the CLI-only bookkeeping (cwd, config) the helper adds, so the two results can be compared directly
     function viaCli(args: Record<string, any>) {
-        const { cwd, ...options } = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, ...args }))['options'];
+        const { cwd, ...options } = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, ...args })).options;
         return options;
     }
     function viaConstructor(options: Record<string, any>) {
-        return new RokuDeploy(options)['options'];
+        return new RokuDeploy(options).options;
     }
 
     it('both read the default rokudeploy.json from cwd', () => {

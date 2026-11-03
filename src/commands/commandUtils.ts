@@ -5,14 +5,6 @@ import { RceManagementClient } from '../RceManagementClient';
 import type { DeviceRegistryEntry, RokuDeployConstructorOptions } from '../RokuDeployOptions';
 
 /**
- * The instance's resolved defaults (file values beneath the CLI flags), for commands that branch on them.
- */
-export function resolvedOptions<T = any>(rokuDeploy: RokuDeploy): T {
-    // eslint-disable-next-line @typescript-eslint/dot-notation
-    return rokuDeploy['options'] as T;
-}
-
-/**
  * Turn raw CLI args into RokuDeploy constructor options. An omitted `--config` means the optional default
  * `rokudeploy.json` (`--no-config` skips the file), `cwd` defaults to the process directory, and `--host`,
  * `--esn` or `--instanceUrl` become an inline `device` config (winning over any `device` from the config
@@ -51,7 +43,8 @@ export const rceWaitPollIntervalMs = 2000;
  * to `rceToken` from rokudeploy.json.
  */
 export function buildRceCommandContext(args: any) {
-    const options = resolvedOptions(new RokuDeploy(normalizeCliArgs(args)));
+    //rce flags (token, wait, snapshot...) are CLI-only, so the instance options are read untyped here
+    const options = new RokuDeploy(normalizeCliArgs(args)).options as Record<string, any>;
     const token = options.token ?? resolveRegistryEntry(options)?.rceToken ?? options.rceToken;
     if (!token) {
         throw new Error('An RCE token is required. Pass --token or set "rceToken" in rokudeploy.json');

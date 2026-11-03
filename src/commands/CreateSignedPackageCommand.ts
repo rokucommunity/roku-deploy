@@ -1,6 +1,5 @@
 import { RokuDeploy } from '../index';
-import type { ConvertToSquashfsOptions, CreateSignedPackageOptions, RekeyDeviceOptions, SideloadOptions } from '../index';
-import { normalizeCliArgs, resolvedOptions } from './commandUtils';
+import { normalizeCliArgs } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -10,16 +9,16 @@ export class CreateSignedPackageCommand {
     async run(args) {
         const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice({} as RekeyDeviceOptions);
+            await rokuDeploy.rekeyDevice();
         }
         if (args.sideload) {
-            await rokuDeploy.sideload({} as SideloadOptions);
+            await rokuDeploy.sideload();
         }
         //a production package should be squashed, so squash runs unless --no-squash (or a config
-        //`squash: false`) opts out
-        if (resolvedOptions(rokuDeploy).squash !== false) {
-            await rokuDeploy.convertToSquashfs({} as ConvertToSquashfsOptions);
+        //`squash: false`) opts out. `squash` is a CLI flag, not a library option, hence the untyped read
+        if ((rokuDeploy.options as Record<string, any>).squash !== false) {
+            await rokuDeploy.convertToSquashfs();
         }
-        await rokuDeploy.createSignedPackage({} as CreateSignedPackageOptions);
+        await rokuDeploy.createSignedPackage();
     }
 }

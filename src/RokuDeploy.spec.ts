@@ -8473,7 +8473,7 @@ describe('RokuDeploy', () => {
                 process.chdir(tempDir);
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'file-pass', ecpPort: 1234 });
                 const rd = new RokuDeploy({ config: true });
-                expect(rd['options']).to.eql({ password: 'file-pass', ecpPort: 1234 });
+                expect(rd.options).to.eql({ password: 'file-pass', ecpPort: 1234 });
             });
 
             it('lets constructor options beat file values and per-call options beat both', async () => {
@@ -8493,33 +8493,33 @@ describe('RokuDeploy', () => {
             it('silently skips a missing default config file when config is true', () => {
                 process.chdir(tempDir);
                 const rd = new RokuDeploy({ config: true, password: 'constructor-pass' });
-                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+                expect(rd.options).to.eql({ password: 'constructor-pass' });
             });
 
             it('loads the file at a config path, resolving relative paths against cwd', () => {
                 process.chdir(tempDir);
                 fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
                 const rd = new RokuDeploy({ config: 'configs/custom.json' });
-                expect(rd['options']).to.eql({ password: 'custom-pass' });
+                expect(rd.options).to.eql({ password: 'custom-pass' });
             });
 
             it('treats null as not set', () => {
                 process.chdir(tempDir);
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'file-pass' });
                 const rd = new RokuDeploy({ config: null, password: 'constructor-pass' });
-                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+                expect(rd.options).to.eql({ password: 'constructor-pass' });
             });
 
             it('loads an optional ?-prefixed config path when the file exists', () => {
                 process.chdir(tempDir);
                 fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
                 const rd = new RokuDeploy({ config: '?configs/custom.json' });
-                expect(rd['options']).to.eql({ password: 'custom-pass' });
+                expect(rd.options).to.eql({ password: 'custom-pass' });
             });
 
             it('silently skips an optional ?-prefixed config path when the file is missing', () => {
                 const rd = new RokuDeploy({ config: s`?${tempDir}/missing.json`, password: 'constructor-pass' });
-                expect(rd['options']).to.eql({ password: 'constructor-pass' });
+                expect(rd.options).to.eql({ password: 'constructor-pass' });
             });
 
             it('throws when a config path does not exist', () => {
@@ -8534,7 +8534,7 @@ describe('RokuDeploy', () => {
                     rootDir: './app'
                 });
                 const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json` });
-                expect(rd['options']).to.eql({ password: 'aaaa', rootDir: './app' });
+                expect(rd.options).to.eql({ password: 'aaaa', rootDir: './app' });
             });
 
             it('lets an explicit logLevel option beat the file logLevel', () => {
@@ -8549,13 +8549,13 @@ describe('RokuDeploy', () => {
                 myLogger.logLevel = 'error';
                 const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json`, logger: myLogger });
                 expect(myLogger.logLevel).to.equal('info');
-                expect(rd['options']).to.include({ rootDir: './app' });
+                expect(rd.options).to.include({ rootDir: './app' });
             });
 
             it('never leaks the config option itself into the merged instance options', () => {
                 process.chdir(tempDir);
                 const rd = new RokuDeploy({ config: true });
-                expect(rd['options']).to.eql({});
+                expect(rd.options).to.eql({});
             });
         });
 
