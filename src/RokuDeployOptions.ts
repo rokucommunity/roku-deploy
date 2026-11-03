@@ -1,5 +1,6 @@
 import type { Logger, LogLevel, LogLevelNumeric } from '@rokucommunity/logger';
 import type { DeviceOption } from './DeviceConfig';
+import type { RokuDeployConfig } from './RokuDeployConfig';
 
 /**
  * The per-device settings a devices registry entry may override, applied whenever the entry is targeted by name.
@@ -36,7 +37,7 @@ export interface DeviceRegistryEntry extends DeviceRegistrySettings {
  * that will be merged into every method call.
  * @public
  */
-export interface RokuDeployConstructorOptions {
+export interface RokuDeployConstructorOptions extends RokuDeployConfig {
     /**
      * Load a `rokudeploy.json` config file at construction. `true` reads `rokudeploy.json` from `cwd` (a
      * missing file is fine). A string path (resolved against `cwd`) must exist; prefix it with `?` to make
@@ -45,51 +46,14 @@ export interface RokuDeployConstructorOptions {
      */
     config?: boolean | string | null;
     /**
-     * The working directory that relative paths (including `config`) resolve against. Defaults to `process.cwd()`.
-     */
-    cwd?: string;
-    /**
-     * The log level for this instance's logger. Beats a `logLevel` set in the config file.
-     */
-    logLevel?: LogLevel | LogLevelNumeric;
-    /**
      * A custom logger instance. If not provided, the global logger will be used.
      */
     logger?: Logger;
-    /**
-     * The target device. Can be a registry name (string) or an inline device config.
-     * @example 'living-room'
-     * @example { host: '192.168.1.21' }
-     */
-    device?: DeviceOption;
     /**
      * A registry of named devices. Keys are device names, values are device configurations.
      * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
      */
     devices?: Record<string, DeviceRegistryEntry>;
-    /**
-     * The password for logging in to the developer portal on the target Roku device
-     */
-    password?: string;
-    /**
-     * The username for the roku box. This will always be 'rokudev', but allows to be overridden
-     * just in case roku adds support for custom usernames in the future
-     * @default 'rokudev'
-     */
-    username?: string;
-    /**
-     * The port that should be used when installing the package. Defaults to 80.
-     */
-    packagePort?: number;
-    /**
-     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
-     */
-    ecpPort?: number;
-    /**
-     * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
-     * rceToken of its own. A config-supplied rceToken always wins over this default.
-     */
-    rceToken?: string;
 }
 
 /**

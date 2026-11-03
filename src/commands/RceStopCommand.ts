@@ -1,15 +1,14 @@
 import { util } from '../util';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStopCommand {
     async run(args: any) {
-        const { options, client } = buildRceCommandContext(args);
-        const device = await resolveRceDevice(client, options);
+        const { client, device } = await buildRceCommandContext(args);
 
         let result = await client.stopDevice({ deviceId: device.id });
 
-        if (options.wait) {
-            result = await waitForRceDeviceStatus(client, device.id, 'shutdown', options.timeout ?? defaultRceWaitTimeoutSeconds);
+        if (args.wait) {
+            result = await waitForRceDeviceStatus(client, device.id, 'shutdown', args.timeout ?? defaultRceWaitTimeoutSeconds);
         }
         console.log(util.objectToTableString(rceDeviceToTableObject(result)));
     }

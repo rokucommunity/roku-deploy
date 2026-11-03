@@ -1,11 +1,10 @@
 import { util } from '../util';
 import type { RceDevice, Snapshot } from '../RceManagementClient';
-import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
+import { buildRceCommandContext, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStartCommand {
     async run(args: any) {
-        const { options, client } = buildRceCommandContext(args);
-        const device = await resolveRceDevice(client, options);
+        const { client, device } = await buildRceCommandContext(args);
 
         let snapshots: Snapshot[] | undefined;
         const listSnapshots = async () => {
@@ -13,11 +12,11 @@ export class RceStartCommand {
             return snapshots;
         };
 
-        const snapshotId = options.snapshotId ?? (await this.resolveSnapshotId(options.snapshot, device, listSnapshots));
+        const snapshotId = args.snapshotId ?? (await this.resolveSnapshotId(args.snapshot, device, listSnapshots));
 
         //firmware resolution: explicit flag, then the chosen snapshot's firmware, then the
         //device's, then the first one available for the device's type
-        let firmwareVersionId: string | undefined = options.firmwareVersionId;
+        let firmwareVersionId: string | undefined = args.firmwareVersionId;
         if (!firmwareVersionId) {
             firmwareVersionId = (await listSnapshots()).find(x => x.id === snapshotId)?.firmwareVersionId ?? device.firmwareVersionId ?? undefined;
             if (!firmwareVersionId) {
@@ -34,12 +33,12 @@ export class RceStartCommand {
             start: {
                 snapshotId: snapshotId,
                 firmwareVersionId: firmwareVersionId,
-                maxRuntime: options.maxRuntime ?? 3600
+                maxRuntime: args.maxRuntime ?? 3600
             }
         });
 
-        if (options.wait) {
-            result = await waitForRceDeviceStatus(client, device.id, 'running', options.timeout ?? defaultRceWaitTimeoutSeconds);
+        if (args.wait) {
+            result = await waitForRceDeviceStatus(client, device.id, 'running', args.timeout ?? defaultRceWaitTimeoutSeconds);
         }
         console.log(util.objectToTableString(rceDeviceToTableObject(result)));
     }

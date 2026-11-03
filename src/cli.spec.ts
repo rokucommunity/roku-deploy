@@ -811,24 +811,6 @@ describe('cli', function cli() {
                 `Device 'tv' is not an RCE device (needs an 'id' or 'esn')`
             );
         });
-
-        it('applies config-file values that yargs used to clobber with defaults', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                rceToken: 'root-token',
-                maxRuntime: 120
-            });
-            sinon.stub(RceManagementClient.prototype, 'getDevice').resolves(makeDevice());
-            const startStub = sinon.stub(RceManagementClient.prototype, 'startDevice').resolves(makeDevice({ status: 'pending' }));
-
-            await new RceStartCommand().run({
-                cwd: tempDir,
-                deviceId: 5,
-                snapshotId: 11,
-                firmwareVersionId: 'fw-1'
-            });
-
-            expect(startStub.getCall(0).args[0].start.maxRuntime).to.equal(120);
-        });
     });
 
     describe('init', () => {

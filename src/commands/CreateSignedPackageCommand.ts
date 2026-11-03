@@ -15,8 +15,8 @@ export class CreateSignedPackageCommand {
             await rokuDeploy.sideload();
         }
         //a production package should be squashed, so squash runs unless --no-squash (or a config
-        //`squash: false`) opts out. `squash` is a CLI flag, not a library option, hence the untyped read
-        if ((rokuDeploy.options as Record<string, any>).squash !== false) {
+        //`squash: false`) opts out
+        if (rokuDeploy.options.squash !== false) {
             await rokuDeploy.convertToSquashfs();
         }
         await rokuDeploy.createSignedPackage();

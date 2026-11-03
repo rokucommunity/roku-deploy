@@ -65,6 +65,10 @@ export interface RokuDeployConfig {
      */
     outFile?: string;
     /**
+     * Convert the installed channel to squashfs before packaging. Read by `package`; on unless set to `false`.
+     */
+    squash?: boolean;
+    /**
      * Convert the installed channel to squashfs before packaging. Read by `package`.
      */
     convertToSquashfs?: boolean;

@@ -1485,23 +1485,16 @@ export interface RokuDeployConfig {
     rekeySignedPackage?: string;
     rootDir?: string;
     signingPassword?: string;
+    squash?: boolean;
     stagingDir?: string;
     username?: string;
 }
 
 // @public
-export interface RokuDeployConstructorOptions {
+export interface RokuDeployConstructorOptions extends RokuDeployConfig {
     config?: boolean | string | null;
-    cwd?: string;
-    device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
-    ecpPort?: number;
     logger?: Logger;
-    logLevel?: LogLevel | LogLevelNumeric;
-    packagePort?: number;
-    password?: string;
-    rceToken?: string;
-    username?: string;
 }
 
 // @public
