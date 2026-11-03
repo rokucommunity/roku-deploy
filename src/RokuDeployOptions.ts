@@ -49,6 +49,10 @@ export interface RokuDeployConstructorOptions {
      */
     cwd?: string;
     /**
+     * The log level for this instance's logger. Beats a `logLevel` set in the config file.
+     */
+    logLevel?: LogLevel | LogLevelNumeric;
+    /**
      * A custom logger instance. If not provided, the global logger will be used.
      */
     logger?: Logger;

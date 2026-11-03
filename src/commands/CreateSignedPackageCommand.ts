@@ -1,5 +1,6 @@
+import { RokuDeploy } from '../index';
 import type { ConvertToSquashfsOptions, CreateSignedPackageOptions, RekeyDeviceOptions, SideloadOptions } from '../index';
-import { createRokuDeploy, resolvedOptions } from './commandUtils';
+import { normalizeCliArgs, resolvedOptions } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -7,7 +8,7 @@ import { createRokuDeploy, resolvedOptions } from './commandUtils';
  */
 export class CreateSignedPackageCommand {
     async run(args) {
-        const rokuDeploy = createRokuDeploy(args);
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
         if (args.rekey) {
             await rokuDeploy.rekeyDevice({} as RekeyDeviceOptions);
         }

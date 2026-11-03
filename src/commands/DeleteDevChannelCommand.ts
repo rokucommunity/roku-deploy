@@ -1,7 +1,8 @@
-import { createRokuDeploy } from './commandUtils';
+import { RokuDeploy } from '../index';
+import { normalizeCliArgs } from './commandUtils';
 
 export class DeleteDevChannelCommand {
     async run(args) {
-        await createRokuDeploy(args).deleteDevChannel();
+        await new RokuDeploy(normalizeCliArgs(args)).deleteDevChannel();
     }
 }

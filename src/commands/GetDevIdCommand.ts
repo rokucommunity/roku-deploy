@@ -1,8 +1,9 @@
-import { createRokuDeploy } from './commandUtils';
+import { RokuDeploy } from '../index';
+import { normalizeCliArgs } from './commandUtils';
 
 export class GetDevIdCommand {
     async run(args) {
-        const { devId } = await createRokuDeploy(args).getDevId();
+        const { devId } = await new RokuDeploy(normalizeCliArgs(args)).getDevId();
         console.log(devId);
     }
 }

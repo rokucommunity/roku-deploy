@@ -1,8 +1,9 @@
+import { RokuDeploy } from '../index';
 import type { SendTextOptions } from '../index';
-import { createRokuDeploy } from './commandUtils';
+import { normalizeCliArgs } from './commandUtils';
 
 export class SendTextCommand {
     async run(args) {
-        await createRokuDeploy(args).sendText({} as SendTextOptions);
+        await new RokuDeploy(normalizeCliArgs(args)).sendText({} as SendTextOptions);
     }
 }

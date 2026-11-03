@@ -1,8 +1,9 @@
+import { RokuDeploy } from '../index';
 import type { StageOptions } from '../index';
-import { createRokuDeploy } from './commandUtils';
+import { normalizeCliArgs } from './commandUtils';
 
 export class StageCommand {
     async run(args) {
-        await createRokuDeploy(args).stage({} as StageOptions);
+        await new RokuDeploy(normalizeCliArgs(args)).stage({} as StageOptions);
     }
 }

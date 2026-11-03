@@ -33,7 +33,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
         text = fsExtra.readFileSync(sampleConfigPath).toString();
-        live = rokuDeploy.loadConfigFile({ configPath: sampleConfigPath });
+        live = rokuDeploy.loadConfigFile({ config: sampleConfigPath });
         const errors = [];
         full = parseJsonc(uncommentOptions(text), errors, { allowTrailingComma: true });
         expect(errors, 'the sample with every value enabled must still parse').to.eql([]);
@@ -96,7 +96,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
     it('loads every value at the top level once enabled, with no nesting by command', () => {
         const enabledPath = s`${tempDir}/rokudeploy.json`;
         fsExtra.outputFileSync(enabledPath, uncommentOptions(text));
-        const config = rokuDeploy.loadConfigFile({ configPath: enabledPath });
+        const config = rokuDeploy.loadConfigFile({ config: enabledPath });
         expect(config.rootDir).to.equal('./');
         expect(config.outFile).to.equal('roku-deploy');
         expect(config.convertToSquashfs).to.equal(false);

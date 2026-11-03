@@ -2,25 +2,7 @@ import { RokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
-import type { DeviceRegistryEntry } from '../RokuDeployOptions';
-
-/**
- * Build the RokuDeploy instance for one CLI command. The CLI-only flags are translated into library
- * options and handed to the constructor together with `--config`, so file-then-flags precedence is
- * decided in the constructor for the CLI and library consumers alike. An omitted `--config` means the
- * optional default `rokudeploy.json`; `--no-config` skips the file.
- */
-export function createRokuDeploy(args: any): RokuDeploy {
-    args.cwd ??= process.cwd();
-    //--config drives file loading; it is not an option any library method reads
-    const { config, ...cliOptions } = args;
-    const rokuDeploy = new RokuDeploy({ ...mapCliArgsToLibraryOptions(cliOptions), config: config ?? true });
-    //the constructor applied the file's logLevel; an explicit --logLevel still wins on the command line
-    if (args.logLevel !== undefined) {
-        rokuDeploy.logger.logLevel = args.logLevel;
-    }
-    return rokuDeploy;
-}
+import type { DeviceRegistryEntry, RokuDeployConstructorOptions } from '../RokuDeployOptions';
 
 /**
  * The instance's resolved defaults (file values beneath the CLI flags), for commands that branch on them.
@@ -31,21 +13,24 @@ export function resolvedOptions<T = any>(rokuDeploy: RokuDeploy): T {
 }
 
 /**
- * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
- * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
- * since constructor options beat file values). `--rceToken` stays a plain option: the library falls back to
- * the instance `rceToken` for any RCE device without one of its own.
+ * Turn raw CLI args into RokuDeploy constructor options. An omitted `--config` means the optional default
+ * `rokudeploy.json` (`--no-config` skips the file), `cwd` defaults to the process directory, and `--host`,
+ * `--esn` or `--instanceUrl` become an inline `device` config (winning over any `device` from the config
+ * file, since constructor options beat file values). `--rceToken` stays a plain option: the library falls
+ * back to the instance `rceToken` for any RCE device without one of its own.
  */
-function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
-    const { host, esn, instanceUrl, ...remainingOptions } = options;
+export function normalizeCliArgs(args: Record<string, any>): RokuDeployConstructorOptions {
+    args.cwd ??= process.cwd();
+    args.config ??= true;
+    const { host, esn, instanceUrl, ...options } = args;
     if (typeof host === 'string') {
-        return { ...remainingOptions, device: { host: host } } as unknown as T;
+        return { ...options, device: { host: host } };
     }
     if (typeof esn === 'string') {
-        return { ...remainingOptions, device: { esn: esn } } as unknown as T;
+        return { ...options, device: { esn: esn } };
     }
     if (typeof instanceUrl === 'string') {
-        return { ...remainingOptions, device: { instanceUrl: instanceUrl } } as unknown as T;
+        return { ...options, device: { instanceUrl: instanceUrl } };
     }
     return options;
 }
@@ -66,7 +51,7 @@ export const rceWaitPollIntervalMs = 2000;
  * to `rceToken` from rokudeploy.json.
  */
 export function buildRceCommandContext(args: any) {
-    const options = resolvedOptions(createRokuDeploy(args));
+    const options = resolvedOptions(new RokuDeploy(normalizeCliArgs(args)));
     const token = options.token ?? resolveRegistryEntry(options)?.rceToken ?? options.rceToken;
     if (!token) {
         throw new Error('An RCE token is required. Pass --token or set "rceToken" in rokudeploy.json');

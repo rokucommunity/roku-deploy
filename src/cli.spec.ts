@@ -20,7 +20,7 @@ import { standardizePath as s, util } from './util';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
-import { createRokuDeploy, resolvedOptions } from './commands/commandUtils';
+import { normalizeCliArgs, resolvedOptions } from './commands/commandUtils';
 import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
@@ -1060,12 +1060,12 @@ describe('cli', function cli() {
 
     describe('CLI flag names that differ from the library options', () => {
         it('maps --host to an inline device config', () => {
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' })));
             expect(options).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa' });
         });
 
         it('maps --host with --no-config too', () => {
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, config: false, host: '1.2.3.4' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, config: false, host: '1.2.3.4' })));
             expect(options.device).to.eql({ host: '1.2.3.4' });
             expect(options).not.to.have.property('host');
         });
@@ -1075,25 +1075,25 @@ describe('cli', function cli() {
                 device: 'office-tv',
                 devices: { 'office-tv': { host: '9.9.9.9' } }
             });
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, host: '1.2.3.4' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, host: '1.2.3.4' })));
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
         it('leaves the config file device alone when --host is not given', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '9.9.9.9' } });
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir })));
             expect(options.device).to.eql({ host: '9.9.9.9' });
         });
 
         it('maps --esn to an inline RCE device config, keeping --rceToken as the instance default', () => {
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, config: false, esn: 'X123', rceToken: 'abc' })));
             expect(options.device).to.eql({ esn: 'X123' });
             expect(options.rceToken).to.equal('abc');
             expect(options).not.to.have.property('esn');
         });
 
         it('maps --instanceUrl to an inline RCE device config, keeping --rceToken as the instance default', () => {
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, config: false, instanceUrl: 'http://1.2.3.4', rceToken: 'abc' })));
             expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
             expect(options.rceToken).to.equal('abc');
             expect(options).not.to.have.property('instanceUrl');
@@ -1101,7 +1101,7 @@ describe('cli', function cli() {
 
         it('keeps the config file rceToken as the instance default for an --esn device', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'from-config' });
-            const options = resolvedOptions(createRokuDeploy({ cwd: tempDir, esn: 'X123' }));
+            const options = resolvedOptions(new RokuDeploy(normalizeCliArgs({ cwd: tempDir, esn: 'X123' })));
             expect(options.device).to.eql({ esn: 'X123' });
             expect(options.rceToken).to.equal('from-config');
         });
@@ -1252,20 +1252,20 @@ describe('cli', function cli() {
         });
 
         it('applies --logLevel to the logger even with --no-config', () => {
-            const rokuDeploy = createRokuDeploy({ cwd: tempDir, config: false, logLevel: 'trace' });
+            const rokuDeploy = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, config: false, logLevel: 'trace' }));
             expect(rokuDeploy.logger.logLevel).to.equal('trace');
         });
 
         it('lets --logLevel win over the config file', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
-            const rokuDeploy = createRokuDeploy({ cwd: tempDir, logLevel: 'error' });
+            const rokuDeploy = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, logLevel: 'error' }));
             expect(rokuDeploy.logger.logLevel).to.equal('error');
         });
 
         it('gives every command its own instance, so one command\'s logLevel never leaks into the next', () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
-            const first = createRokuDeploy({ cwd: tempDir });
-            const second = createRokuDeploy({ cwd: tempDir, config: false });
+            const first = new RokuDeploy(normalizeCliArgs({ cwd: tempDir }));
+            const second = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, config: false }));
             expect(first.logger.logLevel).to.equal('trace');
             expect(second.logger.logLevel).to.equal('log');
             expect(first).to.not.equal(second);

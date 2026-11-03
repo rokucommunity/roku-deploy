@@ -963,7 +963,7 @@ export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceMa
 
 // @public (undocumented)
 export interface LoadConfigFileOptions {
-    configPath?: string;
+    config?: boolean | string | null;
     cwd?: string;
 }
 
@@ -1496,6 +1496,7 @@ export interface RokuDeployConstructorOptions {
     devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     logger?: Logger;
+    logLevel?: LogLevel | LogLevelNumeric;
     packagePort?: number;
     password?: string;
     rceToken?: string;

@@ -4,14 +4,14 @@ import { createSandbox } from 'sinon';
 import { logger } from '@rokucommunity/logger';
 import { RokuDeploy } from './index';
 import { InvalidOptionError } from './Errors';
-import { createRokuDeploy } from './commands/commandUtils';
+import { normalizeCliArgs } from './commands/commandUtils';
 import { tempDir } from './testUtils.spec';
 import { standardizePath as s } from './util';
 
 const sinon = createSandbox();
 
 /**
- * The constructor's `config` option and the CLI's createRokuDeploy are two doors into the same
+ * The constructor's `config` option and the CLI's normalizeCliArgs are two doors into the same
  * config file. Every scenario here runs through both and expects the same answer.
  */
 describe('config loading parity (constructor vs CLI)', () => {
@@ -26,9 +26,9 @@ describe('config loading parity (constructor vs CLI)', () => {
         fsExtra.removeSync(tempDir);
     });
 
-    //strip the CLI-only bookkeeping (cwd) the helper adds, so the two results can be compared directly
+    //strip the CLI-only bookkeeping (cwd, config) the helper adds, so the two results can be compared directly
     function viaCli(args: Record<string, any>) {
-        const { cwd, ...options } = createRokuDeploy({ cwd: tempDir, ...args })['options'];
+        const { cwd, ...options } = new RokuDeploy(normalizeCliArgs({ cwd: tempDir, ...args }))['options'];
         return options;
     }
     function viaConstructor(options: Record<string, any>) {
@@ -87,7 +87,7 @@ describe('config loading parity (constructor vs CLI)', () => {
         myLogger.logLevel = 'error';
         viaConstructor({ config: true, logger: myLogger });
         expect(myLogger.logLevel).to.equal('debug');
-        expect(createRokuDeploy({ cwd: tempDir }).logger.logLevel).to.equal('debug');
+        expect(new RokuDeploy(normalizeCliArgs({ cwd: tempDir })).logger.logLevel).to.equal('debug');
     });
 
     it('both skip the file when told to', () => {

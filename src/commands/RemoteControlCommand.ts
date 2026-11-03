@@ -1,10 +1,11 @@
+import { RokuDeploy } from '../index';
 import * as readline from 'readline';
 import type { KeyPressOptions, RemoteKeyText, SendTextOptions } from '../index';
-import { createRokuDeploy, resolvedOptions } from './commandUtils';
+import { normalizeCliArgs, resolvedOptions } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        const rokuDeploy = createRokuDeploy(args);
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation

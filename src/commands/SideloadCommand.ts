@@ -1,9 +1,10 @@
+import { RokuDeploy } from '../index';
 import type { RekeyDeviceOptions, SideloadOptions } from '../index';
-import { createRokuDeploy } from './commandUtils';
+import { normalizeCliArgs } from './commandUtils';
 
 export class SideloadCommand {
     async run(args) {
-        const rokuDeploy = createRokuDeploy(args);
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
         //--rekey installs the signing key first so the dev channel runs under it
         if (args.rekey) {
             await rokuDeploy.rekeyDevice({} as RekeyDeviceOptions);

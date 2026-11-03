@@ -1,8 +1,9 @@
+import { RokuDeploy } from '../index';
 import type { CaptureScreenshotOptions } from '../index';
-import { createRokuDeploy } from './commandUtils';
+import { normalizeCliArgs } from './commandUtils';
 
 export class CaptureScreenshotCommand {
     async run(args) {
-        await createRokuDeploy(args).captureScreenshot({} as CaptureScreenshotOptions);
+        await new RokuDeploy(normalizeCliArgs(args)).captureScreenshot({} as CaptureScreenshotOptions);
     }
 }

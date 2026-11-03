@@ -8411,10 +8411,41 @@ describe('RokuDeploy', () => {
                 expect(result).to.eql({});
             });
 
-            it('uses provided configPath instead of default', () => {
+            it('reads the file at an absolute config path', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/custom-config.json`, { host: 'custom-host' });
-                const result = rokuDeploy.loadConfigFile({ configPath: s`${tempDir}/custom-config.json` });
+                const result = rokuDeploy.loadConfigFile({ config: s`${tempDir}/custom-config.json` });
                 expect(result).to.eql({ host: 'custom-host' });
+            });
+
+            it('resolves a relative config path against cwd', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, config: 'configs/custom.json' })).to.eql({ password: 'custom-pass' });
+            });
+
+            it('reads nothing when config is false, null, or an optional path to a missing file', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'x' });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, config: false })).to.eql({});
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, config: null })).to.eql({});
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, config: '?missing.json' })).to.eql({});
+            });
+
+            it('throws for a missing file that was not marked optional', () => {
+                expect(() => rokuDeploy.loadConfigFile({ cwd: tempDir, config: 'missing.json' }))
+                    .to.throw(errors.InvalidOptionError, `Config file does not exist at "${s`${tempDir}/missing.json`}"`);
+            });
+
+            it('drops a root-level config key from the result', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'x', config: 'other.json' });
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({ password: 'x' });
+            });
+
+            it('logs the path of the file it read, and nothing when no file was read', () => {
+                const log = sinon.stub(rokuDeploy['logger'], 'log');
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(log.called).to.be.false;
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'x' });
+                rokuDeploy.loadConfigFile({ cwd: tempDir });
+                expect(log.getCall(0).args[0]).to.equal(`Using config: ${s`${tempDir}/rokudeploy.json`}`);
             });
 
             it('returns empty object for an empty (comment-only) config file', () => {
@@ -8434,36 +8465,6 @@ describe('RokuDeploy', () => {
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });
                 rokuDeploy.loadConfigFile({ cwd: tempDir });
                 expect(rokuDeploy['logger'].logLevel).to.equal('warn');
-            });
-        });
-
-        describe('resolveConfig', () => {
-            it('reports the absolute path of the file it read, resolving relative to cwd', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/configs/custom.json`, { password: 'custom-pass' });
-                expect(rokuDeploy['resolveConfig']({ cwd: tempDir, config: 'configs/custom.json' })).to.eql({
-                    configPath: s`${tempDir}/configs/custom.json`,
-                    values: { password: 'custom-pass' }
-                });
-            });
-
-            it('reads the default file from cwd when config is true', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { ecpPort: 1234 });
-                expect(rokuDeploy['resolveConfig']({ cwd: tempDir, config: true })).to.eql({
-                    configPath: s`${tempDir}/rokudeploy.json`,
-                    values: { ecpPort: 1234 }
-                });
-            });
-
-            it('leaves configPath unset when no file was read', () => {
-                expect(rokuDeploy['resolveConfig']({ cwd: tempDir, config: true })).to.eql({ values: {} });
-                expect(rokuDeploy['resolveConfig']({ cwd: tempDir, config: '?missing.json' })).to.eql({ values: {} });
-                expect(rokuDeploy['resolveConfig']({ cwd: tempDir, config: false })).to.eql({ values: {} });
-                expect(rokuDeploy['resolveConfig']()).to.eql({ values: {} });
-            });
-
-            it('throws for a missing file that was not marked optional', () => {
-                expect(() => rokuDeploy['resolveConfig']({ cwd: tempDir, config: 'missing.json' }))
-                    .to.throw(errors.InvalidOptionError, `Config file does not exist at "${s`${tempDir}/missing.json`}"`);
             });
         });
 
@@ -8534,6 +8535,12 @@ describe('RokuDeploy', () => {
                 });
                 const rd = new RokuDeploy({ config: s`${tempDir}/rokudeploy.json` });
                 expect(rd['options']).to.eql({ password: 'aaaa', rootDir: './app' });
+            });
+
+            it('lets an explicit logLevel option beat the file logLevel', () => {
+                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'trace' });
+                const rd = new RokuDeploy({ cwd: tempDir, config: true, logLevel: 'error' });
+                expect(rd.logger.logLevel).to.equal('error');
             });
 
             it('applies the file logLevel to the logger passed to the constructor', () => {
