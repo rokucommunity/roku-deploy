@@ -1,9 +1,9 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, normalizeCliArgs } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class RekeyDeviceCommand {
     async run(args) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         //the library resolves a relative pkg against cwd itself
         await rokuDeploy.rekeyDevice({
@@ -13,7 +13,7 @@ export class RekeyDeviceCommand {
             signingPassword: config.signingPassword,
             devId: config.devId,
             //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config, ['pkg', 'signingPassword', 'devId'])
+            ...normalizeCliArgs(args, config)
         });
     }
 }

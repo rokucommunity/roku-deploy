@@ -1,9 +1,9 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, getConfigOutPath, normalizeCliArgs } from './commandUtils';
+import { extractCommonConfigOptions, getConfigOutPath, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class ZipCommand {
     async run(args) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         await rokuDeploy.zip({
             ...extractCommonConfigOptions(config),
@@ -11,7 +11,7 @@ export class ZipCommand {
             dir: config.stagingDir ?? config.stagingFolderPath,
             out: getConfigOutPath(config),
             //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config, ['dir', 'files', 'out'])
+            ...normalizeCliArgs(args, config)
         });
     }
 }

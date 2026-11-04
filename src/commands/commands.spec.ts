@@ -69,28 +69,10 @@ interface CommandSpec {
     translations: Translation[];
     /** rokudeploy.json values that must NOT reach this command */
     ignoredConfig?: Record<string, any>;
-    /**
-     * For a multi-step command: every cli flag the command accepts, including the other steps' flags, so the
-     * "only its own options" check proves those flags don't leak into this step
-     */
-    strictWith?: Record<string, any>;
 }
 
-const commonOptionNames = ['device', 'devices', 'username', 'password', 'packagePort', 'ecpPort', 'timeout', 'cwd'];
-
-//every flag `sideload` and `package` accept, so each step can be checked to ignore the other steps' flags
-const sideloadCli = {
-    host: '2.2.2.2', password: 'cli-pass', rekey: true, pkg: 'cli.pkg', signingPassword: 'cli-sign', devId: 'cli-dev',
-    zip: './cli.zip', dir: './cli-dir', close: false, appType: 'dcl', remoteDebug: true, remoteDebugConnectEarly: true,
-    failOnCompileError: false, deleteDevChannel: false
-};
-const packageCli = {
-    host: '2.2.2.2', password: 'cli-pass', rekey: true, sideload: true, squash: true, pkg: 'cli.pkg', signingPassword: 'cli-sign',
-    devId: 'cli-dev', zip: './cli.zip', dir: './cli-dir', close: false, appType: 'dcl', failOnCompileError: false,
-    deleteDevChannel: false, appTitle: 'My App', appVersion: '1.0', manifestPath: './manifest', out: './cli.pkg',
-    //not a `package` flag: proves a production package is never sideloaded in debug mode
-    remoteDebug: true, remoteDebugConnectEarly: true
-};
+//the options extractCommonConfigOptions hands every call
+const commonOptionNames = ['device', 'devices', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
 
 //every command spreads these, so every command is checked against them
 const commonFields: Field[] = [
@@ -185,8 +167,7 @@ const specs: CommandSpec[] = [
         stubs: ['sideload', 'rekeyDevice'],
         fields: [...sharedSideloadFields, ...remoteDebugFields],
         translations: deleteDevChannelTranslations,
-        ignoredConfig: { rootDir: './src', pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true },
-        strictWith: sideloadCli
+        ignoredConfig: { rootDir: './src', pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true }
     },
     {
         name: 'sideload --rekey (rekey step)',
@@ -199,8 +180,7 @@ const specs: CommandSpec[] = [
             { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
             { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] }
         ],
-        translations: pkgTranslations,
-        strictWith: sideloadCli
+        translations: pkgTranslations
     },
     {
         name: 'package --rekey (rekey step)',
@@ -213,8 +193,7 @@ const specs: CommandSpec[] = [
             { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
             { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] }
         ],
-        translations: pkgTranslations,
-        strictWith: packageCli
+        translations: pkgTranslations
     },
     {
         name: 'package --sideload (sideload step)',
@@ -224,8 +203,7 @@ const specs: CommandSpec[] = [
         args: { sideload: true },
         fields: sharedSideloadFields,
         ignoredConfig: { remoteDebug: true, remoteDebugConnectEarly: true },
-        translations: deleteDevChannelTranslations,
-        strictWith: packageCli
+        translations: deleteDevChannelTranslations
     },
     {
         name: 'package (squash step)',
@@ -233,8 +211,7 @@ const specs: CommandSpec[] = [
         method: 'convertToSquashfs',
         stubs: ['createSignedPackage', 'convertToSquashfs', 'sideload', 'rekeyDevice'],
         fields: [],
-        translations: [],
-        strictWith: packageCli
+        translations: []
     },
     {
         name: 'package (package step)',
@@ -250,8 +227,7 @@ const specs: CommandSpec[] = [
             { option: 'manifestPath', cli: ['manifestPath', './manifest'] }
         ],
         translations: outPathTranslations,
-        ignoredConfig: { pkg: 'config.pkg', appType: 'dcl', deleteDevChannel: false, convertToSquashfs: true },
-        strictWith: packageCli
+        ignoredConfig: { pkg: 'config.pkg', appType: 'dcl', deleteDevChannel: false, convertToSquashfs: true }
     },
     {
         name: 'rekey',
@@ -287,6 +263,13 @@ const specs: CommandSpec[] = [
     { name: 'keyDown', run: args => new KeyDownCommand().run(args), method: 'keyDown', stubs: ['keyDown'], fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
     { name: 'sendText', run: args => new SendTextCommand().run(args), method: 'sendText', stubs: ['sendText'], fields: [{ option: 'text', cli: ['text', 'hello'] }], translations: [] }
 ];
+
+//a rokudeploy.json setting every config key any command reads, to prove each call takes only its own
+const everyConfigKey = Object.fromEntries(
+    [...commonFields, ...specs.flatMap(spec => spec.fields)]
+        .filter(field => field.config)
+        .map(field => field.config)
+);
 
 describe('commands', () => {
     beforeEach(() => {
@@ -372,20 +355,10 @@ describe('commands', () => {
                 });
             }
 
-            it('receives only the shared options and its own options, whatever other cli args are present', async () => {
-                const ownCli = Object.fromEntries(fields.filter(x => x.cli).map(x => x.cli));
-                const ownConfig = Object.fromEntries(fields.filter(x => x.config).map(x => x.config));
-                const options = await run({
-                    ...spec.strictWith,
-                    ...ownCli,
-                    //flags no command reads, plus yargs bookkeeping
-                    notAnOption: 'x',
-                    'kebab-case': 'x',
-                    _: ['cmd'],
-                    $0: 'roku-deploy',
-                    logLevel: 'info'
-                }, ownConfig);
-                const allowed = [...commonOptionNames, ...fields.map(x => x.option)];
+            it('reads only the shared and its own options from rokudeploy.json, even when the file sets every key', async () => {
+                const options = await run({}, everyConfigKey);
+                //the cli args (the `config` path, plus any step flags like `rekey`) pass through by design
+                const allowed = [...commonOptionNames, ...fields.map(x => x.option), 'config', ...Object.keys(spec.args ?? {})];
                 expect(Object.keys(options).filter(key => !allowed.includes(key))).to.eql([]);
             });
 

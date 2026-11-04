@@ -3,6 +3,23 @@ import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { DeviceRegistryEntry, RokuDeployOptions } from '../RokuDeployOptions';
+import { rokuDeploy } from '../index';
+
+/**
+ * Load the rokudeploy.json a command should use, from its `--config` and `--cwd` args:
+ * - `--no-config` (`config: false`) skips the file and returns an empty config
+ * - `--config <path>` loads that file
+ * - otherwise `rokudeploy.json` in `--cwd` (or the process cwd) is loaded, if it exists
+ */
+export function loadRokuDeployJson(args: { cwd?: string; config?: string | boolean }): RokuDeployOptions {
+    if (args.config === false) {
+        return {};
+    }
+    return rokuDeploy.loadConfigFile({
+        cwd: args.cwd,
+        configPath: typeof args.config === 'string' ? args.config : undefined
+    });
+}
 
 /**
  * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
@@ -28,36 +45,29 @@ export function extractCommonConfigOptions(config: RokuDeployOptions): Record<st
 }
 
 /**
- * The cli flags every device command shares (the device itself comes from `--host`/`--esn`/`--instanceUrl`).
- */
-const commonCliKeys = ['cwd', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
-
-/**
- * Pick the CLI args a command uses and translate them into library option names: the shared flags, plus the
- * command's own `commandKeys`. `--host`, `--esn` and `--instanceUrl` each become an inline `device`; an RCE
- * device carries `--rceToken`, falling back to the config file's `rceToken`.
- *
- * Anything else in `args` is left out: another step's flags (when `package` runs `rekey`, `sideload` and
- * `squash` with its own args), the global `--config`/`--logLevel`, yargs bookkeeping (`_`, `$0`, kebab-case
- * duplicates), and `undefined` values (which would otherwise override the config file's value).
+ * Translate the CLI args into library options. Every arg passes through as-is (the library ignores the
+ * ones a call doesn't use), except:
+ * - `--host`, `--esn` and `--instanceUrl` become an inline `device`; an RCE device carries `--rceToken`,
+ *   falling back to the config file's `rceToken`.
+ * - `undefined` values are dropped, so they can't override the config file's value.
  *
  * Returns `any`: nothing can prove statically that the user supplied a required option like `device`
  * or `password`, so the library's own runtime checks report those instead.
  */
-export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployOptions, commandKeys: string[]): any {
-    const options: Record<string, any> = {};
-    for (const key of [...commonCliKeys, ...commandKeys]) {
-        if (args[key] !== undefined) {
-            options[key] = args[key];
+export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployOptions): any {
+    const { host, esn, instanceUrl, rceToken, ...options } = args;
+    for (const key of Object.keys(options)) {
+        if (options[key] === undefined) {
+            delete options[key];
         }
     }
-    const token = args.rceToken ?? config.rceToken;
-    if (typeof args.host === 'string') {
-        options.device = { host: args.host };
-    } else if (typeof args.esn === 'string') {
-        options.device = { esn: args.esn, ...(token ? { rceToken: token } : {}) };
-    } else if (typeof args.instanceUrl === 'string') {
-        options.device = { instanceUrl: args.instanceUrl, ...(token ? { rceToken: token } : {}) };
+    const token = rceToken ?? config.rceToken;
+    if (typeof host === 'string') {
+        options.device = { host: host };
+    } else if (typeof esn === 'string') {
+        options.device = { esn: esn, ...(token ? { rceToken: token } : {}) };
+    } else if (typeof instanceUrl === 'string') {
+        options.device = { instanceUrl: instanceUrl, ...(token ? { rceToken: token } : {}) };
     }
     return options;
 }

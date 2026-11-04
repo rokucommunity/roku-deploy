@@ -1,5 +1,5 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, getConfigOutPath, normalizeCliArgs } from './commandUtils';
+import { extractCommonConfigOptions, getConfigOutPath, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 /**
  * `package` orchestrates the "ship a signed build" flow: the optional steps run in the fixed order
@@ -7,7 +7,7 @@ import { extractCommonConfigOptions, getConfigOutPath, normalizeCliArgs } from '
  */
 export class CreateSignedPackageCommand {
     async run(args) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         if (args.rekey) {
             await rokuDeploy.rekeyDevice({
@@ -17,7 +17,7 @@ export class CreateSignedPackageCommand {
                 signingPassword: config.signingPassword,
                 devId: config.devId,
                 //cli args win over everything from the config file
-                ...normalizeCliArgs(args, config, ['pkg', 'signingPassword', 'devId'])
+                ...normalizeCliArgs(args, config)
             });
         }
 
@@ -30,7 +30,7 @@ export class CreateSignedPackageCommand {
                 deleteDevChannel: config.deleteDevChannel ?? config.deleteInstalledChannel,
                 packageUploadOverrides: config.packageUploadOverrides,
                 //cli args win over everything from the config file
-                ...normalizeCliArgs(args, config, ['zip', 'dir', 'close', 'appType', 'failOnCompileError', 'deleteDevChannel'])
+                ...normalizeCliArgs(args, config)
             });
         }
 
@@ -40,7 +40,7 @@ export class CreateSignedPackageCommand {
             await rokuDeploy.convertToSquashfs({
                 ...extractCommonConfigOptions(config),
                 //cli args win over everything from the config file
-                ...normalizeCliArgs(args, config, [])
+                ...normalizeCliArgs(args, config)
             });
         }
 
@@ -51,7 +51,7 @@ export class CreateSignedPackageCommand {
             devId: config.devId,
             out: getConfigOutPath(config),
             //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config, ['signingPassword', 'devId', 'out', 'appTitle', 'appVersion', 'manifestPath'])
+            ...normalizeCliArgs(args, config)
         });
     }
 }

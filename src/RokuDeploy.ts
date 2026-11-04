@@ -1651,15 +1651,11 @@ export class RokuDeploy {
      * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed). Returns the
      * flat config as written, except that relative paths are resolved against the config file's own
      * folder (so the file means the same thing no matter where it is run from); the empty object when
-     * the file is absent or `configPath` is `false`. `files` globs are left alone, since they are
-     * relative to `rootDir`. The library never loads config implicitly — the CLI calls this for every
-     * command; library consumers call it explicitly.
+     * the file is absent. `files` globs are left alone, since they are relative to `rootDir`. The library
+     * never loads config implicitly — the CLI calls this for every command; library consumers call it explicitly.
      * @public
      */
     public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
-        if (options?.configPath === false) {
-            return {};
-        }
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
@@ -3421,10 +3417,9 @@ export interface LoadConfigFileOptions {
      */
     cwd?: string;
     /**
-     * Path to the config file. Defaults to `rokudeploy.json` in the cwd. `false` skips loading
-     * entirely and returns an empty config (the CLI's `--no-config`).
+     * Path to the config file. Defaults to `rokudeploy.json` in the cwd.
      */
-    configPath?: string | false;
+    configPath?: string;
 }
 
 /**

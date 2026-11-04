@@ -1,5 +1,5 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, normalizeCliArgs } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 /**
  * `sideload` installs the dev channel; with `--rekey` the signing key is installed first. Each call gets
@@ -7,7 +7,7 @@ import { extractCommonConfigOptions, normalizeCliArgs } from './commandUtils';
  */
 export class SideloadCommand {
     async run(args) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         //--rekey installs the signing key first so the dev channel runs under it
         if (args.rekey) {
@@ -18,7 +18,7 @@ export class SideloadCommand {
                 signingPassword: config.signingPassword,
                 devId: config.devId,
                 //cli args win over everything from the config file
-                ...normalizeCliArgs(args, config, ['pkg', 'signingPassword', 'devId'])
+                ...normalizeCliArgs(args, config)
             });
         }
 
@@ -30,7 +30,7 @@ export class SideloadCommand {
             deleteDevChannel: config.deleteDevChannel ?? config.deleteInstalledChannel,
             packageUploadOverrides: config.packageUploadOverrides,
             //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config, ['zip', 'dir', 'close', 'appType', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel'])
+            ...normalizeCliArgs(args, config)
         });
     }
 }

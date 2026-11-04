@@ -963,7 +963,7 @@ export interface ListSnapshotsOptions extends RceManagementRequestOptions, RceMa
 
 // @public (undocumented)
 export interface LoadConfigFileOptions {
-    configPath?: string | false;
+    configPath?: string;
     cwd?: string;
 }
 

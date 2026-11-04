@@ -1,14 +1,14 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, normalizeCliArgs } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class KeyUpCommand {
     async run(args) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         await rokuDeploy.keyUp({
             ...extractCommonConfigOptions(config),
             //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config, ['key'])
+            ...normalizeCliArgs(args, config)
         });
     }
 }

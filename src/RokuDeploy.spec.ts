@@ -8500,11 +8500,6 @@ describe('RokuDeploy', () => {
                 expect(rokuDeploy['logger'].logLevel).to.equal('error');
             });
 
-            it('skips loading entirely when configPath is false', () => {
-                fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { password: 'password' });
-                expect(rokuDeploy.loadConfigFile({ cwd: tempDir, configPath: false })).to.eql({});
-            });
-
             it('leaves the logger level untouched when the config has no logLevel', () => {
                 rokuDeploy['logger'].logLevel = 'warn';
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { rootDir: './src' });

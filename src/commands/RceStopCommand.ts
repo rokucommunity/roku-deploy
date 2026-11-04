@@ -1,10 +1,9 @@
-import { rokuDeploy } from '../index';
 import { util } from '../util';
-import { createRceClient, defaultRceWaitTimeoutSeconds, rceDeviceToTableObject, resolveRceDevice, resolveRegistryEntry, waitForRceDeviceStatus } from './commandUtils';
+import { createRceClient, defaultRceWaitTimeoutSeconds, loadRokuDeployJson, rceDeviceToTableObject, resolveRceDevice, resolveRegistryEntry, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStopCommand {
     async run(args: any) {
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
 
         const target = {
             deviceId: args.deviceId,

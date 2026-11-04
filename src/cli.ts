@@ -20,6 +20,7 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
 import { InitCommand } from './commands/InitCommand';
+import { loadRokuDeployJson } from './commands/commandUtils';
 import { rokuDeploy } from './index';
 
 void yargs
@@ -40,11 +41,11 @@ void yargs
     //file-supplied values are never an invisible input; greppable in CI logs), then apply --logLevel,
     //falling back to the config file's logLevel
     .middleware((args: any) => {
-        const configPath = args.config ?? path.join(args.cwd ?? process.cwd(), 'rokudeploy.json');
+        const configPath = typeof args.config === 'string' ? args.config : path.join(args.cwd ?? process.cwd(), 'rokudeploy.json');
         if (args.config !== false && fsExtra.existsSync(configPath)) {
             console.log(`Using config: ${configPath}`);
         }
-        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+        const config = loadRokuDeployJson(args);
         const logLevel = args.logLevel ?? config.logLevel;
         if (logLevel !== undefined) {
             rokuDeploy.logger.logLevel = logLevel;
