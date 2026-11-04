@@ -1,9 +1,18 @@
 import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class StageCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.stage(options);
+        const config = loadRokuDeployJson(args);
+
+        await rokuDeploy.stage({
+            ...extractCommonConfigOptions(config),
+            //stage-specific config options
+            rootDir: config.rootDir,
+            files: config.files,
+            out: config.stagingDir ?? config.stagingFolderPath,
+            //cli args win over everything from the config file
+            ...normalizeCliArgs(args, config)
+        });
     }
 }

@@ -1,16 +1,16 @@
 import { expect } from 'chai';
 import * as fsExtra from 'fs-extra';
+import * as path from 'path';
 import { parse as parseJsonc } from 'jsonc-parser';
 import { rokuDeploy } from './index';
 import { standardizePath as s } from './util';
 import { tempDir } from './testUtils.spec';
 import { sampleConfigPath } from './commands/InitCommand';
-import type { RokuDeployConfig } from './RokuDeployConfig';
-import type { DeviceRegistryEntry } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, RokuDeployOptions } from './RokuDeployOptions';
 
-//the flat keys the sample is allowed to use, typed against RokuDeployConfig so a renamed or removed
+//the flat keys the sample is allowed to use, typed against RokuDeployOptions so a renamed or removed
 //option fails to compile here before the sample can drift from the real shape
-const sampleKeys: Array<keyof RokuDeployConfig> = [
+const sampleKeys: Array<keyof RokuDeployOptions> = [
     'device', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
     'convertToSquashfs', 'signingPassword', 'rekeySignedPackage', 'logLevel'
 ];
@@ -27,8 +27,8 @@ function uncommentOptions(text: string) {
 
 describe('src/rokudeploy.sample.jsonc', () => {
     let text: string;
-    let live: RokuDeployConfig;
-    let full: RokuDeployConfig;
+    let live: RokuDeployOptions;
+    let full: RokuDeployOptions;
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
@@ -46,13 +46,14 @@ describe('src/rokudeploy.sample.jsonc', () => {
     it('enables nothing out of the box, so a fresh config changes no behavior until edited', () => {
         //everything the sample ships enabled must be blank/default, so loading it is a no-op
         expect(live.device).to.eql({ host: '', password: '' });
-        expect(live.rootDir).to.equal('./');
+        //rootDir "./" means the folder holding the config file itself
+        expect(live.rootDir).to.equal(path.dirname(path.resolve(sampleConfigPath)));
         //nothing else is enabled
         const enabledKeys = Object.keys(live).filter(key => !['device', 'rootDir', 'files'].includes(key));
         expect(enabledKeys).to.eql([]);
     });
 
-    it('uses only keys that exist on RokuDeployConfig', () => {
+    it('uses only keys that exist on RokuDeployOptions', () => {
         const unknown = Object.keys(full).filter(key => !(sampleKeys as string[]).includes(key));
         expect(unknown).to.eql([]);
     });
@@ -97,7 +98,8 @@ describe('src/rokudeploy.sample.jsonc', () => {
         const enabledPath = s`${tempDir}/rokudeploy.json`;
         fsExtra.outputFileSync(enabledPath, uncommentOptions(text));
         const config = rokuDeploy.loadConfigFile({ configPath: enabledPath });
-        expect(config.rootDir).to.equal('./');
+        expect(config.rootDir).to.equal(path.resolve(tempDir));
+        expect(config.stagingDir).to.equal(path.resolve(tempDir, 'out/.roku-deploy-staging'));
         expect(config.outFile).to.equal('roku-deploy');
         expect(config.convertToSquashfs).to.equal(false);
     });
