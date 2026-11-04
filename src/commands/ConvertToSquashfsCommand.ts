@@ -1,9 +1,14 @@
 import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class ConvertToSquashfsCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.convertToSquashfs(options);
+        const config = loadRokuDeployJson(args);
+
+        await rokuDeploy.convertToSquashfs({
+            ...extractCommonConfigOptions(config),
+            //cli args win over everything from the config file
+            ...normalizeCliArgs(args, config)
+        });
     }
 }

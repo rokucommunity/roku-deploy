@@ -1,11 +1,17 @@
 import * as readline from 'readline';
 import { rokuDeploy } from '../index';
 import type { RemoteKeyText } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
-        let options = loadCommandOptions(args);
+        const config = loadRokuDeployJson(args);
+
+        const options = {
+            ...extractCommonConfigOptions(config),
+            //cli args win over everything from the config file
+            ...normalizeCliArgs(args, config)
+        };
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation
