@@ -19,7 +19,8 @@ import {
     UnknownDeviceResponseError,
     UnparsableDeviceResponseError,
     UnsupportedFirmwareVersionError,
-    UpdateCheckRequiredError
+    UpdateCheckRequiredError,
+    MissingRequiredOptionError
 } from './Errors';
 import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
@@ -166,10 +167,7 @@ export class RokuDeploy {
         logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
 
-        // dir is required
-        if (!options.dir) {
-            throw new Error('"dir" is required for zip');
-        }
+        this.checkRequiredOptions('zip', options, ['dir']);
 
         const dir = path.resolve(cwd, options.dir);
 
@@ -208,7 +206,11 @@ export class RokuDeploy {
     public async sideload(options: SideloadOptions): Promise<SideloadResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('sideload', options, ['device', 'password']);
+        //the type says zip or dir; the runtime check has to be by hand since either one satisfies it
+        if (!options.zip && !options.dir) {
+            throw new MissingRequiredOptionError(`sideload: missing required option 'zip' or 'dir'`, { methodName: 'sideload', optionNames: ['zip', 'dir'] });
+        }
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
@@ -229,15 +231,13 @@ export class RokuDeploy {
         }
 
         // Determine the zip file path based on whether zip or dir was provided
-        if ('zip' in options && options.zip) {
+        if (options.zip) {
             zipFilePath = path.resolve(cwd, options.zip);
-        } else if ('dir' in options && options.dir) {
+        } else {
             // Generate zip from directory to a temp location
             zipFilePath = path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
             await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
             deleteZipAfterSideload = true;
-        } else {
-            throw new Error('Either zip or dir must be provided');
         }
 
         //only delete the dev channel for channel sideloads; a component library (`dcl`) lives in a separate
@@ -389,7 +389,7 @@ export class RokuDeploy {
      */
     public async convertToSquashfs(options: ConvertToSquashfsOptions): Promise<ConvertToSquashfsResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ConvertToSquashfsOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('convertToSquashfs', options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
@@ -440,7 +440,7 @@ export class RokuDeploy {
     public async createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSignedPackageOptions;
         this.logger.info('Creating signed package');
-        this.checkRequiredOptions(options, ['device', 'password', 'signingPassword']);
+        this.checkRequiredOptions('createSignedPackage', options, ['device', 'password', 'signingPassword']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
@@ -535,7 +535,7 @@ export class RokuDeploy {
      */
     public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RekeyDeviceOptions;
-        this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword']);
+        this.checkRequiredOptions('rekeyDevice', options, ['device', 'password', 'pkg', 'signingPassword']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
@@ -615,7 +615,7 @@ export class RokuDeploy {
      */
     public async getDeviceInfo(options: GetDeviceInfoOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDeviceInfoOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('getDeviceInfo', options, ['device']);
 
         let result: EcpResult;
         try {
@@ -679,6 +679,7 @@ export class RokuDeploy {
      */
     public async getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDeviceInfoOptions;
+        this.checkRequiredOptions('getEcpNetworkAccessMode', options, ['device']);
         try {
             const deviceInfo = await this.getDeviceInfo(options);
             return deviceInfo['ecp-setting-mode'];
@@ -698,7 +699,7 @@ export class RokuDeploy {
      */
     public async getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetDevIdOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('getDevId', options, ['device']);
         const deviceInfo = await this.getDeviceInfo(options);
         this.logger.debug('Found dev id:', deviceInfo['keyed-developer-id']);
         return { devId: deviceInfo['keyed-developer-id'] };
@@ -714,7 +715,7 @@ export class RokuDeploy {
      */
     public async captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CaptureScreenshotOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('captureScreenshot', options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
@@ -792,7 +793,7 @@ export class RokuDeploy {
      */
     public async rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RebootDeviceOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('rebootDevice', options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -829,7 +830,7 @@ export class RokuDeploy {
      */
     public async checkForUpdate(options: CheckForUpdateOptions): Promise<CheckForUpdateResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CheckForUpdateOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('checkForUpdate', options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -869,7 +870,7 @@ export class RokuDeploy {
      */
     public async validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ValidateDeveloperPasswordOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('validateDeveloperPassword', options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -940,7 +941,7 @@ export class RokuDeploy {
      */
     public async sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendEcpRequestOptions;
-        this.checkRequiredOptions(options, ['device', 'route']);
+        this.checkRequiredOptions('sendEcpRequest', options, ['device', 'route']);
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
@@ -1000,7 +1001,7 @@ export class RokuDeploy {
      */
     public async createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket> {
         options = { ...this.options, ...options } as CreateEcpSocketOptions;
-        this.checkRequiredOptions(options, ['device', 'route']);
+        this.checkRequiredOptions('createEcpSocket', options, ['device', 'route']);
         this.validatePort(options.ecpPort, 'ecpPort');
         this.validateTimeout(options.timeout);
 
@@ -1092,6 +1093,7 @@ export class RokuDeploy {
      */
     public async keyPress(options: KeyPressOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyPressOptions;
+        this.checkRequiredOptions('keyPress', options, ['device', 'key']);
         return this.sendKeyEvent({
             ...options,
             key: options.key,
@@ -1106,6 +1108,7 @@ export class RokuDeploy {
      */
     public async keyDown(options: KeyDownOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyDownOptions;
+        this.checkRequiredOptions('keyDown', options, ['device', 'key']);
         return this.sendKeyEvent({
             ...options,
             action: 'keydown'
@@ -1119,6 +1122,7 @@ export class RokuDeploy {
      */
     public async keyUp(options: KeyUpOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as KeyUpOptions;
+        this.checkRequiredOptions('keyUp', options, ['device', 'key']);
         return this.sendKeyEvent({
             ...options,
             action: 'keyup'
@@ -1132,7 +1136,7 @@ export class RokuDeploy {
      */
     public async sendText(options: SendTextOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendTextOptions;
-        this.checkRequiredOptions(options, ['device', 'text']);
+        this.checkRequiredOptions('sendText', options, ['device', 'text']);
         for (const char of options.text) {
             await this.sendKeyEvent({
                 ...options,
@@ -1149,7 +1153,7 @@ export class RokuDeploy {
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendKeySequenceOptions;
-        this.checkRequiredOptions(options, ['device', 'keys']);
+        this.checkRequiredOptions('sendKeySequence', options, ['device', 'keys']);
         const keyDelayMs = options.keyDelayMs ?? 250;
         for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
             if (stepIndex > 0 && keyDelayMs > 0) {
@@ -1177,7 +1181,7 @@ export class RokuDeploy {
      */
     public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendDeveloperSettingsComboOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('sendDeveloperSettingsCombo', options, ['device']);
         const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (!isRceDeviceConfig(deviceConfig)) {
             throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
@@ -1203,7 +1207,7 @@ export class RokuDeploy {
      */
     public async launchApp(options: LaunchAppOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as LaunchAppOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('launchApp', options, ['device', 'appId']);
 
         const queryString = this.buildLaunchQueryString(options);
         await this.sendEcpRequest({
@@ -1224,7 +1228,7 @@ export class RokuDeploy {
      */
     public async exitApp(options: ExitAppOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ExitAppOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('exitApp', options, ['device', 'appId']);
 
         const forceSegment = options.force ? '/true' : '';
         const result = await this.sendEcpRequest({
@@ -1253,6 +1257,7 @@ export class RokuDeploy {
      */
     public async closeChannel(options: CloseChannelOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CloseChannelOptions;
+        this.checkRequiredOptions('closeChannel', options, ['device']);
         // TODO: After 13.0 releases, add check for ECP close-app support, and use that twice to kill instant resume if available
         await this.sendKeyEvent({
             ...options,
@@ -1268,7 +1273,7 @@ export class RokuDeploy {
      */
     public async getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetAppsOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('getApps', options, ['device']);
 
         let result: EcpResult;
         let json: Record<string, any> | undefined;
@@ -1314,7 +1319,7 @@ export class RokuDeploy {
      */
     public async getActiveApp(options: GetActiveAppOptions): Promise<RokuActiveApp> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetActiveAppOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('getActiveApp', options, ['device']);
 
         let result: EcpResult;
         let json: Record<string, any> | undefined;
@@ -1351,7 +1356,7 @@ export class RokuDeploy {
      */
     public async getRegistry(options: GetRegistryOptions): Promise<RokuRegistry> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetRegistryOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('getRegistry', options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1393,7 +1398,7 @@ export class RokuDeploy {
      */
     public async getAppState(options: GetAppStateOptions): Promise<RokuAppState> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetAppStateOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('getAppState', options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1424,7 +1429,7 @@ export class RokuDeploy {
      */
     public async getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as GetRendezvousTrackingOptions;
-        this.checkRequiredOptions(options, ['device']);
+        this.checkRequiredOptions('getRendezvousTracking', options, ['device']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1456,7 +1461,7 @@ export class RokuDeploy {
      */
     public async setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SetRendezvousTrackingOptions;
-        this.checkRequiredOptions(options, ['device', 'enabled']);
+        this.checkRequiredOptions('setRendezvousTracking', options, ['device', 'enabled']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1478,7 +1483,7 @@ export class RokuDeploy {
      */
     public async enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing> {
         options = { ...this.options, ...options } as EnablePerfettoTracingOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('enablePerfettoTracing', options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1504,6 +1509,7 @@ export class RokuDeploy {
      * @public
      */
     public async startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket> {
+        this.checkRequiredOptions('startPerfettoSession', { ...this.options, ...options }, ['device']);
         return this.createEcpSocket({ ...options, route: 'perfetto-session' });
     }
 
@@ -1517,7 +1523,7 @@ export class RokuDeploy {
      */
     public async triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger> {
         options = { ...this.options, ...options } as TriggerHeapSnapshotOptions;
-        this.checkRequiredOptions(options, ['device', 'appId']);
+        this.checkRequiredOptions('triggerHeapSnapshot', options, ['device', 'appId']);
 
         const result = await this.sendEcpRequest({
             device: options.device,
@@ -1542,7 +1548,7 @@ export class RokuDeploy {
     public async deleteDevChannel(options?: DeleteDevChannelOptions): Promise<DeleteDevChannelResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
         this.logger.info('Deleting dev channel...');
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('deleteDevChannel', options, ['device', 'password']);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
 
@@ -1566,7 +1572,7 @@ export class RokuDeploy {
      */
     public async deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<DeleteAllSideloadedPluginsResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteDevChannelOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('deleteAllSideloadedPlugins', options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -1587,7 +1593,7 @@ export class RokuDeploy {
      */
     public async deleteComponentLibrary(options?: DeleteComponentLibraryOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteComponentLibraryOptions;
-        this.checkRequiredOptions(options, ['device', 'password', 'fileName']);
+        this.checkRequiredOptions('deleteComponentLibrary', options, ['device', 'password', 'fileName']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -1609,6 +1615,7 @@ export class RokuDeploy {
      */
     public async deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as DeleteAllComponentLibrariesOptions;
+        this.checkRequiredOptions('deleteAllComponentLibraries', options, ['device', 'password']);
         const packages = await this.listSideloadedPlugins(options);
         for (const pkg of packages) {
             if (pkg.appType === 'dcl') {
@@ -1627,7 +1634,7 @@ export class RokuDeploy {
      */
     public async listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as ListSideloadedPluginsOptions;
-        this.checkRequiredOptions(options, ['device', 'password']);
+        this.checkRequiredOptions('listSideloadedPlugins', options, ['device', 'password']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
 
@@ -1688,6 +1695,7 @@ export class RokuDeploy {
      */
     public async resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]> {
         options = { ...this.options, ...options } as ResolveFilesArrayOptions;
+        this.checkRequiredOptions('resolveFilesArray', options, ['rootDir', 'files']);
         let rootDir = options.rootDir;
         const files = options.files;
 
@@ -1736,7 +1744,7 @@ export class RokuDeploy {
      */
     public createSocket(options: CreateSocketOptions): RokuDeploySocket {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as CreateSocketOptions;
-        this.checkRequiredOptions(options, ['device', 'port']);
+        this.checkRequiredOptions('createSocket', options, ['device', 'port']);
         const deviceConfig = this.resolveDevice(options.device, options.devices);
         return createRokuDeploySocket({ device: deviceConfig, port: options.port });
     }
@@ -1783,11 +1791,17 @@ export class RokuDeploy {
         return result;
     }
 
-    private checkRequiredOptions<T extends Record<string, any>>(options: T, requiredOptions: Array<keyof T>) {
-        for (let opt of requiredOptions as string[]) {
-            if (options[opt] === undefined) {
-                throw new Error('Missing required option: ' + opt);
-            }
+    /**
+     * Throw a MissingRequiredOptionError naming the method and every required option that is still
+     * undefined after the instance, device-registry and per-call options were merged.
+     */
+    private checkRequiredOptions<T extends Record<string, any>>(methodName: string, options: T, requiredOptions: Array<keyof T>) {
+        const missing = (requiredOptions as string[]).filter(x => options[x] === undefined);
+        if (missing.length > 0) {
+            throw new MissingRequiredOptionError(
+                `${methodName}: missing required option${missing.length > 1 ? 's' : ''} ${missing.map(x => `'${x}'`).join(', ')}`,
+                { methodName: methodName, optionName: missing[0], optionNames: missing }
+            );
         }
     }
 
@@ -2264,7 +2278,7 @@ export class RokuDeploy {
     private async sendKeyEvent(options: SendKeyEventOptions) {
         options = { ...this.options, ...options };
         this.logger.info('Sending key event:', options.key);
-        this.checkRequiredOptions(options, ['device', 'key']);
+        this.checkRequiredOptions('sendKeyEvent', options, ['device', 'key']);
 
         const deviceConfig = this.resolveDevice(options.device, options.devices);
         if (isRceDeviceConfig(deviceConfig)) {
