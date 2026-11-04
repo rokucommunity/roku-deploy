@@ -1,25 +1,9 @@
 import * as path from 'path';
+import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { DeviceRegistryEntry, RokuDeployOptions } from '../RokuDeployOptions';
-import { rokuDeploy } from '../index';
-
-/**
- * Load the rokudeploy.json a command should use, from its `--config` and `--cwd` args:
- * - `--no-config` (`config: false`) skips the file and returns an empty config
- * - `--config <path>` loads that file
- * - otherwise `rokudeploy.json` in `--cwd` (or the process cwd) is loaded, if it exists
- */
-export function loadRokuDeployJson(args: { cwd?: string; config?: string | boolean }): RokuDeployOptions {
-    if (args.config === false) {
-        return {};
-    }
-    return rokuDeploy.loadConfigFile({
-        cwd: args.cwd,
-        configPath: typeof args.config === 'string' ? args.config : undefined
-    });
-}
 
 /**
  * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
@@ -81,6 +65,22 @@ export function getConfigOutPath(config: RokuDeployOptions): string | undefined 
         return undefined;
     }
     return path.join(config.outDir ?? './out', config.outFile ?? 'roku-deploy');
+}
+
+/**
+ * Load the rokudeploy.json a command should use, from its `--config` and `--cwd` args:
+ * - `--no-config` (`config: false`) skips the file and returns an empty config
+ * - `--config <path>` loads that file
+ * - otherwise `rokudeploy.json` in `--cwd` (or the process cwd) is loaded, if it exists
+ */
+export function loadRokuDeployJson(args: { cwd?: string; config?: string | boolean }): RokuDeployOptions {
+    if (args.config === false) {
+        return {};
+    }
+    return rokuDeploy.loadConfigFile({
+        cwd: args.cwd,
+        configPath: typeof args.config === 'string' ? args.config : undefined
+    });
 }
 
 /**
