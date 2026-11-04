@@ -78,17 +78,39 @@ export interface RokuDeployConstructorOptions {
 }
 
 /**
- * The shape of a `rokudeploy.json` file, as returned by `rokuDeploy.loadConfigFile()`: one flat set of
- * values that each CLI command reads as it needs them. CLI args override the file, and the file
- * overrides the library's built-in defaults. Relative paths are relative to the json file itself.
- *
- * Also accepts the keys of a v3 rokudeploy.json (marked `@deprecated`) so an old file still loads;
- * each CLI command maps the ones that have a v4 equivalent.
+ * The shape of a `rokudeploy.json` file, as returned by `rokuDeploy.loadConfigFile()`. Relative paths
+ * are relative to the json file itself. The `@deprecated` keys are v3 keys, kept so an old file still loads.
  * @public
  */
 export interface RokuDeployOptions {
     /**
-     * The target device. Can be a `devices` registry name or an inline device config.
+     * The root path to the folder holding your Roku project's source files (manifest, components/, source/ should be directly under this folder)
+     * @default './'
+     */
+    rootDir?: string;
+
+    /**
+      * What type of app is being sideloaded? `'channel'` is for applications, and `'dcl'` is for installing component libraries on device for use in channels.
+      * @default 'channel'
+     */
+    appType?: 'channel' | 'dcl';
+
+    /**
+     * An array of source file paths, source file globs, or {src,dest} objects indicating
+     * where the source files are and where they should be placed
+     * in the output directory
+     * @default [
+            'source/**\/*.*',
+            'components/**\/*.*',
+            'images/**\/*.*',
+            'locale/**\/*.*',
+            'manifest'
+        ],
+     */
+    files?: FileEntry[];
+
+    /**
+     * The target device. Can be a registry name (string) or an inline device config.
      * @example 'living-room'
      * @example { host: '192.168.1.21' }
      */
@@ -99,6 +121,45 @@ export interface RokuDeployOptions {
      * @example { 'living-room': { host: '192.168.1.21', password: 'aaaa' } }
      */
     devices?: Record<string, DeviceRegistryEntry>;
+
+    /**
+     * The port that should be used when installing the package. Defaults to 80.
+     * This is mainly useful for things like emulators that use alternate ports,
+     * or when publishing through some type of port forwarding configuration.
+     */
+    packagePort?: number;
+
+    /**
+     * When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. Defaults to false.
+     * More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
+     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebug` instead.
+     */
+    remoteDebug?: boolean;
+
+    /**
+     * When publishing a sideloaded channel, this flag can be used to tell the Roku device that, should any compile errors occur, a client device (such as vscode)
+     * will be trying to attach to the debug protocol control port to consume those compile errors. This must be used in conjuction with the `remoteDebug` option
+     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebugConnectEarly` instead.
+     */
+    remoteDebugConnectEarly?: boolean;
+
+    /**
+     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
+     * This is mainly useful for things like emulators that use alternate ports,
+     * or when sending commands through some type of port forwarding.
+     */
+    ecpPort?: number;
+
+    /**
+     * The directory where screenshots should be saved. Will use the OS temp directory by default
+     */
+    screenshotDir?: string;
+
+    /**
+     * The timeout for each network request to the device, in milliseconds (not for the overall
+     * roku-deploy call). Defaults to 150000 (2 minutes 30 seconds).
+     */
+    timeout?: number;
 
     /**
      * The username for the roku box. This will always be 'rokudev', but allows to be overridden
@@ -113,83 +174,28 @@ export interface RokuDeployOptions {
     password?: string;
 
     /**
-     * The port that should be used when installing the package. Defaults to 80.
-     * This is mainly useful for things like emulators that use alternate ports,
-     * or when publishing through some type of port forwarding configuration.
+     * The password used for creating signed packages
      */
-    packagePort?: number;
+    signingPassword?: string;
 
     /**
-     * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
-     * This is mainly useful for things like emulators that use alternate ports,
-     * or when sending commands through some type of port forwarding.
+     * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
      */
-    ecpPort?: number;
+    devId?: string;
 
     /**
-     * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
-     * rceToken of its own
+     * If true, the publish will fail on compile error
      */
-    rceToken?: string;
+    failOnCompileError?: boolean;
 
     /**
-     * The timeout for each network request to the device, in milliseconds (not for the overall
-     * roku-deploy call). Defaults to 150000 (2 minutes 30 seconds).
-     */
-    timeout?: number;
-
-    /**
-     * The log level
+     * The log level applied to the logger.
      * @default 'log'
      */
     logLevel?: LogLevel | LogLevelNumeric;
 
     /**
-     * The folder holding the project source; the manifest lives directly under it. Read by `stage`.
-     * @default './'
-     */
-    rootDir?: string;
-
-    /**
-     * Globs (relative to `rootDir`), or `{ src, dest }` entries, selecting the files to include when
-     * staging. Read by `stage`. The `zip` command takes its own `--files` instead.
-     * @default [
-            'source/**\/*.*',
-            'components/**\/*.*',
-            'images/**\/*.*',
-            'locale/**\/*.*',
-            'manifest'
-        ],
-     */
-    files?: FileEntry[];
-
-    /**
-     * Where the filtered copy of `rootDir` is written by `stage`, and the folder `zip` zips.
-     * @default './out/.roku-deploy-staging'
-     */
-    stagingDir?: string;
-
-    /**
-     * The base name of generated files: `zip` writes `<outFile>.zip`, `package` writes `<outFile>.pkg`,
-     * inside `./out`. An explicit extension is honored as given.
-     */
-    outFile?: string;
-
-    /**
-     * What type of app is being sideloaded? `'channel'` is for applications, and `'dcl'` is for installing component libraries on device for use in channels.
-     * @default 'channel'
-     */
-    appType?: 'channel' | 'dcl';
-
-    /**
-     * If true, the sideload will fail on compile error
-     * @default true
-     */
-    failOnCompileError?: boolean;
-
-    /**
      * If true, the previously installed dev channel will be deleted before installing the new one
-     * @default true
      */
     deleteDevChannel?: boolean;
 
@@ -210,31 +216,33 @@ export interface RokuDeployOptions {
     };
 
     /**
+     * The default RCE bearer token for Roku Cloud Emulator devices whose config carries no
+     * rceToken of its own
+     */
+    rceToken?: string;
+
+    /**
+     * Where the filtered copy of `rootDir` is written by `stage`, and the folder `zip` zips.
+     * @default './out/.roku-deploy-staging'
+     */
+    stagingDir?: string;
+
+    /**
+     * The base name of generated files: `zip` writes `<outFile>.zip`, `package` writes `<outFile>.pkg`,
+     * inside `./out`. An explicit extension is honored as given.
+     */
+    outFile?: string;
+
+    /**
      * Convert the installed channel to squashfs before packaging. Read by `package`. On by default;
      * set to false to skip.
      */
     convertToSquashfs?: boolean;
 
     /**
-     * The signing password of the key currently on the device. Read by `package` and `rekey`.
-     */
-    signingPassword?: string;
-
-    /**
-     * A previously signed `.pkg` whose key should be installed on the device. Read by `rekey`, and by
-     * `sideload`/`package` with `--rekey`. The cli equivalent is `--pkg`.
+     * Path to a copy of the signed package you want to use for rekeying. The cli equivalent is `--pkg`.
      */
     rekeySignedPackage?: string;
-
-    /**
-     * Dev ID we are expecting the device to have. If supplied we check that the dev ID returned after keying matches what we expected
-     */
-    devId?: string;
-
-    /**
-     * The directory where screenshots should be saved. Will use the OS temp directory by default
-     */
-    screenshotDir?: string;
 
     //
     // v3 keys. Kept so a v3 rokudeploy.json still loads; the CLI commands map the ones that have a
@@ -284,18 +292,6 @@ export interface RokuDeployOptions {
      * @deprecated use `device: { host }`, which wins when both are set.
      */
     host?: string;
-
-    /**
-     * Enable the socket based BrightScript debug protocol for the sideloaded channel.
-     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebug` instead.
-     */
-    remoteDebug?: boolean;
-
-    /**
-     * Tell the device a debugger will attach early to consume compile errors (requires `remoteDebug`).
-     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebugConnectEarly` instead.
-     */
-    remoteDebugConnectEarly?: boolean;
 
     /**
      * When publishing a sideloaded channel, set this to `false` to prevent the Roku device from auto-launching the channel after install.
