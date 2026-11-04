@@ -1,5 +1,5 @@
 import { RokuDeploy } from '../index';
-import type { RemoteKeyText } from '../index';
+import type { KeyPressOptions, RemoteKeyText, SendTextOptions } from '../index';
 import * as readline from 'readline';
 import { normalizeCliArgs } from './commandUtils';
 
@@ -84,13 +84,13 @@ export class RemoteControlCommand {
                             text = ' ';
                         }
 
-                        void rokuDeploy.sendText({ text: text });
+                        void rokuDeploy.sendText({ text: text } as SendTextOptions);
                     }
                     break;
             }
 
             if (rokuDeployKeyName) {
-                void rokuDeploy.keyPress({ key: rokuDeployKeyName });
+                void rokuDeploy.keyPress({ key: rokuDeployKeyName } as KeyPressOptions);
             }
         });
 

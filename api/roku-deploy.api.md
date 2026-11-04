@@ -1411,20 +1411,20 @@ export type RokuAppStateValue = 'active' | 'background' | 'inactive' | 'unknown'
 export class RokuDeploy {
     constructor(options?: RokuDeployConstructorOptions);
     // (undocumented)
-    captureScreenshot(options?: Partial<CaptureScreenshotOptions>): Promise<CaptureScreenshotResult>;
+    captureScreenshot(options: CaptureScreenshotOptions): Promise<CaptureScreenshotResult>;
     // (undocumented)
     checkForUpdate(options: CheckForUpdateOptions): Promise<CheckForUpdateResult>;
     // (undocumented)
     closeChannel(options: CloseChannelOptions): Promise<void>;
-    convertToSquashfs(options?: Partial<ConvertToSquashfsOptions>): Promise<ConvertToSquashfsResult>;
+    convertToSquashfs(options: ConvertToSquashfsOptions): Promise<ConvertToSquashfsResult>;
     createEcpSocket(options: CreateEcpSocketOptions): Promise<WebSocket>;
-    createSignedPackage(options?: Partial<CreateSignedPackageOptions>): Promise<CreateSignedPackageResult>;
+    createSignedPackage(options: CreateSignedPackageOptions): Promise<CreateSignedPackageResult>;
     createSocket(options: CreateSocketOptions): RokuDeploySocket;
     protected createWebSocket(url: string, requestOptions: WebSocket.ClientOptions): WebSocket;
     deleteAllComponentLibraries(options: DeleteAllComponentLibrariesOptions): Promise<void>;
     deleteAllSideloadedPlugins(options?: DeleteDevChannelOptions): Promise<DeleteAllSideloadedPluginsResult>;
     deleteComponentLibrary(options?: DeleteComponentLibraryOptions): Promise<void>;
-    deleteDevChannel(options?: Partial<DeleteDevChannelOptions>): Promise<DeleteDevChannelResult>;
+    deleteDevChannel(options?: DeleteDevChannelOptions): Promise<DeleteDevChannelResult>;
     enablePerfettoTracing(options: EnablePerfettoTracingOptions): Promise<RokuPerfettoTracing>;
     enhanceDeviceInfo(deviceInfo: DeviceInfoRaw): DeviceInfo;
     exitApp(options: ExitAppOptions): Promise<void>;
@@ -1432,18 +1432,18 @@ export class RokuDeploy {
     getApps(options: GetAppsOptions): Promise<RokuAppDescriptor[]>;
     getAppState(options: GetAppStateOptions): Promise<RokuAppState>;
     getDestPath(srcPathAbsolute: string, files: FileEntry[], rootDir: string, skipMatch?: boolean): string;
-    getDeviceInfo(options?: Partial<GetDeviceInfoOptions> & {
+    getDeviceInfo(options?: GetDeviceInfoOptions & {
         enhance: true;
     }): Promise<DeviceInfo>;
     // (undocumented)
-    getDeviceInfo(options?: Partial<GetDeviceInfoOptions>): Promise<DeviceInfoRaw>;
-    getDevId(options?: Partial<GetDevIdOptions>): Promise<GetDevIdResult>;
+    getDeviceInfo(options?: GetDeviceInfoOptions): Promise<DeviceInfoRaw>;
+    getDevId(options?: GetDevIdOptions): Promise<GetDevIdResult>;
     getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode>;
     getRegistry(options: GetRegistryOptions): Promise<RokuRegistry>;
     getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous>;
-    keyDown(options?: Partial<KeyDownOptions>): Promise<EcpResult>;
-    keyPress(options?: Partial<KeyPressOptions>): Promise<EcpResult>;
-    keyUp(options?: Partial<KeyUpOptions>): Promise<EcpResult>;
+    keyDown(options: KeyDownOptions): Promise<EcpResult>;
+    keyPress(options: KeyPressOptions): Promise<EcpResult>;
+    keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
     loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig;
@@ -1451,20 +1451,20 @@ export class RokuDeploy {
     get options(): Readonly<RokuDeployConstructorOptions>;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
-    rekeyDevice(options?: Partial<RekeyDeviceOptions>): Promise<void>;
+    rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
-    sendText(options?: Partial<SendTextOptions>): Promise<void>;
+    sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
-    sideload(options?: Partial<SideloadOptions>): Promise<SideloadResult>;
-    stage(options?: Partial<StageOptions>): Promise<StageResult>;
+    sideload(options: SideloadOptions): Promise<SideloadResult>;
+    stage(options: StageOptions): Promise<StageResult>;
     startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket>;
     triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger>;
     validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean>;
     withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T>;
-    zip(options?: Partial<ZipOptions>): Promise<ZipResult>;
+    zip(options: ZipOptions): Promise<ZipResult>;
 }
 
 // @public (undocumented)

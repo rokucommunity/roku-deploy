@@ -1,4 +1,5 @@
 import { RokuDeploy } from '../index';
+import type { ConvertToSquashfsOptions, CreateSignedPackageOptions, RekeyDeviceOptions, SideloadOptions } from '../index';
 import { normalizeCliArgs } from './commandUtils';
 
 /**
@@ -9,16 +10,16 @@ export class CreateSignedPackageCommand {
     async run(args) {
         const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice();
+            await rokuDeploy.rekeyDevice({} as RekeyDeviceOptions);
         }
         if (args.sideload) {
-            await rokuDeploy.sideload();
+            await rokuDeploy.sideload({} as SideloadOptions);
         }
         //a production package should be squashed, so squash runs unless --no-squash (or a config
         //`squash: false`) opts out
         if (rokuDeploy.options.squash !== false) {
-            await rokuDeploy.convertToSquashfs();
+            await rokuDeploy.convertToSquashfs({} as ConvertToSquashfsOptions);
         }
-        await rokuDeploy.createSignedPackage();
+        await rokuDeploy.createSignedPackage({} as CreateSignedPackageOptions);
     }
 }

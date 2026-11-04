@@ -1,9 +1,10 @@
 import { RokuDeploy } from '../index';
+import type { KeyPressOptions } from '../index';
 import { normalizeCliArgs } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
         const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
-        await rokuDeploy.keyPress();
+        await rokuDeploy.keyPress({} as KeyPressOptions);
     }
 }
