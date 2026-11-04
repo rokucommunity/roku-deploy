@@ -25,8 +25,8 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
-import type { RokuDeployConfig } from './RokuDeployConfig';
+import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
+import type { RokuDeployJson } from './RokuDeployJson';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -1641,17 +1641,30 @@ export class RokuDeploy {
     }
 
     /**
-     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed) and warn
-     * about invalid device-registry entries. Returns the flat config as written; the empty object
-     * when the file is absent. The library never loads config implicitly — the CLI calls this for
-     * every command; library consumers call it explicitly.
+     * The config keys that hold a file or folder path. `loadConfigFile` resolves these against the
+     * config file's own folder.
+     */
+    private static readonly configPathKeys: ReadonlyArray<keyof RokuDeployJson> = [
+        'rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir', 'project'
+    ];
+
+    /**
+     * Load a `rokudeploy.json` config file (jsonc: comments and trailing commas allowed). Returns the
+     * flat config as written, except that relative paths are resolved against the config file's own
+     * folder (so the file means the same thing no matter where it is run from); the empty object when
+     * the file is absent or `configPath` is `false`. `files` globs are left alone, since they are
+     * relative to `rootDir`. The library never loads config implicitly — the CLI calls this for every
+     * command; library consumers call it explicitly.
      * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployJson {
+        if (options?.configPath === false) {
+            return {};
+        }
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
-        let config: RokuDeployConfig = {};
+        let config: RokuDeployJson = {};
         if (fsExtra.existsSync(configPath)) {
             const configFileText = fsExtra.readFileSync(configPath).toString();
             const parseErrors: ParseError[] = [];
@@ -1672,9 +1685,16 @@ export class RokuDeploy {
                     })
                 ));
             }
-            //apply the config's logLevel so a file-supplied level wins over the logger's current level
-            if (config.logLevel !== undefined) {
-                this.logger.logLevel = config.logLevel;
+            //paths in the file are relative to the file itself, not to wherever the caller runs from.
+            //an empty string means "not set" (the sample ships blank values), so it is left as-is
+            const configDir = path.dirname(path.resolve(configPath));
+            for (const key of RokuDeploy.configPathKeys) {
+                const value = config[key];
+                if (typeof value === 'string' && value !== '') {
+                    (config[key] as string) = util.standardizePath(
+                        path.resolve(configDir, value)
+                    );
+                }
             }
         }
         return config;
@@ -2606,7 +2626,7 @@ export class RokuDeploy {
      * that a call targets, for spreading between constructor options and per-call options. Returns `{}` for an
      * inline device config, no device, or an unknown name (resolveDevice() reports the latter).
      */
-    private getDeviceSettings(options: Pick<RokuDeployOptions, 'device' | 'devices'> | undefined): Partial<DeviceRegistrySettings> {
+    private getDeviceSettings(options: { device?: DeviceOption; devices?: Record<string, DeviceRegistryEntry> } | undefined): Partial<DeviceRegistrySettings> {
         const settings: Partial<DeviceRegistrySettings> = {};
         const device = options?.device ?? this.options.device;
         const entry = typeof device === 'string' ? this.getDeviceRegistryEntry(device, options?.devices) : undefined;
@@ -2822,8 +2842,8 @@ export const DefaultFiles = [
 export interface CaptureScreenshotOptions extends BaseRequestOptions {
     /**
      * When provided, saves the screenshot to disk in addition to returning the buffer.
+     * - If a string path, saves to that exact location
      * - If `true`, saves to the default location (screenshotDir or OS temp directory)
-     * - If a string path, saves to that location
      */
     out?: string | true;
 
@@ -3402,9 +3422,10 @@ export interface LoadConfigFileOptions {
      */
     cwd?: string;
     /**
-     * Path to the config file. Defaults to `rokudeploy.json` in the cwd.
+     * Path to the config file. Defaults to `rokudeploy.json` in the cwd. `false` skips loading
+     * entirely and returns an empty config (the CLI's `--no-config`).
      */
-    configPath?: string;
+    configPath?: string | false;
 }
 
 /**

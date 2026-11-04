@@ -13,7 +13,7 @@ import { cwd, expectPathExists, expectThrowsAsync, outDir, rootDir, stagingDir, 
 import undent from 'undent';
 import { standardizePath as s, util } from './util';
 import { powerCycleRokuDevice } from './smartSwitchManagement.spec';
-import type { RokuDeployOptions } from './RokuDeployOptions';
+import type { RokuDeployJson } from './RokuDeployJson';
 
 //load device connection info from a .env file at the repo root (if present), then fall back to any
 //pre-existing environment variables. This is how CI/CD (and local dev) point the device suite at a
@@ -48,12 +48,12 @@ describe('device', function device() {
     this.timeout(10_000);
 
     //device/password are required by every v4 device method; the `before` hook guarantees they're set,
-    //so narrow the type here (they're optional on the base RokuDeployOptions) to avoid
+    //so narrow the type here (they're optional on the base RokuDeployJson) to avoid
     //spreading an optional device/password into methods that require them.
-    let options: RokuDeployOptions & { device: { host: string }; password: string };
+    let options: RokuDeployJson & { device: { host: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
-    //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
+    //the v4 library methods take the rekey package as `pkg`, not the json's `rekeySignedPackage`; track it separately
     const rekeySignedPackage = `${cwd}/testSignedPackage.pkg`;
 
     //tripped by the rebootDevice test (which runs mid-suite) if the device fails to come back; once

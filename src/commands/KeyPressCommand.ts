@@ -1,9 +1,14 @@
 import { rokuDeploy } from '../index';
-import { loadCommandOptions } from './commandUtils';
+import { extractCommonConfigOptions, normalizeCliArgs } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        await rokuDeploy.keyPress(options);
+        const config = rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: args.config });
+
+        await rokuDeploy.keyPress({
+            ...extractCommonConfigOptions(config),
+            //cli args win over everything from the config file
+            ...normalizeCliArgs(args, config, ['key'])
+        });
     }
 }

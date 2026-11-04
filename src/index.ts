@@ -2,7 +2,7 @@
 //everything else (util) is internal.
 export * from './RokuDeploy';
 export * from './RokuDeployOptions';
-export * from './RokuDeployConfig';
+export * from './RokuDeployJson';
 export * from './Errors';
 export * from './DeviceInfo';
 export * from './DeviceConfig';

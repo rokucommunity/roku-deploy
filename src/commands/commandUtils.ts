@@ -1,60 +1,77 @@
 import * as path from 'path';
-import * as fsExtra from 'fs-extra';
-import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { DeviceRegistryEntry } from '../RokuDeployOptions';
+import type { RokuDeployJson } from '../RokuDeployJson';
 
 /**
- * Build the effective options for one CLI command: load `rokudeploy.json` (from `--config` or
- * cwd; skipped entirely with `--no-config`), then merge the CLI args on top.
- * Precedence: CLI args → config file → defaults. Pass `quiet` to skip announcing the config file.
+ * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
+ * `host` and `remotePort` keys onto `device` and `ecpPort`. Unset values are left off entirely: an
+ * explicit `undefined` would mask the same setting on a devices-registry entry.
  */
-export function loadCommandOptions<T = any>(args: any, options?: { quiet?: boolean }): T {
-    args.cwd ??= process.cwd();
-    let result: Record<string, any>;
-    //--no-config: bypass config auto-detection entirely
-    if (args.config === false) {
-        result = mapCliArgsToLibraryOptions({ ...args });
-    } else {
-        const configPath = args.config ?? path.join(args.cwd, 'rokudeploy.json');
-        //announce which config file feeds this run (even without --verbose) so file-supplied values
-        //are never an invisible input; greppable in CI logs
-        if (!options?.quiet && fsExtra.existsSync(configPath)) {
-            console.log(`Using config: ${configPath}`);
+export function extractCommonConfigOptions(config: RokuDeployJson): Record<string, any> {
+    const options: Record<string, any> = {
+        device: config.device ?? (config.host ? { host: config.host } : undefined),
+        devices: config.devices,
+        username: config.username,
+        password: config.password,
+        packagePort: config.packagePort,
+        ecpPort: config.ecpPort ?? config.remotePort,
+        timeout: config.timeout
+    };
+    for (const key of Object.keys(options)) {
+        if (options[key] === undefined) {
+            delete options[key];
         }
-        result = mapCliArgsToLibraryOptions({
-            ...rokuDeploy.loadConfigFile({ cwd: args.cwd, configPath: configPath }),
-            ...args
-        });
     }
-    //loadConfigFile applies the file's logLevel; an explicit --logLevel still wins on the command line
-    if (args.logLevel !== undefined) {
-        rokuDeploy.logger.logLevel = args.logLevel;
-    }
-    return result as T;
+    return options;
 }
 
 /**
- * Translate CLI-only flag names into the option names the library understands. `--host`, `--esn` and
- * `--instanceUrl` each become an inline `device` config (winning over any `device` from the config file,
- * since CLI args take precedence); `--rceToken` (or the config file's root `rceToken`) rides along on an
- * RCE device so the library can authenticate with it.
+ * The cli flags every device command shares (the device itself comes from `--host`/`--esn`/`--instanceUrl`).
  */
-function mapCliArgsToLibraryOptions<T extends Record<string, any>>(options: T): T {
-    const { host, esn, instanceUrl, ...remainingOptions } = options;
-    if (typeof host === 'string') {
-        return { ...remainingOptions, device: { host: host } } as unknown as T;
+const commonCliKeys = ['cwd', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
+
+/**
+ * Pick the CLI args a command uses and translate them into library option names: the shared flags, plus the
+ * command's own `commandKeys`. `--host`, `--esn` and `--instanceUrl` each become an inline `device`; an RCE
+ * device carries `--rceToken`, falling back to the config file's `rceToken`.
+ *
+ * Anything else in `args` is left out: another step's flags (when `package` runs `rekey`, `sideload` and
+ * `squash` with its own args), the global `--config`/`--logLevel`, yargs bookkeeping (`_`, `$0`, kebab-case
+ * duplicates), and `undefined` values (which would otherwise override the config file's value).
+ *
+ * Returns `any`: nothing can prove statically that the user supplied a required option like `device`
+ * or `password`, so the library's own runtime checks report those instead.
+ */
+export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployJson, commandKeys: string[]): any {
+    const options: Record<string, any> = {};
+    for (const key of [...commonCliKeys, ...commandKeys]) {
+        if (args[key] !== undefined) {
+            options[key] = args[key];
+        }
     }
-    const rceToken = remainingOptions.rceToken as string | undefined;
-    if (typeof esn === 'string') {
-        return { ...remainingOptions, device: { esn: esn, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
-    }
-    if (typeof instanceUrl === 'string') {
-        return { ...remainingOptions, device: { instanceUrl: instanceUrl, ...(rceToken ? { rceToken: rceToken } : {}) } } as unknown as T;
+    const token = args.rceToken ?? config.rceToken;
+    if (typeof args.host === 'string') {
+        options.device = { host: args.host };
+    } else if (typeof args.esn === 'string') {
+        options.device = { esn: args.esn, ...(token ? { rceToken: token } : {}) };
+    } else if (typeof args.instanceUrl === 'string') {
+        options.device = { instanceUrl: args.instanceUrl, ...(token ? { rceToken: token } : {}) };
     }
     return options;
+}
+
+/**
+ * The output file path from the config file's v3 `outDir`/`outFile` keys, or undefined when neither is set
+ * (the library then uses its own default). The library adds the `.zip`/`.pkg` extension.
+ */
+export function getConfigOutPath(config: RokuDeployJson): string | undefined {
+    if (config.outDir === undefined && config.outFile === undefined) {
+        return undefined;
+    }
+    return path.join(config.outDir ?? './out', config.outFile ?? 'roku-deploy');
 }
 
 /**
@@ -68,25 +85,20 @@ export const defaultRceWaitTimeoutSeconds = 600;
 export const rceWaitPollIntervalMs = 2000;
 
 /**
- * Merge the config file with the CLI args and build an authenticated management client.
- * The token comes from `--token`, falling back to the target device's registry entry, then
- * to `rceToken` from rokudeploy.json.
+ * Build an authenticated management client, failing with a helpful message when no token was found.
  */
-export function buildRceCommandContext(args: any) {
-    const options = loadCommandOptions(args);
-    const token = options.token ?? resolveRegistryEntry(options)?.rceToken ?? options.rceToken;
+export function createRceClient(token: string | undefined): RceManagementClient {
     if (!token) {
         throw new Error('An RCE token is required. Pass --token or set "rceToken" in rokudeploy.json');
     }
-    const client = new RceManagementClient({ token: token });
-    return { options: options, client: client };
+    return new RceManagementClient({ token: token });
 }
 
 /**
  * Look up the device registry entry named by `device` (if it IS a registry name — an inline
  * device config object passes through as-is). Returns undefined when no device is named.
  */
-function resolveRegistryEntry(options: { device?: string | DeviceRegistryEntry; devices?: Record<string, DeviceRegistryEntry> }): DeviceRegistryEntry | undefined {
+export function resolveRegistryEntry(options: { device?: string | DeviceRegistryEntry; devices?: Record<string, DeviceRegistryEntry> }): DeviceRegistryEntry | undefined {
     if (typeof options.device === 'string') {
         const entry = options.devices?.[options.device];
         if (!entry) {
