@@ -14,8 +14,7 @@ import type * as WebSocket from 'ws';
 import * as ws from 'ws';
 import * as errors from './Errors';
 import { util, standardizePath as s, standardizePathPosix as sp } from './util';
-import type { FileEntry } from './RokuDeployOptions';
-import type { RokuDeployJson } from './RokuDeployJson';
+import type { FileEntry, RokuDeployOptions } from './RokuDeployOptions';
 import { cwd, expectPathExists, expectPathNotExists, expectThrowsAsync, outDir, rootDir, stagingDir, tempDir, writeFiles } from './testUtils.spec';
 import { createSandbox } from 'sinon';
 import { request } from './request';
@@ -31,7 +30,7 @@ const sinon = createSandbox();
 describe('RokuDeploy', () => {
     let rokuDeploy: RokuDeploy;
     //a loose bag of library options for these tests (json keys plus the library-only `pkg`)
-    let options: RokuDeployJson & { pkg?: string };
+    let options: RokuDeployOptions & { pkg?: string };
 
     let writeStreamPromise: Promise<WriteStream>;
     let writeStreamDeferred: Deferred<WriteStream> & { isComplete: true | undefined };
@@ -6324,7 +6323,7 @@ describe('RokuDeploy', () => {
         //create baseline project structure
         beforeEach(() => {
             rokuDeploy = new RokuDeploy();
-            options = { rootDir: rootDir } as RokuDeployJson;
+            options = { rootDir: rootDir } as RokuDeployOptions;
             fsExtra.ensureDirSync(`${rootDir}/components/emptyFolder`);
             writeFiles(rootDir, [
                 `manifest`,
@@ -7037,7 +7036,7 @@ describe('RokuDeploy', () => {
     });
 
     describe('checkRequiredOptions', () => {
-        async function testRequiredOptions(action: string, requiredOptions: Partial<RokuDeployJson>, testedOption: string) {
+        async function testRequiredOptions(action: string, requiredOptions: Partial<RokuDeployOptions>, testedOption: string) {
             const newOptions = { ...requiredOptions };
             delete newOptions[testedOption];
             await expectThrowsAsync(async () => {

@@ -2,15 +2,14 @@ import * as path from 'path';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
-import type { DeviceRegistryEntry } from '../RokuDeployOptions';
-import type { RokuDeployJson } from '../RokuDeployJson';
+import type { DeviceRegistryEntry, RokuDeployOptions } from '../RokuDeployOptions';
 
 /**
  * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
  * `host` and `remotePort` keys onto `device` and `ecpPort`. Unset values are left off entirely: an
  * explicit `undefined` would mask the same setting on a devices-registry entry.
  */
-export function extractCommonConfigOptions(config: RokuDeployJson): Record<string, any> {
+export function extractCommonConfigOptions(config: RokuDeployOptions): Record<string, any> {
     const options: Record<string, any> = {
         device: config.device ?? (config.host ? { host: config.host } : undefined),
         devices: config.devices,
@@ -45,7 +44,7 @@ const commonCliKeys = ['cwd', 'username', 'password', 'packagePort', 'ecpPort', 
  * Returns `any`: nothing can prove statically that the user supplied a required option like `device`
  * or `password`, so the library's own runtime checks report those instead.
  */
-export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployJson, commandKeys: string[]): any {
+export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployOptions, commandKeys: string[]): any {
     const options: Record<string, any> = {};
     for (const key of [...commonCliKeys, ...commandKeys]) {
         if (args[key] !== undefined) {
@@ -67,7 +66,7 @@ export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployJs
  * The output file path from the config file's v3 `outDir`/`outFile` keys, or undefined when neither is set
  * (the library then uses its own default). The library adds the `.zip`/`.pkg` extension.
  */
-export function getConfigOutPath(config: RokuDeployJson): string | undefined {
+export function getConfigOutPath(config: RokuDeployOptions): string | undefined {
     if (config.outDir === undefined && config.outFile === undefined) {
         return undefined;
     }

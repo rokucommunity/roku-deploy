@@ -25,8 +25,7 @@ import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
-import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions } from './RokuDeployOptions';
-import type { RokuDeployJson } from './RokuDeployJson';
+import type { DeviceRegistryEntry, DeviceRegistrySettings, FileEntry, RokuDeployConstructorOptions, RokuDeployOptions } from './RokuDeployOptions';
 import { isLocalDeviceConfig, isRceDeviceConfig, isRceDeviceConfigByEsn, isRceDeviceConfigById, isRceDeviceConfigByUrl, validateDeviceConfig } from './DeviceConfig';
 import type { DeviceConfig, DeviceOption, RceDeviceConfig } from './DeviceConfig';
 import { RceManagementClient } from './RceManagementClient';
@@ -1644,7 +1643,7 @@ export class RokuDeploy {
      * The config keys that hold a file or folder path. `loadConfigFile` resolves these against the
      * config file's own folder.
      */
-    private static readonly configPathKeys: ReadonlyArray<keyof RokuDeployJson> = [
+    private static readonly configPathKeys: ReadonlyArray<keyof RokuDeployOptions> = [
         'rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir', 'project'
     ];
 
@@ -1657,14 +1656,14 @@ export class RokuDeploy {
      * command; library consumers call it explicitly.
      * @public
      */
-    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployJson {
+    public loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions {
         if (options?.configPath === false) {
             return {};
         }
         const cwd = options?.cwd ?? process.cwd();
         const configPath = options?.configPath ?? path.join(cwd, 'rokudeploy.json');
 
-        let config: RokuDeployJson = {};
+        let config: RokuDeployOptions = {};
         if (fsExtra.existsSync(configPath)) {
             const configFileText = fsExtra.readFileSync(configPath).toString();
             const parseErrors: ParseError[] = [];

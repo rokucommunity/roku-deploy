@@ -6,12 +6,11 @@ import { rokuDeploy } from './index';
 import { standardizePath as s } from './util';
 import { tempDir } from './testUtils.spec';
 import { sampleConfigPath } from './commands/InitCommand';
-import type { RokuDeployJson } from './RokuDeployJson';
-import type { DeviceRegistryEntry } from './RokuDeployOptions';
+import type { DeviceRegistryEntry, RokuDeployOptions } from './RokuDeployOptions';
 
-//the flat keys the sample is allowed to use, typed against RokuDeployJson so a renamed or removed
+//the flat keys the sample is allowed to use, typed against RokuDeployOptions so a renamed or removed
 //option fails to compile here before the sample can drift from the real shape
-const sampleKeys: Array<keyof RokuDeployJson> = [
+const sampleKeys: Array<keyof RokuDeployOptions> = [
     'device', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
     'convertToSquashfs', 'signingPassword', 'rekeySignedPackage', 'logLevel'
 ];
@@ -28,8 +27,8 @@ function uncommentOptions(text: string) {
 
 describe('src/rokudeploy.sample.jsonc', () => {
     let text: string;
-    let live: RokuDeployJson;
-    let full: RokuDeployJson;
+    let live: RokuDeployOptions;
+    let full: RokuDeployOptions;
 
     beforeEach(() => {
         fsExtra.emptyDirSync(tempDir);
@@ -54,7 +53,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
         expect(enabledKeys).to.eql([]);
     });
 
-    it('uses only keys that exist on RokuDeployJson', () => {
+    it('uses only keys that exist on RokuDeployOptions', () => {
         const unknown = Object.keys(full).filter(key => !(sampleKeys as string[]).includes(key));
         expect(unknown).to.eql([]);
     });

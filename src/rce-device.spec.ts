@@ -66,9 +66,9 @@ const REQUEST_TIMEOUT = 30_000;
     this.timeout(20_000);
 
     //device/password are required by every v4 device method; the `before` hook guarantees they're set,
-    //so narrow the type here (they're optional on the base RokuDeployJson) to avoid
+    //so narrow the type here (they're optional on the base RokuDeployOptions) to avoid
     //spreading an optional device/password into methods that require them.
-    let options: rokuDeploy.RokuDeployJson & { device: { id: number; rceToken: string }; password: string };
+    let options: rokuDeploy.RokuDeployOptions & { device: { id: number; rceToken: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
     //the v4 library methods take the rekey package as `pkg`, not the json's `rekeySignedPackage`; track it separately

@@ -631,7 +631,7 @@ Here are the available options for customizing to your developer-specific workfl
 - **packageUploadOverrides?:**
     Overrides for values used during the zip upload process. You probably don't need to change these...
 
-Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployJson.ts) to see the typescript interface for these options
+Click [here](https://github.com/rokucommunity/roku-deploy/blob/v4/src/RokuDeployOptions.ts) to see the typescript interface for these options
 
 
 ## User-agent

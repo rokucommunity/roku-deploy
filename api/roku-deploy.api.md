@@ -1446,7 +1446,7 @@ export class RokuDeploy {
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
-    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployJson;
+    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
@@ -1525,7 +1525,7 @@ export enum RokuDeployErrorCode {
 }
 
 // @public
-export interface RokuDeployJson {
+export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
     // @deprecated
     autoLaunch?: boolean;
@@ -1578,9 +1578,6 @@ export interface RokuDeployJson {
     timeout?: number;
     username?: string;
 }
-
-// @public @deprecated
-export type RokuDeployOptions = RokuDeployJson;
 
 // @public
 export interface RokuDeploySocket extends NodeJS.ReadWriteStream {
