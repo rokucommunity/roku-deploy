@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class ZipCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).zip();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.zip();
     }
 }

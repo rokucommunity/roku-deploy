@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class ConvertToSquashfsCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).convertToSquashfs();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.convertToSquashfs();
     }
 }

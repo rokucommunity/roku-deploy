@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class SendTextCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).sendText();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.sendText();
     }
 }

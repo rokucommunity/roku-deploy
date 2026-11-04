@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).keyPress();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.keyPress();
     }
 }

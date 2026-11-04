@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class DeleteDevChannelCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).deleteDevChannel();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.deleteDevChannel();
     }
 }

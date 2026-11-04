@@ -4,7 +4,8 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class GetDeviceInfoCommand {
     async run(args) {
-        const outputPath = await new RokuDeploy(normalizeCliArgs(args)).getDeviceInfo();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        const outputPath = await rokuDeploy.getDeviceInfo();
         console.log(util.objectToTableString(outputPath));
     }
 }

@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class CaptureScreenshotCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).captureScreenshot();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.captureScreenshot();
     }
 }

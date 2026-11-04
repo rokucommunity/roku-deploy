@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class KeyDownCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).keyDown();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.keyDown();
     }
 }

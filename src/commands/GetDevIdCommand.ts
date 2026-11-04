@@ -3,7 +3,8 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class GetDevIdCommand {
     async run(args) {
-        const { devId } = await new RokuDeploy(normalizeCliArgs(args)).getDevId();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        const { devId } = await rokuDeploy.getDevId();
         console.log(devId);
     }
 }

@@ -3,6 +3,7 @@ import { normalizeCliArgs } from './commandUtils';
 
 export class StageCommand {
     async run(args) {
-        await new RokuDeploy(normalizeCliArgs(args)).stage();
+        const rokuDeploy = new RokuDeploy(normalizeCliArgs(args));
+        await rokuDeploy.stage();
     }
 }
