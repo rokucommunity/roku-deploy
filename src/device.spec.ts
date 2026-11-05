@@ -53,7 +53,7 @@ describe('device', function device() {
     let options: RokuDeployOptions & { device: { host: string }; password: string };
     //v4 has no top-level exported functions; every call goes through a RokuDeploy instance
     let rd: RokuDeploy;
-    //v4 RokuDeployOptions no longer carries the rekey package path (old `rekeySignedPackage`); track it separately
+    //the v4 library methods take the rekey package as `pkg`, not the json's `rekeySignedPackage`; track it separately
     const rekeySignedPackage = `${cwd}/testSignedPackage.pkg`;
 
     //tripped by the rebootDevice test (which runs mid-suite) if the device fails to come back; once

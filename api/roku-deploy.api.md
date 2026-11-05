@@ -1451,7 +1451,7 @@ export class RokuDeploy {
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
     launchApp(options: LaunchAppOptions): Promise<void>;
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
-    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployConfig;
+    loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
@@ -1473,25 +1473,6 @@ export class RokuDeploy {
 
 // @public (undocumented)
 export const rokuDeploy: RokuDeploy;
-
-// @public
-export interface RokuDeployConfig {
-    convertToSquashfs?: boolean;
-    cwd?: string;
-    device?: DeviceOption;
-    ecpPort?: number;
-    files?: FileEntry[];
-    logLevel?: LogLevel | LogLevelNumeric;
-    outFile?: string;
-    packagePort?: number;
-    password?: string;
-    rceToken?: string;
-    rekeySignedPackage?: string;
-    rootDir?: string;
-    signingPassword?: string;
-    stagingDir?: string;
-    username?: string;
-}
 
 // @public
 export interface RokuDeployConstructorOptions {
@@ -1548,31 +1529,57 @@ export enum RokuDeployErrorCode {
     UPDATE_CHECK_REQUIRED = "UPDATE_CHECK_REQUIRED"
 }
 
-// @public (undocumented)
+// @public
 export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
-    cwd?: string;
+    // @deprecated
+    autoLaunch?: boolean;
+    convertToSquashfs?: boolean;
     deleteDevChannel?: boolean;
+    // @deprecated
+    deleteInstalledChannel?: boolean;
     device?: DeviceOption;
     devices?: Record<string, DeviceRegistryEntry>;
     devId?: string;
     ecpPort?: number;
     failOnCompileError?: boolean;
     files?: FileEntry[];
-    logger?: Logger;
+    // @deprecated
+    host?: string;
+    // @deprecated
+    incrementBuildNumber?: boolean;
     logLevel?: LogLevel | LogLevelNumeric;
+    // @deprecated
+    outDir?: string;
+    outFile?: string;
     packagePort?: number;
     packageUploadOverrides?: {
         route?: string;
         formData?: Record<string, any>;
     };
     password?: string;
-    pkg?: string;
+    // @deprecated
+    project?: string;
+    rceToken?: string;
+    rekeySignedPackage?: string;
+    // @deprecated
     remoteDebug?: boolean;
+    // @deprecated
     remoteDebugConnectEarly?: boolean;
+    // @deprecated
+    remotePort?: number;
+    // @deprecated
+    retainDeploymentArchive?: boolean;
+    // @deprecated
+    retainStagingDir?: boolean;
+    // @deprecated
+    retainStagingFolder?: boolean;
     rootDir?: string;
     screenshotDir?: string;
     signingPassword?: string;
+    stagingDir?: string;
+    // @deprecated
+    stagingFolderPath?: string;
     timeout?: number;
     username?: string;
 }

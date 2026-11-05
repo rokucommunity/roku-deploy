@@ -1,11 +1,16 @@
 import { rokuDeploy } from '../index';
 import { util } from '../util';
-import { loadCommandOptions } from './commandUtils';
+import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
 
 export class GetDeviceInfoCommand {
     async run(args) {
-        let options = loadCommandOptions(args);
-        const outputPath = await rokuDeploy.getDeviceInfo(options);
-        console.log(util.objectToTableString(outputPath));
+        const config = loadRokuDeployJson(args);
+
+        const deviceInfo = await rokuDeploy.getDeviceInfo({
+            ...extractCommonConfigOptions(config),
+            //cli args win over everything from the config file
+            ...normalizeCliArgs(args, config)
+        });
+        console.log(util.objectToTableString(deviceInfo));
     }
 }

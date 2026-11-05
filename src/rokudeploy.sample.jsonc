@@ -18,7 +18,7 @@
     // "stagingDir": "./out/.roku-deploy-staging", /* stage, sideload --stage, package --sideload. Where the filtered copy of rootDir is written before zipping */
     // "outFile": "roku-deploy",                   /* zip, package. Name of the generated file: zip writes <outFile>.zip, package writes <outFile>.pkg. An extension is honored as given */
 
-    // "convertToSquashfs": false,                 /* package. Convert the installed channel to squashfs before packaging. Default false */
+    // "convertToSquashfs": false,                 /* package. Convert the installed channel to squashfs before packaging. On by default; false skips it */
     // "signingPassword": "",                      /* package, rekey. The signing password of the key on the device */
     // "rekeySignedPackage": "",                   /* rekey, package --rekey. A previously signed .pkg whose key should be installed on the device; signed with signingPassword */
 

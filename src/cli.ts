@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as yargs from 'yargs';
+import * as path from 'path';
 import * as fsExtra from 'fs-extra';
 import { SendTextCommand } from './commands/SendTextCommand';
 import { StageCommand } from './commands/StageCommand';
@@ -19,7 +20,7 @@ import { RemoteControlCommand } from './commands/RemoteControlCommand';
 import { RceStartCommand } from './commands/RceStartCommand';
 import { RceStopCommand } from './commands/RceStopCommand';
 import { InitCommand } from './commands/InitCommand';
-import { loadCommandOptions } from './commands/commandUtils';
+import { loadRokuDeployJson } from './commands/commandUtils';
 import { rokuDeploy } from './index';
 
 void yargs
@@ -36,9 +37,16 @@ void yargs
     .option('config', { type: 'string', description: 'Path to the config file (defaults to rokudeploy.json in cwd). Pass --no-config to skip loading any config file', global: true })
     .option('logLevel', { type: 'string', description: 'The log level for roku-deploy output. Falls back to "logLevel" in rokudeploy.json', choices: ['off', 'error', 'warn', 'log', 'info', 'debug', 'trace'], global: true })
 
-    //apply --logLevel (or the config file's logLevel) to the logger before running any command
-    .middleware((args) => {
-        const { logLevel } = loadCommandOptions(args, { quiet: true });
+    //before running any command: announce which config file feeds this run (even without --verbose, so
+    //file-supplied values are never an invisible input; greppable in CI logs), then apply --logLevel,
+    //falling back to the config file's logLevel
+    .middleware((args: any) => {
+        const configPath = typeof args.config === 'string' ? args.config : path.join(args.cwd ?? process.cwd(), 'rokudeploy.json');
+        if (args.config !== false && fsExtra.existsSync(configPath)) {
+            console.log(`Using config: ${configPath}`);
+        }
+        const config = loadRokuDeployJson(args);
+        const logLevel = args.logLevel ?? config.logLevel;
         if (logLevel !== undefined) {
             rokuDeploy.logger.logLevel = logLevel;
         }

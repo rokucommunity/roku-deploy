@@ -29,7 +29,8 @@ const sinon = createSandbox();
 
 describe('RokuDeploy', () => {
     let rokuDeploy: RokuDeploy;
-    let options: RokuDeployOptions;
+    //a loose bag of library options for these tests (json keys plus the library-only `pkg`)
+    let options: RokuDeployOptions & { pkg?: string };
 
     let writeStreamPromise: Promise<WriteStream>;
     let writeStreamDeferred: Deferred<WriteStream> & { isComplete: true | undefined };
@@ -8407,7 +8408,7 @@ describe('RokuDeploy', () => {
                     }
                 ` as any);
                 let loadedOptions = rokuDeploy.loadConfigFile();
-                expect(loadedOptions.stagingDir).to.equal('./staging-dir');
+                expect(loadedOptions.stagingDir).to.equal(path.resolve(process.cwd(), './staging-dir'));
             });
 
             it('supports jsonc for rokudeploy.json', () => {
@@ -8420,7 +8421,77 @@ describe('RokuDeploy', () => {
                     //trailing comment
                 `);
                 let loadedOptions = rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(loadedOptions.rootDir).to.equal('src');
+                expect(loadedOptions.rootDir).to.equal(path.resolve(tempDir, 'src'));
+            });
+
+            describe('paths', () => {
+                const pathKeys = ['rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir', 'project'];
+
+                it('resolves every relative path against the config file folder, not the caller cwd', () => {
+                    const configPath = s`${tempDir}/nested/deeper/rokudeploy.json`;
+                    fsExtra.outputJsonSync(configPath, Object.fromEntries(pathKeys.map(key => [key, `./${key}-value`])));
+
+                    //cwd points somewhere else entirely; only the file location matters
+                    const config = rokuDeploy.loadConfigFile({ cwd: rootDir, configPath: configPath });
+
+                    for (const key of pathKeys) {
+                        expect(config[key], key).to.equal(s`${tempDir}/nested/deeper/${key}-value`);
+                    }
+                });
+
+                it('resolves a relative configPath the same way it was read', () => {
+                    fsExtra.outputJsonSync(s`${process.cwd()}/.tmp/relative-config.json`, { rootDir: './src' });
+                    const config = rokuDeploy.loadConfigFile({ configPath: '.tmp/relative-config.json' });
+                    expect(config.rootDir).to.equal(s`${process.cwd()}/.tmp/src`);
+                });
+
+                it('standardizes every path: one separator style, no repeated separators, no `.`/`..` segments, no trailing separator', () => {
+                    //mixed separators, doubled separators, `.`/`..` segments and a trailing separator, all in one value.
+                    //(`..` and the trailing separator use forward slashes only: on posix a backslash is not a
+                    //separator until standardizePath swaps it, after path.resolve/normalize have already run)
+                    fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, Object.fromEntries(
+                        pathKeys.map(key => [key, `./sub\\${key}//./skipped/../value/`])
+                    ));
+
+                    const config = rokuDeploy.loadConfigFile({ cwd: tempDir });
+
+                    for (const key of pathKeys) {
+                        expect(config[key], key).to.equal(s`${tempDir}/sub/${key}/value`);
+                    }
+                });
+
+                it('standardizes absolute paths too, without moving them', () => {
+                    fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                        rootDir: `${rootDir}//abs\\nested/`
+                    });
+                    expect(rokuDeploy.loadConfigFile({ cwd: tempDir }).rootDir).to.equal(s`${rootDir}/abs/nested`);
+                });
+
+                it('uses the platform separator exclusively', () => {
+                    fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { stagingDir: 'a/b\\c' });
+                    const resolved = rokuDeploy.loadConfigFile({ cwd: tempDir }).stagingDir;
+                    const otherSeparator = path.sep === '/' ? '\\' : '/';
+                    expect(resolved).not.to.include(otherSeparator);
+                    expect(resolved.endsWith(['a', 'b', 'c'].join(path.sep))).to.equal(true);
+                });
+
+                it('leaves absolute paths, empty strings and non-path values alone', () => {
+                    const absolute = path.resolve(rootDir, 'abs');
+                    fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, {
+                        rootDir: absolute,
+                        rekeySignedPackage: '',
+                        files: ['source/**/*'],
+                        outFile: 'app',
+                        password: 'secret'
+                    });
+                    expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({
+                        rootDir: absolute,
+                        rekeySignedPackage: '',
+                        files: ['source/**/*'],
+                        outFile: 'app',
+                        password: 'secret'
+                    });
+                });
             });
 
             it('returns empty object when config file does not exist', () => {
@@ -8439,11 +8510,11 @@ describe('RokuDeploy', () => {
                 expect(rokuDeploy.loadConfigFile({ cwd: tempDir })).to.eql({});
             });
 
-            it('applies the config file logLevel so it wins over the current logger level', () => {
+            it('returns the logLevel without applying it to the logger (the CLI does that)', () => {
                 rokuDeploy['logger'].logLevel = 'error';
                 fsExtra.outputJsonSync(s`${tempDir}/rokudeploy.json`, { logLevel: 'debug' });
-                rokuDeploy.loadConfigFile({ cwd: tempDir });
-                expect(rokuDeploy['logger'].logLevel).to.equal('debug');
+                expect(rokuDeploy.loadConfigFile({ cwd: tempDir }).logLevel).to.equal('debug');
+                expect(rokuDeploy['logger'].logLevel).to.equal('error');
             });
 
             it('leaves the logger level untouched when the config has no logLevel', () => {
