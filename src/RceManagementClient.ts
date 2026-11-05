@@ -218,6 +218,40 @@ export class RceManagementClient {
      * The single HTTP choke point, so auth and error handling stay consistent and tests can stub
      * one method rather than the network. A per-call token wins over the constructor token.
      */
+    /**
+     * Press the developer-settings key combo on a running RCE device through its instance api, which brings
+     * up the on-screen developer setup wizard for the user to complete. The bearer token rides the
+     * `X-Authorization` header so the standard `Authorization` header stays free for the proxied device.
+     * @public
+     */
+    public sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
+        const url = `${options.instanceUrl.replace(/\/+$/, '')}/api/v0/xi/developer-settings-combo`;
+        const needleOptions: needle.NeedleOptions = {
+            'open_timeout': this.timeout,
+            'response_timeout': this.timeout,
+            connection: 'close',
+            agent: false,
+            headers: { 'X-Authorization': `Bearer ${options.token ?? this.token}` }
+        };
+        return new Promise<void>((resolve, reject) => {
+            needle.request('post', url, null, needleOptions, (error, response) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const statusCode = response.statusCode ?? 0;
+                if (statusCode < 200 || statusCode >= 300) {
+                    reject(new RceManagementApiError(
+                        `RCE instance POST /api/v0/xi/developer-settings-combo failed (status ${statusCode})`,
+                        buildApiErrorDetails('POST', '/api/v0/xi/developer-settings-combo', statusCode, response.body)
+                    ));
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse> {
         const url = this.baseUrl + path + this.buildQueryString(options?.query);
         const needleOptions: needle.NeedleOptions = {
@@ -501,6 +535,14 @@ export interface DeleteSnapshotOptions extends RceManagementRequestOptions {
  */
 export interface FindDeviceByEsnOptions extends RceManagementRequestOptions {
     esn: string;
+}
+
+/**
+ * @public
+ */
+export interface SendDeveloperSettingsComboOptions extends RceManagementRequestOptions {
+    /** The running device's instance api url (see `getInstanceUrl`). */
+    instanceUrl: string;
 }
 
 /**

@@ -2789,48 +2789,70 @@ describe('RokuDeploy', () => {
         });
     });
 
-    describe('sendDeveloperSettingsCombo', () => {
-        it('POSTs to the instance api developer-settings-combo endpoint with the X-Authorization bearer header', async () => {
-            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
+    describe('sendKeyCombo', () => {
+        const rceDevice = { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' };
 
-            await rokuDeploy.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' } });
-
-            expect(stub.getCall(0).args[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/xi/developer-settings-combo');
-            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+        it('sends an array of keys as a key sequence, passing the delay along', async () => {
+            const stub = sinon.stub(rokuDeploy, 'sendKeySequence').resolves();
+            await rokuDeploy.sendKeyCombo({ device: { host: '1.2.3.4' }, combo: ['Home', 'Up'], keyDelayMs: 0 });
+            expect(stub.getCall(0).args[0]).to.include({ keyDelayMs: 0 });
+            expect(stub.getCall(0).args[0].keys).to.eql(['Home', 'Up']);
         });
 
-        it('throws for a local device', async () => {
+        it('sends a named combo as its documented key sequence', async () => {
+            const stub = sinon.stub(rokuDeploy, 'sendKeySequence').resolves();
+            await rokuDeploy.sendKeyCombo({ device: { host: '1.2.3.4' }, combo: 'secret-screen' });
+            expect(stub.getCall(0).args[0].keys).to.eql(['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Fwd', 'Fwd', 'Rev', 'Rev']);
+        });
+
+        it('triggers developer-settings on an RCE device through the instance api, never through ECP', async () => {
+            const sequenceStub = sinon.stub(rokuDeploy, 'sendKeySequence').resolves();
+            const comboStub = sinon.stub(RceManagementClient.prototype, 'sendDeveloperSettingsCombo').resolves();
+            await rokuDeploy.sendKeyCombo({ device: rceDevice, combo: 'developer-settings' });
+            expect(sequenceStub.called).to.be.false;
+            expect(comboStub.getCall(0).args[0]).to.eql({ instanceUrl: 'https://device.rce.roku.com/instance/abc' });
+        });
+
+        it('rejects developer-settings for a physical device', async () => {
             await expectThrowsAsync(
-                rokuDeploy.sendDeveloperSettingsCombo({ device: { host: '1.2.3.4' } }),
-                'sendDeveloperSettingsCombo is only supported for RCE devices'
+                rokuDeploy.sendKeyCombo({ device: { host: '1.2.3.4' }, combo: 'developer-settings' }),
+                `The 'developer-settings' combo is only supported for RCE devices (Roku ignores it over ECP)`
+            );
+        });
+
+        it('throws for an unknown named combo, listing the known ones', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.sendKeyCombo({ device: { host: '1.2.3.4' }, combo: 'nope' as any }),
+                `Unknown key combo 'nope'. Known combos: ${Object.keys(RokuDeploy.keyCombos).join(', ')}`
+            );
+        });
+
+        it('throws when no combo is given', async () => {
+            await expectThrowsAsync(
+                rokuDeploy.sendKeyCombo({ device: { host: '1.2.3.4' } } as any),
+                'Missing required option: combo'
             );
         });
 
         it('throws for an RCE device without any rceToken', async () => {
             await expectThrowsAsync(
-                rokuDeploy.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' } }),
+                rokuDeploy.sendKeyCombo({ device: { instanceUrl: rceDevice.instanceUrl }, combo: 'developer-settings' }),
                 'An rceToken is required to reach the instance api on an RCE device'
             );
         });
 
         it('falls back to the constructor default rceToken', async () => {
             const rd = new RokuDeploy({ rceToken: 'default-token' });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-
-            await rd.sendDeveloperSettingsCombo({ device: { instanceUrl: 'https://device.rce.roku.com/instance/abc' } });
-
-            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer default-token' });
+            const createStub = sinon.stub(rd as any, 'createRceManagementClient').callThrough();
+            sinon.stub(RceManagementClient.prototype, 'sendDeveloperSettingsCombo').resolves();
+            await rd.sendKeyCombo({ device: { instanceUrl: rceDevice.instanceUrl }, combo: 'developer-settings' });
+            expect(createStub.getCall(0).args[0]).to.equal('default-token');
         });
 
-        it('honors an explicit timeout', async () => {
-            const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-
-            await rokuDeploy.sendDeveloperSettingsCombo({
-                device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
-                timeout: 1234
-            });
-
-            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
+        it('documents every known combo as a key sequence', () => {
+            for (const [name, keys] of Object.entries(RokuDeploy.keyCombos)) {
+                expect(keys, name).to.have.length.greaterThan(0);
+            }
         });
     });
 
