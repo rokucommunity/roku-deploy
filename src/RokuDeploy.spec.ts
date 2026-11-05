@@ -4103,7 +4103,7 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     close: false
                 } as any),
-                `sideload: missing required option 'zip' or 'dir'`
+                `sideload: missing required option 'zip'`
             );
         });
 
@@ -7051,9 +7051,10 @@ describe('RokuDeploy', () => {
         });
 
         it('throws error when sideload is missing required options', async () => {
-            const requiredOptions: Partial<SideloadOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            const requiredOptions: Partial<SideloadOptions> = { device: { host: '1.2.3.4' }, password: 'abcd', zip: 'app.zip' };
             await testRequiredOptions('sideload', requiredOptions, 'device');
             await testRequiredOptions('sideload', requiredOptions, 'password');
+            await testRequiredOptions('sideload', requiredOptions, 'zip');
         });
 
         it('throws error when convertToSquashfs is missing required options', async () => {

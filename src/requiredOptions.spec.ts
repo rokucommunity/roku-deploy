@@ -14,7 +14,7 @@ const sinon = createSandbox();
  */
 const rows: Array<{ method: string; required: string[]; values: Record<string, any> }> = [
     { method: 'zip', required: ['dir'], values: { dir: `${tempDir}/app` } },
-    { method: 'sideload', required: ['device', 'password'], values: { device: { host: '1.2.3.4' }, password: 'p', dir: `${tempDir}/app` } },
+    { method: 'sideload', required: ['device', 'password', 'zip'], values: { device: { host: '1.2.3.4' }, password: 'p', dir: `${tempDir}/app` } },
     { method: 'convertToSquashfs', required: ['device', 'password'], values: { device: { host: '1.2.3.4' }, password: 'p' } },
     { method: 'createSignedPackage', required: ['device', 'password', 'signingPassword'], values: { device: { host: '1.2.3.4' }, password: 'p', signingPassword: 's' } },
     { method: 'rekeyDevice', required: ['device', 'password', 'pkg', 'signingPassword'], values: { device: { host: '1.2.3.4' }, password: 'p', pkg: `${tempDir}/app/signed.pkg`, signingPassword: 's' } },
@@ -112,11 +112,12 @@ describe('required options', () => {
         });
     }
 
-    it('sideload needs a zip or a dir once the device and password are there', async () => {
+    it('sideload asks for a zip when neither a zip nor a dir is given, and accepts a dir in its place', async () => {
         const e = await thrownBy(new RokuDeploy({ device: { host: '1.2.3.4' }, password: 'p' }), 'sideload', {});
         expect(e).to.be.instanceOf(MissingRequiredOptionError);
-        expect(e.message).to.equal(`sideload: missing required option 'zip' or 'dir'`);
-        expect(e.details.optionNames).to.eql(['zip', 'dir']);
+        expect(e.message).to.equal(`sideload: missing required option 'zip'`);
+        const withDir = await thrownBy(new RokuDeploy({ device: { host: '1.2.3.4' }, password: 'p' }), 'sideload', { dir: `${tempDir}/app` });
+        expect(withDir).not.to.be.instanceOf(MissingRequiredOptionError, withDir?.message);
     });
 
     it('stage has no required options', async () => {

@@ -205,11 +205,8 @@ export class RokuDeploy {
     public async sideload(options: SideloadOptions): Promise<SideloadResult> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SideloadOptions;
         this.logger.info('Beginning to sideload package');
-        this.checkRequiredOptions('sideload', options, ['device', 'password']);
-        //the type says zip or dir; the runtime check has to be by hand since either one satisfies it
-        if (!options.zip && !options.dir) {
-            throw new MissingRequiredOptionError(`sideload: missing required option 'zip' or 'dir'`, { methodName: 'sideload', optionNames: ['zip', 'dir'] });
-        }
+        //a zip is the preferred input; a dir stands in for it (the folder is zipped first)
+        this.checkRequiredOptions('sideload', options, ['device', 'password', ...(options.dir ? [] : ['zip' as const])]);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
         this.validateEnum(options.appType, 'appType', ['channel', 'dcl'] as const);
