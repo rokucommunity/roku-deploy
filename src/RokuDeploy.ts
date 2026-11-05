@@ -19,9 +19,10 @@ import {
     UnknownDeviceResponseError,
     UnparsableDeviceResponseError,
     UnsupportedFirmwareVersionError,
-    UpdateCheckRequiredError
+    UpdateCheckRequiredError,
+    NoFilesStagedError
 } from './Errors';
-import type { HttpDetails, RokuDeployError } from './Errors';
+import type { HttpDetails, NoFilesStagedDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { util } from './util';
@@ -137,6 +138,9 @@ export class RokuDeploy {
         }
 
         let fileObjects = await this.resolveFilesArray({ files: files, rootDir: rootDir });
+        if (fileObjects.length === 0) {
+            throw await this.buildNoFilesStagedError(cwd, rootDir, files);
+        }
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
@@ -153,6 +157,44 @@ export class RokuDeploy {
         }));
         this.logger.info('Relevant files copied to:', out);
         return { stagingDir: out };
+    }
+
+    /**
+     * Explain an empty staging run. The files are listed so a bad pattern is visible, and the nearby
+     * folders are searched for a `manifest` (the marker of a Roku project root) so a wrong `rootDir` can
+     * be corrected in one step.
+     */
+    private async buildNoFilesStagedError(cwd: string, rootDir: string, files: FileEntry[]): Promise<NoFilesStagedError> {
+        const shownFiles = files.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(', ');
+        let message = `stage: no files matched in "${rootDir}" with files [${shownFiles}].`;
+        const details: NoFilesStagedDetails = { rootDir: rootDir, files: files };
+        if (await fsExtra.pathExists(path.join(rootDir, 'manifest'))) {
+            message += ` The folder holds a manifest, so check the files array.`;
+        } else {
+            const suggestedRootDir = await this.findManifestDir([rootDir, cwd]);
+            if (suggestedRootDir) {
+                details.suggestedRootDir = suggestedRootDir;
+                message += ` A manifest was found in "${util.standardizePath(path.relative(cwd, suggestedRootDir) || '.')}"; did you mean that for rootDir?`;
+            }
+        }
+        return new NoFilesStagedError(message, details);
+    }
+
+    /**
+     * The shallowest folder under any of `roots` (a few levels deep, skipping dependency and output
+     * folders) that holds a `manifest`, or undefined when there is none.
+     */
+    private async findManifestDir(roots: string[]): Promise<string | undefined> {
+        const candidates: string[] = [];
+        for (const root of [...new Set(roots.map(x => util.standardizePath(x)))]) {
+            const matches = await util.findFiles(['manifest', '*/**/manifest'], {
+                cwd: root,
+                deep: 4,
+                ignore: ['**/node_modules/**', '**/.git/**', '**/out/**', '**/dist/**']
+            });
+            candidates.push(...matches.map(x => path.dirname(x)));
+        }
+        return candidates.sort((a, b) => a.split(/[\\/]/).length - b.split(/[\\/]/).length || a.localeCompare(b))[0];
     }
 
     /**
