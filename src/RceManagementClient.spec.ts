@@ -292,6 +292,47 @@ describe('RceManagementClient', () => {
         });
     });
 
+    describe('sendDeveloperSettingsCombo', () => {
+        it('POSTs to the instance api combo route with the X-Authorization bearer header and no Authorization header', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'secret', timeout: 1234 });
+
+            await client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc/' });
+
+            expect(requests[0].method).to.equal('post');
+            expect(requests[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/xi/developer-settings-combo');
+            expect(requests[0].options.headers).to.eql({ 'X-Authorization': 'Bearer secret' });
+            expect(requests[0].options.open_timeout).to.equal(1234);
+        });
+
+        it('uses a per-call token over the constructor token', async () => {
+            const requests = stubNeedle();
+            await new RceManagementClient({ token: 'secret' }).sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc', token: 'override' });
+            expect(requests[0].options.headers).to.eql({ 'X-Authorization': 'Bearer override' });
+        });
+
+        it('rejects a non-2xx response with an RceManagementApiError and surfaces transport errors', async () => {
+            const stub = sinon.stub(needle, 'request');
+            stub.onFirstCall().callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(null, { statusCode: 503, body: { message: 'instance down' } });
+                return {} as any;
+            }) as any);
+            stub.onSecondCall().callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(new Error('socket hang up'));
+                return {} as any;
+            }) as any);
+            //a response with no status at all is treated as a failure too
+            stub.onThirdCall().callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(null, { body: {} });
+                return {} as any;
+            }) as any);
+            const client = new RceManagementClient({ token: 'secret' });
+            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 503)');
+            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'socket hang up');
+            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 0)');
+        });
+    });
+
     describe('wire casing conversion', () => {
         it('converts snake_case response keys (nested and in arrays) to camelCase', async () => {
             stubNeedle({

@@ -1168,42 +1168,51 @@ export class RokuDeploy {
     }
 
     /**
-     * Ask a Roku Cloud Emulator device to show one of its hidden "secret" screens (the ones a physical
-     * remote reaches through a key combo). `developerSettings` shows the developer setup wizard for the
-     * user to complete on screen; this call only brings the screen up. Local devices are not supported:
-     * the combo endpoints only exist on the RCE instance api.
+     * Send a remote key combo: a named Roku secret-screen combo (see `keyCombos`) or any array of keys. The
+     * keys go out as ECP key presses, except `developer-settings`, which Roku ignores over ECP: on an RCE
+     * device it is triggered through the instance api instead, and a physical device is rejected.
      * @public
      */
-    public async requestSecretScreen(options: RequestSecretScreenOptions): Promise<void> {
-        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RequestSecretScreenOptions;
-        this.checkRequiredOptions(options, ['device', 'screen']);
-        const route = RokuDeploy.secretScreenRoutes[options.screen];
-        if (!route) {
-            throw new Error(`Unknown secret screen '${options.screen as string}'. Supported screens: ${Object.keys(RokuDeploy.secretScreenRoutes).join(', ')}`);
+    public async sendKeyCombo(options: SendKeyComboOptions): Promise<void> {
+        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendKeyComboOptions;
+        this.checkRequiredOptions(options, ['device', 'combo']);
+        if (options.combo === 'developer-settings') {
+            //Roku ignores this combo over ECP, so it only works through the RCE instance api
+            const deviceConfig = this.resolveDevice(options.device, options.devices);
+            if (!isRceDeviceConfig(deviceConfig)) {
+                throw new Error(`The 'developer-settings' combo is only supported for RCE devices (Roku ignores it over ECP)`);
+            }
+            const rceToken = this.getRceToken(deviceConfig);
+            if (!rceToken) {
+                throw new Error('An rceToken is required to reach the instance api on an RCE device');
+            }
+            await this.withRceInstanceUrlRetry(deviceConfig, async () => {
+                const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
+                return this.createRceManagementClient(rceToken).sendDeveloperSettingsCombo({ instanceUrl: instanceUrl });
+            });
+        } else {
+            //every other combo is just its keys, pressed in order over ECP
+            const keys = Array.isArray(options.combo) ? options.combo : RokuDeploy.keyCombos[options.combo];
+            if (!keys) {
+                throw new Error(`Unknown key combo '${options.combo as string}'. Known combos: ${Object.keys(RokuDeploy.keyCombos).join(', ')}`);
+            }
+            await this.sendKeySequence({ ...options, keys: keys });
         }
-        const deviceConfig = this.resolveDevice(options.device, options.devices);
-        if (!isRceDeviceConfig(deviceConfig)) {
-            throw new Error('requestSecretScreen is only supported for RCE devices');
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to reach the instance api on an RCE device');
-        }
-        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-            return this.doPostRequest({
-                url: `${instanceUrl}/api/v0/xi/${route}`,
-                timeout: options.timeout ?? RokuDeploy.timeouts.quick,
-                headers: this.buildRceAuthHeaders(rceToken)
-            }, true);
-        });
     }
 
     /**
-     * The RCE instance api route behind each secret screen.
+     * The key presses behind each named combo, as documented for a physical Roku remote.
+     * @public
      */
-    private static readonly secretScreenRoutes: Record<SecretScreen, string> = {
-        developerSettings: 'developer-settings-combo'
+    public static readonly keyCombos: Readonly<Record<KnownKeyCombo, RemoteKeyText[]>> = {
+        'developer-settings': ['Home', 'Home', 'Home', 'Up', 'Up', 'Right', 'Left', 'Right', 'Left', 'Right'],
+        'secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Fwd', 'Fwd', 'Rev', 'Rev'],
+        'platform-secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Play', 'Rev', 'Play', 'Fwd'],
+        'wifi-secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Up', 'Down', 'Up', 'Down', 'Up'],
+        'reboot': ['Home', 'Home', 'Home', 'Home', 'Home', 'Up', 'Rev', 'Rev', 'Fwd', 'Fwd'],
+        'hdmi-secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Down', 'Left', 'Up', 'Up', 'Up'],
+        'bit-rate-override': ['Home', 'Home', 'Home', 'Home', 'Home', 'Rev', 'Rev', 'Rev', 'Fwd', 'Fwd'],
+        'antenna-secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Down', 'Rev', 'Down', 'Fwd']
     };
 
     /**
@@ -3037,17 +3046,20 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
 }
 
 /**
- * A hidden Roku screen that `requestSecretScreen` can bring up on an RCE device.
+ * A named Roku remote key combo. Most open one of the hidden "secret" screens; `developer-settings`
+ * opens the developer setup wizard.
  * @public
  */
-export type SecretScreen = 'developerSettings';
+export type KnownKeyCombo = 'developer-settings' | 'secret-screen' | 'platform-secret-screen' | 'wifi-secret-screen' | 'reboot' | 'hdmi-secret-screen' | 'bit-rate-override' | 'antenna-secret-screen';
 
 /**
  * @public
  */
-export interface RequestSecretScreenOptions extends BaseEcpOptions {
-    /** Which secret screen to show. */
-    screen: SecretScreen;
+export interface SendKeyComboOptions extends BaseEcpOptions {
+    /** A named combo, or the keys to press in order. */
+    combo: KnownKeyCombo | RemoteKeyText[];
+    /** The pause between consecutive key presses, in milliseconds. Defaults to 250. */
+    keyDelayMs?: number;
 }
 
 /**
