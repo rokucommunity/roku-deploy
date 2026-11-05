@@ -1,6 +1,4 @@
 import * as path from 'path';
-import * as fsExtra from 'fs-extra';
-import type { Argv } from 'yargs';
 import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
@@ -83,66 +81,6 @@ export function loadRokuDeployJson(args: { cwd?: string; config?: string | boole
         cwd: args.cwd,
         configPath: typeof args.config === 'string' ? args.config : undefined
     });
-}
-
-/**
- * The config file a `--help` run would read, honoring the same `--cwd`, `--config` and `--no-config` flags
- * the command itself does, with its values. Undefined when help was not requested, when config loading is
- * off, or when the file is missing or unparseable (the real run reports the latter).
- */
-export function findHelpConfig(argv: string[] = process.argv): { path: string; values: Record<string, any> } | undefined {
-    if (!argv.includes('--help') || argv.includes('--no-config')) {
-        return undefined;
-    }
-    const flag = (name: string) => {
-        const index = argv.findIndex(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
-        if (index < 0) {
-            return undefined;
-        }
-        return argv[index].includes('=') ? argv[index].split('=').slice(1).join('=') : argv[index + 1];
-    };
-    const cwd = path.resolve(flag('cwd') ?? process.cwd());
-    const config = flag('config');
-    //same resolution as the loader: an explicit --config is taken as given, the default lives in cwd
-    const configPath = config ? path.resolve(config) : path.join(cwd, 'rokudeploy.json');
-    if (!fsExtra.existsSync(configPath)) {
-        return undefined;
-    }
-    try {
-        return { path: configPath, values: loadRokuDeployJson({ cwd: cwd, config: config ?? true }) };
-    } catch {
-        return undefined;
-    }
-}
-
-/**
- * The yargs `description` and `builder` for a command whose `--help` names the config file in play and the
- * keys it sets that this command reads (keys only, never values, so secrets stay out of the terminal). The
- * list is limited to the options the builder declares, plus `device` for commands that take `--host`,
- * `--esn` or `--instanceUrl`. Spread into `.command(name, ...hinted(name, description, builder), handler)`.
- */
-export function hinted<T>(command: string, description: string, build: (builder: Argv<T>) => Argv<any>, argv: string[] = process.argv): [string, (builder: Argv<T>) => Argv<any>] {
-    return [description, (builder) => {
-        const built = build(builder);
-        const config = command.split(' ').every(word => argv.includes(word)) ? findHelpConfig(argv) : undefined;
-        if (config) {
-            //getOptions() is not in the yargs typings but is a public method on the instance
-            const declared = Object.keys((built as any).getOptions().key);
-            if (['host', 'esn', 'instanceUrl'].some(name => declared.includes(name))) {
-                declared.push('device');
-            }
-            const keys = Object.keys(config.values).filter(key => declared.includes(key));
-            const cwd = process.cwd();
-            const shown = config.path.startsWith(cwd + path.sep) ? `.${path.sep}${path.relative(cwd, config.path)}` : config.path;
-            const lines = [`$0 ${command}`, '', description, '', `Using config: ${shown}`];
-            if (keys.length > 0) {
-                lines.push(`Using values from config: ${keys.join(', ')}`);
-            }
-            //yargs only fills in a command's usage when none was set, so this replaces the default header
-            built.usage(lines.join('\n'));
-        }
-        return built;
-    }];
 }
 
 /**

@@ -20,7 +20,7 @@ import { standardizePath as s, util } from './util';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
-import { findHelpConfig, hinted, loadRokuDeployJson, normalizeCliArgs } from './commands/commandUtils';
+import { loadRokuDeployJson, normalizeCliArgs } from './commands/commandUtils';
 import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
@@ -1476,71 +1476,6 @@ describe('cli', function cli() {
             const output = help('stage --help');
             expect(output).to.include('Copies all of the referenced files');
             expect(output).not.to.include('Using config');
-        });
-
-        describe('findHelpConfig', () => {
-            it('returns nothing when help was not requested, with --no-config, or when the file is missing or broken', () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rootDir: './src' });
-                expect(findHelpConfig(['node', 'cli', 'stage', '--cwd', tempDir])).to.be.undefined;
-                expect(findHelpConfig()).to.be.undefined;
-                expect(findHelpConfig(['node', 'cli', 'stage', '--help', '--no-config', '--cwd', tempDir])).to.be.undefined;
-                expect(findHelpConfig(['node', 'cli', 'stage', '--help', '--cwd', `${tempDir}/nowhere`])).to.be.undefined;
-                fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ not json');
-                expect(findHelpConfig(['node', 'cli', 'stage', '--help', '--cwd', tempDir])).to.be.undefined;
-            });
-
-            it('returns the file path and values, honoring --cwd and both --config spellings', () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rootDir: './src' });
-                fsExtra.outputJsonSync(`${tempDir}/configs/other.json`, { password: 'p' });
-                const found = findHelpConfig(['node', 'cli', 'stage', '--help', `--cwd=${tempDir}`]);
-                expect(found?.path).to.equal(s`${tempDir}/rokudeploy.json`);
-                expect(found?.values).to.have.property('rootDir');
-                expect(findHelpConfig(['node', 'cli', 'stage', '--help', '--config', `${tempDir}/configs/other.json`])?.values).to.eql({ password: 'p' });
-                expect(findHelpConfig(['node', 'cli', 'stage', '--help', `--config=${tempDir}/configs/other.json`])?.path).to.equal(s`${tempDir}/configs/other.json`);
-            });
-        });
-
-        describe('hinted', () => {
-            /**
-             * A stand-in for the yargs instance a builder receives: records the usage text it is given.
-             */
-            function fakeBuilder(optionNames: string[]) {
-                const usage = sinon.stub();
-                return { builder: { getOptions: () => ({ key: Object.fromEntries(optionNames.map(x => [x, true])) }), usage: usage } as any, usage: usage };
-            }
-
-            it('passes the description through and leaves the builder alone when no config applies', () => {
-                const { builder, usage } = fakeBuilder(['host']);
-                //no argv given: the real process.argv (a mocha run, no --help) applies
-                const [description, build] = hinted('package', 'Make a package', b => b);
-                expect(description).to.equal('Make a package');
-                expect(build(builder)).to.equal(builder);
-                expect(usage.called).to.be.false;
-            });
-
-            it('only reacts to help for its own command', () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { password: 'p' });
-                const { builder, usage } = fakeBuilder(['host']);
-                hinted('rce start', 'Boot', b => b, ['node', 'cli', 'rce', 'stop', '--help', '--cwd', tempDir])[1](builder);
-                expect(usage.called).to.be.false;
-            });
-
-            it('writes a usage header naming the file (absolute when outside cwd) and the keys the command declares, with device for --host commands', () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '1.2.3.4' }, password: 'p', rootDir: './src', signingPassword: 's' });
-                //the file is outside the process cwd, so it is shown by its absolute path
-                sinon.stub(process, 'cwd').returns(s`${tempDir}/elsewhere`);
-                const { builder, usage } = fakeBuilder(['host', 'password', 'signingPassword', 'out']);
-                hinted('package', 'Make a package', b => b, ['node', 'cli', 'package', '--help', '--cwd', tempDir])[1](builder);
-                expect(usage.getCall(0).args[0]).to.equal(`$0 package\n\nMake a package\n\nUsing config: ${s`${tempDir}/rokudeploy.json`}\nUsing values from config: device, password, signingPassword`);
-            });
-
-            it('shows the file relative to cwd when it lives inside it, and skips the keys line when nothing matches', () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rootDir: './src' });
-                sinon.stub(process, 'cwd').returns(tempDir);
-                const { builder, usage } = fakeBuilder(['deviceId']);
-                hinted('getDevId', 'Get Dev ID', b => b, ['node', 'cli', 'getDevId', '--help'])[1](builder);
-                expect(usage.getCall(0).args[0]).to.equal(`$0 getDevId\n\nGet Dev ID\n\nUsing config: .${path.sep}rokudeploy.json`);
-            });
         });
     });
 });
