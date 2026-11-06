@@ -192,7 +192,7 @@ export class RokuDeploy {
                 deep: 4,
                 ignore: ['**/node_modules/**', '**/.git/**', '**/out/**', '**/dist/**']
             });
-            candidates.push(...matches.map(x => path.dirname(x)));
+            candidates.push(...matches.map(x => util.standardizePath(path.dirname(x))));
         }
         return candidates.sort((a, b) => a.split(/[\\/]/).length - b.split(/[\\/]/).length || a.localeCompare(b))[0];
     }
