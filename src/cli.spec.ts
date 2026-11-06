@@ -1422,4 +1422,60 @@ describe('cli', function cli() {
             expect((stub.getCall(0).args[0] as any).password).to.equal('from-custom');
         });
     });
+
+    describe('--help config hints', () => {
+        const sep = path.sep;
+
+        function help(command: string) {
+            return execSync(`node ${cwd}/dist/cli.js ${command}`).toString();
+        }
+
+        it('names the config file and only the keys the helped command reads, never the values', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '1.2.3.4' }, password: 'secret', rootDir: './src', files: ['manifest'], signingPassword: 'sign' });
+            const output = help('package --help');
+            expect(output).to.include(`Using config: .${sep}rokudeploy.json`);
+            expect(output).to.include('Using values from config: device, password, signingPassword');
+            expect(output).not.to.include('rootDir');
+            expect(output).not.to.include('secret');
+            expect(output).not.to.include('sign\n');
+        });
+
+        it('lists the staging keys for stage and not the device ones', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '1.2.3.4' }, password: 'secret', rootDir: './src', files: ['manifest'] });
+            const output = help('stage --help');
+            expect(output).to.include('Using values from config: rootDir, files');
+            expect(output).not.to.include('password');
+        });
+
+        it('works for nested commands', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: 'emu', rceToken: 'tok' });
+            expect(help('rce start --help')).to.include('Using values from config: device');
+        });
+
+        it('omits the keys line when the file sets nothing this command reads', () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rootDir: './src' });
+            const output = help('getDevId --help');
+            expect(output).to.include(`Using config: .${sep}rokudeploy.json`);
+            expect(output).not.to.include('Using values from config');
+        });
+
+        it('honors --cwd and --config (both spellings) when locating the file', () => {
+            fsExtra.outputJsonSync(`${tempDir}/proj/rokudeploy.json`, { rootDir: './a' });
+            fsExtra.outputJsonSync(`${tempDir}/configs/other.json`, { rootDir: './b' });
+            expect(help('stage --help --cwd proj')).to.include(`Using config: .${sep}proj${sep}rokudeploy.json`);
+            expect(help('stage --help --config configs/other.json')).to.include(`Using config: .${sep}configs${sep}other.json`);
+            expect(help('stage --help --config=configs/other.json')).to.include(`Using config: .${sep}configs${sep}other.json`);
+        });
+
+        it('shows nothing about config when there is no file, with --no-config, on the root help, or for a broken file', () => {
+            expect(help('stage --help')).not.to.include('Using config');
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rootDir: './src' });
+            expect(help('stage --help --no-config')).not.to.include('Using config');
+            expect(help('--help')).not.to.include('Using config');
+            fsExtra.outputFileSync(`${tempDir}/rokudeploy.json`, '{ not json');
+            const output = help('stage --help');
+            expect(output).to.include('Copies all of the referenced files');
+            expect(output).not.to.include('Using config');
+        });
+    });
 });
