@@ -4878,6 +4878,59 @@ describe('RokuDeploy', () => {
     });
 
     describe('stage', () => {
+        describe('when nothing matches', () => {
+            //a project folder of its own, so the suite's manifest fixture stays out of the search
+            const proj = s`${tempDir}/proj`;
+            it('throws a NoFilesStagedError that lists the files and offers no suggestion when no manifest is anywhere near', async () => {
+                fsExtra.ensureDirSync(`${proj}/empty`);
+                let error: any;
+                try {
+                    await rokuDeploy.stage({ cwd: proj, rootDir: 'empty', files: ['source/**/*.*', { src: 'manifest', dest: 'manifest' }] });
+                } catch (e) {
+                    error = e;
+                }
+                expect(error).to.be.instanceOf(errors.NoFilesStagedError);
+                expect(error.code).to.equal('NO_FILES_STAGED');
+                expect(error.message).to.equal(`stage: no files matched in "${s`${proj}/empty`}" with files [source/**/*.*, {"src":"manifest","dest":"manifest"}].`);
+                expect(error.details).to.eql({ rootDir: s`${proj}/empty`, files: ['source/**/*.*', { src: 'manifest', dest: 'manifest' }] });
+            });
+
+            it('suggests the folder under rootDir that holds a manifest', async () => {
+                fsExtra.outputFileSync(`${proj}/src/manifest`, '');
+                fsExtra.outputFileSync(`${proj}/src/source/main.brs`, '');
+                const error: any = await rokuDeploy.stage({ cwd: proj, rootDir: './' }).catch(e => e);
+                expect(error).to.be.instanceOf(errors.NoFilesStagedError);
+                expect(error.details.suggestedRootDir).to.equal(s`${proj}/src`);
+                expect(error.message).to.include(`A manifest was found in "src"; did you mean that for rootDir?`);
+            });
+
+            it('suggests the cwd itself when rootDir points below the project', async () => {
+                fsExtra.outputFileSync(`${proj}/manifest`, '');
+                fsExtra.ensureDirSync(`${proj}/wrong`);
+                const error: any = await rokuDeploy.stage({ cwd: proj, rootDir: 'wrong' }).catch(e => e);
+                expect(error.details.suggestedRootDir).to.equal(s`${proj}`);
+                expect(error.message).to.include(`A manifest was found in "."; did you mean that for rootDir?`);
+            });
+
+            it('prefers the shallowest manifest (alphabetical on a tie) and ignores dependency and output folders', async () => {
+                fsExtra.outputFileSync(`${proj}/node_modules/dep/manifest`, '');
+                fsExtra.outputFileSync(`${proj}/out/manifest`, '');
+                fsExtra.outputFileSync(`${proj}/deep/er/app/manifest`, '');
+                fsExtra.outputFileSync(`${proj}/zzz/manifest`, '');
+                fsExtra.outputFileSync(`${proj}/app/manifest`, '');
+                const error: any = await rokuDeploy.stage({ cwd: proj, rootDir: './' }).catch(e => e);
+                expect(error.details.suggestedRootDir).to.equal(s`${proj}/app`);
+            });
+
+            it('points at the files array when rootDir itself holds a manifest', async () => {
+                fsExtra.outputFileSync(`${proj}/app/manifest`, '');
+                const error: any = await rokuDeploy.stage({ cwd: proj, rootDir: 'app', files: ['nothing/**/*'] }).catch(e => e);
+                expect(error).to.be.instanceOf(errors.NoFilesStagedError);
+                expect(error.message).to.include('The folder holds a manifest, so check the files array.');
+                expect(error.details.suggestedRootDir).to.be.undefined;
+            });
+        });
+
         it('should use outDir for staging folder', async () => {
             await rokuDeploy.stage({
                 files: [

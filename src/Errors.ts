@@ -20,7 +20,8 @@ export enum RokuDeployErrorCode {
     MISSING_REQUIRED_OPTION = 'MISSING_REQUIRED_OPTION',
     INVALID_OPTION = 'INVALID_OPTION',
     UNSUPPORTED_FIRMWARE = 'UNSUPPORTED_FIRMWARE',
-    RCE_MANAGEMENT_API_ERROR = 'RCE_MANAGEMENT_API_ERROR'
+    RCE_MANAGEMENT_API_ERROR = 'RCE_MANAGEMENT_API_ERROR',
+    NO_FILES_STAGED = 'NO_FILES_STAGED'
 }
 
 /**
@@ -372,6 +373,30 @@ export class ConvertError extends RokuDeployError<ConvertErrorDetails> {
      * @public
      */
     public readonly code = RokuDeployErrorCode.CONVERT_ERROR;
+}
+
+/**
+ * Details for a staging run that matched no files
+ * @public
+ */
+export interface NoFilesStagedDetails {
+    /** The resolved rootDir the files were matched against */
+    rootDir: string;
+    /** The files array that matched nothing */
+    files: unknown[];
+    /** A folder holding a `manifest` that looks like the intended rootDir, when one was found */
+    suggestedRootDir?: string;
+}
+
+/**
+ * Thrown when staging matches no files at all, which almost always means the wrong rootDir
+ * @public
+ */
+export class NoFilesStagedError extends RokuDeployError<NoFilesStagedDetails> {
+    /**
+     * @public
+     */
+    public readonly code = RokuDeployErrorCode.NO_FILES_STAGED;
 }
 
 /**
