@@ -97,8 +97,10 @@ export abstract class ConfigurationError extends RokuDeployError<ConfigurationEr
 export interface ConfigurationErrorDetails {
     // (undocumented)
     expectedFormat?: string;
+    methodName?: string;
     // (undocumented)
     optionName?: string;
+    optionNames?: string[];
     // (undocumented)
     providedValue?: unknown;
 }

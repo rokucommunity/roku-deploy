@@ -933,7 +933,7 @@ describe('cli', function cli() {
             //gets past argument parsing and fails on the missing device instead
             const result = execExpectingFailure(`node ${cwd}/dist/cli.js sideload --no-close --zip app.zip`);
             expect(result.output).not.to.include('Unknown argument');
-            expect(result.output).to.include('Missing required option: device');
+            expect(result.output).to.include(`sideload: missing required options 'device', 'password'`);
         });
     });
 
@@ -1204,7 +1204,7 @@ describe('cli', function cli() {
                 const error = e as childProcess.SpawnSyncReturns<Buffer>;
                 const output = `${error.stdout}${error.stderr}`;
                 expect(output).not.to.include('Unknown argument');
-                expect(output).to.include('Missing required option: password');
+                expect(output).to.include(`sideload: missing required option 'password'`);
                 return;
             }
             throw new Error('Expected the command to fail');
