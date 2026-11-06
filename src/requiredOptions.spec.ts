@@ -120,6 +120,14 @@ describe('required options', () => {
         expect(withDir).not.to.be.instanceOf(MissingRequiredOptionError, withDir?.message);
     });
 
+    it('names the method when given one, and falls back to a plain message without it', () => {
+        const rokuDeploy = new RokuDeploy();
+        expect(() => rokuDeploy['checkRequiredOptions']({} as Record<string, any>, ['device', 'password']))
+            .to.throw(MissingRequiredOptionError, `Missing required options 'device', 'password'`);
+        expect(() => rokuDeploy['checkRequiredOptions']({} as Record<string, any>, ['device'], 'remote-control'))
+            .to.throw(MissingRequiredOptionError, `remote-control: missing required option 'device'`);
+    });
+
     it('stage has no required options', async () => {
         const e = await thrownBy(new RokuDeploy(), 'stage', { out: `${tempDir}/staging`, rootDir: `${tempDir}/app` });
         expect(e).to.be.undefined;
