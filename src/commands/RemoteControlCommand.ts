@@ -15,7 +15,7 @@ export class RemoteControlCommand {
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation
-        rokuDeploy['checkRequiredOptions'](options, ['device']);
+        rokuDeploy['checkRequiredOptions'](options, ['device'], 'remote-control');
 
         readline.emitKeypressEvents(process.stdin);
         process.stdin.setRawMode(true);
