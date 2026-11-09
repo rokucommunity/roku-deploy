@@ -31,7 +31,7 @@ const rows: Array<{ method: string; required: string[]; values: Record<string, a
     { method: 'keyDown', required: ['device', 'key'], values: { device: { host: '1.2.3.4' }, key: 'Home' } },
     { method: 'keyUp', required: ['device', 'key'], values: { device: { host: '1.2.3.4' }, key: 'Home' } },
     { method: 'sendText', required: ['device', 'text'], values: { device: { host: '1.2.3.4' }, text: 'hi' } },
-    { method: 'sendKeySequence', required: ['device', 'keys'], values: { device: { host: '1.2.3.4' }, keys: ['Home'], keyDelayMs: 0 } },
+    { method: 'sendKeySequence', required: ['device', 'keys'], values: { device: { host: '1.2.3.4' }, keys: ['Home'], keyDelay: 0 } },
     { method: 'openSecretScreen', required: ['device', 'screen'], values: { device: { host: '1.2.3.4' }, screen: 'secret-screen' } },
     { method: 'launchApp', required: ['device', 'appId'], values: { device: { host: '1.2.3.4' }, appId: 'dev' } },
     { method: 'exitApp', required: ['device', 'appId'], values: { device: { host: '1.2.3.4' }, appId: 'dev' } },

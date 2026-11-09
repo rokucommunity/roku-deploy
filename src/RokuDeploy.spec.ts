@@ -2725,7 +2725,7 @@ describe('RokuDeploy', () => {
         it('presses every key in order on a LAN device through HTTP ECP', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
 
-            await rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up', 'Select'], keyDelayMs: 0 });
+            await rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up', 'Select'], keyDelay: 0 });
 
             expect(stub.getCalls().map((call) => call.args[0].url)).to.eql([
                 'http://1.2.3.4:8060/keypress/Home',
@@ -2740,7 +2740,7 @@ describe('RokuDeploy', () => {
             await rokuDeploy.sendKeySequence({
                 device: { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret' },
                 keys: ['Home', 'Up'],
-                keyDelayMs: 0
+                keyDelay: 0
             });
 
             expect(stub.getCalls().map((call) => call.args[0].url)).to.eql([
@@ -2754,7 +2754,7 @@ describe('RokuDeploy', () => {
             const stub = sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 403, headers: {}, body: '' });
 
             await expectThrowsAsync(
-                rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up'], keyDelayMs: 0 }),
+                rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up'], keyDelay: 0 }),
                 `Key press 'Home' (step 1 of 2) failed (status 403)`
             );
             //the second key was never sent
@@ -2765,12 +2765,12 @@ describe('RokuDeploy', () => {
             sinon.stub(rokuDeploy as any, 'doPostRequest').rejects(new Error('socket hang up'));
 
             await expectThrowsAsync(
-                rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home'], keyDelayMs: 0 }),
+                rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home'], keyDelay: 0 }),
                 `Key press 'Home' (step 1 of 1) failed: socket hang up`
             );
         });
 
-        it('waits the default 250ms between presses when no keyDelayMs is given', async () => {
+        it('waits the default 250ms between presses when no keyDelay is given', async () => {
             sinon.stub(rokuDeploy as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
             const sleepStub = sinon.stub(util, 'sleep').resolves();
 
@@ -2783,7 +2783,7 @@ describe('RokuDeploy', () => {
         it('continues the sequence when a press resolves without a status to check', async () => {
             const stub = sinon.stub(rokuDeploy as any, 'keyPress').resolves(undefined);
 
-            await rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up'], keyDelayMs: 0 });
+            await rokuDeploy.sendKeySequence({ device: { host: '1.2.3.4' }, keys: ['Home', 'Up'], keyDelay: 0 });
 
             expect(stub.callCount).to.equal(2);
         });
@@ -2794,8 +2794,8 @@ describe('RokuDeploy', () => {
 
         it('opens an ECP screen as its documented key sequence, passing the delay along', async () => {
             const stub = sinon.stub(rokuDeploy, 'sendKeySequence').resolves();
-            await rokuDeploy.openSecretScreen({ device: { host: '1.2.3.4' }, screen: 'secret-screen', keyDelayMs: 0 });
-            expect(stub.getCall(0).args[0]).to.include({ keyDelayMs: 0 });
+            await rokuDeploy.openSecretScreen({ device: { host: '1.2.3.4' }, screen: 'secret-screen', keyDelay: 0 });
+            expect(stub.getCall(0).args[0]).to.include({ keyDelay: 0 });
             expect(stub.getCall(0).args[0].keys).to.eql(['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Fwd', 'Fwd', 'Rev', 'Rev']);
         });
 

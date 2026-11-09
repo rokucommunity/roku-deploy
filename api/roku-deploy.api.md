@@ -1024,7 +1024,7 @@ export interface OpenDeveloperSettingsSecretScreenOptions extends RceManagementR
 
 // @public (undocumented)
 export interface OpenSecretScreenOptions extends BaseEcpOptions {
-    keyDelayMs?: number;
+    keyDelay?: number;
     screen: SecretScreen;
 }
 
@@ -1715,7 +1715,7 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
 
 // @public (undocumented)
 export interface SendKeySequenceOptions extends BaseEcpOptions {
-    keyDelayMs?: number;
+    keyDelay?: number;
     keys: RemoteKeyText[];
 }
 

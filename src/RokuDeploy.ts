@@ -1143,17 +1143,17 @@ export class RokuDeploy {
     }
 
     /**
-     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
+     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelay`
      * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
      * @public
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendKeySequenceOptions;
         this.checkRequiredOptions(options, ['device', 'keys'], RokuDeploy.prototype.sendKeySequence.name);
-        const keyDelayMs = options.keyDelayMs ?? 250;
+        const keyDelay = options.keyDelay ?? 250;
         for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
-            if (stepIndex > 0 && keyDelayMs > 0) {
-                await util.sleep(keyDelayMs);
+            if (stepIndex > 0 && keyDelay > 0) {
+                await util.sleep(keyDelay);
             }
             const key = options.keys[stepIndex];
             let result: EcpResult;
@@ -3054,7 +3054,7 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
      * The pause between consecutive key presses, in milliseconds, so on-screen navigation keeps up
      * with the input. Defaults to 250.
      */
-    keyDelayMs?: number;
+    keyDelay?: number;
 }
 
 /**
@@ -3071,7 +3071,7 @@ export interface OpenSecretScreenOptions extends BaseEcpOptions {
     /** The secret screen to open. */
     screen: SecretScreen;
     /** The pause between consecutive key presses, in milliseconds, for screens reached over ECP. Defaults to 250. */
-    keyDelayMs?: number;
+    keyDelay?: number;
 }
 
 /**
