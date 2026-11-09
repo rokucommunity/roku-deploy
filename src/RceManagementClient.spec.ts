@@ -292,12 +292,12 @@ describe('RceManagementClient', () => {
         });
     });
 
-    describe('sendDeveloperSettingsCombo', () => {
+    describe('openDeveloperSettingsSecretScreen', () => {
         it('POSTs to the instance api combo route with the X-Authorization bearer header and no Authorization header', async () => {
             const requests = stubNeedle();
             const client = new RceManagementClient({ token: 'secret', timeout: 1234 });
 
-            await client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc/' });
+            await client.openDeveloperSettingsSecretScreen({ instanceUrl: 'https://device.rce.roku.com/instance/abc/' });
 
             expect(requests[0].method).to.equal('post');
             expect(requests[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/xi/developer-settings-combo');
@@ -307,7 +307,7 @@ describe('RceManagementClient', () => {
 
         it('uses a per-call token over the constructor token', async () => {
             const requests = stubNeedle();
-            await new RceManagementClient({ token: 'secret' }).sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc', token: 'override' });
+            await new RceManagementClient({ token: 'secret' }).openDeveloperSettingsSecretScreen({ instanceUrl: 'https://device.rce.roku.com/instance/abc', token: 'override' });
             expect(requests[0].options.headers).to.eql({ 'X-Authorization': 'Bearer override' });
         });
 
@@ -327,9 +327,9 @@ describe('RceManagementClient', () => {
                 return {} as any;
             }) as any);
             const client = new RceManagementClient({ token: 'secret' });
-            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 503)');
-            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'socket hang up');
-            await expectThrowsAsync(client.sendDeveloperSettingsCombo({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 0)');
+            await expectThrowsAsync(client.openDeveloperSettingsSecretScreen({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 503)');
+            await expectThrowsAsync(client.openDeveloperSettingsSecretScreen({ instanceUrl: 'https://x' }), 'socket hang up');
+            await expectThrowsAsync(client.openDeveloperSettingsSecretScreen({ instanceUrl: 'https://x' }), 'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 0)');
         });
     });
 

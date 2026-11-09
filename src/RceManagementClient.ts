@@ -219,12 +219,12 @@ export class RceManagementClient {
      * one method rather than the network. A per-call token wins over the constructor token.
      */
     /**
-     * Press the developer-settings key combo on a running RCE device through its instance api, which brings
+     * Open the developer-settings secret screen on a running RCE device through its instance api, which brings
      * up the on-screen developer setup wizard for the user to complete. The bearer token rides the
      * `X-Authorization` header so the standard `Authorization` header stays free for the proxied device.
      * @public
      */
-    public sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
+    public openDeveloperSettingsSecretScreen(options: OpenDeveloperSettingsSecretScreenOptions): Promise<void> {
         const url = `${options.instanceUrl.replace(/\/+$/, '')}/api/v0/xi/developer-settings-combo`;
         const needleOptions: needle.NeedleOptions = {
             'open_timeout': this.timeout,
@@ -540,7 +540,7 @@ export interface FindDeviceByEsnOptions extends RceManagementRequestOptions {
 /**
  * @public
  */
-export interface SendDeveloperSettingsComboOptions extends RceManagementRequestOptions {
+export interface OpenDeveloperSettingsSecretScreenOptions extends RceManagementRequestOptions {
     /** The running device's instance api url (see `getInstanceUrl`). */
     instanceUrl: string;
 }

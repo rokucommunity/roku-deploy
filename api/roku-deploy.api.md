@@ -940,9 +940,6 @@ export interface KeyUpOptions extends BaseEcpOptions {
     key: RemoteKeyText | string;
 }
 
-// @public
-export type KnownKeyCombo = 'developer-settings' | 'secret-screen' | 'platform-secret-screen' | 'wifi-secret-screen' | 'reboot' | 'hdmi-secret-screen' | 'bit-rate-override' | 'antenna-secret-screen';
-
 // @public (undocumented)
 export interface LaunchAppOptions extends BaseEcpOptions {
     appId: string;
@@ -1018,6 +1015,17 @@ export interface ManifestData {
 export class MissingRequiredOptionError extends ConfigurationError {
     // (undocumented)
     readonly code = RokuDeployErrorCode.MISSING_REQUIRED_OPTION;
+}
+
+// @public (undocumented)
+export interface OpenDeveloperSettingsSecretScreenOptions extends RceManagementRequestOptions {
+    instanceUrl: string;
+}
+
+// @public (undocumented)
+export interface OpenSecretScreenOptions extends BaseEcpOptions {
+    keyDelayMs?: number;
+    screen: SecretScreen;
 }
 
 // @public (undocumented)
@@ -1159,9 +1167,9 @@ export class RceManagementClient {
     listDevices(options?: ListDevicesOptions): Promise<RceDevice[]>;
     listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
     listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
+    openDeveloperSettingsSecretScreen(options: OpenDeveloperSettingsSecretScreenOptions): Promise<void>;
     // (undocumented)
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
-    sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     startDevice(options: StartDeviceOptions): Promise<RceDevice>;
     stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
     updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
@@ -1448,7 +1456,6 @@ export class RokuDeploy {
     getEcpNetworkAccessMode(options: GetDeviceInfoOptions): Promise<EcpNetworkAccessMode>;
     getRegistry(options: GetRegistryOptions): Promise<RokuRegistry>;
     getRendezvousTracking(options: GetRendezvousTrackingOptions): Promise<RokuRendezvous>;
-    static readonly keyCombos: Readonly<Record<KnownKeyCombo, RemoteKeyText[]>>;
     keyDown(options: KeyDownOptions): Promise<EcpResult>;
     keyPress(options: KeyPressOptions): Promise<EcpResult>;
     keyUp(options: KeyUpOptions): Promise<EcpResult>;
@@ -1456,12 +1463,12 @@ export class RokuDeploy {
     listSideloadedPlugins(options: ListSideloadedPluginsOptions): Promise<RokuPlugin[]>;
     loadConfigFile(options?: LoadConfigFileOptions): RokuDeployOptions;
     readonly logger: typeof logger;
+    openSecretScreen(options: OpenSecretScreenOptions): Promise<void>;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
-    sendKeyCombo(options: SendKeyComboOptions): Promise<void>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
@@ -1684,10 +1691,8 @@ export interface RokuRendezvousItem {
     startTime: string;
 }
 
-// @public (undocumented)
-export interface SendDeveloperSettingsComboOptions extends RceManagementRequestOptions {
-    instanceUrl: string;
-}
+// @public
+export type SecretScreen = 'developer-settings' | 'secret-screen' | 'platform-secret-screen' | 'wifi-secret-screen' | 'reboot' | 'hdmi-secret-screen' | 'bit-rate-override' | 'antenna-secret-screen';
 
 // @public (undocumented)
 export interface SendEcpRequestOptions extends BaseEcpOptions {
@@ -1696,12 +1701,6 @@ export interface SendEcpRequestOptions extends BaseEcpOptions {
     method?: 'GET' | 'POST';
     route: string;
     verify?: boolean;
-}
-
-// @public (undocumented)
-export interface SendKeyComboOptions extends BaseEcpOptions {
-    combo: KnownKeyCombo | RemoteKeyText[];
-    keyDelayMs?: number;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "SendKeyEventOptions" should be prefixed with an underscore because the declaration is marked as @internal

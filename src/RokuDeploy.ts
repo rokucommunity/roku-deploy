@@ -1169,19 +1169,19 @@ export class RokuDeploy {
     }
 
     /**
-     * Send a remote key combo: a named Roku secret-screen combo (see `keyCombos`) or any array of keys. The
-     * keys go out as ECP key presses, except `developer-settings`, which Roku ignores over ECP: on an RCE
-     * device it is triggered through the instance api instead, and a physical device is rejected.
+     * Open one of the Roku hidden "secret" screens by name. Most are reached by a documented remote key combo
+     * pressed over ECP; `developer-settings` is ignored by Roku over ECP, so on an RCE device it is opened
+     * through the instance api instead and a physical device is rejected.
      * @public
      */
-    public async sendKeyCombo(options: SendKeyComboOptions): Promise<void> {
-        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendKeyComboOptions;
-        this.checkRequiredOptions(options, ['device', 'combo'], RokuDeploy.prototype.sendKeyCombo.name);
-        if (options.combo === 'developer-settings') {
+    public async openSecretScreen(options: OpenSecretScreenOptions): Promise<void> {
+        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as OpenSecretScreenOptions;
+        this.checkRequiredOptions(options, ['device', 'screen'], RokuDeploy.prototype.openSecretScreen.name);
+        if (options.screen === 'developer-settings') {
             //Roku ignores this combo over ECP, so it only works through the RCE instance api
             const deviceConfig = this.resolveDevice(options.device, options.devices);
             if (!isRceDeviceConfig(deviceConfig)) {
-                throw new Error(`The 'developer-settings' combo is only supported for RCE devices (Roku ignores it over ECP)`);
+                throw new Error(`The 'developer-settings' screen is only supported for RCE devices (Roku ignores its key combo over ECP)`);
             }
             const rceToken = this.getRceToken(deviceConfig);
             if (!rceToken) {
@@ -1189,23 +1189,23 @@ export class RokuDeploy {
             }
             await this.withRceInstanceUrlRetry(deviceConfig, async () => {
                 const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-                return this.createRceManagementClient(rceToken).sendDeveloperSettingsCombo({ instanceUrl: instanceUrl });
+                return this.createRceManagementClient(rceToken).openDeveloperSettingsSecretScreen({ instanceUrl: instanceUrl });
             });
         } else {
-            //every other combo is just its keys, pressed in order over ECP
-            const keys = Array.isArray(options.combo) ? options.combo : RokuDeploy.keyCombos[options.combo];
+            //every other screen is just its key combo, pressed in order over ECP
+            const keys = RokuDeploy.keyCombos[options.screen];
             if (!keys) {
-                throw new Error(`Unknown key combo '${options.combo as string}'. Known combos: ${Object.keys(RokuDeploy.keyCombos).join(', ')}`);
+                throw new Error(`Unknown secret screen '${options.screen as string}'. Known screens: ${Object.keys(RokuDeploy.keyCombos).join(', ')}`);
             }
             await this.sendKeySequence({ ...options, keys: keys });
         }
     }
 
     /**
-     * The key presses behind each named combo, as documented for a physical Roku remote.
-     * @public
+     * The key presses behind each secret screen, as documented for a physical Roku remote. `developer-settings`
+     * is listed for reference but is opened through the RCE instance api, not these keys.
      */
-    public static readonly keyCombos: Readonly<Record<KnownKeyCombo, RemoteKeyText[]>> = {
+    private static readonly keyCombos: Readonly<Record<SecretScreen, RemoteKeyText[]>> = {
         'developer-settings': ['Home', 'Home', 'Home', 'Up', 'Up', 'Right', 'Left', 'Right', 'Left', 'Right'],
         'secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Fwd', 'Fwd', 'Rev', 'Rev'],
         'platform-secret-screen': ['Home', 'Home', 'Home', 'Home', 'Home', 'Fwd', 'Play', 'Rev', 'Play', 'Fwd'],
@@ -3058,19 +3058,19 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
 }
 
 /**
- * A named Roku remote key combo. Most open one of the hidden "secret" screens; `developer-settings`
- * opens the developer setup wizard.
+ * A Roku hidden "secret" screen opened from the remote. `developer-settings` opens the developer setup
+ * wizard; the rest open the various diagnostic screens.
  * @public
  */
-export type KnownKeyCombo = 'developer-settings' | 'secret-screen' | 'platform-secret-screen' | 'wifi-secret-screen' | 'reboot' | 'hdmi-secret-screen' | 'bit-rate-override' | 'antenna-secret-screen';
+export type SecretScreen = 'developer-settings' | 'secret-screen' | 'platform-secret-screen' | 'wifi-secret-screen' | 'reboot' | 'hdmi-secret-screen' | 'bit-rate-override' | 'antenna-secret-screen';
 
 /**
  * @public
  */
-export interface SendKeyComboOptions extends BaseEcpOptions {
-    /** A named combo, or the keys to press in order. */
-    combo: KnownKeyCombo | RemoteKeyText[];
-    /** The pause between consecutive key presses, in milliseconds. Defaults to 250. */
+export interface OpenSecretScreenOptions extends BaseEcpOptions {
+    /** The secret screen to open. */
+    screen: SecretScreen;
+    /** The pause between consecutive key presses, in milliseconds, for screens reached over ECP. Defaults to 250. */
     keyDelayMs?: number;
 }
 
