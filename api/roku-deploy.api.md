@@ -1021,7 +1021,6 @@ export class MissingRequiredOptionError extends ConfigurationError {
 export interface NoFilesStagedDetails {
     files: unknown[];
     rootDir: string;
-    suggestedRootDir?: string;
 }
 
 // @public

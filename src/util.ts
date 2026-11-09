@@ -145,14 +145,6 @@ export class Util {
     }
 
     /**
-     * Absolute paths of the files matching `patterns` under `cwd`, at most `deep` folders down, skipping
-     * anything under the `ignore` globs.
-     */
-    public async findFiles(patterns: string[], options: { cwd: string; deep?: number; ignore?: string[] }): Promise<string[]> {
-        return fastGlob(patterns, { cwd: options.cwd, absolute: true, onlyFiles: true, deep: options.deep, ignore: options.ignore });
-    }
-
-    /**
      * Run a series of glob patterns, returning the matches in buckets corresponding to their pattern index.
      */
     public async globAllByIndex(patterns: string[], cwd: string) {

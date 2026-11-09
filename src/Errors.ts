@@ -388,8 +388,6 @@ export interface NoFilesStagedDetails {
     rootDir: string;
     /** The files array that matched nothing */
     files: unknown[];
-    /** A folder holding a `manifest` that looks like the intended rootDir, when one was found */
-    suggestedRootDir?: string;
 }
 
 /**
