@@ -758,7 +758,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.getDeviceInfo();
-                }, 'Missing required option: device');
+                }, `getDeviceInfo: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -1880,7 +1880,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.getDevId();
-                }, 'Missing required option: device');
+                }, `getDevId: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2010,7 +2010,7 @@ describe('RokuDeploy', () => {
                 rokuDeploy.zip({
                     out: `${outDir}/roku-deploy.zip`
                 } as any),
-                '"dir" is required for zip'
+                `zip: missing required option 'dir'`
             );
         });
 
@@ -2098,11 +2098,11 @@ describe('RokuDeploy', () => {
         });
 
         it('throws when no device is available', () => {
-            expect(() => rokuDeploy.createSocket({ port: 8085 })).to.throw('Missing required option: device');
+            expect(() => rokuDeploy.createSocket({ port: 8085 })).to.throw(`createSocket: missing required option 'device'`);
         });
 
         it('throws when no port is given', () => {
-            expect(() => rokuDeploy.createSocket({ device: { host: '1.2.3.4' } } as any)).to.throw('Missing required option: port');
+            expect(() => rokuDeploy.createSocket({ device: { host: '1.2.3.4' } } as any)).to.throw(`createSocket: missing required option 'port'`);
         });
 
         it('throws for an unknown registry name', () => {
@@ -2497,7 +2497,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyPress({ key: 'Home' } as any);
-                }, 'Missing required option: device');
+                }, `keyPress: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2522,7 +2522,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyUp({ key: 'Home' } as any);
-                }, 'Missing required option: device');
+                }, `keyUp: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2547,7 +2547,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.keyDown({ key: 'Home' } as any);
-                }, 'Missing required option: device');
+                }, `keyDown: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2572,7 +2572,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.sendText({ text: 'a' } as any);
-                }, 'Missing required option: device');
+                }, `sendText: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2862,7 +2862,7 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy();
                 await expectThrowsAsync(async () => {
                     await rd.closeChannel({} as any);
-                }, 'Missing required option: device');
+                }, `closeChannel: missing required option 'device'`);
             });
 
             it('uses constructor device when not provided in call', async () => {
@@ -2885,7 +2885,7 @@ describe('RokuDeploy', () => {
         it('fails when appId not provided', async () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.launchApp({ device: { host: '1.1.1.1' } } as any);
-            }, 'Missing required option: appId');
+            }, `launchApp: missing required option 'appId'`);
         });
 
         it('POSTs to launch/{appId} with no query string when no deep-link params are given', async () => {
@@ -2934,7 +2934,7 @@ describe('RokuDeploy', () => {
         it('fails when appId not provided', async () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.exitApp({ device: { host: '1.1.1.1' } } as any);
-            }, 'Missing required option: appId');
+            }, `exitApp: missing required option 'appId'`);
         });
 
         it('POSTs to exit-app/{appId} without a force segment by default', async () => {
@@ -3964,7 +3964,7 @@ describe('RokuDeploy', () => {
                     password: undefined,
                     zip: zipFile
                 });
-            }, 'Missing required option: password');
+            }, `sideload: missing required option 'password'`);
         });
 
         describe('constructor defaults', () => {
@@ -3972,14 +3972,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.sideload({ zip: 'test.zip' } as any);
-                }, 'Missing required option: device');
+                }, `sideload: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.sideload({ zip: 'test.zip' } as any);
-                }, 'Missing required option: password');
+                }, `sideload: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -4125,7 +4125,7 @@ describe('RokuDeploy', () => {
                     password: 'password',
                     close: false
                 } as any),
-                'Either zip or dir must be provided'
+                `sideload: missing required option 'zip'`
             );
         });
 
@@ -4250,14 +4250,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.convertToSquashfs({} as any);
-                }, 'Missing required option: device');
+                }, `convertToSquashfs: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.convertToSquashfs({} as any);
-                }, 'Missing required option: password');
+                }, `convertToSquashfs: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -4471,14 +4471,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.rekeyDevice({ pkg: 'test.pkg', signingPassword: 'sign' } as any);
-                }, 'Missing required option: device');
+                }, `rekeyDevice: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.rekeyDevice({ pkg: 'test.pkg', signingPassword: 'sign' } as any);
-                }, 'Missing required option: password');
+                }, `rekeyDevice: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -4871,14 +4871,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.createSignedPackage({ signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
-                }, 'Missing required option: device');
+                }, `createSignedPackage: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.createSignedPackage({ signingPassword: 'sign', appTitle: 'test', appVersion: '1.0.0' } as any);
-                }, 'Missing required option: password');
+                }, `createSignedPackage: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -5591,14 +5591,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.rebootDevice({} as any);
-                }, 'Missing required option: device');
+                }, `rebootDevice: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.rebootDevice({} as any);
-                }, 'Missing required option: password');
+                }, `rebootDevice: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -5623,14 +5623,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.checkForUpdate({} as any);
-                }, 'Missing required option: device');
+                }, `checkForUpdate: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.checkForUpdate({} as any);
-                }, 'Missing required option: password');
+                }, `checkForUpdate: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -5684,14 +5684,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.deleteDevChannel();
-                }, 'Missing required option: device');
+                }, `deleteDevChannel: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.deleteDevChannel();
-                }, 'Missing required option: password');
+                }, `deleteDevChannel: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -6208,14 +6208,14 @@ describe('RokuDeploy', () => {
                 const rd = new RokuDeploy({ password: 'pass' });
                 await expectThrowsAsync(async () => {
                     await rd.captureScreenshot({} as any);
-                }, 'Missing required option: device');
+                }, `captureScreenshot: missing required option 'device'`);
             });
 
             it('fails when password not provided in constructor or call', async () => {
                 const rd = new RokuDeploy({ device: { host: 'localhost' } });
                 await expectThrowsAsync(async () => {
                     await rd.captureScreenshot({} as any);
-                }, 'Missing required option: password');
+                }, `captureScreenshot: missing required option 'password'`);
             });
 
             it('uses constructor host when not provided in call', async () => {
@@ -7063,7 +7063,7 @@ describe('RokuDeploy', () => {
             delete newOptions[testedOption];
             await expectThrowsAsync(async () => {
                 await rokuDeploy[action](newOptions);
-            }, `Missing required option: ${testedOption}`);
+            }, `${action}: missing required option '${testedOption}'`);
         }
 
         it('throws error when sendKeyEvent is missing required options', async () => {
@@ -7073,9 +7073,10 @@ describe('RokuDeploy', () => {
         });
 
         it('throws error when sideload is missing required options', async () => {
-            const requiredOptions: Partial<SideloadOptions> = { device: { host: '1.2.3.4' }, password: 'abcd' };
+            const requiredOptions: Partial<SideloadOptions> = { device: { host: '1.2.3.4' }, password: 'abcd', zip: 'app.zip' };
             await testRequiredOptions('sideload', requiredOptions, 'device');
             await testRequiredOptions('sideload', requiredOptions, 'password');
+            await testRequiredOptions('sideload', requiredOptions, 'zip');
         });
 
         it('throws error when convertToSquashfs is missing required options', async () => {
@@ -8106,7 +8107,7 @@ describe('RokuDeploy', () => {
             //return 0 packages
             sinon.stub(rokuDeploy as any, 'listSideloadedPlugins').returns(Promise.resolve([]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
-            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            await rokuDeploy.deleteAllComponentLibraries({ device: { host: '1.2.3.4' }, password: 'p' } as any);
             expect(stub.called).to.be.false;
         });
 
@@ -8123,7 +8124,7 @@ describe('RokuDeploy', () => {
                 size: '2267547'
             }]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
-            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            await rokuDeploy.deleteAllComponentLibraries({ device: { host: '1.2.3.4' }, password: 'p' } as any);
             expect(stub.called).to.be.false;
         });
 
@@ -8149,9 +8150,9 @@ describe('RokuDeploy', () => {
                 size: '1231'
             }]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
-            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            await rokuDeploy.deleteAllComponentLibraries({ device: { host: '1.2.3.4' }, password: 'p' } as any);
             expect(stub.getCall(0).args[0]).to.eql({
-                fileName: 'lib.zip'
+                device: { host: '1.2.3.4' }, password: 'p', fileName: 'lib.zip'
             });
         });
 
@@ -8186,13 +8187,13 @@ describe('RokuDeploy', () => {
                 size: '1231'
             }]));
             const stub = sinon.stub(rokuDeploy, 'deleteComponentLibrary').returns(Promise.resolve());
-            await rokuDeploy.deleteAllComponentLibraries({} as any);
+            await rokuDeploy.deleteAllComponentLibraries({ device: { host: '1.2.3.4' }, password: 'p' } as any);
             expect(stub.getCalls().map(x => x.args)).to.eql([
                 [{
-                    fileName: 'lib1.zip'
+                    device: { host: '1.2.3.4' }, password: 'p', fileName: 'lib1.zip'
                 }],
                 [{
-                    fileName: 'lib2.zip'
+                    device: { host: '1.2.3.4' }, password: 'p', fileName: 'lib2.zip'
                 }]
             ]);
         });
@@ -8232,7 +8233,7 @@ describe('RokuDeploy', () => {
                     const rd = new RokuDeploy();
                     await expectThrowsAsync(async () => {
                         await rd['sendKeyEvent']({ key: 'Home', action: 'keypress' } as any);
-                    }, 'Missing required option: device');
+                    }, `sendKeyEvent: missing required option 'device'`);
                 });
 
                 it('uses constructor value when not provided in call', async () => {
@@ -8262,7 +8263,7 @@ describe('RokuDeploy', () => {
                     const rd = new RokuDeploy({ device: { host: 'localhost' } });
                     await expectThrowsAsync(async () => {
                         await rd.deleteDevChannel();
-                    }, 'Missing required option: password');
+                    }, `deleteDevChannel: missing required option 'password'`);
                 });
 
                 it('uses constructor value when not provided in call', async () => {

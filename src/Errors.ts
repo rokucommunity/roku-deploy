@@ -79,6 +79,10 @@ export interface ConnectionErrorDetails {
  */
 export interface ConfigurationErrorDetails {
     optionName?: string;
+    /** Every missing option, when more than one was required (optionName holds the first) */
+    optionNames?: string[];
+    /** The RokuDeploy method that was called */
+    methodName?: string;
     providedValue?: unknown;
     expectedFormat?: string;
 }
