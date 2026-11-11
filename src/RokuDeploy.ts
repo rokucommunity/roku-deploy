@@ -1158,17 +1158,17 @@ export class RokuDeploy {
     }
 
     /**
-     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelayMs`
+     * Press a sequence of remote keys, in order, waiting for each press's response plus `keyDelay`
      * so on-screen navigation keeps up. The first failed press throws with the failing key and step.
      * @public
      */
     public async sendKeySequence(options: SendKeySequenceOptions): Promise<void> {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendKeySequenceOptions;
         this.checkRequiredOptions(options, ['device', 'keys'], RokuDeploy.prototype.sendKeySequence.name);
-        const keyDelayMs = options.keyDelayMs ?? 250;
+        const keyDelay = options.keyDelay ?? 250;
         for (let stepIndex = 0; stepIndex < options.keys.length; stepIndex++) {
-            if (stepIndex > 0 && keyDelayMs > 0) {
-                await util.sleep(keyDelayMs);
+            if (stepIndex > 0 && keyDelay > 0) {
+                await util.sleep(keyDelay);
             }
             const key = options.keys[stepIndex];
             let result: EcpResult;
@@ -1181,34 +1181,6 @@ export class RokuDeploy {
                 throw new Error(`Key press '${key}' (step ${stepIndex + 1} of ${options.keys.length}) failed (status ${result.status})`);
             }
         }
-    }
-
-    /**
-     * Enter the developer-settings key combo on a Roku Cloud Emulator device, causing it to show
-     * the on-screen developer setup wizard for the user to complete (this call only triggers that
-     * screen, it does not finish the setup). Local devices are not supported — the combo endpoint
-     * only exists on the RCE instance api.
-     * @public
-     */
-    public async sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
-        options = { ...this.options, ...this.getDeviceSettings(options), ...options } as SendDeveloperSettingsComboOptions;
-        this.checkRequiredOptions(options, ['device'], RokuDeploy.prototype.sendDeveloperSettingsCombo.name);
-        const deviceConfig = this.resolveDevice(options.device, options.devices);
-        if (!isRceDeviceConfig(deviceConfig)) {
-            throw new Error('sendDeveloperSettingsCombo is only supported for RCE devices');
-        }
-        const rceToken = this.getRceToken(deviceConfig);
-        if (!rceToken) {
-            throw new Error('An rceToken is required to reach the instance api on an RCE device');
-        }
-        await this.withRceInstanceUrlRetry(deviceConfig, async () => {
-            const instanceUrl = await this.getRceInstanceUrl(deviceConfig);
-            return this.doPostRequest({
-                url: `${instanceUrl}/api/v0/xi/developer-settings-combo`,
-                timeout: options.timeout ?? RokuDeploy.timeouts.quick,
-                headers: this.buildRceAuthHeaders(rceToken)
-            }, true);
-        });
     }
 
     /**
@@ -3049,13 +3021,8 @@ export interface SendKeySequenceOptions extends BaseEcpOptions {
      * The pause between consecutive key presses, in milliseconds, so on-screen navigation keeps up
      * with the input. Defaults to 250.
      */
-    keyDelayMs?: number;
+    keyDelay?: number;
 }
-
-/**
- * @public
- */
-export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
 
 /**
  * @public

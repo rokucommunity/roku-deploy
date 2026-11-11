@@ -358,6 +358,76 @@ describe('RceManagementClient', () => {
         });
     });
 
+    describe('sendDeveloperSettingsCombo', () => {
+        it('POSTs to the instance api combo endpoint with the X-Authorization header and timeout timers', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'constructor-token', timeout: 4321 });
+
+            await client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc/' });
+
+            expect(requests[0].method).to.equal('post');
+            //the trailing slash on instanceUrl is stripped before the path is appended
+            expect(requests[0].url).to.equal('https://device.rce.roku.com/instance/abc/api/v0/xi/developer-settings-combo');
+            expect(requests[0].data).to.equal(null);
+            expect(requests[0].options.headers['X-Authorization']).to.equal('Bearer constructor-token');
+            expect(requests[0].options.open_timeout).to.equal(4321);
+            expect(requests[0].options.response_timeout).to.equal(4321);
+            expect(requests[0].options.connection).to.equal('close');
+            expect(requests[0].options.agent).to.equal(false);
+        });
+
+        it('lets a per-call token override the constructor token', async () => {
+            const requests = stubNeedle();
+            const client = new RceManagementClient({ token: 'constructor-token' });
+
+            await client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc', token: 'override-token' });
+
+            expect(requests[0].options.headers['X-Authorization']).to.equal('Bearer override-token');
+        });
+
+        it('rejects with the transport error when needle reports one', async () => {
+            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(new Error('socket hang up'), undefined);
+                return {} as any;
+            }) as any);
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await expectThrowsAsync(
+                client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc' }),
+                'socket hang up'
+            );
+        });
+
+        it('rejects with an RceManagementApiError carrying the path and status on a non-2xx response', async () => {
+            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(null, { statusCode: 500, body: {} });
+                return {} as any;
+            }) as any);
+            const client = new RceManagementClient({ token: 'secret' });
+
+            const error = await client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc' }).then(
+                () => undefined,
+                (e: unknown) => e as RceManagementApiError
+            );
+            expect(error).to.be.instanceOf(RceManagementApiError);
+            expect(error?.message).to.equal('RCE instance POST /api/v0/xi/developer-settings-combo failed (status 500)');
+            expect(error?.details).to.eql({ method: 'POST', path: '/api/v0/xi/developer-settings-combo', statusCode: 500 });
+        });
+
+        it('treats a response with no status code as a failure (status 0)', async () => {
+            sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {
+                callback(null, { body: {} });
+                return {} as any;
+            }) as any);
+            const client = new RceManagementClient({ token: 'secret' });
+
+            await expectThrowsAsync(
+                client.sendDeveloperSettingsCombo({ instanceUrl: 'https://device.rce.roku.com/instance/abc' }),
+                'RCE instance POST /api/v0/xi/developer-settings-combo failed (status 0)'
+            );
+        });
+    });
+
     describe('send failures', () => {
         it('rejects with the transport error when needle reports one', async () => {
             sinon.stub(needle, 'request').callsFake(((method: string, url: string, data: any, options: any, callback: any) => {

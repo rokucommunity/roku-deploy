@@ -214,6 +214,42 @@ export class RceManagementClient {
     }
 
     /**
+     * Enter the developer-settings key combo on a running RCE device through its instance api, bringing
+     * up the on-screen developer setup wizard for the user to complete (this only triggers the screen,
+     * it does not finish setup). The instance api proxies the device, so the token rides the
+     * `X-Authorization` header, leaving `Authorization` free for the proxied device.
+     * @public
+     */
+    public sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void> {
+        const path = '/api/v0/xi/developer-settings-combo';
+        const url = `${options.instanceUrl.replace(/\/+$/, '')}${path}`;
+        const needleOptions: needle.NeedleOptions = {
+            'open_timeout': this.timeout,
+            'response_timeout': this.timeout,
+            connection: 'close',
+            agent: false,
+            headers: { 'X-Authorization': `Bearer ${options.token ?? this.token}` }
+        };
+        return new Promise<void>((resolve, reject) => {
+            needle.request('post', url, null, needleOptions, (error, response) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const statusCode = response.statusCode ?? 0;
+                if (statusCode < 200 || statusCode >= 300) {
+                    reject(new RceManagementApiError(
+                        `RCE instance POST ${path} failed (status ${statusCode})`,
+                        buildApiErrorDetails('POST', path, statusCode, response.body)
+                    ));
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+
+    /**
      * Sends an authenticated request and returns the parsed JSON body; non-2xx responses reject.
      * The single HTTP choke point, so auth and error handling stay consistent and tests can stub
      * one method rather than the network. A per-call token wins over the constructor token.
@@ -515,6 +551,14 @@ export interface GetInstanceUrlOptions extends RceManagementRequestOptions {
  */
 export interface GetRunningInstanceApiUrlOptions extends RceManagementRequestOptions {
     deviceId: DeviceId;
+}
+
+/**
+ * @public
+ */
+export interface SendDeveloperSettingsComboOptions extends RceManagementRequestOptions {
+    /** The running device's instance api url (see `getInstanceUrl`). */
+    instanceUrl: string;
 }
 
 /**
