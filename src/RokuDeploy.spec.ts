@@ -4878,6 +4878,21 @@ describe('RokuDeploy', () => {
     });
 
     describe('stage', () => {
+        it('throws a NoFilesStagedError that lists the files when nothing matches', async () => {
+            const proj = s`${tempDir}/proj`;
+            fsExtra.ensureDirSync(`${proj}/empty`);
+            let error: any;
+            try {
+                await rokuDeploy.stage({ cwd: proj, rootDir: 'empty', files: ['source/**/*.*', { src: 'manifest', dest: 'manifest' }] });
+            } catch (e) {
+                error = e;
+            }
+            expect(error).to.be.instanceOf(errors.NoFilesStagedError);
+            expect(error.code).to.equal('NO_FILES_STAGED');
+            expect(error.message).to.equal(`stage: no files matched in "${s`${proj}/empty`}" with files [source/**/*.*, {"src":"manifest","dest":"manifest"}]. Check rootDir and the files array.`);
+            expect(error.details).to.eql({ rootDir: s`${proj}/empty`, files: ['source/**/*.*', { src: 'manifest', dest: 'manifest' }] });
+        });
+
         it('should use outDir for staging folder', async () => {
             await rokuDeploy.stage({
                 files: [

@@ -1017,6 +1017,18 @@ export class MissingRequiredOptionError extends ConfigurationError {
     readonly code = RokuDeployErrorCode.MISSING_REQUIRED_OPTION;
 }
 
+// @public
+export interface NoFilesStagedDetails {
+    files: unknown[];
+    rootDir: string;
+}
+
+// @public
+export class NoFilesStagedError extends RokuDeployError<NoFilesStagedDetails> {
+    // (undocumented)
+    readonly code = RokuDeployErrorCode.NO_FILES_STAGED;
+}
+
 // @public (undocumented)
 export interface PackageUploadOverridesOptions {
     // (undocumented)
@@ -1512,6 +1524,8 @@ export enum RokuDeployErrorCode {
     INVALID_RESPONSE_CODE = "INVALID_RESPONSE_CODE",
     // (undocumented)
     MISSING_REQUIRED_OPTION = "MISSING_REQUIRED_OPTION",
+    // (undocumented)
+    NO_FILES_STAGED = "NO_FILES_STAGED",
     // (undocumented)
     RCE_MANAGEMENT_API_ERROR = "RCE_MANAGEMENT_API_ERROR",
     // (undocumented)

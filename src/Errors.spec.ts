@@ -478,6 +478,7 @@ describe('Errors', () => {
             expect(RokuDeployErrorCode.COMPILE_ERROR).to.equal('COMPILE_ERROR');
             expect(RokuDeployErrorCode.CONVERT_ERROR).to.equal('CONVERT_ERROR');
             expect(RokuDeployErrorCode.MISSING_REQUIRED_OPTION).to.equal('MISSING_REQUIRED_OPTION');
+            expect(RokuDeployErrorCode.NO_FILES_STAGED).to.equal('NO_FILES_STAGED');
             expect(RokuDeployErrorCode.INVALID_OPTION).to.equal('INVALID_OPTION');
             expect(RokuDeployErrorCode.UNSUPPORTED_FIRMWARE).to.equal('UNSUPPORTED_FIRMWARE');
         });

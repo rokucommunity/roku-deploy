@@ -20,7 +20,8 @@ import {
     UnparsableDeviceResponseError,
     UnsupportedFirmwareVersionError,
     UpdateCheckRequiredError,
-    MissingRequiredOptionError
+    MissingRequiredOptionError,
+    NoFilesStagedError
 } from './Errors';
 import type { HttpDetails, RokuDeployError } from './Errors';
 import * as xml2js from 'xml2js';
@@ -138,6 +139,9 @@ export class RokuDeploy {
         }
 
         let fileObjects = await this.resolveFilesArray({ files: files, rootDir: rootDir });
+        if (fileObjects.length === 0) {
+            throw this.buildNoFilesStagedError(rootDir, files);
+        }
         await Promise.all(fileObjects.map(async (fileObject) => {
             let destFilePath = util.standardizePath(`${out}/${fileObject.dest}`);
 
@@ -154,6 +158,17 @@ export class RokuDeploy {
         }));
         this.logger.info('Relevant files copied to:', out);
         return { stagingDir: out };
+    }
+
+    /**
+     * Explain an empty staging run: the files array is listed so a bad pattern or wrong rootDir is visible.
+     */
+    private buildNoFilesStagedError(rootDir: string, files: FileEntry[]): NoFilesStagedError {
+        const shownFiles = files.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(', ');
+        return new NoFilesStagedError(
+            `stage: no files matched in "${rootDir}" with files [${shownFiles}]. Check rootDir and the files array.`,
+            { rootDir: rootDir, files: files }
+        );
     }
 
     /**
