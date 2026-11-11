@@ -1169,6 +1169,7 @@ export class RceManagementClient {
     listFirmwareVersions(options?: ListFirmwareVersionsOptions): Promise<FirmwareVersion[]>;
     listSnapshots(options: ListSnapshotsOptions): Promise<Snapshot[]>;
     protected send<TResponse>(method: HttpMethod, path: string, options?: SendOptions): Promise<TResponse>;
+    sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     startDevice(options: StartDeviceOptions): Promise<RceDevice>;
     stopDevice(options: StopDeviceOptions): Promise<RceDevice>;
     updateDevice(options: UpdateDeviceOptions): Promise<RceDevice>;
@@ -1466,7 +1467,6 @@ export class RokuDeploy {
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
     rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
-    sendDeveloperSettingsCombo(options: SendDeveloperSettingsComboOptions): Promise<void>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
@@ -1693,7 +1693,9 @@ export interface RokuRendezvousItem {
 }
 
 // @public (undocumented)
-export type SendDeveloperSettingsComboOptions = BaseEcpOptions;
+export interface SendDeveloperSettingsComboOptions extends RceManagementRequestOptions {
+    instanceUrl: string;
+}
 
 // @public (undocumented)
 export interface SendEcpRequestOptions extends BaseEcpOptions {
@@ -1716,7 +1718,7 @@ export interface SendKeyEventOptions extends BaseEcpOptions {
 
 // @public (undocumented)
 export interface SendKeySequenceOptions extends BaseEcpOptions {
-    keyDelayMs?: number;
+    keyDelay?: number;
     keys: RemoteKeyText[];
 }
 
