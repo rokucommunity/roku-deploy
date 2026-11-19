@@ -5,7 +5,7 @@ import { createSandbox } from 'sinon';
 import type { SinonStub } from 'sinon';
 import { rokuDeploy } from '../index';
 import { expectPathExists, tempDir } from '../testUtils.spec';
-import { getConfigOutPath } from './commandUtils';
+import { getConfigOutPath, resolveDeviceOption } from './commandUtils';
 import { CaptureScreenshotCommand } from './CaptureScreenshotCommand';
 import { ConvertToSquashfsCommand } from './ConvertToSquashfsCommand';
 import { CreateSignedPackageCommand } from './CreateSignedPackageCommand';
@@ -69,34 +69,70 @@ interface CommandSpec {
     translations: Translation[];
     /** rokudeploy.json values that must NOT reach this command */
     ignoredConfig?: Record<string, any>;
+    /**
+     * Which shared options this command accepts. Unset = the legacy full union (not-yet-converted commands).
+     * `request` = BaseRequestOptions (no ecpPort); `ecp` = BaseEcpOptions (no password/username/packagePort);
+     * `local` = no device options (stage, zip).
+     */
+    tier?: 'request' | 'ecp' | 'local';
 }
 
-//the options extractCommonConfigOptions hands every call
-const commonOptionNames = ['device', 'devices', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
+//the individual options a command may share. Each command's tier picks which apply:
+// - `request` (BaseRequestOptions): device commands with a password, no ecpPort
+// - `ecp` (BaseEcpOptions): ecp commands, no password/username/packagePort
+// - `local`: no device options at all (stage, zip)
+//cli only: rokudeploy.json has no cwd (its paths are relative to the json file itself). Every tier takes cwd.
+const cwdField: Field = { option: 'cwd', cli: ['cwd', './cli-cwd'] };
+const deviceField: Field = { option: 'device', config: ['device', { host: '1.1.1.1' }], cli: ['host', '2.2.2.2'], fromCli: { host: '2.2.2.2' } };
+const devicesField: Field = { option: 'devices', config: ['devices', { tv: { host: '1.1.1.1' } }] };
+const usernameField: Field = { option: 'username', config: ['username', 'config-user'], cli: ['username', 'cli-user'] };
+const passwordField: Field = { option: 'password', config: ['password', 'config-pass'], cli: ['password', 'cli-pass'] };
+const packagePortField: Field = { option: 'packagePort', config: ['packagePort', 81], cli: ['packagePort', 82] };
+const ecpPortField: Field = { option: 'ecpPort', config: ['ecpPort', 8061], cli: ['ecpPort', 8062] };
+const timeoutField: Field = { option: 'timeout', config: ['timeout', 1000], cli: ['timeout', 2000] };
 
-//every command spreads these, so every command is checked against them
-const commonFields: Field[] = [
-    { option: 'device', config: ['device', { host: '1.1.1.1' }], cli: ['host', '2.2.2.2'], fromCli: { host: '2.2.2.2' } },
-    { option: 'devices', config: ['devices', { tv: { host: '1.1.1.1' } }] },
-    { option: 'username', config: ['username', 'config-user'], cli: ['username', 'cli-user'] },
-    { option: 'password', config: ['password', 'config-pass'], cli: ['password', 'cli-pass'] },
-    { option: 'packagePort', config: ['packagePort', 81], cli: ['packagePort', 82] },
-    { option: 'ecpPort', config: ['ecpPort', 8061], cli: ['ecpPort', 8062] },
-    { option: 'timeout', config: ['timeout', 1000], cli: ['timeout', 2000] },
-    //cli only: rokudeploy.json has no cwd (its paths are relative to the json file itself)
-    { option: 'cwd', cli: ['cwd', './cli-cwd'] }
-];
+//cwd is per-command (a method takes it only if its *Options has it), so it is NOT a request-tier common;
+//request commands that take cwd (rekey, screenshot, package) list cwdField in their own fields.
+const requestCommonFields: Field[] = [deviceField, devicesField, usernameField, passwordField, packagePortField, timeoutField];
+//ecp methods (BaseEcpOptions) resolve no paths, so they take no cwd
+const ecpCommonFields: Field[] = [deviceField, devicesField, ecpPortField, timeoutField];
+//the full union, still handed to not-yet-converted commands (no tier) and used to build everyConfigKey
+const commonFields: Field[] = [deviceField, devicesField, usernameField, passwordField, packagePortField, ecpPortField, timeoutField, cwdField];
 
-const commonTranslations: Translation[] = [
+//v3 host -> device applies to any device command; v3 remotePort -> ecpPort only to ecp commands
+const deviceTranslations: Translation[] = [
     { name: 'translates v3 host into device', config: { host: '3.3.3.3' }, option: 'device', expected: { host: '3.3.3.3' } },
-    { name: 'prefers device over v3 host', config: { host: '3.3.3.3', device: { host: '1.1.1.1' } }, option: 'device', expected: { host: '1.1.1.1' } },
+    { name: 'prefers device over v3 host', config: { host: '3.3.3.3', device: { host: '1.1.1.1' } }, option: 'device', expected: { host: '1.1.1.1' } }
+];
+const ecpTranslations: Translation[] = [
     { name: 'translates v3 remotePort into ecpPort', config: { remotePort: 9000 }, option: 'ecpPort', expected: 9000 },
     { name: 'prefers ecpPort over v3 remotePort', config: { remotePort: 9000, ecpPort: 8061 }, option: 'ecpPort', expected: 8061 }
 ];
+//the full set, still applied to not-yet-converted commands (no tier)
+const commonTranslations: Translation[] = [...deviceTranslations, ...ecpTranslations];
+
+//the shared fields/translations each tier contributes (no tier = the legacy full union)
+const tierFieldsByTier: Record<NonNullable<CommandSpec['tier']>, Field[]> = {
+    local: [cwdField],
+    request: requestCommonFields,
+    ecp: ecpCommonFields
+};
+const tierTranslationsByTier: Record<NonNullable<CommandSpec['tier']>, Translation[]> = {
+    local: [],
+    request: deviceTranslations,
+    ecp: [...deviceTranslations, ...ecpTranslations]
+};
 
 //the json key is `rekeySignedPackage`; the cli flag and the library option are `pkg`
 const pkgField: Field = { option: 'pkg', config: ['rekeySignedPackage', 'config.pkg'], cli: ['pkg', 'cli.pkg'], fromConfig: fromConfigDir('config.pkg') };
 const pkgTranslations: Translation[] = [];
+//the rekey step's options (rekeyDevice takes cwd)
+const rekeyStepFields: Field[] = [
+    pkgField,
+    { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
+    { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] },
+    cwdField
+];
 
 //keys that are deliberately NOT rokudeploy.json keys, so no command may read them from the file
 const commonIgnoredConfig = { cwd: './config-cwd', pkg: 'config.pkg' };
@@ -131,6 +167,7 @@ const specs: CommandSpec[] = [
         run: args => new StageCommand().run(args),
         method: 'stage',
         stubs: ['stage'],
+        tier: 'local',
         fields: [
             { option: 'rootDir', config: ['rootDir', './config-src'], cli: ['rootDir', './cli-src'], fromConfig: fromConfigDir('./config-src') },
             //globs stay relative to rootDir, so they are not resolved
@@ -147,6 +184,7 @@ const specs: CommandSpec[] = [
         run: args => new ZipCommand().run(args),
         method: 'zip',
         stubs: ['zip'],
+        tier: 'local',
         fields: [
             { option: 'dir', config: ['stagingDir', './config-staging'], cli: ['dir', './cli-dir'], fromConfig: fromConfigDir('./config-staging') },
             { option: 'out', config: ['outFile', 'config-app'], cli: ['out', './cli.zip'], fromConfig: path.join('./out', 'config-app') },
@@ -175,11 +213,8 @@ const specs: CommandSpec[] = [
         method: 'rekeyDevice',
         stubs: ['sideload', 'rekeyDevice'],
         args: { rekey: true },
-        fields: [
-            pkgField,
-            { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
-            { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] }
-        ],
+        tier: 'request',
+        fields: rekeyStepFields,
         translations: pkgTranslations
     },
     {
@@ -188,11 +223,8 @@ const specs: CommandSpec[] = [
         method: 'rekeyDevice',
         stubs: ['createSignedPackage', 'convertToSquashfs', 'sideload', 'rekeyDevice'],
         args: { rekey: true },
-        fields: [
-            pkgField,
-            { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
-            { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] }
-        ],
+        tier: 'request',
+        fields: rekeyStepFields,
         translations: pkgTranslations
     },
     {
@@ -210,6 +242,7 @@ const specs: CommandSpec[] = [
         run: args => new CreateSignedPackageCommand().run(args),
         method: 'convertToSquashfs',
         stubs: ['createSignedPackage', 'convertToSquashfs', 'sideload', 'rekeyDevice'],
+        tier: 'request',
         fields: [],
         translations: []
     },
@@ -218,13 +251,15 @@ const specs: CommandSpec[] = [
         run: args => new CreateSignedPackageCommand().run(args),
         method: 'createSignedPackage',
         stubs: ['createSignedPackage', 'convertToSquashfs', 'sideload', 'rekeyDevice'],
+        tier: 'request',
         fields: [
             { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
             { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] },
             { option: 'out', config: ['outFile', 'config-app'], cli: ['out', './cli.pkg'], fromConfig: path.join('./out', 'config-app') },
             { option: 'appTitle', cli: ['appTitle', 'My App'] },
             { option: 'appVersion', cli: ['appVersion', '1.0'] },
-            { option: 'manifestPath', cli: ['manifestPath', './manifest'] }
+            { option: 'manifestPath', cli: ['manifestPath', './manifest'] },
+            cwdField
         ],
         translations: outPathTranslations,
         ignoredConfig: { pkg: 'config.pkg', appType: 'dcl', deleteDevChannel: false, convertToSquashfs: true }
@@ -234,11 +269,8 @@ const specs: CommandSpec[] = [
         run: args => new RekeyDeviceCommand().run(args),
         method: 'rekeyDevice',
         stubs: ['rekeyDevice'],
-        fields: [
-            pkgField,
-            { option: 'signingPassword', config: ['signingPassword', 'config-sign'], cli: ['signingPassword', 'cli-sign'] },
-            { option: 'devId', config: ['devId', 'config-dev'], cli: ['devId', 'cli-dev'] }
-        ],
+        tier: 'request',
+        fields: rekeyStepFields,
         translations: pkgTranslations
     },
     {
@@ -246,22 +278,24 @@ const specs: CommandSpec[] = [
         run: args => new CaptureScreenshotCommand().run(args),
         method: 'captureScreenshot',
         stubs: ['captureScreenshot'],
+        tier: 'request',
         fields: [
             { option: 'screenshotDir', config: ['screenshotDir', './config-shots'], fromConfig: fromConfigDir('./config-shots') },
             { option: 'out', cli: ['out', './cli.jpg'] },
-            { option: 'autoExtension', cli: ['autoExtension', true] }
+            { option: 'autoExtension', cli: ['autoExtension', true] },
+            cwdField
         ],
         translations: [],
         ignoredConfig: { rootDir: './src' }
     },
-    { name: 'squash', run: args => new ConvertToSquashfsCommand().run(args), method: 'convertToSquashfs', stubs: ['convertToSquashfs'], fields: [], translations: [] },
-    { name: 'deleteDevChannel', run: args => new DeleteDevChannelCommand().run(args), method: 'deleteDevChannel', stubs: ['deleteDevChannel'], fields: [], translations: [] },
-    { name: 'getDeviceInfo', run: args => new GetDeviceInfoCommand().run(args), method: 'getDeviceInfo', stubs: ['getDeviceInfo'], resolves: { 'device-id': '1234' }, fields: [], translations: [] },
-    { name: 'getDevId', run: args => new GetDevIdCommand().run(args), method: 'getDevId', stubs: ['getDevId'], fields: [], translations: [] },
-    { name: 'keyPress', run: args => new KeyPressCommand().run(args), method: 'keyPress', stubs: ['keyPress'], fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
-    { name: 'keyUp', run: args => new KeyUpCommand().run(args), method: 'keyUp', stubs: ['keyUp'], fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
-    { name: 'keyDown', run: args => new KeyDownCommand().run(args), method: 'keyDown', stubs: ['keyDown'], fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
-    { name: 'sendText', run: args => new SendTextCommand().run(args), method: 'sendText', stubs: ['sendText'], fields: [{ option: 'text', cli: ['text', 'hello'] }], translations: [] }
+    { name: 'squash', run: args => new ConvertToSquashfsCommand().run(args), method: 'convertToSquashfs', stubs: ['convertToSquashfs'], tier: 'request', fields: [], translations: [] },
+    { name: 'deleteDevChannel', run: args => new DeleteDevChannelCommand().run(args), method: 'deleteDevChannel', stubs: ['deleteDevChannel'], tier: 'request', fields: [], translations: [] },
+    { name: 'getDeviceInfo', run: args => new GetDeviceInfoCommand().run(args), method: 'getDeviceInfo', stubs: ['getDeviceInfo'], resolves: { 'device-id': '1234' }, tier: 'ecp', fields: [], translations: [] },
+    { name: 'getDevId', run: args => new GetDevIdCommand().run(args), method: 'getDevId', stubs: ['getDevId'], tier: 'ecp', fields: [], translations: [] },
+    { name: 'keyPress', run: args => new KeyPressCommand().run(args), method: 'keyPress', stubs: ['keyPress'], tier: 'ecp', fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
+    { name: 'keyUp', run: args => new KeyUpCommand().run(args), method: 'keyUp', stubs: ['keyUp'], tier: 'ecp', fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
+    { name: 'keyDown', run: args => new KeyDownCommand().run(args), method: 'keyDown', stubs: ['keyDown'], tier: 'ecp', fields: [{ option: 'key', cli: ['key', 'Home'] }], translations: [] },
+    { name: 'sendText', run: args => new SendTextCommand().run(args), method: 'sendText', stubs: ['sendText'], tier: 'ecp', fields: [{ option: 'text', cli: ['text', 'hello'] }], translations: [] }
 ];
 
 //a rokudeploy.json setting every config key any command reads, to prove each call takes only its own
@@ -285,8 +319,10 @@ describe('commands', () => {
 
     for (const spec of specs) {
         describe(spec.name, () => {
-            const fields = [...commonFields, ...spec.fields];
-            const translations = [...commonTranslations, ...spec.translations];
+            const tierFields = spec.tier ? tierFieldsByTier[spec.tier] : commonFields;
+            const tierTranslations = spec.tier ? tierTranslationsByTier[spec.tier] : commonTranslations;
+            const fields = [...tierFields, ...spec.fields];
+            const translations = [...tierTranslations, ...spec.translations];
             let stubs: Record<string, SinonStub>;
 
             beforeEach(() => {
@@ -358,7 +394,8 @@ describe('commands', () => {
             it('reads only the shared and its own options from rokudeploy.json, even when the file sets every key', async () => {
                 const options = await run({}, everyConfigKey);
                 //the cli args (the `config` path, plus any step flags like `rekey`) pass through by design
-                const allowed = [...commonOptionNames, ...fields.map(x => x.option), 'config', ...Object.keys(spec.args ?? {})];
+                //every allowed option name is already covered by `fields` (tier commons + this command's own)
+                const allowed = [...fields.map(x => x.option), 'config', ...Object.keys(spec.args ?? {})];
                 expect(Object.keys(options).filter(key => !allowed.includes(key))).to.eql([]);
             });
 
@@ -395,6 +432,21 @@ describe('commands', () => {
             expect(getConfigOutPath({})).to.be.undefined;
             expect(getConfigOutPath({ outDir: './dist' })).to.equal(path.join('./dist', 'roku-deploy'));
             expect(getConfigOutPath({ outFile: 'app' })).to.equal(path.join('./out', 'app'));
+        });
+    });
+
+    describe('resolveDeviceOption', () => {
+        it('builds an RCE device from --esn, carrying the cli --rceToken', () => {
+            expect(resolveDeviceOption({ esn: 'X123', rceToken: 'cli-token' }, {})).to.eql({ esn: 'X123', rceToken: 'cli-token' });
+        });
+
+        it('builds an RCE device from --instanceUrl, falling back to the config rceToken', () => {
+            expect(resolveDeviceOption({ instanceUrl: 'https://x' }, { rceToken: 'config-token' })).to.eql({ instanceUrl: 'https://x', rceToken: 'config-token' });
+        });
+
+        it('omits rceToken entirely when none is supplied', () => {
+            expect(resolveDeviceOption({ esn: 'X123' }, {})).to.eql({ esn: 'X123' });
+            expect(resolveDeviceOption({ instanceUrl: 'https://x' }, {})).to.eql({ instanceUrl: 'https://x' });
         });
     });
 });

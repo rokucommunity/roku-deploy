@@ -1,16 +1,22 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class CaptureScreenshotCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.captureScreenshot({
-            ...extractCommonConfigOptions(config),
-            //screenshot-specific config options
+        //screenshot is a password-auth device call (BaseRequestOptions) plus its own out/screenshotDir/autoExtension
+        await rokuDeploy.captureScreenshot(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            username: args.username ?? config.username,
+            password: args.password ?? config.password,
+            packagePort: args.packagePort ?? config.packagePort,
+            timeout: args.timeout ?? config.timeout,
+            out: args.out,
             screenshotDir: config.screenshotDir,
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+            autoExtension: args.autoExtension,
+            cwd: args.cwd
+        }));
     }
 }

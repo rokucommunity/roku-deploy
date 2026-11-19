@@ -20,7 +20,7 @@ import { standardizePath as s, util } from './util';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { SideloadCommand } from './commands/SideloadCommand';
-import { loadRokuDeployJson, normalizeCliArgs } from './commands/commandUtils';
+import { loadRokuDeployJson } from './commands/commandUtils';
 import { InitCommand, sampleConfigPath } from './commands/InitCommand';
 
 const sinon = createSandbox();
@@ -143,7 +143,6 @@ describe('cli', function cli() {
             password: '5536',
             pkg: `${tempDir}/testSignedPackage.pkg`,
             signingPassword: '12345',
-            rootDir: rootDir,
             devId: 'abcde'
         });
     });
@@ -182,13 +181,14 @@ describe('cli', function cli() {
             signingPassword: undefined
         });
 
+        //an unset signingPassword is dropped rather than passed as undefined
         expect(
             stub.getCall(0).args[0]
         ).to.deep.include({
             device: { host: '1.2.3.4' },
-            password: '5536',
-            signingPassword: undefined
+            password: '5536'
         });
+        expect(stub.getCall(0).args[0]).to.not.have.property('signingPassword');
     });
 
     it('Signs an existing package using the provided cwd', async () => {
@@ -329,11 +329,11 @@ describe('cli', function cli() {
             password: '5536'
         });
 
+        //getDevId is an ecp call, so it takes no password
         expect(
             stub.getCall(0).args[0]
         ).to.eql({
-            device: { host: '1.2.3.4' },
-            password: '5536'
+            device: { host: '1.2.3.4' }
         });
     });
 
@@ -1038,10 +1038,15 @@ describe('cli', function cli() {
                 await new CreateSignedPackageCommand().run({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa', rekey: true, sideload: true, dir: rootDir, appTitle: 'App', appVersion: '1.0' });
                 sinon.assert.callOrder(rekeyStub, sideloadStub, squashStub, packageStub);
 
-                //every step gets the cli args
+                //every step gets the cli device and password
                 for (const stub of [rekeyStub, sideloadStub, squashStub, packageStub]) {
-                    expect(stub.getCall(0).args[0]).to.deep.include({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa' });
+                    expect(stub.getCall(0).args[0]).to.deep.include({ device: { host: '1.2.3.4' }, password: 'aaaa' });
                 }
+                //the steps that take cwd get it; squash (BaseRequestOptions) takes none
+                for (const stub of [rekeyStub, sideloadStub, packageStub]) {
+                    expect(stub.getCall(0).args[0].cwd).to.equal(tempDir);
+                }
+                expect(squashStub.getCall(0).args[0].cwd).to.be.undefined;
                 //but only the config options that step maps
                 expect(rekeyStub.getCall(0).args[0]).to.deep.include({ pkg: s`${tempDir}/k.pkg`, signingPassword: 'sp' });
                 expect(rekeyStub.getCall(0).args[0].appType).to.be.undefined;
@@ -1116,19 +1121,7 @@ describe('cli', function cli() {
     });
 
     describe('CLI flag names that differ from the library options', () => {
-        it('maps --host to an inline device config', () => {
-            const options = normalizeCliArgs({ cwd: tempDir, host: '1.2.3.4', password: 'aaaa' }, {});
-            expect(options).to.eql({ cwd: tempDir, device: { host: '1.2.3.4' }, password: 'aaaa' });
-        });
-
-        it('passes every other arg through as-is', () => {
-            const options = normalizeCliArgs({ packagePort: 81, pkg: 'k.pkg', appTitle: 'My App', rekey: true }, {});
-            expect(options).to.eql({ packagePort: 81, pkg: 'k.pkg', appTitle: 'My App', rekey: true });
-        });
-
         it('drops undefined values so they cannot override a rokudeploy.json value', async () => {
-            expect(normalizeCliArgs({ password: undefined, packagePort: 81 }, {})).to.eql({ packagePort: 81 });
-
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { host: '1.2.3.4', password: 'from-config' });
             const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves({} as any);
             await new DeleteDevChannelCommand().run({ cwd: tempDir, password: undefined });
@@ -1152,36 +1145,6 @@ describe('cli', function cli() {
             sinon.stub(console, 'log');
             await new GetDevIdCommand().run({ cwd: tempDir });
             expect(stub.getCall(0).args[0].device).to.eql({ host: '9.9.9.9' });
-        });
-
-        it('maps --esn to an inline RCE device config carrying --rceToken', () => {
-            const options = normalizeCliArgs({ esn: 'X123', rceToken: 'abc' }, {});
-            expect(options).to.eql({ device: { esn: 'X123', rceToken: 'abc' } });
-        });
-
-        it('maps --instanceUrl to an inline RCE device config carrying --rceToken', () => {
-            const options = normalizeCliArgs({ instanceUrl: 'http://1.2.3.4', rceToken: 'abc' }, {});
-            expect(options).to.eql({ device: { instanceUrl: 'http://1.2.3.4', rceToken: 'abc' } });
-        });
-
-        it('falls back to the config file rceToken for an --esn device', () => {
-            const options = normalizeCliArgs({ esn: 'X123' }, { rceToken: 'from-config' });
-            expect(options.device).to.eql({ esn: 'X123', rceToken: 'from-config' });
-        });
-
-        it('leaves the device token off when neither --rceToken nor a config rceToken exists', () => {
-            const options = normalizeCliArgs({ esn: 'X123' }, {});
-            expect(options.device).to.eql({ esn: 'X123' });
-        });
-
-        it('leaves the device token off an --instanceUrl device when no token is available', () => {
-            const options = normalizeCliArgs({ instanceUrl: 'http://1.2.3.4' }, {});
-            expect(options.device).to.eql({ instanceUrl: 'http://1.2.3.4' });
-        });
-
-        it('does not attach --rceToken to a --host device', () => {
-            const options = normalizeCliArgs({ host: '1.2.3.4', rceToken: 'abc' }, {});
-            expect(options).to.eql({ device: { host: '1.2.3.4' } });
         });
 
         it('rejects more than one device address flag at parse time', () => {
