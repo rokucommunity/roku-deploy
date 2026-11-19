@@ -1,17 +1,17 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, getConfigOutPath, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, getConfigOutPath, loadRokuDeployJson } from './commandUtils';
 
 export class ZipCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.zip({
-            ...extractCommonConfigOptions(config),
-            //zip-specific config options
-            dir: config.stagingDir ?? config.stagingFolderPath,
-            out: getConfigOutPath(config),
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //zip is local: the dir to zip (config `stagingDir`), a cli-only file filter (config `files` is for
+        //staging, not zip), and the output path from config outDir/outFile or --out.
+        await rokuDeploy.zip(definedOptions({
+            dir: args.dir ?? config.stagingDir,
+            files: args.files,
+            out: args.out ?? getConfigOutPath(config),
+            cwd: args.cwd
+        }));
     }
 }

@@ -1,14 +1,18 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class ConvertToSquashfsCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.convertToSquashfs({
-            ...extractCommonConfigOptions(config),
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //squash is a password-auth device call (BaseRequestOptions): no ecpPort, no cwd
+        await rokuDeploy.convertToSquashfs(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            username: args.username ?? config.username,
+            password: args.password ?? config.password,
+            packagePort: args.packagePort ?? config.packagePort,
+            timeout: args.timeout ?? config.timeout
+        }));
     }
 }

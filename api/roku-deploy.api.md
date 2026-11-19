@@ -1465,19 +1465,19 @@ export class RokuDeploy {
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
-    rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
+    rekeyDevice(options: WithConfig<RekeyDeviceOptions, 'rekeySignedPackage', 'pkg'>): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
     sideload(options: SideloadOptions): Promise<SideloadResult>;
-    stage(options: StageOptions): Promise<StageResult>;
+    stage(options: WithConfig<StageOptions, 'stagingDir'>): Promise<StageResult>;
     startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket>;
     triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger>;
     validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean>;
     withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T>;
-    zip(options: ZipOptions): Promise<ZipResult>;
+    zip(options: WithConfig<ZipOptions, 'stagingDir' | 'outFile', 'dir'>): Promise<ZipResult>;
 }
 
 // @public (undocumented)
@@ -1543,8 +1543,6 @@ export enum RokuDeployErrorCode {
 // @public
 export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
-    // @deprecated
-    autoLaunch?: boolean;
     convertToSquashfs?: boolean;
     deleteDevChannel?: boolean;
     // @deprecated
@@ -1557,8 +1555,6 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
     // @deprecated
     host?: string;
-    // @deprecated
-    incrementBuildNumber?: boolean;
     logLevel?: LogLevel | LogLevelNumeric;
     // @deprecated
     outDir?: string;
@@ -1569,22 +1565,10 @@ export interface RokuDeployOptions {
         formData?: Record<string, any>;
     };
     password?: string;
-    // @deprecated
-    project?: string;
     rceToken?: string;
     rekeySignedPackage?: string;
     // @deprecated
-    remoteDebug?: boolean;
-    // @deprecated
-    remoteDebugConnectEarly?: boolean;
-    // @deprecated
     remotePort?: number;
-    // @deprecated
-    retainDeploymentArchive?: boolean;
-    // @deprecated
-    retainStagingDir?: boolean;
-    // @deprecated
-    retainStagingFolder?: boolean;
     rootDir?: string;
     screenshotDir?: string;
     signingPassword?: string;
@@ -1970,6 +1954,9 @@ export interface ValidateDeveloperPasswordOptions {
 
 // @public
 export function validateDeviceConfig(config: DeviceConfigLike, subject?: string): asserts config is DeviceConfig;
+
+// @public
+export type WithConfig<TStrict, TAlias extends keyof RokuDeployOptions, TOptional extends keyof TStrict = never> = Omit<TStrict, TOptional> & Partial<Pick<TStrict, TOptional>> & Pick<RokuDeployOptions, TAlias>;
 
 // @public (undocumented)
 export interface ZipOptions {

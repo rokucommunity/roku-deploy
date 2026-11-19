@@ -1,14 +1,17 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class KeyPressCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.keyPress({
-            ...extractCommonConfigOptions(config),
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //keyPress is an ecp call (BaseEcpOptions): device/ecpPort/timeout, no password or cwd
+        await rokuDeploy.keyPress(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            ecpPort: args.ecpPort ?? config.ecpPort,
+            timeout: args.timeout ?? config.timeout,
+            key: args.key
+        }));
     }
 }

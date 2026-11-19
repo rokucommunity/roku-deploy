@@ -4,56 +4,67 @@ import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
 import type { DeviceRegistryEntry, RokuDeployOptions } from '../RokuDeployOptions';
+import type { DeviceOption } from '../DeviceConfig';
 
 /**
- * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
- * `host` and `remotePort` keys onto `device` and `ecpPort`. Unset values are left off entirely: an
- * explicit `undefined` would mask the same setting on a devices-registry entry.
+ * The device a command should target. A cli `--host`/`--esn`/`--instanceUrl` wins (an RCE address carries
+ * `--rceToken`, falling back to the config's `rceToken`); otherwise the config's `device` (an inline config
+ * or a registry name) is used, or the v3 `host` key as an inline device. Undefined when none is set, so the
+ * library's own required-option check reports it.
  */
-export function extractCommonConfigOptions(config: RokuDeployOptions): Record<string, any> {
-    const options: Record<string, any> = {
-        device: config.device ?? (config.host ? { host: config.host } : undefined),
-        devices: config.devices,
-        username: config.username,
-        password: config.password,
-        packagePort: config.packagePort,
-        ecpPort: config.ecpPort ?? config.remotePort,
-        timeout: config.timeout
-    };
-    for (const key of Object.keys(options)) {
-        if (options[key] === undefined) {
-            delete options[key];
-        }
+export function resolveDeviceOption(args: Record<string, any>, config: RokuDeployOptions): DeviceOption | undefined {
+    const token = args.rceToken ?? config.rceToken;
+    if (typeof args.host === 'string') {
+        return { host: args.host };
     }
-    return options;
+    if (typeof args.esn === 'string') {
+        return { esn: args.esn, ...(token ? { rceToken: token } : {}) };
+    }
+    if (typeof args.instanceUrl === 'string') {
+        return { instanceUrl: args.instanceUrl, ...(token ? { rceToken: token } : {}) };
+    }
+    //the v3 `host` key is normalized into `device` at load (see normalizeV3ConfigKeys)
+    return config.device;
 }
 
 /**
- * Translate the CLI args into library options. Every arg passes through as-is (the library ignores the
- * ones a call doesn't use), except:
- * - `--host`, `--esn` and `--instanceUrl` become an inline `device`; an RCE device carries `--rceToken`,
- *   falling back to the config file's `rceToken`.
- * - `undefined` values are dropped, so they can't override the config file's value.
- *
- * Returns `any`: nothing can prove statically that the user supplied a required option like `device`
- * or `password`, so the library's own runtime checks report those instead.
+ * Drop keys whose value is undefined, so a cli/config option left unset does not reach the method as an
+ * explicit `undefined` (which would mask the same setting on the constructor or a devices-registry entry).
+ * Command handlers list every option explicitly and wrap the result in this.
  */
-export function normalizeCliArgs(args: Record<string, any>, config: RokuDeployOptions): any {
-    const { host, esn, instanceUrl, rceToken, ...options } = args;
-    for (const key of Object.keys(options)) {
-        if (options[key] === undefined) {
-            delete options[key];
+export function definedOptions<T extends object>(options: T): T {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(options)) {
+        if (value !== undefined) {
+            result[key] = value;
         }
     }
-    const token = rceToken ?? config.rceToken;
-    if (typeof host === 'string') {
-        options.device = { host: host };
-    } else if (typeof esn === 'string') {
-        options.device = { esn: esn, ...(token ? { rceToken: token } : {}) };
-    } else if (typeof instanceUrl === 'string') {
-        options.device = { instanceUrl: instanceUrl, ...(token ? { rceToken: token } : {}) };
+    return result as T;
+}
+
+/**
+ * Rename the deprecated v3 rokudeploy.json keys to their v4 equivalents so command handlers only ever read
+ * the current keys, instead of each repeating a v3 fallback. The v4 key wins when both are present. This
+ * runs only on the cli path (loadRokuDeployJson); the library's loadConfigFile stays literal. `outDir`/
+ * `outFile` are left alone — they are combined per command by getConfigOutPath.
+ */
+export function normalizeV3ConfigKeys(config: RokuDeployOptions): RokuDeployOptions {
+    const normalized: Record<string, any> = { ...config };
+    const rename = (v3: string, v4: string) => {
+        if (normalized[v3] !== undefined && normalized[v4] === undefined) {
+            normalized[v4] = normalized[v3];
+        }
+        delete normalized[v3];
+    };
+    rename('remotePort', 'ecpPort');
+    rename('stagingFolderPath', 'stagingDir');
+    rename('deleteInstalledChannel', 'deleteDevChannel');
+    //host -> device is structural (a string becomes an inline device config)
+    if (normalized.device === undefined && normalized.host !== undefined) {
+        normalized.device = { host: normalized.host };
     }
-    return options;
+    delete normalized.host;
+    return normalized;
 }
 
 /**
@@ -77,10 +88,10 @@ export function loadRokuDeployJson(args: { cwd?: string; config?: string | boole
     if (args.config === false) {
         return {};
     }
-    return rokuDeploy.loadConfigFile({
+    return normalizeV3ConfigKeys(rokuDeploy.loadConfigFile({
         cwd: args.cwd,
         configPath: typeof args.config === 'string' ? args.config : undefined
-    });
+    }));
 }
 
 /**
