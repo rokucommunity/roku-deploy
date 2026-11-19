@@ -1543,8 +1543,6 @@ export enum RokuDeployErrorCode {
 // @public
 export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
-    // @deprecated
-    autoLaunch?: boolean;
     convertToSquashfs?: boolean;
     deleteDevChannel?: boolean;
     // @deprecated
@@ -1557,8 +1555,6 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
     // @deprecated
     host?: string;
-    // @deprecated
-    incrementBuildNumber?: boolean;
     logLevel?: LogLevel | LogLevelNumeric;
     // @deprecated
     outDir?: string;
@@ -1569,22 +1565,10 @@ export interface RokuDeployOptions {
         formData?: Record<string, any>;
     };
     password?: string;
-    // @deprecated
-    project?: string;
     rceToken?: string;
     rekeySignedPackage?: string;
     // @deprecated
-    remoteDebug?: boolean;
-    // @deprecated
-    remoteDebugConnectEarly?: boolean;
-    // @deprecated
     remotePort?: number;
-    // @deprecated
-    retainDeploymentArchive?: boolean;
-    // @deprecated
-    retainStagingDir?: boolean;
-    // @deprecated
-    retainStagingFolder?: boolean;
     rootDir?: string;
     screenshotDir?: string;
     signingPassword?: string;

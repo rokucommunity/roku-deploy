@@ -1635,7 +1635,7 @@ export class RokuDeploy {
      * config file's own folder.
      */
     private static readonly configPathKeys: ReadonlyArray<keyof RokuDeployOptions> = [
-        'rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir', 'project'
+        'rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir'
     ];
 
     /**
