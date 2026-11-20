@@ -3204,6 +3204,18 @@ describe('RokuDeploy', () => {
             expect(rokuDeploy.stringifyManifest(parsed)).to.equal('# comment\ntitle=App\nbuild_version=2\n');
         });
 
+        it('omits keys that were deleted after parsing', () => {
+            const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App\nfoo=bar\nmajor_version=1');
+            delete parsed.foo;
+            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('# comment\ntitle=App\n\nmajor_version=1');
+        });
+
+        it('collapses duplicate live keys to the last occurrence', () => {
+            const parsed = rokuDeploy.parseManifestFromString('title=A\n# note\ntitle=B');
+            parsed.title = 'C';
+            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('\n# note\ntitle=C');
+        });
+
         it('falls back to blank lines when the original lines are unavailable', () => {
             const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App');
             const copy = { ...parsed };

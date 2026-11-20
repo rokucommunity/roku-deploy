@@ -1461,7 +1461,7 @@ export class RokuDeploy {
         Object.defineProperty(manifestData, 'lines', { value: manifestLines, enumerable: false, writable: true, configurable: true });
         manifestLines.forEach((line, index) => {
             //anchored so `# key=value` comment lines are skipped, and `.*` so `key=` (empty value) is kept
-            let match = /^\s*(\w+)=(.*)$/.exec(line);
+            let match = manifestKeyLineRegex.exec(line);
             if (match) {
                 let key = match[1];
                 manifestData[key] = match[2];
@@ -1476,8 +1476,11 @@ export class RokuDeploy {
         let output: string[] = [];
 
         if (manifestData.keyIndexes && manifestData.lineCount) {
-            //start from the original lines (if available) so comments and blank lines survive
-            output = manifestData.lines ? [...manifestData.lines] : new Array<string>(manifestData.lineCount).fill('');
+            //start from the original non-key lines (if available) so comments and blank lines survive.
+            //key lines are blanked and only re-filled from the current data, so deleted, moved, or duplicate keys behave as they always have
+            output = manifestData.lines
+                ? manifestData.lines.map(line => (manifestKeyLineRegex.test(line) ? '' : line))
+                : new Array<string>(manifestData.lineCount).fill('');
             const appendedLines: string[] = [];
 
             let key;
@@ -1585,6 +1588,11 @@ export class RokuDeploy {
         });
     }
 }
+
+/**
+ * Matches a live `key=value` manifest line. Anchored so `# key=value` comments are skipped, and `.*` so `key=` (empty value) is kept
+ */
+const manifestKeyLineRegex = /^\s*(\w+)=(.*)$/;
 
 export interface ManifestData {
     [key: string]: any;
