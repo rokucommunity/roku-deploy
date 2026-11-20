@@ -1458,7 +1458,8 @@ export class RokuDeploy {
         manifestData.keyIndexes = {};
         manifestData.lineCount = manifestLines.length;
         manifestLines.forEach((line, index) => {
-            let match = /(\w+)=(.+)/.exec(line);
+            //anchored to match how Roku reads the manifest: `#` lines are comments, and the key must start the line (Roku doesn't trim leading whitespace)
+            let match = /^(\w+)=(.*)$/.exec(line);
             if (match) {
                 let key = match[1];
                 manifestData[key] = match[2];

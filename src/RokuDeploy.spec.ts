@@ -3113,16 +3113,16 @@ describe('RokuDeploy', () => {
 
     describe('parseManifestFromString', () => {
         it('correctly parses valid manifest', () => {
-            let parsedManifest = rokuDeploy.parseManifestFromString(`
-                title=RokuDeployTestChannel
-                major_version=1
-                minor_version=0
-                build_version=0
-                splash_screen_hd=pkg:/images/splash_hd.jpg
-                ui_resolutions=hd
-                bs_const=IS_DEV_BUILD=false
-                splash_color=#000000
-            `);
+            let parsedManifest = rokuDeploy.parseManifestFromString([
+                'title=RokuDeployTestChannel',
+                'major_version=1',
+                'minor_version=0',
+                'build_version=0',
+                'splash_screen_hd=pkg:/images/splash_hd.jpg',
+                'ui_resolutions=hd',
+                'bs_const=IS_DEV_BUILD=false',
+                'splash_color=#000000'
+            ].join('\n'));
             expect(parsedManifest.title).to.equal('RokuDeployTestChannel');
             expect(parsedManifest.major_version).to.equal('1');
             expect(parsedManifest.minor_version).to.equal('0');
@@ -3131,6 +3131,27 @@ describe('RokuDeploy', () => {
             expect(parsedManifest.ui_resolutions).to.equal('hd');
             expect(parsedManifest.bs_const).to.equal('IS_DEV_BUILD=false');
             expect(parsedManifest.splash_color).to.equal('#000000');
+        });
+
+        //verified against a real device: Roku ignores these lines
+        it('ignores commented-out and indented key=value lines', () => {
+            let parsedManifest = rokuDeploy.parseManifestFromString([
+                'title=My App',
+                '# title=Old App',
+                'bs_const=DEBUG=false',
+                '#bs_const=DEBUG=true',
+                '  # indented_comment=yes',
+                '   indented_key=yes'
+            ].join('\n'));
+            expect(parsedManifest.title).to.equal('My App');
+            expect(parsedManifest.bs_const).to.equal('DEBUG=false');
+            expect(parsedManifest).not.to.have.property('indented_comment');
+            expect(parsedManifest).not.to.have.property('indented_key');
+        });
+
+        it('keeps keys with empty values', () => {
+            let parsedManifest = rokuDeploy.parseManifestFromString('title=App\nempty_value=');
+            expect(parsedManifest.empty_value).to.equal('');
         });
     });
 
@@ -3154,6 +3175,11 @@ describe('RokuDeploy', () => {
             );
             expect(outputParsedManifest.title).to.equal('App');
             expect(outputParsedManifest.major_version).to.equal('3');
+        });
+
+        it('does not uncomment commented-out keys', () => {
+            const parsed = rokuDeploy.parseManifestFromString('title=My App\n# title=Old App');
+            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('title=My App');
         });
     });
 
