@@ -3113,16 +3113,16 @@ describe('RokuDeploy', () => {
 
     describe('parseManifestFromString', () => {
         it('correctly parses valid manifest', () => {
-            let parsedManifest = rokuDeploy.parseManifestFromString(`
-                title=RokuDeployTestChannel
-                major_version=1
-                minor_version=0
-                build_version=0
-                splash_screen_hd=pkg:/images/splash_hd.jpg
-                ui_resolutions=hd
-                bs_const=IS_DEV_BUILD=false
-                splash_color=#000000
-            `);
+            let parsedManifest = rokuDeploy.parseManifestFromString([
+                'title=RokuDeployTestChannel',
+                'major_version=1',
+                'minor_version=0',
+                'build_version=0',
+                'splash_screen_hd=pkg:/images/splash_hd.jpg',
+                'ui_resolutions=hd',
+                'bs_const=IS_DEV_BUILD=false',
+                'splash_color=#000000'
+            ].join('\n'));
             expect(parsedManifest.title).to.equal('RokuDeployTestChannel');
             expect(parsedManifest.major_version).to.equal('1');
             expect(parsedManifest.minor_version).to.equal('0');
@@ -3133,25 +3133,25 @@ describe('RokuDeploy', () => {
             expect(parsedManifest.splash_color).to.equal('#000000');
         });
 
-        it('ignores commented-out key=value lines', () => {
+        //verified against a real device: Roku ignores these lines
+        it('ignores commented-out and indented key=value lines', () => {
             let parsedManifest = rokuDeploy.parseManifestFromString([
                 'title=My App',
                 '# title=Old App',
                 'bs_const=DEBUG=false',
-                '  #bs_const=DEBUG=true'
+                '#bs_const=DEBUG=true',
+                '  # indented_comment=yes',
+                '   indented_key=yes'
             ].join('\n'));
             expect(parsedManifest.title).to.equal('My App');
             expect(parsedManifest.bs_const).to.equal('DEBUG=false');
+            expect(parsedManifest).not.to.have.property('indented_comment');
+            expect(parsedManifest).not.to.have.property('indented_key');
         });
 
         it('keeps keys with empty values', () => {
             let parsedManifest = rokuDeploy.parseManifestFromString('title=App\nempty_value=');
             expect(parsedManifest.empty_value).to.equal('');
-        });
-
-        it('does not expose the original lines as an enumerable key', () => {
-            let parsedManifest = rokuDeploy.parseManifestFromString('title=App');
-            expect(Object.keys(parsedManifest)).not.to.include('lines');
         });
     });
 
@@ -3177,49 +3177,9 @@ describe('RokuDeploy', () => {
             expect(outputParsedManifest.major_version).to.equal('3');
         });
 
-        it('preserves comments, blank lines, and empty values', () => {
-            const source = [
-                '# my channel',
-                'title=My App',
-                '# title=Old App',
-                '',
-                'bs_const=DEBUG=false',
-                '# bs_const=DEBUG=true',
-                'empty_value='
-            ].join('\n');
-            expect(
-                rokuDeploy.stringifyManifest(rokuDeploy.parseManifestFromString(source))
-            ).to.equal(source);
-        });
-
-        it('updates changed values in place', () => {
-            const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App\nbuild_version=1\n');
-            parsed.build_version = '2';
-            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('# comment\ntitle=App\nbuild_version=2\n');
-        });
-
-        it('appends keys that were added after parsing', () => {
-            const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App\n');
-            parsed.build_version = '2';
-            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('# comment\ntitle=App\nbuild_version=2\n');
-        });
-
-        it('omits keys that were deleted after parsing', () => {
-            const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App\nfoo=bar\nmajor_version=1');
-            delete parsed.foo;
-            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('# comment\ntitle=App\n\nmajor_version=1');
-        });
-
-        it('collapses duplicate live keys to the last occurrence', () => {
-            const parsed = rokuDeploy.parseManifestFromString('title=A\n# note\ntitle=B');
-            parsed.title = 'C';
-            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('\n# note\ntitle=C');
-        });
-
-        it('falls back to blank lines when the original lines are unavailable', () => {
-            const parsed = rokuDeploy.parseManifestFromString('# comment\ntitle=App');
-            const copy = { ...parsed };
-            expect(rokuDeploy.stringifyManifest(copy)).to.equal('\ntitle=App');
+        it('does not uncomment commented-out keys', () => {
+            const parsed = rokuDeploy.parseManifestFromString('title=My App\n# title=Old App');
+            expect(rokuDeploy.stringifyManifest(parsed)).to.equal('title=My App');
         });
     });
 

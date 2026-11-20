@@ -1457,11 +1457,9 @@ export class RokuDeploy {
         let manifestData: ManifestData = {};
         manifestData.keyIndexes = {};
         manifestData.lineCount = manifestLines.length;
-        //keep the original lines (non-enumerable so consumers iterating keys don't see it) so stringifyManifest can preserve comments and blank lines
-        Object.defineProperty(manifestData, 'lines', { value: manifestLines, enumerable: false, writable: true, configurable: true });
         manifestLines.forEach((line, index) => {
-            //anchored so `# key=value` comment lines are skipped, and `.*` so `key=` (empty value) is kept
-            let match = manifestKeyLineRegex.exec(line);
+            //anchored to match how Roku reads the manifest: `#` lines are comments, and the key must start the line (Roku doesn't trim leading whitespace)
+            let match = /^(\w+)=(.*)$/.exec(line);
             if (match) {
                 let key = match[1];
                 manifestData[key] = match[2];
@@ -1473,33 +1471,20 @@ export class RokuDeploy {
     }
 
     public stringifyManifest(manifestData: ManifestData): string {
-        let output: string[] = [];
+        let output = [];
 
         if (manifestData.keyIndexes && manifestData.lineCount) {
-            //start from the original non-key lines (if available) so comments and blank lines survive.
-            //key lines are blanked and only re-filled from the current data, so deleted, moved, or duplicate keys behave as they always have
-            output = manifestData.lines
-                ? manifestData.lines.map(line => (manifestKeyLineRegex.test(line) ? '' : line))
-                : new Array<string>(manifestData.lineCount).fill('');
-            const appendedLines: string[] = [];
+            output.fill('', 0, manifestData.lineCount);
 
             let key;
             for (key in manifestData) {
-                if (key === 'lineCount' || key === 'keyIndexes' || key === 'lines') {
+                if (key === 'lineCount' || key === 'keyIndexes') {
                     continue;
                 }
 
                 let index = manifestData.keyIndexes[key];
-                if (index === undefined) {
-                    //this key was added after parsing, so append it
-                    appendedLines.push(`${key}=${manifestData[key]}`);
-                } else {
-                    output[index] = `${key}=${manifestData[key]}`;
-                }
+                output[index] = `${key}=${manifestData[key]}`;
             }
-            //insert before any trailing newline so the file still ends the same way
-            const insertIndex = output.length > 0 && output[output.length - 1] === '' ? output.length - 1 : output.length;
-            output.splice(insertIndex, 0, ...appendedLines);
         } else {
             output = Object.keys(manifestData).map((key) => {
                 return `${key}=${manifestData[key]}`;
@@ -1589,20 +1574,10 @@ export class RokuDeploy {
     }
 }
 
-/**
- * Matches a live `key=value` manifest line. Anchored so `# key=value` comments are skipped, and `.*` so `key=` (empty value) is kept
- */
-const manifestKeyLineRegex = /^\s*(\w+)=(.*)$/;
-
 export interface ManifestData {
     [key: string]: any;
     keyIndexes?: Record<string, number>;
     lineCount?: number;
-
-    /**
-     * The original lines of the manifest (non-enumerable). Used by `stringifyManifest` to preserve comments and blank lines
-     */
-    lines?: string[];
 }
 
 export interface BeforeZipCallbackInfo {
