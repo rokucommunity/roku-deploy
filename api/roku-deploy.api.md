@@ -1465,19 +1465,19 @@ export class RokuDeploy {
     readonly logger: typeof logger;
     // (undocumented)
     rebootDevice(options: RebootDeviceOptions): Promise<RebootDeviceResult>;
-    rekeyDevice(options: WithConfig<RekeyDeviceOptions, 'rekeySignedPackage', 'pkg'>): Promise<void>;
+    rekeyDevice(options: RekeyDeviceOptions): Promise<void>;
     resolveFilesArray(options: ResolveFilesArrayOptions): Promise<StandardizedFileEntry[]>;
     sendEcpRequest(options: SendEcpRequestOptions): Promise<EcpResult>;
     sendKeySequence(options: SendKeySequenceOptions): Promise<void>;
     sendText(options: SendTextOptions): Promise<void>;
     setRendezvousTracking(options: SetRendezvousTrackingOptions): Promise<boolean>;
     sideload(options: SideloadOptions): Promise<SideloadResult>;
-    stage(options: WithConfig<StageOptions, 'stagingDir'>): Promise<StageResult>;
+    stage(options: StageOptions): Promise<StageResult>;
     startPerfettoSession(options: StartPerfettoSessionOptions): Promise<WebSocket>;
     triggerHeapSnapshot(options: TriggerHeapSnapshotOptions): Promise<RokuHeapSnapshotTrigger>;
     validateDeveloperPassword(options: ValidateDeveloperPasswordOptions): Promise<boolean>;
     withDnsResolvedHost<T extends DeviceConfig>(device: T): Promise<T>;
-    zip(options: WithConfig<ZipOptions, 'stagingDir' | 'outFile', 'dir'>): Promise<ZipResult>;
+    zip(options: ZipOptions): Promise<ZipResult>;
 }
 
 // @public (undocumented)
@@ -1954,9 +1954,6 @@ export interface ValidateDeveloperPasswordOptions {
 
 // @public
 export function validateDeviceConfig(config: DeviceConfigLike, subject?: string): asserts config is DeviceConfig;
-
-// @public
-export type WithConfig<TStrict, TAlias extends keyof RokuDeployOptions, TOptional extends keyof TStrict = never> = Omit<TStrict, TOptional> & Partial<Pick<TStrict, TOptional>> & Pick<RokuDeployOptions, TAlias>;
 
 // @public (undocumented)
 export interface ZipOptions {

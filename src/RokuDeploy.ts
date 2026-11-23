@@ -119,7 +119,7 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async stage(options: WithConfig<StageOptions, 'stagingDir'>): Promise<StageResult> {
+    public async stage(options: StageOptions): Promise<StageResult> {
         options = { ...this.options, ...options };
         this.logger.info('Beginning to copy files to staging folder');
         const cwd = options.cwd ?? process.cwd();
@@ -127,10 +127,8 @@ export class RokuDeploy {
         const rootDir = path.resolve(cwd, options.rootDir ?? './');
         const files = options.files ?? [...DefaultFiles];
 
-        //the config calls the staging dir `stagingDir`; the method calls it `out`
-        const outInput = options.out ?? options.stagingDir;
-        const out = outInput
-            ? path.resolve(cwd, outInput)
+        const out = options.out
+            ? path.resolve(cwd, options.out)
             : path.resolve(cwd, RokuDeploy.defaults.outDir, '.roku-deploy-staging');
 
         await fsExtra.remove(out);
@@ -178,21 +176,18 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async zip(options: WithConfig<ZipOptions, 'stagingDir' | 'outFile', 'dir'>): Promise<ZipResult> {
+    public async zip(options: ZipOptions): Promise<ZipResult> {
         options = { ...this.options, ...options };
         logger.info('Beginning to zip');
         const cwd = options.cwd ?? process.cwd();
 
-        //the config calls the input dir `stagingDir` and the output path `outFile`
-        const dirInput = options.dir ?? options.stagingDir;
-        this.checkRequiredOptions({ ...options, dir: dirInput }, ['dir'], RokuDeploy.prototype.zip.name);
+        this.checkRequiredOptions(options, ['dir'], RokuDeploy.prototype.zip.name);
 
-        const dir = path.resolve(cwd, dirInput);
+        const dir = path.resolve(cwd, options.dir);
 
         // Resolve output zip path - use 'out' if provided, otherwise default
-        const outInput = options.out ?? options.outFile;
-        let out = outInput
-            ? path.resolve(cwd, outInput)
+        let out = options.out
+            ? path.resolve(cwd, options.out)
             : path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
 
         // Ensure .zip extension
@@ -549,11 +544,8 @@ export class RokuDeploy {
      * @param options
      * @public
      */
-    public async rekeyDevice(options: WithConfig<RekeyDeviceOptions, 'rekeySignedPackage', 'pkg'>) {
-        //the config calls the package to rekey `rekeySignedPackage`; the method calls it `pkg`
-        const rekeySignedPackage = options.rekeySignedPackage;
+    public async rekeyDevice(options: RekeyDeviceOptions) {
         options = { ...this.options, ...this.getDeviceSettings(options), ...options } as RekeyDeviceOptions;
-        options.pkg ??= rekeySignedPackage;
         this.checkRequiredOptions(options, ['device', 'password', 'pkg', 'signingPassword'], RokuDeploy.prototype.rekeyDevice.name);
         this.validatePort(options.packagePort, 'packagePort');
         this.validateTimeout(options.timeout);
@@ -3071,18 +3063,6 @@ export interface ResolveFilesArrayOptions {
     files: FileEntry[];
     rootDir: string;
 }
-
-/**
- * A method's strict options, extended to also accept the descriptive `rokudeploy.json` config keys
- * that method resolves. `TAlias` lists the config keys accepted; `TOptional` lists any strict fields
- * those aliases can satisfy, which become optional on the accepted input (so the whole config object
- * is assignable). The strict `*Options` type stays unchanged for direct callers.
- * @public
- */
-export type WithConfig<TStrict, TAlias extends keyof RokuDeployOptions, TOptional extends keyof TStrict = never> =
-    Omit<TStrict, TOptional>
-    & Partial<Pick<TStrict, TOptional>>
-    & Pick<RokuDeployOptions, TAlias>;
 
 /**
  * @public
