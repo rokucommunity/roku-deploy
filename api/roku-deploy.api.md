@@ -19,7 +19,6 @@ import * as WebSocket from 'ws';
 export interface BaseEcpOptions {
     // (undocumented)
     device: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     // (undocumented)
     ecpPort?: number;
     timeout?: number;
@@ -29,7 +28,6 @@ export interface BaseEcpOptions {
 export interface BaseRequestOptions {
     // (undocumented)
     device: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     // (undocumented)
     packagePort?: number;
     // (undocumented)
@@ -192,7 +190,6 @@ export interface CreateSnapshotOptions extends RceManagementRequestOptions {
 // @public (undocumented)
 export interface CreateSocketOptions {
     device?: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     port: number;
 }
 
@@ -565,34 +562,7 @@ export interface DeviceInfoRaw {
 export type DeviceInstanceStatus = 'created' | 'pending' | 'running' | 'completed' | 'failed' | 'crashed' | 'unknown';
 
 // @public
-export type DeviceOption = string | DeviceConfig;
-
-// @public
-export interface DeviceRegistryEntry extends DeviceRegistrySettings {
-    // (undocumented)
-    esn?: string;
-    // (undocumented)
-    host?: string;
-    id?: number;
-    // (undocumented)
-    instanceUrl?: string;
-    // (undocumented)
-    rceToken?: string;
-}
-
-// @public
-export interface DeviceRegistrySettings {
-    // (undocumented)
-    ecpPort?: number;
-    // (undocumented)
-    packagePort?: number;
-    // (undocumented)
-    password?: string;
-    // (undocumented)
-    timeout?: number;
-    // (undocumented)
-    username?: string;
-}
+export type DeviceOption = DeviceConfig;
 
 // @public (undocumented)
 export interface DeviceRun {
@@ -1486,7 +1456,6 @@ export const rokuDeploy: RokuDeploy;
 // @public
 export interface RokuDeployConstructorOptions {
     device?: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     ecpPort?: number;
     logger?: Logger;
     packagePort?: number;
@@ -1550,7 +1519,6 @@ export interface RokuDeployOptions {
     // @deprecated
     deleteInstalledChannel?: boolean;
     device?: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     devId?: string;
     ecpPort?: number;
     failOnCompileError?: boolean;
@@ -1961,7 +1929,6 @@ export interface UserOrganisation {
 // @public (undocumented)
 export interface ValidateDeveloperPasswordOptions {
     device: DeviceOption;
-    devices?: Record<string, DeviceRegistryEntry>;
     password: string;
     port?: number;
     timeout?: number;

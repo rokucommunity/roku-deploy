@@ -968,6 +968,18 @@ describe('RokuDeploy', () => {
             expect(result).to.eql({ status: undefined, headers: {}, body: undefined });
         });
 
+        it('resolves an esn-addressed RCE device to its instance url', async () => {
+            const rd = new RokuDeploy({ rceToken: 'default-token' });
+            sinon.stub(rd as any, 'createRceManagementClient').returns({
+                getInstanceUrl: sinon.stub().resolves('https://device.rce.roku.com/instance/abc')
+            });
+            sinon.stub(rd as any, 'doGetRequest').resolves(undefined);
+
+            const result = await rd.sendEcpRequest({ device: { esn: 'ABC123' }, route: 'query/device-info' });
+
+            expect(result).to.eql({ status: undefined, headers: {}, body: undefined });
+        });
+
         it('retries against a refreshed instance url when the mesh reports the cached instance gone', async () => {
             const rd = new RokuDeploy({ rceToken: 'default-token' });
             const getInstanceUrlStub = sinon.stub();
@@ -1116,18 +1128,6 @@ describe('RokuDeploy', () => {
             await socketPromise;
 
             expect(capturedUrl).to.equal('ws://1.1.1.1:8060/some-other-route');
-        });
-
-        it('resolves a registry-name device through the devices registry', async () => {
-            const rd = new RokuDeploy({ devices: { 'my-device': { host: '2.2.2.2' } } });
-            stubCreateWebSocket(rd);
-
-            const socketPromise = rd.createEcpSocket({ device: 'my-device', route: 'perfetto-session' });
-            await flushMicrotasks();
-            fakeWebSocket.emit('open');
-            await socketPromise;
-
-            expect(capturedUrl).to.equal('ws://2.2.2.2:8060/perfetto-session');
         });
 
         it('routes an RCE device through the wss instance proxy with the X-Authorization bearer header', async () => {
@@ -2081,17 +2081,6 @@ describe('RokuDeploy', () => {
             expect(socket).to.be.instanceOf(RceSocket);
         });
 
-        it('resolves a registry device name through the constructor registry', () => {
-            const rd = new RokuDeploy({ devices: { tv: { host: '5.6.7.8' } } });
-            const socket = rd.createSocket({ device: 'tv', port: 8080 });
-            expect(socket['host']).to.equal('5.6.7.8');
-        });
-
-        it('resolves a registry device name through a per-call registry', () => {
-            const socket = rokuDeploy.createSocket({ device: 'tv', devices: { tv: { host: '5.6.7.8' } }, port: 8080 });
-            expect(socket['host']).to.equal('5.6.7.8');
-        });
-
         it('falls back to the constructor device', () => {
             const rd = new RokuDeploy({ device: { host: '9.9.9.9' } });
             expect(rd.createSocket({ port: 8085 })['host']).to.equal('9.9.9.9');
@@ -2103,10 +2092,6 @@ describe('RokuDeploy', () => {
 
         it('throws when no port is given', () => {
             expect(() => rokuDeploy.createSocket({ device: { host: '1.2.3.4' } } as any)).to.throw(`createSocket: missing required option 'port'`);
-        });
-
-        it('throws for an unknown registry name', () => {
-            expect(() => rokuDeploy.createSocket({ device: 'nope', port: 8085 })).to.throw(`Device 'nope' not found in devices registry`);
         });
     });
 
@@ -7072,147 +7057,9 @@ describe('RokuDeploy', () => {
     });
 
     describe('resolveDevice', () => {
-        it('resolves a name from a per-call devices registry (how the CLI passes config-file registries)', async () => {
-            //no constructor registry at all — the registry arrives with the call, like CLI config flow
-            const rd = new RokuDeploy();
-            sinon.stub(rd as any, 'doGetRequest').callsFake(() => {
-                let results = fakeHttpResponse(200, '<device-info><serial-number>SN123</serial-number></device-info>');
-                rd['checkRequest'](results);
-                return Promise.resolve(results);
-            });
-            const deviceInfo = await rd.getDeviceInfo({
-                device: 'office-tv',
-                devices: { 'office-tv': { host: '1.2.3.4' } }
-            });
-            expect(deviceInfo['serial-number']).to.eql('SN123');
+        it('returns an inline device config unchanged', () => {
+            expect(rokuDeploy['resolveDevice']({ host: '1.2.3.4' })).to.eql({ host: '1.2.3.4' });
         });
-
-        it('per-call registry wins over the constructor registry; constructor is the fallback', () => {
-            const rd = new RokuDeploy({
-                devices: { tv: { host: '9.9.9.9' }, den: { host: '8.8.8.8' } }
-            });
-            expect(rd['resolveDevice']('tv', { tv: { host: '1.1.1.1' } })).to.eql({ host: '1.1.1.1' });
-            //name missing from the per-call registry falls back to the constructor's
-            expect(rd['resolveDevice']('den', { tv: { host: '1.1.1.1' } })).to.eql({ host: '8.8.8.8' });
-        });
-
-        it('resolves a device from the devices registry by host', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'living-room': { host: '1.2.3.4' }
-                }
-            });
-            sinon.stub(rd as any, 'doGetRequest').callsFake((params) => {
-                let results = fakeHttpResponse(200, '<device-info><serial-number>SN123</serial-number></device-info>');
-                rd['checkRequest'](results);
-                return Promise.resolve(results);
-            });
-            const deviceInfo = await rd.getDeviceInfo({
-                device: 'living-room'
-            });
-            expect(deviceInfo['serial-number']).to.eql('SN123');
-        });
-
-        it('resolves a device from the devices registry by esn', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'cloud-device': { esn: 'ABC123' }
-                }
-            });
-            let ex;
-            try {
-                await rd.getDeviceInfo({
-                    device: 'cloud-device'
-                });
-            } catch (e) {
-                ex = e;
-            }
-            //the token-required error proves the registry entry resolved into the RCE path
-            expect(ex?.message).to.eql('An rceToken is required to reach ECP on an RCE device');
-        });
-
-        it('resolves a device from the devices registry by id', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'cloud-device': { id: 1 }
-                }
-            });
-            let ex;
-            try {
-                await rd.getDeviceInfo({
-                    device: 'cloud-device'
-                });
-            } catch (e) {
-                ex = e;
-            }
-            //the token-required error proves the registry entry resolved into the RCE path
-            expect(ex?.message).to.eql('An rceToken is required to reach ECP on an RCE device');
-        });
-
-        it('resolves a device from the devices registry by instanceUrl', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'cloud-device': { instanceUrl: 'https://example.com' }
-                }
-            });
-            let ex;
-            try {
-                await rd.getDeviceInfo({
-                    device: 'cloud-device'
-                });
-            } catch (e) {
-                ex = e;
-            }
-            //the token-required error proves the registry entry resolved into the RCE path
-            expect(ex?.message).to.eql('An rceToken is required to reach ECP on an RCE device');
-        });
-
-        it('throws when a registry entry has no valid identifier', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'bogus-device': {}
-                }
-            });
-            await expectThrowsAsync(async () => {
-                await rd.getDeviceInfo({
-                    device: 'bogus-device'
-                });
-            }, `Device registry entry 'bogus-device' must specify exactly one targeting identifier: host, esn, id, or instanceUrl`);
-        });
-
-        it('throws when a registry entry has multiple identifiers', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'ambiguous-device': { host: '1.2.3.4', esn: 'ABC123' } as any
-                }
-            });
-            await expectThrowsAsync(async () => {
-                await rd.getDeviceInfo({
-                    device: 'ambiguous-device'
-                });
-            }, `Device registry entry 'ambiguous-device' specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed`);
-        });
-
-        it('throws when the device name is not found in the registry', async () => {
-            const rd = new RokuDeploy({
-                devices: {}
-            });
-            await expectThrowsAsync(async () => {
-                await rd.getDeviceInfo({
-                    device: 'does-not-exist'
-                });
-            }, `Device 'does-not-exist' not found in devices registry`);
-        });
-
-        it('throws when the device name is used but no devices registry was configured', async () => {
-            const rd = new RokuDeploy();
-            await expectThrowsAsync(async () => {
-                await rd.getDeviceInfo({
-                    device: 'does-not-exist'
-                });
-            }, `Device 'does-not-exist' not found in devices registry`);
-        });
-
         it('throws when an inline device config has no identifier', async () => {
             await expectThrowsAsync(async () => {
                 await rokuDeploy.getDeviceInfo({
@@ -7227,222 +7074,6 @@ describe('RokuDeploy', () => {
                     device: { host: '1.2.3.4', esn: 'ABC123' } as any
                 });
             }, 'Device config specifies multiple targeting identifiers (host, esn); exactly one of host, esn, id, or instanceUrl is allowed');
-        });
-    });
-
-    describe('devices registry per-device settings', () => {
-        it('uses the registry entry password when the call provides none', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv' } as any);
-            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
-        });
-
-        it('call password overrides the registry entry password', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv', password: 'call-pass' });
-            expect(stub.getCall(0).args[0].auth.password).to.equal('call-pass');
-        });
-
-        it('falls back to the constructor password when the registry entry has none', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv' } as any);
-            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
-        });
-
-        it('uses the registry entry username and packagePort when the call provides none', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                packagePort: 8080,
-                devices: {
-                    'office-tv': { host: '1.2.3.4', username: 'entry-user', packagePort: 8081 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv' } as any);
-            expect(stub.getCall(0).args[0].auth.username).to.equal('entry-user');
-            expect(stub.getCall(0).args[0].url).to.include(':8081/');
-        });
-
-        it('uses the registry entry ecpPort when the call provides none', async () => {
-            const rd = new RokuDeploy({
-                ecpPort: 9000,
-                devices: {
-                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-            await rd.keyPress({ device: 'office-tv', key: 'Home' });
-            expect(stub.getCall(0).args[0].url).to.include(':9001/');
-        });
-
-        it('call ecpPort overrides the registry entry ecpPort', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'office-tv': { host: '1.2.3.4', ecpPort: 9001 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-            await rd.keyPress({ device: 'office-tv', key: 'Home', ecpPort: 9999 });
-            expect(stub.getCall(0).args[0].url).to.include(':9999/');
-        });
-
-        it('falls back to the constructor ecpPort when the registry entry has none', async () => {
-            const rd = new RokuDeploy({
-                ecpPort: 9000,
-                devices: {
-                    'office-tv': { host: '1.2.3.4' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-            await rd.keyPress({ device: 'office-tv', key: 'Home' });
-            expect(stub.getCall(0).args[0].url).to.include(':9000/');
-        });
-
-        it('uses the registry entry timeout when the call provides none', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv' } as any);
-            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
-        });
-
-        it('call timeout overrides the registry entry timeout', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', timeout: 1234 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv', timeout: 4321 } as any);
-            expect(stub.getCall(0).args[0].timeout).to.equal(4321);
-        });
-
-        it('applies registry entry settings when the device name comes from the constructor', async () => {
-            const rd = new RokuDeploy({
-                device: 'office-tv',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel();
-            expect(stub.getCall(0).args[0].auth.password).to.equal('entry-pass');
-        });
-
-        it('uses constructor settings unchanged for an entry with only targeting fields', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                username: 'root-user',
-                packagePort: 8080,
-                devices: {
-                    'office-tv': { host: '1.2.3.4' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: 'office-tv' } as any);
-            expect(stub.getCall(0).args[0].auth).to.eql({ username: 'root-user', password: 'root-pass' });
-            expect(stub.getCall(0).args[0].url).to.include(':8080/');
-        });
-
-        it('does not apply registry settings to an inline device config', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', password: 'entry-pass' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({ device: { host: '1.2.3.4' } } as any);
-            expect(stub.getCall(0).args[0].auth.password).to.equal('root-pass');
-        });
-
-        it('still honors the registry entry rceToken alongside per-device settings', async () => {
-            const rd = new RokuDeploy({
-                devices: {
-                    'cloud-device': { instanceUrl: 'https://device.rce.roku.com/instance/abc', rceToken: 'secret', timeout: 1234 }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ statusCode: 200, headers: {}, body: '' });
-            await rd.keyPress({ device: 'cloud-device', key: 'Home' });
-            expect(stub.getCall(0).args[0].url).to.contain('/api/v0/input/keypress/Home');
-            expect(stub.getCall(0).args[0].headers).to.eql({ 'X-Authorization': 'Bearer secret' });
-            expect(stub.getCall(0).args[0].timeout).to.equal(1234);
-        });
-
-        it('uses settings from a per-call devices registry entry', async () => {
-            const rd = new RokuDeploy({
-                password: 'root-pass',
-                devices: {
-                    'office-tv': { host: '1.2.3.4', password: 'constructor-entry-pass' }
-                }
-            });
-            const stub = sinon.stub(rd as any, 'doPostRequest').resolves({ body: '', statusCode: 200, headers: {} });
-            await rd.deleteDevChannel({
-                device: 'office-tv',
-                devices: { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } }
-            } as any);
-            expect(stub.getCall(0).args[0].auth.password).to.equal('call-entry-pass');
-        });
-
-        describe('getDeviceSettings', () => {
-            const devices = {
-                'office-tv': { host: '1.2.3.4', rceToken: 'token', password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 },
-                'bare-tv': { host: '5.6.7.8' }
-            };
-            const officeSettings = { password: 'entry-pass', username: 'entry-user', packagePort: 8081, ecpPort: 9001, timeout: 1234 };
-
-            it('returns only the settings fields of the registry entry the call targets', () => {
-                const rd = new RokuDeploy({ devices: devices });
-                expect((rd as any).getDeviceSettings({ device: 'office-tv' })).to.eql(officeSettings);
-            });
-
-            it('omits settings the entry does not define', () => {
-                const rd = new RokuDeploy({ devices: devices });
-                expect((rd as any).getDeviceSettings({ device: 'bare-tv' })).to.eql({});
-            });
-
-            it('falls back to the constructor device when the call names none', () => {
-                const rd = new RokuDeploy({ device: 'office-tv', devices: devices });
-                expect((rd as any).getDeviceSettings({})).to.eql(officeSettings);
-                expect((rd as any).getDeviceSettings(undefined)).to.eql(officeSettings);
-            });
-
-            it('returns nothing for an inline device config, no device, or an unknown name', () => {
-                const rd = new RokuDeploy({ devices: devices });
-                expect((rd as any).getDeviceSettings({ device: { host: '1.2.3.4', password: 'inline' } })).to.eql({});
-                expect((rd as any).getDeviceSettings(undefined)).to.eql({});
-                expect((rd as any).getDeviceSettings({ device: 'unknown' })).to.eql({});
-            });
-
-            it('prefers the per-call registry and falls back to the constructor registry by name', () => {
-                const rd = new RokuDeploy({ devices: devices });
-                const callDevices = { 'office-tv': { host: '1.2.3.4', password: 'call-entry-pass' } };
-                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: callDevices })).to.eql({ password: 'call-entry-pass' });
-                expect((rd as any).getDeviceSettings({ device: 'bare-tv', devices: callDevices })).to.eql({});
-                expect((rd as any).getDeviceSettings({ device: 'office-tv', devices: {} })).to.eql(officeSettings);
-            });
         });
     });
 

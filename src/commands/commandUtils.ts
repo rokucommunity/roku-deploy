@@ -3,17 +3,18 @@ import { rokuDeploy } from '../index';
 import { util } from '../util';
 import type { DeviceStatus, RceDevice } from '../RceManagementClient';
 import { RceManagementClient } from '../RceManagementClient';
-import type { DeviceRegistryEntry, RokuDeployOptions } from '../RokuDeployOptions';
+import type { RokuDeployOptions } from '../RokuDeployOptions';
+import type { DeviceConfig } from '../DeviceConfig';
+import { isRceDeviceConfigByEsn, isRceDeviceConfigById } from '../DeviceConfig';
 
 /**
  * Pull the options every device command shares out of a loaded rokudeploy.json, mapping the v3
  * `host` and `remotePort` keys onto `device` and `ecpPort`. Unset values are left off entirely: an
- * explicit `undefined` would mask the same setting on a devices-registry entry.
+ * explicit `undefined` would mask the same setting on the constructor options.
  */
 export function extractCommonConfigOptions(config: RokuDeployOptions): Record<string, any> {
     const options: Record<string, any> = {
         device: config.device ?? (config.host ? { host: config.host } : undefined),
-        devices: config.devices,
         username: config.username,
         password: config.password,
         packagePort: config.packagePort,
@@ -104,33 +105,18 @@ export function createRceClient(token: string | undefined): RceManagementClient 
 }
 
 /**
- * Look up the device registry entry named by `device` (if it IS a registry name — an inline
- * device config object passes through as-is). Returns undefined when no device is named.
+ * Resolve the target RCE device from `--deviceId`, `--esn`, or an inline `device` config that
+ * carries an `id` or `esn`.
  */
-export function resolveRegistryEntry(options: { device?: string | DeviceRegistryEntry; devices?: Record<string, DeviceRegistryEntry> }): DeviceRegistryEntry | undefined {
-    if (typeof options.device === 'string') {
-        const entry = options.devices?.[options.device];
-        if (!entry) {
-            throw new Error(`Device '${options.device}' was not found in the devices registry`);
-        }
-        return entry;
-    }
-    return options.device;
-}
-
-/**
- * Resolve the target device from `--deviceId`, `--esn`, or `--device` (a devices-registry name
- * or inline device config whose entry carries an `id` or `esn`).
- */
-export async function resolveRceDevice(client: RceManagementClient, options: { deviceId?: number; esn?: string; device?: string | DeviceRegistryEntry; devices?: Record<string, DeviceRegistryEntry> }): Promise<RceDevice> {
+export async function resolveRceDevice(client: RceManagementClient, options: { deviceId?: number; esn?: string; device?: DeviceConfig }): Promise<RceDevice> {
     let { deviceId, esn } = options;
     if (deviceId === undefined && !esn) {
-        const entry = resolveRegistryEntry(options);
-        if (entry) {
-            deviceId = entry.id;
-            esn = entry.esn;
+        const device = options.device;
+        if (device) {
+            deviceId = isRceDeviceConfigById(device) ? device.id : undefined;
+            esn = isRceDeviceConfigByEsn(device) ? device.esn : undefined;
             if (deviceId === undefined && !esn) {
-                throw new Error(`Device '${typeof options.device === 'string' ? options.device : JSON.stringify(options.device)}' is not an RCE device (needs an 'id' or 'esn')`);
+                throw new Error(`Device '${JSON.stringify(device)}' is not an RCE device (needs an 'id' or 'esn')`);
             }
         }
     }
@@ -144,7 +130,7 @@ export async function resolveRceDevice(client: RceManagementClient, options: { d
         }
         return device;
     }
-    throw new Error('A device is required. Pass --deviceId, --esn, or --device');
+    throw new Error('A device is required. Pass --deviceId or --esn');
 }
 
 /**

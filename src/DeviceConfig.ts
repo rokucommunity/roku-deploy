@@ -57,16 +57,15 @@ export type RceDeviceConfig =
 export type DeviceConfig = LocalDeviceConfig | RceDeviceConfig;
 
 /**
- * What the user provides as a device option.
- * Either a registry name (string) or an inline device config.
+ * What the user provides as a device option: an inline device config.
  * @public
  */
-export type DeviceOption = string | DeviceConfig;
+export type DeviceOption = DeviceConfig;
 
 // === Type Guards ===
 
 /**
- * Any object that may carry device identifier keys (a DeviceConfig, a registry entry, etc.)
+ * Any object that may carry device identifier keys (a DeviceConfig, a partially-built config, etc.)
  * Lets the guards below work on partially-populated shapes, not just the strict union.
  * @public
  */
@@ -116,7 +115,7 @@ export function isRceDeviceConfigByUrl(config: DeviceConfigLike): config is RceD
 /**
  * Validate that a device config carries exactly one targeting identifier (host, esn, id, or instanceUrl).
  * Throws an InvalidOptionError if zero or more than one are present; otherwise asserts config is a DeviceConfig.
- * @param subject prefixes the error message, so callers with more context (e.g. a named registry entry) can identify what failed
+ * @param subject prefixes the error message, so callers with more context can identify what failed
  * @public
  */
 export function validateDeviceConfig(config: DeviceConfigLike, subject = 'Device config'): asserts config is DeviceConfig {
