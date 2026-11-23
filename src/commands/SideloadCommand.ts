@@ -44,7 +44,7 @@ export class SideloadCommand {
             packageUploadOverrides: config.packageUploadOverrides,
             remoteDebug: args.remoteDebug,
             remoteDebugConnectEarly: args.remoteDebugConnectEarly,
-            dir: args.dir,
+            dir: args.dir ?? config.rootDir,
             zip: args.zip
         }) as SideloadOptions);
     }

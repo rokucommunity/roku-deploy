@@ -25,7 +25,7 @@ export class CreateSignedPackageCommand {
             }));
         }
 
-        //package does not offer the per-session remote-debug switches, so they are not passed here
+        //the `package` command does not offer the per-session remote-debug switches, so they are not passed here
         if (args.sideload) {
             await rokuDeploy.sideload(definedOptions({
                 device: resolveDeviceOption(args, config),
@@ -41,7 +41,7 @@ export class CreateSignedPackageCommand {
                 failOnCompileError: args.failOnCompileError ?? config.failOnCompileError,
                 deleteDevChannel: args.deleteDevChannel ?? config.deleteDevChannel,
                 packageUploadOverrides: config.packageUploadOverrides,
-                dir: args.dir,
+                dir: args.dir ?? config.rootDir,
                 zip: args.zip
             }) as SideloadOptions);
         }

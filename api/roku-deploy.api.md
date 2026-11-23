@@ -1543,6 +1543,7 @@ export enum RokuDeployErrorCode {
 // @public
 export interface RokuDeployOptions {
     appType?: 'channel' | 'dcl';
+    autoLaunch?: boolean;
     convertToSquashfs?: boolean;
     deleteDevChannel?: boolean;
     // @deprecated
@@ -1555,6 +1556,7 @@ export interface RokuDeployOptions {
     files?: FileEntry[];
     // @deprecated
     host?: string;
+    incrementBuildNumber?: boolean;
     logLevel?: LogLevel | LogLevelNumeric;
     // @deprecated
     outDir?: string;

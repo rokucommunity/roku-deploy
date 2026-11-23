@@ -230,6 +230,16 @@ export interface RokuDeployOptions {
      */
     rekeySignedPackage?: string;
 
+    /**
+     * If true, launch the sideloaded channel on the device after a successful sideload.
+     */
+    autoLaunch?: boolean;
+
+    /**
+     * If true, increment the build number in the manifest before staging/zipping the app.
+     */
+    incrementBuildNumber?: boolean;
+
     //
     // v3 keys. Kept so a v3 rokudeploy.json still loads; the CLI commands map the ones that have a
     // v4 equivalent onto it.

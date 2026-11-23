@@ -28,14 +28,14 @@ export function resolveDeviceOption(args: Record<string, any>, config: RokuDeplo
 }
 
 /**
- * Drop keys whose value is undefined, so a cli/config option left unset does not reach the method as an
+ * Drop keys whose value is undefined or null, so a cli/config option left unset does not reach the method as an
  * explicit `undefined` (which would mask the same setting on the constructor or a devices-registry entry).
  * Command handlers list every option explicitly and wrap the result in this.
  */
 export function definedOptions<T extends object>(options: T): T {
     const result: Record<string, any> = {};
     for (const [key, value] of Object.entries(options)) {
-        if (value !== undefined) {
+        if (value !== undefined && value !== null) {
             result[key] = value;
         }
     }

@@ -143,7 +143,7 @@ const deleteDevChannelTranslations: Translation[] = [
 ];
 //the sideload options `package --sideload` shares with `sideload`
 const sharedSideloadFields: Field[] = [
-    { option: 'dir', cli: ['dir', './cli-dir'] },
+    { option: 'dir', config: ['rootDir', './config-src'], cli: ['dir', './cli-dir'], fromConfig: fromConfigDir('./config-src') },
     { option: 'zip', cli: ['zip', './cli.zip'] },
     { option: 'close', cli: ['close', false] },
     { option: 'appType', config: ['appType', 'dcl'], cli: ['appType', 'channel'] },
@@ -186,17 +186,15 @@ const specs: CommandSpec[] = [
         stubs: ['zip'],
         tier: 'local',
         fields: [
-            { option: 'dir', config: ['stagingDir', './config-staging'], cli: ['dir', './cli-dir'], fromConfig: fromConfigDir('./config-staging') },
+            { option: 'dir', config: ['rootDir', './config-src'], cli: ['dir', './cli-dir'], fromConfig: fromConfigDir('./config-src') },
             { option: 'out', config: ['outFile', 'config-app'], cli: ['out', './cli.zip'], fromConfig: path.join('./out', 'config-app') },
-            { option: 'files', cli: ['files', ['cli/**']] }
+            { option: 'files', config: ['files', ['config/**']], cli: ['files', ['cli/**']] }
         ],
         translations: [
-            { name: 'translates v3 stagingFolderPath into dir', config: { stagingFolderPath: './v3-staging' }, option: 'dir', expected: fromConfigDir('./v3-staging') },
-            { name: 'prefers stagingDir over v3 stagingFolderPath', config: { stagingFolderPath: './v3-staging', stagingDir: './staging' }, option: 'dir', expected: fromConfigDir('./staging') },
             ...outPathTranslations
         ],
-        //the config `files` array is for staging; zip only takes --files
-        ignoredConfig: { files: ['manifest'] }
+        //zip zips rootDir, not stagingDir; stagingDir is for stage
+        ignoredConfig: { stagingDir: './config-staging' }
     },
     {
         name: 'sideload',
@@ -205,7 +203,7 @@ const specs: CommandSpec[] = [
         stubs: ['sideload', 'rekeyDevice'],
         fields: [...sharedSideloadFields, ...remoteDebugFields],
         translations: deleteDevChannelTranslations,
-        ignoredConfig: { rootDir: './src', pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true }
+        ignoredConfig: { pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true }
     },
     {
         name: 'sideload --rekey (rekey step)',
