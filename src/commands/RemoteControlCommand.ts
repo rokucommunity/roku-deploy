@@ -1,17 +1,19 @@
 import * as readline from 'readline';
 import { rokuDeploy } from '../index';
 import type { RemoteKeyText } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class RemoteControlCommand {
     run(args) {
         const config = loadRokuDeployJson(args);
 
-        const options = {
-            ...extractCommonConfigOptions(config),
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        };
+        //remote-control drives keyPress/sendText, both ecp calls (BaseEcpOptions): device/ecpPort/timeout
+        const options = definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            ecpPort: args.ecpPort ?? config.ecpPort,
+            timeout: args.timeout ?? config.timeout
+        });
 
         //`checkRequiredOptions` is private; use bracket access to reach it from this internal CLI command
         // eslint-disable-next-line @typescript-eslint/dot-notation

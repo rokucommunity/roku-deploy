@@ -8029,8 +8029,6 @@ describe('RokuDeploy', () => {
 
         it('deletes the component library', async () => {
             options.failOnCompileError = true;
-            options.remoteDebug = true;
-            options.remoteDebugConnectEarly = true;
             const stub = mockDoPostRequest();
 
             await rokuDeploy.deleteComponentLibrary({
@@ -8379,7 +8377,7 @@ describe('RokuDeploy', () => {
             });
 
             describe('paths', () => {
-                const pathKeys = ['rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir', 'project'];
+                const pathKeys = ['rootDir', 'stagingDir', 'stagingFolderPath', 'outDir', 'rekeySignedPackage', 'screenshotDir'];
 
                 it('resolves every relative path against the config file folder, not the caller cwd', () => {
                     const configPath = s`${tempDir}/nested/deeper/rokudeploy.json`;

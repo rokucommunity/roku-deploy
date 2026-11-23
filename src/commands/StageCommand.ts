@@ -1,18 +1,17 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson } from './commandUtils';
 
 export class StageCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.stage({
-            ...extractCommonConfigOptions(config),
-            //stage-specific config options
-            rootDir: config.rootDir,
-            files: config.files,
-            out: config.stagingDir ?? config.stagingFolderPath,
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //stage is a local operation, so it takes only its own options: no device, password or ports.
+        //cli args win over the config file; the config `stagingDir` maps to the `out` option.
+        await rokuDeploy.stage(definedOptions({
+            rootDir: args.rootDir ?? config.rootDir,
+            files: args.files ?? config.files,
+            out: args.out ?? config.stagingDir,
+            cwd: args.cwd
+        }));
     }
 }

@@ -130,20 +130,6 @@ export interface RokuDeployOptions {
     packagePort?: number;
 
     /**
-     * When publishing a side loaded channel this flag can be used to enable the socket based BrightScript debug protocol. Defaults to false.
-     * More information on the BrightScript debug protocol can be found here: https://developer.roku.com/en-ca/docs/developer-program/debugging/socket-based-debugger.md
-     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebug` instead.
-     */
-    remoteDebug?: boolean;
-
-    /**
-     * When publishing a sideloaded channel, this flag can be used to tell the Roku device that, should any compile errors occur, a client device (such as vscode)
-     * will be trying to attach to the debug protocol control port to consume those compile errors. This must be used in conjuction with the `remoteDebug` option
-     * @deprecated a per-session debugger switch, not project config; ignored in rokudeploy.json. Pass `--remoteDebugConnectEarly` instead.
-     */
-    remoteDebugConnectEarly?: boolean;
-
-    /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      * This is mainly useful for things like emulators that use alternate ports,
      * or when sending commands through some type of port forwarding.
@@ -244,16 +230,20 @@ export interface RokuDeployOptions {
      */
     rekeySignedPackage?: string;
 
+    /**
+     * If true, launch the sideloaded channel on the device after a successful sideload.
+     */
+    autoLaunch?: boolean;
+
+    /**
+     * If true, increment the build number in the manifest before staging/zipping the app.
+     */
+    incrementBuildNumber?: boolean;
+
     //
     // v3 keys. Kept so a v3 rokudeploy.json still loads; the CLI commands map the ones that have a
     // v4 equivalent onto it.
     //
-
-    /**
-     * Path to a bsconfig.json project file
-     * @deprecated v3 key with no v4 equivalent; ignored.
-     */
-    project?: string;
 
     /**
      * The folder where the zip/pkg package should be placed
@@ -261,24 +251,6 @@ export interface RokuDeployOptions {
      * @deprecated combined with `outFile` by the CLI; use `--out` on `zip`/`package` instead.
      */
     outDir?: string;
-
-    /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @deprecated v3 key with no v4 equivalent (v4 never deletes the staging folder); ignored.
-     */
-    retainStagingFolder?: boolean;
-
-    /**
-     * Set this to true to prevent the staging folder from being deleted after creating the package
-     * @deprecated v3 key with no v4 equivalent (v4 never deletes the staging folder); ignored.
-     */
-    retainStagingDir?: boolean;
-
-    /**
-     * Should the zipped package be retained after deploying to a roku. If false, this will delete the zip after a deployment.
-     * @deprecated v3 key with no v4 equivalent; ignored.
-     */
-    retainDeploymentArchive?: boolean;
 
     /**
      * The path where roku-deploy should stage all of the files right before being zipped
@@ -294,22 +266,10 @@ export interface RokuDeployOptions {
     host?: string;
 
     /**
-     * When publishing a sideloaded channel, set this to `false` to prevent the Roku device from auto-launching the channel after install.
-     * @deprecated v3 key with no v4 equivalent; ignored.
-     */
-    autoLaunch?: boolean;
-
-    /**
      * The port used to send remote control commands (like home press, back, etc.). Defaults to 8060.
      * @deprecated use `ecpPort`, which wins when both are set.
      */
     remotePort?: number;
-
-    /**
-     * If true we increment the build number to be a timestamp in the format yymmddHHMM
-     * @deprecated v3 key with no v4 equivalent; ignored.
-     */
-    incrementBuildNumber?: boolean;
 
     /**
      * If true, the previously installed dev channel will be deleted before installing the new one

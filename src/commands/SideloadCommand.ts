@@ -1,5 +1,6 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import type { SideloadOptions } from '../index';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 /**
  * `sideload` installs the dev channel; with `--rekey` the signing key is installed first. Each call gets
@@ -11,26 +12,40 @@ export class SideloadCommand {
 
         //--rekey installs the signing key first so the dev channel runs under it
         if (args.rekey) {
-            await rokuDeploy.rekeyDevice({
-                ...extractCommonConfigOptions(config),
-                //rekey-specific config options
-                pkg: config.rekeySignedPackage,
-                signingPassword: config.signingPassword,
-                devId: config.devId,
-                //cli args win over everything from the config file
-                ...normalizeCliArgs(args, config)
-            });
+            await rokuDeploy.rekeyDevice(definedOptions({
+                device: resolveDeviceOption(args, config),
+                devices: config.devices,
+                username: args.username ?? config.username,
+                password: args.password ?? config.password,
+                packagePort: args.packagePort ?? config.packagePort,
+                timeout: args.timeout ?? config.timeout,
+                pkg: args.pkg ?? config.rekeySignedPackage,
+                signingPassword: args.signingPassword ?? config.signingPassword,
+                devId: args.devId ?? config.devId,
+                cwd: args.cwd
+            }));
         }
 
-        await rokuDeploy.sideload({
-            ...extractCommonConfigOptions(config),
-            //sideload-specific config options
-            appType: config.appType,
-            failOnCompileError: config.failOnCompileError,
-            deleteDevChannel: config.deleteDevChannel ?? config.deleteInstalledChannel,
+        //sideload installs over the dev web server and can close the running channel over ecp, so it takes
+        //both the request and ecp options
+        await rokuDeploy.sideload(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            username: args.username ?? config.username,
+            password: args.password ?? config.password,
+            packagePort: args.packagePort ?? config.packagePort,
+            ecpPort: args.ecpPort ?? config.ecpPort,
+            timeout: args.timeout ?? config.timeout,
+            cwd: args.cwd,
+            appType: args.appType ?? config.appType,
+            close: args.close,
+            failOnCompileError: args.failOnCompileError ?? config.failOnCompileError,
+            deleteDevChannel: args.deleteDevChannel ?? config.deleteDevChannel,
             packageUploadOverrides: config.packageUploadOverrides,
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+            remoteDebug: args.remoteDebug,
+            remoteDebugConnectEarly: args.remoteDebugConnectEarly,
+            dir: args.dir ?? config.rootDir,
+            zip: args.zip
+        }) as SideloadOptions);
     }
 }

@@ -1,14 +1,17 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class SendTextCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        await rokuDeploy.sendText({
-            ...extractCommonConfigOptions(config),
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //sendText is an ecp call (BaseEcpOptions): device/ecpPort/timeout, no password or cwd
+        await rokuDeploy.sendText(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            ecpPort: args.ecpPort ?? config.ecpPort,
+            timeout: args.timeout ?? config.timeout,
+            text: args.text
+        }));
     }
 }

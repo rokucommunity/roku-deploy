@@ -1,19 +1,23 @@
 import { rokuDeploy } from '../index';
-import { extractCommonConfigOptions, loadRokuDeployJson, normalizeCliArgs } from './commandUtils';
+import { definedOptions, loadRokuDeployJson, resolveDeviceOption } from './commandUtils';
 
 export class RekeyDeviceCommand {
     async run(args) {
         const config = loadRokuDeployJson(args);
 
-        //the library resolves a relative pkg against cwd itself
-        await rokuDeploy.rekeyDevice({
-            ...extractCommonConfigOptions(config),
-            //rekey-specific config options
-            pkg: config.rekeySignedPackage,
-            signingPassword: config.signingPassword,
-            devId: config.devId,
-            //cli args win over everything from the config file
-            ...normalizeCliArgs(args, config)
-        });
+        //rekey targets a device by password (BaseRequestOptions), so no ecpPort. Config `rekeySignedPackage`
+        //maps to the `pkg` option; the library resolves a relative pkg against cwd itself.
+        await rokuDeploy.rekeyDevice(definedOptions({
+            device: resolveDeviceOption(args, config),
+            devices: config.devices,
+            username: args.username ?? config.username,
+            password: args.password ?? config.password,
+            packagePort: args.packagePort ?? config.packagePort,
+            timeout: args.timeout ?? config.timeout,
+            pkg: args.pkg ?? config.rekeySignedPackage,
+            signingPassword: args.signingPassword ?? config.signingPassword,
+            devId: args.devId ?? config.devId,
+            cwd: args.cwd
+        }));
     }
 }
