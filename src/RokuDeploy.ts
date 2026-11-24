@@ -298,6 +298,11 @@ export class RokuDeploy {
                         requestOptions.formData = { ...requestOptions.formData, 'remotedebug_connect_early': '1' };
                     }
 
+                    //autoLaunch is on by default on the device; send dev_autolaunch=0 to suppress the post-install launch
+                    if (options.autoLaunch === false) {
+                        requestOptions.formData = { ...requestOptions.formData, 'dev_autolaunch': '0' };
+                    }
+
                     //apply any supplied formData overrides
                     for (const key in options.packageUploadOverrides?.formData ?? {}) {
                         const value = options.packageUploadOverrides.formData[key];
@@ -3105,6 +3110,8 @@ export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
     deleteDevChannel?: boolean;
+    /** When sideloading a channel, set to false to stop the device from auto-launching it after install */
+    autoLaunch?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };

@@ -3439,6 +3439,39 @@ describe('RokuDeploy', () => {
             });
         });
 
+        it('sends dev_autolaunch=0 when autoLaunch is false', () => {
+            const stub = mockDoPostRequest();
+
+            return rokuDeploy.sideload({
+                device: { host: '1.2.3.4' },
+                password: 'password',
+                zip: zipFile,
+                autoLaunch: false,
+                deleteDevChannel: false,
+                close: false
+            }).then(() => {
+                expect(stub.getCall(0).args[0].formData.dev_autolaunch).to.eql('0');
+            }, () => {
+                assert.fail('Should not have rejected the promise');
+            });
+        });
+
+        it('omits dev_autolaunch when autoLaunch is not false', () => {
+            const stub = mockDoPostRequest();
+
+            return rokuDeploy.sideload({
+                device: { host: '1.2.3.4' },
+                password: 'password',
+                zip: zipFile,
+                deleteDevChannel: false,
+                close: false
+            }).then(() => {
+                expect(stub.getCall(0).args[0].formData).to.not.haveOwnProperty('dev_autolaunch');
+            }, () => {
+                assert.fail('Should not have rejected the promise');
+            });
+        });
+
         it('does not set appType if not explicitly defined', async () => {
             delete options.appType;
             const stub = mockDoPostRequest();

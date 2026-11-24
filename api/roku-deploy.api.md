@@ -48,6 +48,7 @@ export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     remoteDebugConnectEarly?: boolean;
     failOnCompileError?: boolean;
     deleteDevChannel?: boolean;
+    autoLaunch?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };

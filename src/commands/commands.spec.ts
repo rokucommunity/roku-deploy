@@ -201,7 +201,7 @@ const specs: CommandSpec[] = [
         run: args => new SideloadCommand().run(args),
         method: 'sideload',
         stubs: ['sideload', 'rekeyDevice'],
-        fields: [...sharedSideloadFields, ...remoteDebugFields],
+        fields: [...sharedSideloadFields, ...remoteDebugFields, { option: 'autoLaunch', config: ['autoLaunch', false], cli: ['autoLaunch', false] }],
         translations: deleteDevChannelTranslations,
         ignoredConfig: { pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true }
     },

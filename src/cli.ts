@@ -83,7 +83,8 @@ void yargs
             .option('signingPassword', { type: 'string', description: 'The password of the signing key', demandOption: false })
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
-            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .option('autoLaunch', { type: 'boolean', description: 'Launch the channel on the device after install. On by default, use --no-autoLaunch to suppress it', demandOption: false })
+            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'autoLaunch', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
             .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey:');
     }), (args: any) => {
         return new SideloadCommand().run(args);
