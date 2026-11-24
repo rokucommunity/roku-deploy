@@ -41,6 +41,7 @@ export class CreateSignedPackageCommand {
                 failOnCompileError: args.failOnCompileError ?? config.failOnCompileError,
                 deleteDevChannel: args.deleteDevChannel ?? config.deleteDevChannel,
                 packageUploadOverrides: config.packageUploadOverrides,
+                incrementBuildNumber: args.incrementBuildNumber ?? config.incrementBuildNumber,
                 dir: args.dir ?? config.rootDir,
                 zip: args.zip
             }) as SideloadOptions);

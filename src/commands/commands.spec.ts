@@ -149,7 +149,8 @@ const sharedSideloadFields: Field[] = [
     { option: 'appType', config: ['appType', 'dcl'], cli: ['appType', 'channel'] },
     { option: 'failOnCompileError', config: ['failOnCompileError', false], cli: ['failOnCompileError', true] },
     deleteDevChannelField,
-    { option: 'packageUploadOverrides', config: ['packageUploadOverrides', { route: 'custom' }] }
+    { option: 'packageUploadOverrides', config: ['packageUploadOverrides', { route: 'custom' }] },
+    { option: 'incrementBuildNumber', config: ['incrementBuildNumber', true], cli: ['incrementBuildNumber', true] }
 ];
 //per-session debugger switches: cli only, never read from rokudeploy.json, and not offered by `package`
 const remoteDebugFields: Field[] = [
@@ -172,7 +173,8 @@ const specs: CommandSpec[] = [
             { option: 'rootDir', config: ['rootDir', './config-src'], cli: ['rootDir', './cli-src'], fromConfig: fromConfigDir('./config-src') },
             //globs stay relative to rootDir, so they are not resolved
             { option: 'files', config: ['files', ['config/**']], cli: ['files', ['cli/**']] },
-            { option: 'out', config: ['stagingDir', './config-staging'], cli: ['out', './cli-staging'], fromConfig: fromConfigDir('./config-staging') }
+            { option: 'out', config: ['stagingDir', './config-staging'], cli: ['out', './cli-staging'], fromConfig: fromConfigDir('./config-staging') },
+            { option: 'incrementBuildNumber', config: ['incrementBuildNumber', true], cli: ['incrementBuildNumber', true] }
         ],
         translations: [
             { name: 'translates v3 stagingFolderPath into out', config: { stagingFolderPath: './v3-staging' }, option: 'out', expected: fromConfigDir('./v3-staging') },
@@ -188,7 +190,8 @@ const specs: CommandSpec[] = [
         fields: [
             { option: 'dir', config: ['rootDir', './config-src'], cli: ['dir', './cli-dir'], fromConfig: fromConfigDir('./config-src') },
             { option: 'out', config: ['outFile', 'config-app'], cli: ['out', './cli.zip'], fromConfig: path.join('./out', 'config-app') },
-            { option: 'files', config: ['files', ['config/**']], cli: ['files', ['cli/**']] }
+            { option: 'files', config: ['files', ['config/**']], cli: ['files', ['cli/**']] },
+            { option: 'incrementBuildNumber', config: ['incrementBuildNumber', true], cli: ['incrementBuildNumber', true] }
         ],
         translations: [
             ...outPathTranslations
@@ -201,7 +204,7 @@ const specs: CommandSpec[] = [
         run: args => new SideloadCommand().run(args),
         method: 'sideload',
         stubs: ['sideload', 'rekeyDevice'],
-        fields: [...sharedSideloadFields, ...remoteDebugFields],
+        fields: [...sharedSideloadFields, ...remoteDebugFields, { option: 'autoLaunch', config: ['autoLaunch', false], cli: ['autoLaunch', false] }],
         translations: deleteDevChannelTranslations,
         ignoredConfig: { pkg: 'config.pkg', signingPassword: 'config-sign', remoteDebug: true, remoteDebugConnectEarly: true }
     },

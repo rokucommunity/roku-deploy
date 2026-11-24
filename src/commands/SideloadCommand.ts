@@ -41,6 +41,8 @@ export class SideloadCommand {
             close: args.close,
             failOnCompileError: args.failOnCompileError ?? config.failOnCompileError,
             deleteDevChannel: args.deleteDevChannel ?? config.deleteDevChannel,
+            autoLaunch: args.autoLaunch ?? config.autoLaunch,
+            incrementBuildNumber: args.incrementBuildNumber ?? config.incrementBuildNumber,
             packageUploadOverrides: config.packageUploadOverrides,
             remoteDebug: args.remoteDebug,
             remoteDebugConnectEarly: args.remoteDebugConnectEarly,
