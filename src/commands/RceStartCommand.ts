@@ -1,6 +1,6 @@
 import { util } from '../util';
 import type { RceDevice, Snapshot } from '../RceManagementClient';
-import { createRceClient, defaultRceWaitTimeoutSeconds, loadRokuDeployJson, rceDeviceToTableObject, resolveRceDevice, resolveRegistryEntry, waitForRceDeviceStatus } from './commandUtils';
+import { createRceClient, defaultRceWaitTimeoutSeconds, loadRokuDeployJson, rceDeviceToTableObject, resolveRceDevice, waitForRceDeviceStatus } from './commandUtils';
 
 export class RceStartCommand {
     async run(args: any) {
@@ -9,12 +9,11 @@ export class RceStartCommand {
         const target = {
             deviceId: args.deviceId,
             esn: args.esn,
-            //--deviceId/--esn pick the device directly; otherwise --device (or the config file's device) names it
-            device: args.deviceId === undefined && !args.esn ? args.device ?? config.device : undefined,
-            devices: config.devices
+            //--deviceId/--esn pick the device directly; otherwise the config file's inline device is used
+            device: args.deviceId === undefined && !args.esn ? config.device : undefined
         };
-        //token precedence: --token, then the targeted registry entry's rceToken, then the config file's rceToken
-        const client = createRceClient(args.token ?? resolveRegistryEntry(target)?.rceToken ?? config.rceToken);
+        //token precedence: --token, then the inline device config's rceToken, then the config file's rceToken
+        const client = createRceClient(args.token ?? (target.device as { rceToken?: string } | undefined)?.rceToken ?? config.rceToken);
         const device = await resolveRceDevice(client, target);
 
         let snapshots: Snapshot[] | undefined;

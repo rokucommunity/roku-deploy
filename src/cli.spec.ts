@@ -604,7 +604,7 @@ describe('cli', function cli() {
         it('throws when neither deviceId nor esn is provided', async () => {
             await expectThrowsAsync(
                 new RceStopCommand().run({ cwd: tempDir, token: 'abc' }),
-                'A device is required. Pass --deviceId, --esn, or --device'
+                'A device is required. Pass --deviceId or --esn'
             );
         });
 
@@ -739,43 +739,6 @@ describe('cli', function cli() {
             expect(consoleOutput).to.include('pending');
         });
 
-        it('resolves the device from a --device registry name and takes the token from its entry', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                devices: {
-                    emu: { esn: 'X123', rceToken: 'entry-token' }
-                }
-            });
-            const findStub = sinon.stub(RceManagementClient.prototype, 'findDeviceByEsn').resolves(makeDevice({ id: 5 }));
-            const stopStub = sinon.stub(RceManagementClient.prototype, 'stopDevice').resolves(makeDevice({ status: 'pending' }));
-
-            //no --token and no root rceToken: the registry entry's rceToken is the only token available
-            await new RceStopCommand().run({
-                cwd: tempDir,
-                device: 'emu'
-            });
-
-            expect(findStub.getCall(0).args[0]).to.eql({ esn: 'X123' });
-            expect(stopStub.getCall(0).args[0]).to.eql({ deviceId: 5 });
-        });
-
-        it('throws when the --device registry name is unknown', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                rceToken: 'root-token',
-                devices: { emu: { esn: 'X123' } }
-            });
-            await expectThrowsAsync(
-                new RceStopCommand().run({ cwd: tempDir, device: 'nope' }),
-                `Device 'nope' was not found in the devices registry`
-            );
-        });
-
-        it('throws for a --device name when no devices registry exists at all', async () => {
-            await expectThrowsAsync(
-                new RceStopCommand().run({ cwd: tempDir, token: 'abc', device: 'nope' }),
-                `Device 'nope' was not found in the devices registry`
-            );
-        });
-
         it('throws for an inline root device config without an id or esn', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
                 rceToken: 'root-token',
@@ -784,17 +747,6 @@ describe('cli', function cli() {
             await expectThrowsAsync(
                 new RceStopCommand().run({ cwd: tempDir }),
                 `Device '{"host":"1.2.3.4"}' is not an RCE device (needs an 'id' or 'esn')`
-            );
-        });
-
-        it('throws when the --device registry entry has no id or esn', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                rceToken: 'root-token',
-                devices: { tv: { host: '1.2.3.4' } }
-            });
-            await expectThrowsAsync(
-                new RceStopCommand().run({ cwd: tempDir, device: 'tv' }),
-                `Device 'tv' is not an RCE device (needs an 'id' or 'esn')`
             );
         });
 
@@ -812,14 +764,24 @@ describe('cli', function cli() {
                 expect(startStub.getCall(0).args[0].deviceId).to.equal(5);
             });
 
-            it('starts the --device registry entry, taking the token from that entry', async () => {
-                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { devices: { emu: { id: 7, rceToken: 'entry-token' } } });
+            it('starts the inline config device, taking the token from that device config', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { id: 7, rceToken: 'entry-token' } });
                 const getDeviceStub = sinon.stub(RceManagementClient.prototype, 'getDevice').resolves(makeDevice({ id: 7 }));
                 sinon.stub(RceManagementClient.prototype, 'startDevice').resolves(makeDevice({ status: 'pending' }));
 
-                await new RceStartCommand().run({ ...startArgs, device: 'emu' });
+                await new RceStartCommand().run({ ...startArgs });
 
                 expect(getDeviceStub.getCall(0).args[0]).to.eql({ deviceId: 7 });
+            });
+
+            it('resolves the inline config device addressed by esn', async () => {
+                fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { rceToken: 'root-token', device: { esn: 'X123' } });
+                const findStub = sinon.stub(RceManagementClient.prototype, 'findDeviceByEsn').resolves(makeDevice({ id: 9 }));
+                sinon.stub(RceManagementClient.prototype, 'startDevice').resolves(makeDevice({ status: 'pending' }));
+
+                await new RceStartCommand().run({ ...startArgs });
+
+                expect(findStub.getCall(0).args[0]).to.eql({ esn: 'X123' });
             });
 
             it('falls back to the config file device and root rceToken', async () => {
@@ -844,8 +806,7 @@ describe('cli', function cli() {
         it('ignores the config file device when --esn picks the device', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
                 rceToken: 'root-token',
-                device: 'emu',
-                devices: { emu: { esn: 'OTHER' } }
+                device: { esn: 'OTHER' }
             });
             const findStub = sinon.stub(RceManagementClient.prototype, 'findDeviceByEsn').resolves(makeDevice({ id: 5 }));
             sinon.stub(RceManagementClient.prototype, 'stopDevice').resolves(makeDevice({ status: 'pending' }));
@@ -1137,8 +1098,7 @@ describe('cli', function cli() {
 
         it('lets --host win over the config file device', async () => {
             fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                device: 'office-tv',
-                devices: { 'office-tv': { host: '9.9.9.9' } }
+                device: { host: '9.9.9.9' }
             });
             const stub = sinon.stub(rokuDeploy, 'getDevId').resolves({ devId: '' });
             sinon.stub(console, 'log');
@@ -1319,8 +1279,8 @@ describe('cli', function cli() {
             expect(options.device).to.eql({ host: '1.2.3.4' });
         });
 
-        it('leaves unset config values off entirely, so they cannot mask a registry entry setting', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: 'tv', devices: { tv: { host: '1.2.3.4', password: 'entry-pass' } } });
+        it('leaves unset config values off entirely, so they cannot mask a constructor setting', async () => {
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { host: '1.2.3.4' } });
             const stub = sinon.stub(rokuDeploy, 'deleteDevChannel').resolves({} as any);
 
             await new DeleteDevChannelCommand().run({ cwd: tempDir });
@@ -1390,23 +1350,6 @@ describe('cli', function cli() {
             expect(output).to.not.include('Using config');
         });
 
-        it('resolves a registry device name from the config file (the CLI has no constructor registry)', async () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, {
-                device: 'office-tv',
-                password: 'aaaa',
-                devices: {
-                    'office-tv': { host: '1.2.3.4' }
-                }
-            });
-            const stub = sinon.stub(rokuDeploy, 'captureScreenshot').resolves({ buffer: Buffer.from(''), format: 'jpg' as const, filePath: '' });
-
-            await new CaptureScreenshotCommand().run({ cwd: tempDir });
-
-            const options = stub.getCall(0).args[0] as any;
-            expect(options.device).to.equal('office-tv');
-            expect(options.devices['office-tv']).to.eql({ host: '1.2.3.4' });
-        });
-
         it('loads the file named by --config instead of cwd/rokudeploy.json', async () => {
             fsExtra.outputJsonSync(`${tempDir}/elsewhere/deploy-config.json`, {
                 password: 'from-custom'
@@ -1448,7 +1391,7 @@ describe('cli', function cli() {
         });
 
         it('works for nested commands', () => {
-            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: 'emu', rceToken: 'tok' });
+            fsExtra.outputJsonSync(`${tempDir}/rokudeploy.json`, { device: { esn: 'X123' }, rceToken: 'tok' });
             expect(help('rce start --help')).to.include('Using values from config: device');
         });
 

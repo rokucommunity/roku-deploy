@@ -6,7 +6,7 @@ import { rokuDeploy } from './index';
 import { standardizePath as s } from './util';
 import { tempDir } from './testUtils.spec';
 import { sampleConfigPath } from './commands/InitCommand';
-import type { DeviceRegistryEntry, RokuDeployOptions } from './RokuDeployOptions';
+import type { RokuDeployOptions } from './RokuDeployOptions';
 
 //the flat keys the sample is allowed to use, typed against RokuDeployOptions so a renamed or removed
 //option fails to compile here before the sample can drift from the real shape
@@ -14,8 +14,9 @@ const sampleKeys: Array<keyof RokuDeployOptions> = [
     'device', 'rceToken', 'rootDir', 'files', 'stagingDir', 'outFile',
     'convertToSquashfs', 'signingPassword', 'rekeySignedPackage', 'logLevel'
 ];
-//the keys a device/registry entry in the sample may use, typed against the real entry interface
-const deviceEntryKeys: Array<keyof DeviceRegistryEntry> = ['host', 'password', 'esn', 'id', 'instanceUrl', 'rceToken'];
+//the keys the sample's inline device config may use: the DeviceConfig targeting identifiers plus the
+//Roku `password` the sample documents alongside the host
+const deviceEntryKeys = ['host', 'password', 'esn', 'id', 'instanceUrl', 'rceToken'];
 
 /**
  * The sample lists its values but ships most of them commented out (`// "key": value,`), tsc --init
@@ -61,7 +62,7 @@ describe('src/rokudeploy.sample.jsonc', () => {
     it('uses only device keys that exist on the device entry type', () => {
         const entries = [full.device as unknown as Record<string, unknown>];
         for (const entry of entries) {
-            const unknown = Object.keys(entry).filter(key => !(deviceEntryKeys as string[]).includes(key));
+            const unknown = Object.keys(entry).filter(key => !deviceEntryKeys.includes(key));
             expect(unknown, `device entry ${JSON.stringify(entry)}`).to.eql([]);
         }
     });

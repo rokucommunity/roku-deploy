@@ -72,12 +72,11 @@ interface CommandSpec {
 }
 
 //the options extractCommonConfigOptions hands every call
-const commonOptionNames = ['device', 'devices', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
+const commonOptionNames = ['device', 'username', 'password', 'packagePort', 'ecpPort', 'timeout'];
 
 //every command spreads these, so every command is checked against them
 const commonFields: Field[] = [
     { option: 'device', config: ['device', { host: '1.1.1.1' }], cli: ['host', '2.2.2.2'], fromCli: { host: '2.2.2.2' } },
-    { option: 'devices', config: ['devices', { tv: { host: '1.1.1.1' } }] },
     { option: 'username', config: ['username', 'config-user'], cli: ['username', 'cli-user'] },
     { option: 'password', config: ['password', 'config-pass'], cli: ['password', 'cli-pass'] },
     { option: 'packagePort', config: ['packagePort', 81], cli: ['packagePort', 82] },

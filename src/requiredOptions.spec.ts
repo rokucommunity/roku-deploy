@@ -54,8 +54,8 @@ const rows: Array<{ method: string; required: string[]; values: Record<string, a
 ];
 
 /**
- * Every public method that takes options validates them after merging the instance defaults, the device
- * registry and the per-call options, so the same error is raised no matter where a value was (not) supplied.
+ * Every public method that takes options validates them after merging the instance defaults and the
+ * per-call options, so the same error is raised no matter where a value was (not) supplied.
  */
 describe('required options', () => {
     const networkStubbed = new Error('network stubbed');

@@ -98,8 +98,8 @@ class FakeWebSocket extends EventEmitter {
 }
 
 describe('createRokuDeploySocket', () => {
-    it('throws when given a registry name string instead of a device config', () => {
-        expect(() => createRokuDeploySocket({ device: 'my-device' as any, port: 8085 })).to.throw('Device registry names are not supported');
+    it('throws when given a string instead of a device config', () => {
+        expect(() => createRokuDeploySocket({ device: 'my-device' as any, port: 8085 })).to.throw('createRokuDeploySocket requires a device config object, not a string');
     });
 
     it('throws when given a device config with no recognized identifier', () => {

@@ -13,10 +13,10 @@ import { RceManagementClient } from './RceManagementClient';
  * @public
  */
 export function createRokuDeploySocket(options: SocketOptions): RokuDeploySocket {
-    //runtime guard for javascript callers, since a registry name (string) cannot be resolved to a
-    //device config without the registry this function does not have access to
+    //runtime guard for javascript callers, since this function takes a resolved device config
+    //object, not a bare string
     if (typeof (options.device as unknown) === 'string') {
-        throw new Error('Device registry names are not supported by createRokuDeploySocket; provide a device config object');
+        throw new Error('createRokuDeploySocket requires a device config object, not a string');
     }
     //runtime guard for javascript callers (and for optional ports that were never defaulted
     //upstream), since the port addresses the device console on both transports
@@ -516,7 +516,7 @@ interface PendingWrite {
  * @public
  */
 export interface SocketOptions {
-    /** the device to connect to. Registry names (strings) are not supported here; pass a resolved device config */
+    /** the device to connect to. Pass a resolved device config object, not a string */
     device: DeviceConfig;
     /**
      * the device port to connect to (for example 8085 for the BrightScript console, 8080 for the
