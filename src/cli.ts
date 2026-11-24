@@ -84,7 +84,8 @@ void yargs
             .option('devId', { type: 'string', description: 'The dev ID', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .option('autoLaunch', { type: 'boolean', description: 'Launch the channel on the device after install. On by default, use --no-autoLaunch to suppress it', demandOption: false })
-            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'autoLaunch', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
+            .option('incrementBuildNumber', { type: 'boolean', description: 'Rewrite the manifest build_version to a yymmddHHMM timestamp before zipping', demandOption: false })
+            .group(['zip', 'dir', 'ecpPort', 'close', 'remoteDebug', 'remoteDebugConnectEarly', 'autoLaunch', 'incrementBuildNumber', 'failOnCompileError', 'deleteDevChannel', 'appType', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
             .group(['rekey', 'pkg', 'signingPassword', 'devId'], 'Rekey:');
     }), (args: any) => {
         return new SideloadCommand().run(args);
@@ -116,6 +117,7 @@ void yargs
             .option('deleteDevChannel', { type: 'boolean', description: 'Remove the existing dev channel before installing. On by default, use --no-deleteDevChannel to keep it', demandOption: false })
             .option('appType', { type: 'string', description: 'The type of app to sideload. Use \'dcl\' for Device Component Libraries', choices: ['channel', 'dcl'], demandOption: false })
             .option('squash', { type: 'boolean', description: 'Convert the installed channel to squashfs before packaging. On by default, use --no-squash to skip', demandOption: false })
+            .option('incrementBuildNumber', { type: 'boolean', description: 'Rewrite the manifest build_version to a yymmddHHMM timestamp before zipping', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .group(['signingPassword', 'devId', 'appTitle', 'appVersion', 'manifestPath', 'out', 'host', 'esn', 'instanceUrl', 'rceToken', 'password', 'packagePort', 'timeout', 'config', 'logLevel'], '')
             .group(['rekey', 'pkg'], 'Rekey:')
@@ -193,7 +195,8 @@ void yargs
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false })
             .option('rootDir', { type: 'string', description: 'The selected root folder to be copied', demandOption: false })
             .option('files', { type: 'array', description: 'An array of source file paths indicating where the source files are', demandOption: false })
-            .option('out', { type: 'string', description: 'The selected staging folder where all files will be copied to', demandOption: false });
+            .option('out', { type: 'string', description: 'The selected staging folder where all files will be copied to', demandOption: false })
+            .option('incrementBuildNumber', { type: 'boolean', description: 'Rewrite the manifest build_version to a yymmddHHMM timestamp', demandOption: false });
     }), (args: any) => {
         return new StageCommand().run(args);
     })
@@ -314,6 +317,7 @@ void yargs
             .option('dir', { type: 'string', description: 'The folder to be zipped', demandOption: false })
             .option('files', { type: 'array', description: 'Optional file patterns to filter which files are included (defaults to all files)', demandOption: false })
             .option('out', { type: 'string', description: 'The path to the zip file that will be created, relative to cwd', demandOption: false, alias: 'outZip' })
+            .option('incrementBuildNumber', { type: 'boolean', description: 'Rewrite the manifest build_version to a yymmddHHMM timestamp', demandOption: false })
             .option('cwd', { type: 'string', description: 'The current working directory to use for relative paths', demandOption: false });
     }), (args: any) => {
         return new ZipCommand().run(args);

@@ -11,6 +11,7 @@ export class StageCommand {
             rootDir: args.rootDir ?? config.rootDir,
             files: args.files ?? config.files,
             out: args.out ?? config.stagingDir,
+            incrementBuildNumber: args.incrementBuildNumber ?? config.incrementBuildNumber,
             cwd: args.cwd
         }));
     }

@@ -36,7 +36,7 @@ import { createRokuDeploySocket } from './RokuDeploySocket';
 import type { RokuDeploySocket } from './RokuDeploySocket';
 import type { DeviceInfo, DeviceInfoRaw } from './DeviceInfo';
 import * as semver from 'semver';
-import { formatTimestampForScreenshot } from './dateUtils';
+import { formatTimestampForPackage, formatTimestampForScreenshot } from './dateUtils';
 import * as WebSocket from 'ws';
 
 /**
@@ -156,6 +156,9 @@ export class RokuDeploy {
                 });
             }, 10);
         }));
+        if (options.incrementBuildNumber) {
+            await this.incrementManifestBuildNumber(util.standardizePath(`${out}/manifest`));
+        }
         this.logger.info('Relevant files copied to:', out);
         return { stagingDir: out };
     }
@@ -206,7 +209,7 @@ export class RokuDeploy {
         }
 
         //create a zip of the folder
-        await this.makeZip(dir, out, files);
+        await this.makeZip(dir, out, files, options.incrementBuildNumber);
         this.logger.info('Zip created at:', out);
         return { zipPath: out };
     }
@@ -247,7 +250,7 @@ export class RokuDeploy {
         } else {
             // Generate zip from directory to a temp location
             zipFilePath = path.resolve(cwd, RokuDeploy.defaults.outDir, RokuDeploy.defaults.outFile);
-            await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd });
+            await this.zip({ dir: path.resolve(cwd, options.dir), out: zipFilePath, cwd: cwd, incrementBuildNumber: options.incrementBuildNumber });
             deleteZipAfterSideload = true;
         }
 
@@ -1816,7 +1819,7 @@ export class RokuDeploy {
      * @param zipFilePath the path to the zip that will be created
      * @param files a files array used to filter the files from `srcFolder`
      */
-    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*']) {
+    private async makeZip(srcFolder: string, zipFilePath: string, files: FileEntry[] = ['**/*'], incrementBuildNumber = false) {
         const filePaths = await this.resolveFilesArray({ files: files, rootDir: srcFolder });
 
         const zip = new JSZip();
@@ -1830,7 +1833,11 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                zip.file(file.dest.replace(/[\\/]/g, '/'), data as Uint8Array, {
+                //bump the manifest's build_version in the zipped copy without touching the source file
+                const content = incrementBuildNumber && file.dest.toLowerCase() === 'manifest'
+                    ? Buffer.from(this.setManifestBuildNumber(data.toString('utf8')), 'utf8')
+                    : data;
+                zip.file(file.dest.replace(/[\\/]/g, '/'), content as Uint8Array, {
                     compression: compression
                 });
             });
@@ -2737,6 +2744,26 @@ export class RokuDeploy {
         }
     }
 
+    /**
+     * Rewrite a manifest's build_version to a fresh yymmddHHMM timestamp, matching the legacy
+     * incrementBuildNumber behavior, and return the updated manifest text.
+     */
+    private setManifestBuildNumber(manifestContents: string): string {
+        const timestamp = formatTimestampForPackage();
+        if (/^[ \t]*build_version[ \t]*=.*$/m.test(manifestContents)) {
+            return manifestContents.replace(/^([ \t]*build_version[ \t]*=).*$/m, `$1${timestamp}`);
+        }
+        return `${manifestContents.replace(/\s*$/, '')}\nbuild_version=${timestamp}\n`;
+    }
+
+    /**
+     * Read the staged manifest, bump its build_version, and write it back in place.
+     */
+    private async incrementManifestBuildNumber(manifestPath: string): Promise<void> {
+        const contents = await fsExtra.readFile(manifestPath, 'utf-8');
+        await fsExtra.writeFile(manifestPath, this.setManifestBuildNumber(contents));
+    }
+
     private async parseManifest(manifestPath: string): Promise<ManifestData> {
         if (!await fsExtra.pathExists(manifestPath)) {
             throw new Error(manifestPath + ' does not exist');
@@ -3079,6 +3106,8 @@ export interface StageOptions {
      * The output directory where staged files will be placed
      */
     out?: string;
+    /** When true, rewrite the staged manifest's build_version to a yymmddHHMM timestamp */
+    incrementBuildNumber?: boolean;
     cwd?: string;
 }
 
@@ -3099,6 +3128,8 @@ export interface ZipOptions {
      * The output zip file path (e.g., './out/roku-deploy.zip')
      */
     out?: string;
+    /** When true, rewrite the zipped manifest's build_version to a yymmddHHMM timestamp (the source file is left untouched) */
+    incrementBuildNumber?: boolean;
     cwd?: string;
 }
 
@@ -3112,6 +3143,8 @@ export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     deleteDevChannel?: boolean;
     /** When sideloading a channel, set to false to stop the device from auto-launching it after install */
     autoLaunch?: boolean;
+    /** When true, rewrite the manifest's build_version to a yymmddHHMM timestamp before zipping */
+    incrementBuildNumber?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };

@@ -49,6 +49,7 @@ export type BaseSideloadOptions = BaseRequestOptions & BaseEcpOptions & {
     failOnCompileError?: boolean;
     deleteDevChannel?: boolean;
     autoLaunch?: boolean;
+    incrementBuildNumber?: boolean;
     cwd?: string;
     packageUploadOverrides?: PackageUploadOverridesOptions;
 };
@@ -1809,6 +1810,7 @@ export interface StageOptions {
     cwd?: string;
     // (undocumented)
     files?: FileEntry[];
+    incrementBuildNumber?: boolean;
     out?: string;
     // (undocumented)
     rootDir?: string;
@@ -1964,6 +1966,7 @@ export interface ZipOptions {
     cwd?: string;
     dir: string;
     files?: FileEntry[];
+    incrementBuildNumber?: boolean;
     out?: string;
 }
 

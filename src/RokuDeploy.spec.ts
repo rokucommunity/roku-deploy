@@ -1994,6 +1994,24 @@ describe('RokuDeploy', () => {
             expect(result.zipPath).to.equal(expectedPath);
         });
 
+        it('increments the manifest build_version in the zip without touching the source when incrementBuildNumber is true', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test\nbuild_version=00001');
+
+            await rokuDeploy.zip({
+                dir: rootDir,
+                out: `${outDir}/roku-deploy.zip`,
+                incrementBuildNumber: true
+            });
+
+            const zip = new JSZip();
+            const zipContents = await zip.loadAsync(fsExtra.readFileSync(`${outDir}/roku-deploy.zip`));
+            const manifest = await zipContents.files['manifest'].async('string');
+            expect(manifest).to.match(/build_version=\d{10}/);
+            expect(manifest).to.not.include('build_version=00001');
+            //the source manifest on disk is left untouched
+            expect(fsExtra.readFileSync(s`${rootDir}/manifest`, 'utf8')).to.include('build_version=00001');
+        });
+
         it('should return the default path when out is not specified', async () => {
             fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
 
@@ -4898,6 +4916,34 @@ describe('RokuDeploy', () => {
                 rootDir: rootDir
             });
             expectPathExists(`${tempDir}/custom-out-dir`);
+        });
+
+        it('rewrites the staged manifest build_version to a timestamp when incrementBuildNumber is true', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test\nbuild_version=00001');
+
+            await rokuDeploy.stage({ files: ['manifest'], rootDir: rootDir, out: `${tempDir}/staged`, incrementBuildNumber: true });
+
+            const staged = fsExtra.readFileSync(`${tempDir}/staged/manifest`, 'utf8');
+            expect(staged).to.match(/build_version=\d{10}/);
+            expect(staged).to.not.include('build_version=00001');
+            //the source manifest is left untouched
+            expect(fsExtra.readFileSync(s`${rootDir}/manifest`, 'utf8')).to.include('build_version=00001');
+        });
+
+        it('leaves the staged manifest unchanged when incrementBuildNumber is not set', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test\nbuild_version=00001');
+
+            await rokuDeploy.stage({ files: ['manifest'], rootDir: rootDir, out: `${tempDir}/staged` });
+
+            expect(fsExtra.readFileSync(`${tempDir}/staged/manifest`, 'utf8')).to.include('build_version=00001');
+        });
+
+        it('appends build_version when incrementBuildNumber is set but the manifest has none', async () => {
+            fsExtra.outputFileSync(s`${rootDir}/manifest`, 'title=Test');
+
+            await rokuDeploy.stage({ files: ['manifest'], rootDir: rootDir, out: `${tempDir}/staged`, incrementBuildNumber: true });
+
+            expect(fsExtra.readFileSync(`${tempDir}/staged/manifest`, 'utf8')).to.match(/build_version=\d{10}/);
         });
 
         it('handles old glob-style', async () => {

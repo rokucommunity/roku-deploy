@@ -11,6 +11,7 @@ export class ZipCommand {
             dir: args.dir ?? config.rootDir,
             files: args.files ?? config.files,
             out: args.out ?? getConfigOutPath(config),
+            incrementBuildNumber: args.incrementBuildNumber ?? config.incrementBuildNumber,
             cwd: args.cwd
         }));
     }
